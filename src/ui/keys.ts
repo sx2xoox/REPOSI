@@ -2,6 +2,8 @@
 // hints and the controls reference always match the actual bindings.
 
 import type { Action } from '../engine/input';
+import { input } from '../engine/input';
+import { touchUiActive } from './touch-mode';
 
 const KEY_NAMES: Record<string, string> = {
   Space: 'Space',
@@ -53,6 +55,8 @@ export const PAD_NAMES: Partial<Record<Action, string>> = {
  * Prefers keyboard keys over mouse buttons (more readable in hints).
  */
 export function actionLabel(bindings: Record<Action, string[]>, action: Action, pad = false): string {
+  // touch mode: the on-screen buttons carry their own icons, so key caps are omitted ('')
+  if (!pad && input.aimMode !== 'pad' && touchUiActive()) return '';
   if (pad) return PAD_NAMES[action] ?? keyName(bindings[action]?.[0] ?? '?');
   const codes = bindings[action] ?? [];
   const kb = codes.find((c) => !c.startsWith('Mouse')) ?? codes[0];
@@ -81,6 +85,19 @@ export const CONTROL_ROWS: { label: string; actions: Action[]; padLabel?: string
   { label: '소지품', actions: ['inventory'] },
   { label: '지도', actions: ['map'] },
   { label: '일시정지', actions: ['pause'] },
+];
+
+/** Touch controls reference: [icon sprite or '', name, description]. */
+export const TOUCH_CONTROL_ROWS: [string, string, string][] = [
+  ['', '왼쪽 화면', '끌어서 이동'],
+  ['', '오른쪽 화면', '끌어서 조준 · 자동 공격'],
+  ['tc_dash', '대시', '이동 방향으로 돌진'],
+  ['hud_bomb', '폭탄', '금 간 벽을 부순다'],
+  ['ui_flame', '등불 해방', '게이지가 차면 사용'],
+  ['ui_gem', '아이템 · 물약', '가지고 있을 때 나타남'],
+  ['tc_pause', '일시정지', ''],
+  ['tc_map', '지도', ''],
+  ['tc_bag', '소지품', ''],
 ];
 
 /** Compact key text for a controls row (e.g. "WASD", "↑←↓→ / 좌클릭"). */

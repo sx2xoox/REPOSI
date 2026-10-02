@@ -225,6 +225,8 @@ class AudioEngine {
 
   stopMusic(fade = 0.8): void {
     this.pendingMusic = null;
+    // a long (pause) duck must not outlive the music it was ducking
+    this.releaseDuck();
     if (this.current) {
       try { this.current.handle.stop(fade); } catch (e) { console.error(e); }
       this.current = null;
@@ -252,6 +254,22 @@ class AudioEngine {
     g.linearRampToValueAtTime(Math.min(g.value, target), now + 0.08);
     g.setValueAtTime(Math.min(g.value, target), this.duckUntil);
     g.linearRampToValueAtTime(1, this.duckUntil + 0.9);
+  }
+
+  /** End any duck in progress now; the music ramps back up over `fade` seconds. */
+  releaseDuck(fade = 0.4): void {
+    const ctx = this.ctx;
+    const g = this.duckGain?.gain;
+    if (!ctx || !g) return;
+    const now = ctx.currentTime;
+    if (now >= this.duckUntil && g.value >= 0.999) return;
+    this.duckUntil = now;
+    if (typeof g.cancelAndHoldAtTime === 'function') g.cancelAndHoldAtTime(now);
+    else {
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(g.value, now);
+    }
+    g.linearRampToValueAtTime(1, now + fade);
   }
 
   setMusicIntensity(v: number): void {

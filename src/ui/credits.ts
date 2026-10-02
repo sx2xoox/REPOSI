@@ -12,6 +12,7 @@ import { C, VERSION } from './theme';
 import { divider, keyHintRow } from './frame';
 import { drawLogo } from './logo';
 import { appear } from './anim';
+import { touchUiActive } from './touch-mode';
 
 type Line = { kind: 'logo' } | { kind: 'head'; text: string } | { kind: 'name'; text: string; sub?: string } | { kind: 'gap'; h: number } | { kind: 'note'; text: string };
 
@@ -56,6 +57,7 @@ function lineHeight(l: Line): number {
 
 export class CreditsScene implements Scene {
   transparent = true;
+  touchBack = 'close' as const;
   passUpdate = true;
   private t = 0;
   private y = 0;
@@ -118,6 +120,6 @@ export class CreditsScene implements Scene {
       }
       y += h;
     }
-    keyHintRow(r, [['Enter', '빨리 감기'], ['Esc', '닫기']], UI_W / 2, UI_H - 14, { alpha: k * 0.7 });
+    if (!touchUiActive()) keyHintRow(r, [['Enter', '빨리 감기'], ['Esc', '닫기']], UI_W / 2, UI_H - 14, { alpha: k * 0.7 });
   }
 }

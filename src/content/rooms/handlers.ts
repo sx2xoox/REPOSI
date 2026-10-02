@@ -15,6 +15,7 @@ import { Candles } from '../props/lights';
 import { LightShaft } from '../props/ambient';
 import { coinHeap, darkRing, ritualCircle, roundRug, withDecals } from './decor';
 import { paintKeyHint, whenFontsReady } from './floortext';
+import { touchUiActive } from '../../ui/touch-mode';
 
 // ------------------------------------------------------------------ start
 const HINTS: { keys: string[]; label: string; dx: number; row: number }[] = [
@@ -27,11 +28,17 @@ const HINTS: { keys: string[]; label: string; dx: number; row: number }[] = [
   { keys: ['R'], label: '물약', dx: 44, row: 3 },
 ];
 
+// touch screens: the on-screen buttons carry icons, only the sticks need explaining
+const TOUCH_HINTS: typeof HINTS = [
+  { keys: ['왼쪽'], label: '끌어서 이동', dx: -72, row: 0 },
+  { keys: ['오른쪽'], label: '끌어서 공격', dx: 72, row: 0 },
+];
+
 function paintHints(room: Room): void {
   const top = room.interiorY + 10;
   const bottom = room.interiorY + room.interiorH;
   const rows = [top, top + 20, bottom - 44, bottom - 24];
-  for (const h of HINTS) paintKeyHint(room, room.centerX + h.dx, rows[h.row], h.keys, h.label);
+  for (const h of touchUiActive() ? TOUCH_HINTS : HINTS) paintKeyHint(room, room.centerX + h.dx, rows[h.row], h.keys, h.label);
 }
 
 registerRoomHandler('start', {

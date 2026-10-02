@@ -85,6 +85,64 @@ const GLYPHS: Record<string, string[]> = {
   'Y': ['101', '101', '010', '010', '010'],
 };
 
+// ---------------------------------------------------------------- bitmap caches
+const textCache = new Map<string, HTMLCanvasElement>();
+const TEXT_CACHE_MAX = 400;
+
+/** Pixel text (with optional 8-way outline) rendered once into a canvas with a `scale` px margin. */
+function textBitmap(up: string, color: string, outline: string | undefined, s: number): HTMLCanvasElement {
+  const key = `${s}|${color}|${outline ?? ''}|${up}`;
+  let cv = textCache.get(key);
+  if (cv) return cv;
+  if (textCache.size >= TEXT_CACHE_MAX) textCache.clear();
+  cv = document.createElement('canvas');
+  cv.width = Math.max(1, (up.length * 4 - 1) * s + 2 * s);
+  cv.height = 7 * s;
+  const c = cv.getContext('2d')!;
+  const glyphs = (ox: number, oy: number, col: string) => {
+    c.fillStyle = col;
+    for (let i = 0; i < up.length; i++) {
+      const g = GLYPHS[up[i]];
+      if (!g) continue;
+      for (let r = 0; r < 5; r++) {
+        for (let k = 0; k < 3; k++) {
+          if (g[r][k] === '1') c.fillRect(s + ox + (i * 4 + k) * s, s + oy + r * s, s, s);
+        }
+      }
+    }
+  };
+  if (outline) {
+    for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) glyphs(ox * s, oy * s, outline);
+  }
+  glyphs(0, 0, color);
+  textCache.set(key, cv);
+  return cv;
+}
+
+const shadowCache = new Map<number, { canvas: HTMLCanvasElement; cx: number; cy: number }>();
+
+/** Black anti-aliased ellipse (radii quantized to 0.25 px), centered on an integer pixel. */
+function shadowSprite(rx: number, ry: number): { canvas: HTMLCanvasElement; cx: number; cy: number } {
+  const qx = Math.round(rx * 4);
+  const qy = Math.round(ry * 4);
+  const key = qx * 1024 + qy;
+  let s = shadowCache.get(key);
+  if (s) return s;
+  const cx = Math.ceil(qx / 4) + 1;
+  const cy = Math.ceil(qy / 4) + 1;
+  const canvas = document.createElement('canvas');
+  canvas.width = cx * 2;
+  canvas.height = cy * 2;
+  const c = canvas.getContext('2d')!;
+  c.fillStyle = '#000000';
+  c.beginPath();
+  c.ellipse(cx, cy, qx / 4, qy / 4, 0, 0, TAU);
+  c.fill();
+  s = { canvas, cx, cy };
+  shadowCache.set(key, s);
+  return s;
+}
+
 export class Renderer {
   readonly display: HTMLCanvasElement;
   readonly dctx: CanvasRenderingContext2D;
@@ -300,44 +358,39 @@ export class Renderer {
     c.globalAlpha = 1;
   }
 
-  /** Soft elliptical ground shadow. */
+  /** Soft elliptical ground shadow (pre-rendered per size: one drawImage). */
   shadow(x: number, y: number, w: number, h = w * 0.4, alpha = 0.35): void {
+    if (alpha <= 0) return;
     const c = this.ctx;
+    const rx = Math.max(1, w / 2);
+    const ry = Math.max(1, h / 2);
     c.globalAlpha = alpha;
-    c.fillStyle = '#000000';
-    c.beginPath();
-    c.ellipse(Math.round(x - this.viewX), Math.round(y - this.viewY), Math.max(1, w / 2), Math.max(1, h / 2), 0, 0, TAU);
-    c.fill();
+    if (rx > 64 || ry > 64) {
+      c.fillStyle = '#000000';
+      c.beginPath();
+      c.ellipse(Math.round(x - this.viewX), Math.round(y - this.viewY), rx, ry, 0, 0, TAU);
+      c.fill();
+    } else {
+      const s = shadowSprite(rx, ry);
+      c.drawImage(s.canvas, Math.round(x - this.viewX) - s.cx, Math.round(y - this.viewY) - s.cy);
+    }
     c.globalAlpha = 1;
   }
 
-  /** Tiny 3x5 bitmap text in world space. Returns width in pixels. */
+  /** Tiny 3x5 bitmap text in world space (cached bitmaps). Returns width in pixels. */
   pixelText(str: string, x: number, y: number, color: string, opts: { align?: 'left' | 'center' | 'right'; outline?: string; scale?: number; alpha?: number } = {}): number {
-    const s = opts.scale ?? 1;
+    const s = Math.max(1, Math.round(opts.scale ?? 1));
+    const alpha = opts.alpha ?? 1;
     const up = str.toUpperCase();
     const width = (up.length * 4 - 1) * s;
+    if (alpha <= 0 || !up.length) return width;
     let sx = Math.round(x - this.viewX);
     const sy = Math.round(y - this.viewY);
     if (opts.align === 'center') sx -= Math.floor(width / 2);
     else if (opts.align === 'right') sx -= width;
     const c = this.ctx;
-    c.globalAlpha = opts.alpha ?? 1;
-    const drawGlyphs = (ox: number, oy: number, col: string) => {
-      c.fillStyle = col;
-      for (let i = 0; i < up.length; i++) {
-        const g = GLYPHS[up[i]];
-        if (!g) continue;
-        for (let r = 0; r < 5; r++) {
-          for (let k = 0; k < 3; k++) {
-            if (g[r][k] === '1') c.fillRect(sx + ox + (i * 4 + k) * s, sy + oy + r * s, s, s);
-          }
-        }
-      }
-    };
-    if (opts.outline) {
-      for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) drawGlyphs(ox * s, oy * s, opts.outline);
-    }
-    drawGlyphs(0, 0, color);
+    c.globalAlpha = alpha;
+    c.drawImage(textBitmap(up, color, opts.outline, s), sx - s, sy - s);
     c.globalAlpha = 1;
     return width;
   }

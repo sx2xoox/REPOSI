@@ -16,6 +16,7 @@ import { C, formatTime } from './theme';
 import { divider, fitScale, frame, gauge, iconSlot, keyHintRow, spriteCentered } from './frame';
 import { Repeater, Spring, appear } from './anim';
 import { gridMove, scrollToRow } from './logic';
+import { touchUiActive } from './touch-mode';
 
 type TabId = 'artifact' | 'active' | 'weapon' | 'enemy' | 'record';
 
@@ -110,6 +111,7 @@ function buildEntries(tab: TabId): Entry[] {
 
 export class CollectionScene implements Scene {
   transparent = true;
+  touchBack = 'close' as const;
   passUpdate = true;
   private t = 0;
   private tab = 0;
@@ -213,7 +215,7 @@ export class CollectionScene implements Scene {
       r.uiSprite(tb.icon, tx + 14, 76, 2, { alpha: k * (on ? 1 : 0.6) });
       r.uiText(tb.label, tx + 26, 70, { size: 12, color: on ? C.goldHi : C.textDim, alpha: k });
     });
-    keyHintRow(r, [['Q', '이전'], ['E', '다음']], 30 + TABS.length * 84 + 52, 76, { alpha: k * 0.7 });
+    if (!touchUiActive()) keyHintRow(r, [['Q', '이전'], ['E', '다음']], 30 + TABS.length * 84 + 52, 76, { alpha: k * 0.7 });
     const id = TABS[this.tab].id;
     const tk = appear(this.tabT, 0.25) * k;
     if (id === 'record') {
@@ -222,7 +224,7 @@ export class CollectionScene implements Scene {
       this.drawGrid(r, tk);
       this.drawDetail(r, tk);
     }
-    keyHintRow(r, [['방향키', '이동'], ['Q/E', '분류'], ['Esc', '닫기']], UI_W / 2, UI_H - 15, { alpha: k * 0.8 });
+    if (!touchUiActive()) keyHintRow(r, [['방향키', '이동'], ['Q/E', '분류'], ['Esc', '닫기']], UI_W / 2, UI_H - 15, { alpha: k * 0.8 });
   }
 
   private drawGrid(r: Renderer, k: number): void {

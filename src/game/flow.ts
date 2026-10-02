@@ -18,6 +18,9 @@ export class FlowField {
   private lastTx = -1;
   private lastTy = -1;
   private lastVersion = -1;
+  /** BFS queue buffers, reused between recomputes */
+  private qx = new Int16Array(0);
+  private qy = new Int16Array(0);
 
   private walkable(tx: number, ty: number): boolean {
     const r = this.room!;
@@ -38,8 +41,12 @@ export class FlowField {
     const n = this.w * this.h;
     if (this.dist.length !== n) this.dist = new Int32Array(n);
     this.dist.fill(-1);
-    const qx = new Int16Array(n);
-    const qy = new Int16Array(n);
+    if (this.qx.length < n) {
+      this.qx = new Int16Array(n);
+      this.qy = new Int16Array(n);
+    }
+    const qx = this.qx;
+    const qy = this.qy;
     let head = 0;
     let tail = 0;
     if (tx < 0 || ty < 0 || tx >= this.w || ty >= this.h) return;

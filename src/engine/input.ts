@@ -1,7 +1,9 @@
-// Unified input: keyboard + mouse + gamepad mapped onto abstract actions.
+// Unified input: keyboard + mouse + gamepad + touch mapped onto abstract actions.
 // Call `input.update()` exactly once per fixed simulation step; edge queries
 // (`pressed`, `released`) are relative to the previous step. Very short taps that
 // begin and end between two steps are latched so they are never lost.
+// Touch: the on-screen controls (ui/touch.ts) feed `touchMove` / `touchAim` and
+// press virtual buttons with `touchPress` / `touchRelease` / `touchTap`.
 
 export type Action =
   | 'up' | 'down' | 'left' | 'right'
@@ -10,7 +12,10 @@ export type Action =
   | 'inventory' | 'map' | 'pause' | 'confirm' | 'cancel'
   | 'uiUp' | 'uiDown' | 'uiLeft' | 'uiRight' | 'restart';
 
-export type AimMode = 'mouse' | 'keys' | 'pad';
+export type AimMode = 'mouse' | 'keys' | 'pad' | 'touch';
+
+/** Input device family used most recently (drives automatic touch-control visibility). */
+export type InputDevice = 'keyboard' | 'mouse' | 'pad' | 'touch';
 
 /** Key codes (KeyboardEvent.code) or mouse buttons ("Mouse0", "Mouse2"). */
 export const DEFAULT_BINDINGS: Record<Action, string[]> = {
@@ -89,11 +94,31 @@ export class Input {
   /** set by the game when a text box is focused, so WASD etc. do not trigger actions */
   textCapture = false;
 
+  // touch (virtual sticks / buttons)
+  /** left virtual stick, length <= 1 */
+  touchMove = { x: 0, y: 0 };
+  /** right virtual stick direction (unit vector) while aiming, else null */
+  touchAim: { x: number; y: number } | null = null;
+  private touchHeld = new Set<Action>();
+  private touchLatched = new Set<Action>();
+  /** most recently used device family */
+  lastDevice: InputDevice = 'keyboard';
+  /** performance.now() of the last touch event (compat mouse events after it are ignored) */
+  lastTouchAt = -1e9;
+
   private canvas: HTMLCanvasElement | null = null;
 
   attach(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
     window.addEventListener('keydown', (e) => {
+      if (isTextField(e.target)) {
+        // a DOM text box (mobile seed entry) owns the keyboard: only Enter / Escape pass
+        if (e.key === 'Enter' || e.key === 'Escape') {
+          this.latched.add(e.key === 'Enter' ? 'Enter' : 'Escape');
+        }
+        return;
+      }
+      this.lastDevice = 'keyboard';
       if (['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace'].includes(e.code)) e.preventDefault();
       if (e.repeat) {
         if (this.textCapture && e.key === 'Backspace') this.typedAcc.push('\b');
@@ -119,11 +144,20 @@ export class Input {
       this.mouseY = ((e.clientY - rect.top) / rect.height) * canvas.height;
     };
     canvas.addEventListener('mousemove', (e) => {
+      if (this.fromTouch()) return;
       toCanvas(e);
       this.mouseMoved = true;
-      if (Math.abs(e.movementX) + Math.abs(e.movementY) > 2) this.aimMode = 'mouse';
+      if (Math.abs(e.movementX) + Math.abs(e.movementY) > 2) {
+        this.aimMode = 'mouse';
+        this.lastDevice = 'mouse';
+      }
     });
     canvas.addEventListener('mousedown', (e) => {
+      if (this.fromTouch()) {
+        e.preventDefault();
+        return;
+      }
+      this.lastDevice = 'mouse';
       toCanvas(e);
       const code = `Mouse${e.button}`;
       this.down.add(code);
@@ -143,6 +177,53 @@ export class Input {
     window.addEventListener('gamepaddisconnected', () => { this.padConnected = false; });
   }
 
+  /** Mouse events synthesized by the browser right after a touch are not real mouse use. */
+  private fromTouch(): boolean {
+    return typeof performance !== 'undefined' && performance.now() - this.lastTouchAt < 900;
+  }
+
+  // ------------------------------------------------------------ touch API
+  /** Note touch activity (called by the touch layer on every touch pointer event). */
+  noteTouch(now = typeof performance !== 'undefined' ? performance.now() : 0): void {
+    this.lastTouchAt = now;
+    this.lastDevice = 'touch';
+  }
+
+  /** Hold a virtual button down (until `touchRelease`). */
+  touchPress(a: Action): void {
+    this.touchHeld.add(a);
+    this.touchLatched.add(a);
+  }
+
+  touchRelease(a: Action): void {
+    this.touchHeld.delete(a);
+  }
+
+  /** One-step press (pressed on the next update, released on the one after). */
+  touchTap(a: Action): void {
+    this.touchLatched.add(a);
+  }
+
+  /** A tap at canvas backing-store coords acting like a left click (menus). */
+  tapMouse(x: number, y: number): void {
+    this.mouseX = x;
+    this.mouseY = y;
+    this.mouseMoved = true;
+    this.latched.add('Mouse0');
+  }
+
+  /** Move the virtual pointer (hover in menus) without clicking. */
+  pointMouse(x: number, y: number): void {
+    this.mouseX = x;
+    this.mouseY = y;
+    this.mouseMoved = true;
+  }
+
+  /** Scroll as if by mouse wheel (touch drag in lists); + = down. */
+  addWheel(steps: number): void {
+    this.wheelAcc += steps;
+  }
+
   /** Simulate a key press from code (used by automated tests / bots). */
   simulateDown(code: string): void {
     this.down.add(code);
@@ -156,6 +237,10 @@ export class Input {
   releaseAll(): void {
     this.down.clear();
     this.latched.clear();
+    this.touchHeld.clear();
+    this.touchLatched.clear();
+    this.touchMove.x = this.touchMove.y = 0;
+    this.touchAim = null;
   }
 
   private pollPad(): void {
@@ -174,8 +259,10 @@ export class Input {
     this.padButtons = pad.buttons.map((b) => b.pressed);
     if (Math.hypot(this.padAim.x, this.padAim.y) > 0.4) this.aimMode = 'pad';
     if (this.padButtons.some((b, i) => b && !this.padPrevButtons[i])) {
-      if (this.aimMode === 'mouse') this.aimMode = 'pad';
+      if (this.aimMode === 'mouse' || this.aimMode === 'touch') this.aimMode = 'pad';
+      this.lastDevice = 'pad';
     }
+    if (Math.hypot(this.padMove.x, this.padMove.y) > 0.5 || Math.hypot(this.padAim.x, this.padAim.y) > 0.5) this.lastDevice = 'pad';
   }
 
   update(): void {
@@ -189,6 +276,7 @@ export class Input {
       for (const c of codes) {
         if (this.down.has(c) || this.latched.has(c)) { on = true; break; }
       }
+      if (!on && (this.touchHeld.has(action) || this.touchLatched.has(action))) on = true;
       if (!on) {
         const pb = PAD_BUTTONS[action];
         if (pb) for (const i of pb) if (this.padButtons[i]) { on = true; break; }
@@ -203,6 +291,7 @@ export class Input {
       if (on) this.curActions.add(action);
     }
     this.latched.clear();
+    this.touchLatched.clear();
     this.wheel = this.wheelAcc;
     this.wheelAcc = 0;
     this.typed = this.typedAcc;
@@ -243,6 +332,10 @@ export class Input {
     if (this.held('right')) x += 1;
     if (this.held('up')) y -= 1;
     if (this.held('down')) y += 1;
+    if (x === 0 && y === 0 && (this.touchMove.x || this.touchMove.y)) {
+      x = this.touchMove.x;
+      y = this.touchMove.y;
+    }
     if (x === 0 && y === 0 && (this.padMove.x || this.padMove.y)) {
       x = this.padMove.x;
       y = this.padMove.y;
@@ -265,11 +358,22 @@ export class Input {
     return { x: x / l, y: y / l };
   }
 
+  /** Right-stick aim (gamepad, or the touch aim stick): aim + auto-fire while non-null. */
   padAimVector(): { x: number; y: number } | null {
     const l = Math.hypot(this.padAim.x, this.padAim.y);
-    if (l < 0.4) return null;
-    return { x: this.padAim.x / l, y: this.padAim.y / l };
+    if (l >= 0.4) return { x: this.padAim.x / l, y: this.padAim.y / l };
+    const t = this.touchAim;
+    if (t) {
+      const tl = Math.hypot(t.x, t.y);
+      if (tl > 1e-6) return { x: t.x / tl, y: t.y / tl };
+    }
+    return null;
   }
+}
+
+function isTextField(t: EventTarget | null): boolean {
+  if (typeof HTMLElement === 'undefined' || !(t instanceof HTMLElement)) return false;
+  return t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable;
 }
 
 export const input = new Input();

@@ -15,6 +15,7 @@ import { clamp, ease } from '../engine/math';
 import { frame, keycap } from './frame';
 import { C } from './theme';
 import { actionLabel } from './keys';
+import { touchUiActive } from './touch-mode';
 import { sfx } from '../audio/audio';
 
 interface HintDef {
@@ -124,18 +125,18 @@ export class HintSystem {
       const slide = (1 - ease.outBack(clamp(t / 0.35, 0, 1))) * 14;
       const key = actionLabel(input.bindings, this.cur.def.action, pad);
       const tw = r.measureText(this.cur.def.text, 12);
-      const kw = Math.max(16, r.measureText(key, 10, false, 'small') + 10);
+      const kw = key ? Math.max(16, r.measureText(key, 10, false, 'small') + 10) : 0;
       const width = tw + kw + 34;
       const x = UI_W / 2 - width / 2;
-      const menuKeys = this.menuKeysT >= 0 && !this.menuKeysDone;
+      const menuKeys = this.menuKeysT >= 0 && !this.menuKeysDone && !touchUiActive();
       const y = bottomY - 30 + slide - (menuKeys ? 30 : 0);
       frame(r, x, y, width, 28, 'ribbon', { color: C.gold, alpha: a * 0.95 });
       keycap(r, key, x + 12, y + 14, { align: 'left', alpha: a, pad });
       r.uiText(this.cur.def.text, x + 18 + kw, y + 8, { size: 12, color: C.text, alpha: a });
       // pulse ring hint at the key
-      r.uiRect(x + 12, y + 6, kw, 16, '#ffe8a0', a * 0.25 * (0.5 + 0.5 * Math.sin(t * 8)));
+      if (kw) r.uiRect(x + 12, y + 6, kw, 16, '#ffe8a0', a * 0.25 * (0.5 + 0.5 * Math.sin(t * 8)));
     }
-    if (this.menuKeysT >= 0 && !this.menuKeysDone) {
+    if (this.menuKeysT >= 0 && !this.menuKeysDone && !touchUiActive()) {
       const t = this.menuKeysT;
       const a = clamp(Math.min((t - 0.8) / 0.4, (14 - t) / 0.6), 0, 1);
       if (a > 0) {

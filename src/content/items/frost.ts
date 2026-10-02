@@ -218,7 +218,7 @@ defineArtifact({
     w.renderer.screenFlash('#c8f0ff', 0.3);
     w.spawn(new RingFx(p.x, p.y - 6, R, 0.4, '#d8f6ff', 3));
     w.particles.burst(p.x, p.y - 6, { count: 40, speed: [60, 200], life: [0.3, 0.7], colors: ['#ffffff', '#d8f6ff', '#8fd8f8', '#4aa0d8'], size: [1, 3], shape: 'square', drag: 3, vrot: 10 });
-    for (const pr of w.projectiles) if (pr.team === 'enemy' && Math.hypot(pr.x - p.x, pr.y - p.y) < R * 1.2) pr.expire(w, true);
+    w.clearEnemyBullets(p.x, p.y, R * 1.2);
     for (const e of enemiesNear(w, p.x, p.y, R)) inflict(w, e, { kind: 'freeze', duration: 1.8 });
   },
 });

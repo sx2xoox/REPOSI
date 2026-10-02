@@ -283,6 +283,7 @@ const PAD_COLORS: Record<string, string> = { A: '#4ac060', B: '#e04a4a', X: '#4a
  * Returns the width used. `align` decides whether x is the left edge or center.
  */
 export function keycap(r: Renderer, label: string, x: number, y: number, o: { align?: 'left' | 'center' | 'right'; alpha?: number; down?: boolean; pad?: boolean } = {}): number {
+  if (!label) return 0; // no key (touch mode)
   const a = o.alpha ?? 1;
   const isPadFace = !!o.pad && PAD_COLORS[label] !== undefined;
   const tw = r.measureText(label, 10, false, 'small');
@@ -315,12 +316,13 @@ export function keycap(r: Renderer, label: string, x: number, y: number, o: { al
 /** A key cap followed by a label; returns total width. */
 export function keyHint(r: Renderer, key: string, label: string, x: number, y: number, o: { alpha?: number; color?: string; pad?: boolean } = {}): number {
   const kw = keycap(r, key, x, y, { align: 'left', alpha: o.alpha, pad: o.pad });
-  r.uiText(label, x + kw + 4, y - 5, { size: 10, font: 'small', color: o.color ?? C.textDim, alpha: o.alpha });
+  r.uiText(label, x + (kw ? kw + 4 : 0), y - 5, { size: 10, font: 'small', color: o.color ?? C.textDim, alpha: o.alpha });
   return kw + 4 + r.measureText(label, 10, false, 'small');
 }
 
 /** Measure what keyHint() would use without drawing. */
 export function keyHintWidth(r: Renderer, key: string, label: string, pad = false): number {
+  if (!key) return r.measureText(label, 10, false, 'small');
   const tw = r.measureText(key, 10, false, 'small');
   const kw = pad && PAD_COLORS[key] !== undefined ? 18 : Math.max(18, Math.ceil((tw + 10) / PX) * PX);
   return kw + 4 + r.measureText(label, 10, false, 'small');

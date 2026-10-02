@@ -240,7 +240,7 @@ defineArtifact({
     w.banner('재점화!', '깃털이 타오르며 다시 일어선다', { icon: 'icon_rekindle_plume', color: '#ffb040', small: true });
     for (let i = 0; i < 3; i++) w.spawn(new RingFx(p.x, p.y - 6, 40 + i * 25, 0.4 + i * 0.12, i ? '#ff7020' : '#fff0a0', 4 - i));
     w.particles.burst(p.x, p.y - 6, { count: 70, speed: [60, 260], life: [0.4, 0.9], colors: ['#ffffff', '#ffe080', '#ff9a30', '#c04010'], size: [1, 3], additive: true, light: 7 });
-    for (const pr of w.projectiles) if (pr.team === 'enemy') pr.expire(w, true);
+    w.clearEnemyBullets(p.x, p.y);
     for (const e of enemiesNear(w, p.x, p.y, 100)) itemHit(w, e, dmg(w) * 4, { knockback: 300, statuses: [{ kind: 'burn', duration: 4, power: dmg(w) * 0.6 }] });
     w.items.take('rekindle_plume');
   },

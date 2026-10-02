@@ -2,7 +2,8 @@
 // with name / story, stat bars, starting kit icons, the lantern-release
 // description, and locked silhouettes with unlock hints. Mouse, keys and pad.
 
-import type { Scene } from './scene';
+import type { Scene, TouchButtonSpec } from './scene';
+import { touchUiActive } from './touch-mode';
 import type { Renderer } from '../engine/renderer';
 import { UI_H, UI_W } from '../engine/renderer';
 import { app } from '../game/app';
@@ -32,6 +33,8 @@ export class CharacterSelectScene implements Scene {
   private rl = new Repeater(0.35, 0.16);
   private rr = new Repeater(0.35, 0.16);
   private shake = 0;
+  touchBack = 'back' as const;
+  touchBackAt = 'left' as const;
 
   constructor(seed?: string) {
     this.seed = seed;
@@ -121,6 +124,16 @@ export class CharacterSelectScene implements Scene {
         }
       }
     }
+  }
+
+  touchButtons(): TouchButtonSpec[] {
+    if (this.starting >= 0) return [];
+    const y = 360;
+    return [
+      { x: 196, y, w: 64, h: 40, icon: 'tc_arrow_l', tap: 'uiLeft' },
+      { x: 274, y, w: 220, h: 40, label: '하강 시작', tap: 'confirm', primary: true },
+      { x: 508, y, w: 64, h: 40, icon: 'tc_arrow_r', tap: 'uiRight' },
+    ];
   }
 
   /** Carousel slot position for character i given the animated selection. */
@@ -232,7 +245,7 @@ export class CharacterSelectScene implements Scene {
     this.drawStats(r, cur, open, A, k);
     this.drawRelease(r, cur, open, A, k);
 
-    keyHintRow(r, [['←→', '선택'], ['Enter', '하강 시작'], ['Esc', '뒤로']], UI_W / 2, UI_H - 12, { alpha: A * 0.85, pad: input.aimMode === 'pad' });
+    if (!touchUiActive()) keyHintRow(r, [['←→', '선택'], ['Enter', '하강 시작'], ['Esc', '뒤로']], UI_W / 2, UI_H - 12, { alpha: A * 0.85, pad: input.aimMode === 'pad' });
     if (out > 0) r.uiRect(0, 0, UI_W, UI_H, '#000000', ease.inQuad(out) * 0.9);
   }
 
@@ -324,7 +337,7 @@ export class CharacterSelectScene implements Scene {
     if (open) glow(r, x + 22, y + 26, 30, '#ff8a30', 0.25 * A * fl);
     r.uiSprite(open ? 'ui_flame' : 'ui_question', x + 22, y + 26 + (1 - k) * 8, 2, { alpha: A });
     r.uiText('등불 해방', x + 42, y + 8 + (1 - k) * 8, { size: 12, bold: true, color: open ? C.emberHi : C.textFaint, alpha: A });
-    r.uiText('게이지가 가득 차면 F', x + w - 12, y + 9 + (1 - k) * 8, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: A });
+    r.uiText(touchUiActive() ? '게이지가 가득 차면 해방 버튼' : '게이지가 가득 차면 F', x + w - 12, y + 9 + (1 - k) * 8, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: A });
     const desc = open ? c.releaseDesc ?? '등불을 터뜨려 주변의 적과 탄환을 태운다.' : '???';
     const lines = r.wrapText(desc, w - 60, 10, false, 'small');
     lines.slice(0, 2).forEach((l, i) => r.uiText(l, x + 42, y + 26 + i * 12 + (1 - k) * 8, { size: 10, font: 'small', color: open ? C.text : C.textMute, alpha: A * k }));

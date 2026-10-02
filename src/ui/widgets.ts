@@ -21,6 +21,8 @@ export interface MenuItem {
   hint?: string | (() => string);
   /** slider fill 0..1 (draws a gauge) */
   value?: () => number;
+  /** set a slider directly from a 0..1 fraction (tap / click on the gauge) */
+  setValue?: (frac: number) => void;
   /** toggle state (draws a switch) */
   toggle?: () => boolean;
   /** right-aligned value text (choices, slider %) */
@@ -43,6 +45,8 @@ export interface MenuOpts {
   showHint?: boolean;
   /** custom hint position (UI y) */
   hintY?: number;
+  /** visible rows; longer menus scroll (wheel / touch drag / follow selection) */
+  maxRows?: number;
 }
 
 export class Menu {
@@ -56,6 +60,12 @@ export class Menu {
   align: 'center' | 'left';
   showHint: boolean;
   hintY?: number;
+  /** visible rows (0 = all) */
+  maxRows: number;
+  /** first visible row (target) */
+  scroll = 0;
+  private scrollS = new Spring(0, 380, 36);
+  private lastIndex = -1;
   /** time since creation (entrance animation) */
   t = 0;
   /** input disabled (e.g. while a modal is open) */
@@ -78,7 +88,11 @@ export class Menu {
     this.align = o.align ?? 'center';
     this.showHint = o.showHint ?? true;
     this.hintY = o.hintY;
+    this.maxRows = o.maxRows ?? 0;
     while (this.items[this.index]?.header && this.index < this.items.length - 1) this.index++;
+    this.followSelection();
+    this.scrollS.set(this.scroll);
+    this.lastIndex = this.index;
     this.cursor.set(this.rowY(this.index));
   }
 
@@ -91,7 +105,30 @@ export class Menu {
   }
 
   rowY(i: number): number {
-    return this.y + i * this.lineH;
+    return this.y + (i - this.scrollS.value) * this.lineH;
+  }
+
+  private get scrollable(): boolean {
+    return this.maxRows > 0 && this.items.length > this.maxRows;
+  }
+
+  private get maxScroll(): number {
+    return this.scrollable ? this.items.length - this.maxRows : 0;
+  }
+
+  /** Is row i inside the visible window (by the scroll target)? */
+  private rowVisible(i: number): boolean {
+    return !this.scrollable || (i >= this.scroll && i < this.scroll + this.maxRows);
+  }
+
+  /** Scroll so the selected row (and a header right above it) is visible. */
+  private followSelection(): void {
+    if (!this.scrollable) return;
+    const i = this.index;
+    const top = i > 0 && this.items[i - 1]?.header ? i - 1 : i;
+    if (top < this.scroll) this.scroll = top;
+    if (i >= this.scroll + this.maxRows) this.scroll = i - this.maxRows + 1;
+    this.scroll = clamp(this.scroll, 0, this.maxScroll);
   }
 
   /** Row rect in UI space. */
@@ -100,7 +137,14 @@ export class Menu {
   }
 
   get height(): number {
-    return this.items.length * this.lineH;
+    return (this.scrollable ? this.maxRows : this.items.length) * this.lineH;
+  }
+
+  /** Gauge rect (UI space) of a slider row, as drawn. */
+  private gaugeRect(): { x: number; w: number } {
+    const right = this.x - this.width / 2 + this.width - 14;
+    const gw = Math.min(110, this.width * 0.34);
+    return { x: right - gw - 36, w: gw };
   }
 
   private move(dir: number): void {
@@ -124,6 +168,12 @@ export class Menu {
   update(r: Renderer, dt = 1 / 60): void {
     this.t += dt;
     this.flashT = Math.max(0, this.flashT - dt);
+    if (this.index !== this.lastIndex) {
+      this.lastIndex = this.index;
+      this.followSelection();
+    }
+    this.scrollS.target = this.scroll;
+    this.scrollS.update(dt);
     this.cursor.target = this.rowY(this.index);
     this.cursor.update(dt);
     if (!this.active) return;
@@ -139,22 +189,38 @@ export class Menu {
     }
     // mouse
     const m = r.displayToUI(input.mouseX, input.mouseY);
+    if (this.scrollable && input.wheel && m.x >= this.x - this.width / 2 && m.x <= this.x + this.width / 2 && m.y >= this.y - 8 && m.y <= this.y + this.maxRows * this.lineH) {
+      this.scroll = clamp(this.scroll + Math.sign(input.wheel), 0, this.maxScroll);
+    }
     this.hover = -1;
     for (let i = 0; i < n; i++) {
-      if (this.items[i].header) continue;
+      if (this.items[i].header || !this.rowVisible(i)) continue;
       const rr = this.rowRect(i);
       if (m.x >= rr.x && m.x <= rr.x + rr.w && m.y >= rr.y && m.y < rr.y + this.lineH) {
         this.hover = i;
         if (input.mouseMoved && this.index !== i) {
           this.index = i;
+          this.lastIndex = i; // hovering never auto-scrolls
           sfx('ui_move', { vol: 0.5 });
         }
       }
     }
     const clicked = this.hover >= 0 && input.pressed('fire');
-    if (clicked) this.index = this.hover;
+    if (clicked) {
+      this.index = this.hover;
+      this.lastIndex = this.index;
+    }
     const cur = this.items[this.index];
     if (!cur || cur.header) return;
+    if (clicked && cur.setValue && cur.value && !cur.disabled) {
+      // click / tap on the gauge sets the value directly
+      const g = this.gaugeRect();
+      if (m.x >= g.x - 6 && m.x <= g.x + g.w + 6) {
+        cur.setValue(clamp((m.x - g.x) / g.w, 0, 1));
+        sfx('ui_move');
+        return;
+      }
+    }
     if (clicked && cur.adjust && (cur.value || cur.valueText) && !cur.toggle) {
       // click on the left / right half of the value area adjusts
       const rr = this.rowRect(this.index);
@@ -184,6 +250,14 @@ export class Menu {
   draw(r: Renderer, alpha = 1): void {
     const a0 = alpha;
     const left = this.x - this.width / 2;
+    const clip = this.scrollable;
+    if (clip) {
+      const d = r.dctx;
+      d.save();
+      d.beginPath();
+      d.rect(left - 4, this.y - 8, this.width + 8, this.maxRows * this.lineH + 2);
+      d.clip();
+    }
     // selection plate (springs between rows)
     const sel = this.items[this.index];
     if (sel && !sel.header) {
@@ -196,6 +270,7 @@ export class Menu {
       r.uiSprite(animFrame('ui_cursor', this.t), cx, y + h / 2 + 7, 2, { alpha: a0 * appear });
     }
     this.items.forEach((it, i) => {
+      if (clip && (i < this.scrollS.value - 1 || i > this.scrollS.value + this.maxRows)) return;
       const stagger = ease.outCubic(clamp((this.t - Math.min(i * 0.04, 0.3)) / 0.28, 0, 1));
       const a = a0 * stagger;
       if (a <= 0) return;
@@ -249,6 +324,19 @@ export class Menu {
         }
       }
     });
+    if (clip) {
+      r.dctx.restore();
+      // scroll indicators
+      const top = this.y - 8;
+      const h = this.maxRows * this.lineH;
+      const frac = this.maxRows / this.items.length;
+      const pos = this.scrollS.value / Math.max(1, this.maxScroll);
+      const bx = left + this.width + 4;
+      r.uiRect(bx, top, PX, h, C.rimDark, a0 * 0.8);
+      r.uiRect(bx, top + (h - h * frac) * clamp(pos, 0, 1), PX, h * frac, C.gold, a0 * 0.9);
+      if (this.scroll > 0) r.uiSprite('ui_arrow_r', this.x, top - 4, 2, { alpha: a0 * 0.8, rot: -Math.PI / 2 });
+      if (this.scroll < this.maxScroll) r.uiSprite('ui_arrow_r', this.x, top + h + 2, 2, { alpha: a0 * 0.8, rot: Math.PI / 2 });
+    }
     const cur = this.items[this.index];
     const hint = cur ? this.hintOf(cur) : '';
     if (this.showHint && hint) {

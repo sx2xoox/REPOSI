@@ -14,6 +14,7 @@ import { MapOverlay } from './map-overlay';
 import { GameOverOverlay } from './gameover';
 import { audio } from '../audio/audio';
 import { save } from '../engine/save';
+import { applyGraphics } from './quality';
 
 export class GameScene implements Scene, WorldHost {
   world: World;
@@ -32,6 +33,7 @@ export class GameScene implements Scene, WorldHost {
     save.saveProgress();
     this.world.start();
     (window as unknown as { __world?: World }).__world = this.world;
+    applyGraphics(this.world);
   }
 
   exit(): void {

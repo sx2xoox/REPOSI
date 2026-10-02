@@ -22,9 +22,19 @@ import { FlowField } from './flow';
 import { ItemSystem, Loot } from './items';
 import { RunState } from './run';
 import { roomHandler } from './roomkinds';
-import { FloatingText, RingFx } from './effects';
+import { DamageNumber, DoorClearGlow, FloatingText, RingFx } from './effects';
 import { Bomb, Chest, FirePlace, Pedestal, Pickup, Trapdoor, itemInfo, type PedestalItem, type PickupKind } from './pickups';
 import { Tile } from './tiles';
+import { roomBaseJob } from './roomart';
+
+/** Max wall-clock ms per rendered frame spent pre-rendering neighbour rooms. */
+const IDLE_BUDGET_MS = 2.5;
+/** Duration of the trapdoor fall animation before the floor fade. */
+const DESCEND_FALL = 0.62;
+/** Max particle lights per frame (beyond that every k-th particle emits). */
+const PARTICLE_LIGHT_CAP = 90;
+/** Max stereo pan for positional sounds (subtle). */
+const MAX_PAN = 0.6;
 
 export interface Banner {
   title: string;
@@ -88,7 +98,7 @@ export class World {
   /** current (unscaled) simulation step */
   dt = 1 / 60;
   roomTime = 0;
-  paused = false;
+  private pausedFlag = false;
   private hitstopT = 0;
   /** enemies & enemy projectiles time scale (time-slow items) */
   enemyTimeScale = 1;
@@ -113,6 +123,23 @@ export class World {
   /** free-form per-run flags for content (e.g. "devilDealTaken") */
   flags = new Set<string>();
   vars: Record<string, number> = {};
+  /** entity whose update() is running: default position of sounds played via `sfx()` */
+  private sfxSource: Entity | null = null;
+  /** accumulating damage numbers per (enemy, color) */
+  private dmgNums = new Map<number, DamageNumber>();
+  /** idle-time background pre-render of neighbour rooms */
+  private bgJob: { node: RoomNode; gen: Generator<void, void, void> } | null = null;
+  private bgWarm = new Set<number>();
+  /** trapdoor fall animation in progress */
+  descending: { x: number; y: number; t: number } | null = null;
+  /** red edge flash after the player got hurt (seconds left) */
+  private hurtT = 0;
+  private hurtPower = 0;
+  /** delayed room-clear "moment" (chime + door glow) */
+  private clearMomentT = -1;
+  /** reusable per-frame draw lists */
+  private drawAll: Entity[] = [];
+  private drawMid: Entity[] = [];
 
   constructor(renderer: Renderer, run: RunState, host: WorldHost) {
     this.renderer = renderer;
@@ -124,6 +151,27 @@ export class World {
     this.snapCanvas.width = VIEW_W;
     this.snapCanvas.height = VIEW_H;
     this.particles.density = save.settings.particles;
+  }
+
+  /** World simulation paused (overlays). Pausing ducks the music. */
+  get paused(): boolean {
+    return this.pausedFlag;
+  }
+
+  set paused(v: boolean) {
+    this.setPaused(v);
+  }
+
+  /**
+   * Pause / resume the simulation. The UI may simply assign `world.paused`; both
+   * routes duck the music while paused (not on the game-over screen).
+   */
+  setPaused(v: boolean): void {
+    if (v === this.pausedFlag) return;
+    this.pausedFlag = v;
+    if (v) {
+      if (!this.gameOver) audio.duck(0.6, 3600);
+    } else audio.releaseDuck();
   }
 
   // ================================================================== setup
@@ -156,6 +204,8 @@ export class World {
     this.floor = floor;
     this.map = generateFloor(floor, this.run.floorRng(index));
     this.roomCache.clear();
+    this.bgJob = null;
+    this.bgWarm.clear();
     this.mapVersion++;
     const start = this.map.nodes[this.map.startId];
     // forget the previous floor's room so enterRoom() does not cache it under a
@@ -167,7 +217,7 @@ export class World {
     this.items.expire('floor');
     this.items.onFloorStart();
     audio.playMusic(floor.music);
-    playSfx('floor_start');
+    this.sfx('floor_start');
     save.progress.bestFloor = Math.max(save.progress.bestFloor, index);
     save.saveProgress();
   }
@@ -206,9 +256,17 @@ export class World {
     } else {
       room = this.buildRoom(node);
       this.entities = [];
+      // a neighbour pre-render that was still in progress: finish it now (cheaper
+      // than starting over); the base is cached per node, so `room` picks it up
+      if (this.bgJob && this.bgJob.node === node) {
+        while (!this.bgJob.gen.next().done);
+      }
     }
+    if (this.bgJob && this.bgJob.node === node) this.bgJob = null;
     this.room = room;
     this.pending = [];
+    this.dmgNums.clear();
+    this.clearMomentT = -1;
     this.particles.clear();
     this.roomTime = 0;
     this.holdClear = 0;
@@ -265,12 +323,15 @@ export class World {
     this.flushPending();
     this.camInit = false;
     this.items.onRoomEnter();
+    // things spawned by room-enter hooks (familiars, hounds ...) must be visible
+    // during the room slide, not pop in when it ends
+    this.flushPending();
     this.updateCamera(1);
     // music: boss / shop
     if (node.kind === 'shop') audio.playMusic('shop');
     else if (node.kind === 'secret') audio.playMusic('secret');
     else if (node.kind !== 'boss' && audio.currentMusic !== this.floor.music && audio.currentMusic !== 'victory') audio.playMusic(this.floor.music);
-    if (hostile) playSfx('door_close', { vol: 0.6 });
+    if (hostile) this.sfx('door_close', { vol: 0.6 });
   }
 
   /** Spawn pickups / fireplaces etc. from template markers (enemies handled separately). */
@@ -365,7 +426,10 @@ export class World {
     this.dt = dt;
     if (this.renderer) this.renderer.updateEffects(dt);
     this.updateUiTimers(dt);
+    if (this.hurtT > 0) this.hurtT = Math.max(0, this.hurtT - dt);
     if (this.transition) {
+      // anything spawned while sliding (room-enter hooks ...) is shown right away
+      this.flushPending();
       this.transition.t += dt;
       if (this.transition.t >= this.transition.dur) {
         this.transition = null;
@@ -394,9 +458,12 @@ export class World {
 
     for (const e of this.entities) {
       if (e.dead) continue;
+      this.sfxSource = e;
       if (e instanceof Projectile && e.team === 'enemy') e.update(this, sdt * this.enemyTimeScale);
       else e.update(this, sdt);
     }
+    this.sfxSource = null;
+    if (this.descending) this.updateDescend(sdt);
     this.items.update(sdt);
     this.flushPending();
     this.rebuildCaches();
@@ -404,8 +471,21 @@ export class World {
 
     // deaths
     for (const e of this.enemies) if (!e.dead && e.hp <= 0) this.killEnemy(e);
-    for (const e of this.entities) if (e.dead) e.onRemove(this);
-    this.entities = this.entities.filter((e) => !e.dead || e === this.player);
+    const es = this.entities;
+    let n = 0;
+    for (let i = 0; i < es.length; i++) {
+      const e = es[i];
+      if (e.dead) {
+        e.onRemove(this);
+        if (e !== this.player) continue;
+      }
+      es[n++] = e;
+    }
+    es.length = n;
+    if (this.clearMomentT >= 0) {
+      this.clearMomentT -= sdt;
+      if (this.clearMomentT < 0) this.roomClearMoment();
+    }
 
     this.particles.update(sdt);
     this.room.updateDoors(sdt);
@@ -558,45 +638,85 @@ export class World {
       }
       if (hit.crit) hit.damage *= p.stats.critMult;
       if (target.isBoss) hit.damage *= 1 + p.stats.bossDamage;
-      if (hit.kind !== 'status') this.items.modifyHit(target, hit);
-      const before = target.hp;
-      const applied = target.takeHit(this, hit);
-      if (!applied) return false;
-      const dealt = Math.max(0, before - Math.max(0, target.hp));
-      this.run.stats.damageDealt += dealt;
-      if (hit.kind !== 'status' && !hit.noProc) p.addEmber(Math.min(6, 1.2 + dealt / Math.max(1, p.stats.damage) * 1.3) * (target.isBoss ? 0.6 : 1));
-      this.hitFeedback(target, hit, dealt);
-      this.items.onHit(target, hit);
-      if (target.hp <= 0) this.killEnemy(target);
-      return true;
+      // sounds played by hooks / onHurt come from the enemy's position
+      const prevSrc = this.sfxSource;
+      this.sfxSource = target;
+      try {
+        if (hit.kind !== 'status') this.items.modifyHit(target, hit);
+        const before = target.hp;
+        const applied = target.takeHit(this, hit);
+        if (!applied) return false;
+        const dealt = Math.max(0, before - Math.max(0, target.hp));
+        this.run.stats.damageDealt += dealt;
+        if (hit.kind !== 'status' && !hit.noProc) p.addEmber(Math.min(6, 1.2 + dealt / Math.max(1, p.stats.damage) * 1.3) * (target.isBoss ? 0.6 : 1));
+        this.hitFeedback(target, hit, dealt);
+        this.items.onHit(target, hit);
+        if (target.hp <= 0) this.killEnemy(target);
+        return true;
+      } finally {
+        this.sfxSource = prevSrc;
+      }
     }
     if (target === p) return p.takeHit(this, hit);
     return target.takeHit(this, hit);
   }
 
+  /**
+   * Hit feedback scaled by how big the hit is relative to the player's base
+   * damage: numbers, blood, flash, shake and hit-stop all grow together, so a
+   * charged smash reads as heavy and a beam tick stays quiet.
+   */
   private hitFeedback(e: Enemy, hit: HitInfo, dealt: number): void {
-    if (save.settings.damageNumbers && dealt > 0) {
-      const big = hit.crit;
-      const txt = `${Math.max(1, Math.round(dealt))}${big ? '!' : ''}`;
-      const col = hit.kind === 'status' ? statusColor(hit) : big ? '#ffd23a' : '#ffffff';
-      this.spawn(new FloatingText(e.x, e.y - e.r - 6 - e.z, txt, col, big ? 2 : 1, big ? 0.9 : 0.6)).layer = 3;
-    }
+    const p = this.player;
+    const rel = clamp(dealt / Math.max(1, p.stats.damage), 0, 6);
+    if (save.settings.damageNumbers && dealt > 0) this.damageNumber(e, hit, dealt);
     if (hit.kind === 'status') return;
     const blood = e.def.bloodColor ?? '#b8202c';
     const ang = Math.atan2(hit.dirY ?? 0, hit.dirX ?? 1);
+    const heavy = hit.kind === 'melee' || hit.kind === 'explosion' || !!hit.crit;
+    e.flash = Math.max(e.flash, 0.07 + 0.03 * Math.min(rel, 3));
     this.particles.burst(e.x, e.y - e.z - 3, {
-      count: hit.crit ? 10 : 5, speed: [40, 120], angle: ang, spread: 1.4, life: [0.2, 0.45],
+      count: Math.round((hit.crit ? 10 : 4) + Math.min(rel, 4) * 1.5), speed: [40, 110 + 15 * Math.min(rel, 4)], angle: ang, spread: 1.4, life: [0.2, 0.45],
       colors: ['#ffffff', blood, blood], size: [1, 2], gravity: 250, vz: [20, 80],
     });
     if (hit.crit) {
       this.particles.burst(e.x, e.y - e.z - 3, { count: 6, speed: [60, 160], life: [0.1, 0.25], colors: ['#ffffff', '#ffe060'], shape: 'spark', size: [1, 2] });
-      this.shake(0.12);
-      if (!hit.light && save.settings.hitStop) this.hitstop(0.035);
-      playSfx('hit_crit', { vol: 0.6, pitch: fx.range(0.95, 1.1) });
+      this.sfx('hit_crit', { vol: 0.6, pitch: fx.range(0.95, 1.1), x: e.x });
     } else if (!hit.light) {
-      playSfx(e.def.hurtSfx ?? 'hit', { vol: 0.45, pitch: fx.range(0.9, 1.15) });
+      this.sfx(e.def.hurtSfx ?? 'hit', { vol: Math.min(0.7, 0.4 + 0.05 * rel), pitch: fx.range(0.9, 1.15) / (1 + Math.max(0, rel - 2) * 0.04), x: e.x });
     }
-    if (hit.kind === 'melee' && save.settings.hitStop && !hit.light) this.hitstop(0.045);
+    if (hit.light) return;
+    // shake: only hits clearly above a normal shot move the camera
+    const shake = (heavy ? 0.04 : 0) + Math.max(0, rel - 1.2) * 0.035 + (hit.crit ? 0.07 : 0);
+    if (shake > 0.01) this.shake(Math.min(0.4, shake));
+    if (save.settings.hitStop && (heavy || rel >= 2)) {
+      this.hitstop(Math.min(0.075, (hit.kind === 'melee' ? 0.03 : 0.012) + 0.008 * rel + (hit.crit ? 0.015 : 0)));
+    }
+  }
+
+  /** Spawn or grow the damage number over `e` (rapid hits merge; crits stay separate). */
+  private damageNumber(e: Enemy, hit: HitInfo, dealt: number): void {
+    const status = hit.kind === 'status';
+    const col = status ? statusColor(hit) : hit.crit ? '#ffd23a' : '#ffffff';
+    const y = e.y - e.r - 6 - e.z;
+    if (hit.crit) {
+      this.spawn(new FloatingText(e.x, y, `${Math.max(1, Math.round(dealt))}!`, col, 2, 0.9)).layer = 3;
+      return;
+    }
+    const slot = numberSlot(col);
+    const key = e.id * 8 + slot;
+    const cur = this.dmgNums.get(key);
+    if (cur && !cur.dead && cur.sinceAdd < (status ? 0.6 : 0.25)) {
+      cur.add(dealt);
+      return;
+    }
+    // DoT numbers sit around the hit number instead of on top of it
+    const off = NUMBER_OFFSETS[slot];
+    const n = slot ? new DamageNumber(e, e.x, y, dealt, col, off[0] + fx.range(-1, 1), off[1]) : new DamageNumber(e, e.x, y, dealt, col);
+    n.layer = 3;
+    this.dmgNums.set(key, n);
+    this.spawn(n);
+    if (this.dmgNums.size > 64) for (const [k, v] of this.dmgNums) if (v.dead) this.dmgNums.delete(k);
   }
 
   /** Damage-over-time tick (burn/poison/bleed). */
@@ -614,6 +734,8 @@ export class World {
     if (e.dead) return;
     e.hp = Math.min(0, e.hp);
     e.dead = true;
+    const prevSrc = this.sfxSource;
+    this.sfxSource = e;
     try {
       e.def.onDeath?.(e, this);
     } catch (err) {
@@ -624,6 +746,7 @@ export class World {
     save.progress.totalKills++;
     save.markSeenEnemy(e.def.id);
     this.items.onKill(e);
+    this.sfxSource = prevSrc;
     const p = this.player;
     if (p.stats.lifesteal > 0 && this.rng.chance(p.stats.lifesteal) && p.red < p.maxRed) {
       p.heal(1);
@@ -633,14 +756,18 @@ export class World {
     if (e.champion) this.dropRandom(e.x, e.y, 'champion');
     else if (!e.isMinion && !e.isBoss && this.rng.chance(0.06 + p.stats.luck * 0.01)) this.dropRandom(e.x, e.y, 'enemy');
     if (e.isBoss) this.bossKilled(e);
-    else if (save.settings.hitStop) this.hitstop(0.025);
+    else {
+      const big = e.r > 10;
+      if (save.settings.hitStop) this.hitstop(big ? 0.045 : 0.022);
+      if (big) this.shake(0.15);
+    }
   }
 
   private deathEffects(e: Enemy): void {
     const fxKind = e.def.deathFx ?? 'blood';
     const col = e.def.bloodColor ?? (fxKind === 'goo' ? '#5aa02a' : fxKind === 'ember' ? '#ff7a2a' : fxKind === 'ice' ? '#a0e0ff' : fxKind === 'void' ? '#8a4aff' : fxKind === 'bone' ? '#e0d8c0' : fxKind === 'metal' ? '#9098a8' : fxKind === 'spore' ? '#c0d060' : '#b01c28');
     const big = e.r > 10 || e.isBoss;
-    playSfx(e.def.dieSfx ?? (big ? 'enemy_die_big' : 'enemy_die'), { vol: 0.7, pitch: fx.range(0.9, 1.1) });
+    this.sfx(e.def.dieSfx ?? (big ? 'enemy_die_big' : 'enemy_die'), { vol: 0.7, pitch: fx.range(0.9, 1.1), x: e.x });
     if (fxKind === 'none') return;
     const n = big ? 34 : 18;
     this.particles.burst(e.x, e.y - e.z - 3, {
@@ -664,7 +791,7 @@ export class World {
 
   private bossKilled(e: Enemy): void {
     this.run.stats.bossesKilled++;
-    playSfx('boss_die');
+    this.sfx('boss_die', { pan: 0 });
     this.shake(1);
     this.renderer.screenFlash('#ffffff', 0.6);
     this.slowmo = 0.3;
@@ -677,9 +804,10 @@ export class World {
    */
   explode(x: number, y: number, radius: number, damage: number, o: { source?: Entity | null; byPlayer?: boolean; hurtsPlayer?: boolean; color?: string; noTiles?: boolean } = {}): void {
     const p = this.player;
-    playSfx('explosion', { vol: Math.min(1, 0.6 + radius / 100) });
+    this.sfx('explosion', { vol: Math.min(1, 0.6 + radius / 100), x });
     this.shake(Math.min(1, 0.35 + radius / 90));
-    this.renderer.screenFlash('#fff2c0', 0.12);
+    this.renderer.screenFlash('#fff2c0', Math.min(0.22, 0.08 + radius / 500));
+    if (save.settings.hitStop) this.hitstop(Math.min(0.06, 0.018 + radius / 1600));
     const col = o.color ?? '#ff9a2a';
     this.particles.burst(x, y, { count: 34, speed: [60, 220], life: [0.25, 0.6], colors: ['#ffffff', '#fff0a0', col, '#a03010', '#402020'], size: [2, 4], sizeEnd: 0.5, additive: true, light: 8 });
     this.particles.burst(x, y, { count: 22, speed: [10, 60], life: [0.6, 1.4], colors: ['#706060', '#504848', '#302828'], size: [3, 6], sizeEnd: 8, drag: 3, fade: true });
@@ -740,13 +868,13 @@ export class World {
     this.map.nodes[d.to].discovered = true;
     this.mapVersion++;
     this.run.stats.secretsFound++;
-    playSfx('secret_found');
+    this.sfx('secret_found', { x: d.x });
   }
 
   onTileDestroyed(t: number, tx: number, ty: number, cx: number, cy: number): void {
     const pal = this.room.theme.palette;
     if (t === Tile.POT) {
-      playSfx('pot_break', { vol: 0.7 });
+      this.sfx('pot_break', { vol: 0.7, x: cx });
       this.particles.burst(cx, cy, { count: 16, speed: [40, 120], life: [0.3, 0.7], colors: ['#c08a5a', '#8a5a3a', '#5a3a2a'], size: [1, 3], gravity: 300, vz: [40, 120], shape: 'square', vrot: 10 });
       const r = this.rng.next();
       if (r < 0.25) this.spawn(new Pickup('coin', cx, cy).pop());
@@ -754,7 +882,7 @@ export class World {
       else if (r < 0.34) this.spawn(new Pickup('bomb', cx, cy).pop());
       else if (r < 0.36) this.spawn(new Pickup('key', cx, cy).pop());
     } else {
-      playSfx('rock_break', { vol: 0.8 });
+      this.sfx('rock_break', { vol: 0.8, x: cx });
       this.particles.burst(cx, cy, { count: 18, speed: [40, 140], life: [0.4, 0.9], colors: pal.rock, size: [1, 3], gravity: 300, vz: [60, 150], shape: 'square', vrot: 8, bounce: 0.3 });
       this.particles.burst(cx, cy, { count: 8, speed: [10, 40], life: [0.5, 1.0], colors: ['#9a9088', '#6a6058'], size: [3, 5], sizeEnd: 7, drag: 3 });
       if (t === Tile.TINTED) {
@@ -763,7 +891,7 @@ export class World {
         else if (r < 0.65) this.spawn(new Pickup('soul_heart', cx, cy).pop());
         else if (r < 0.85) { this.spawn(new Pickup('bomb', cx, cy).pop()); this.spawn(new Pickup('key', cx, cy).pop()); }
         else this.spawn(new Chest(cx, cy, false));
-        playSfx('secret_found', { vol: 0.6 });
+        this.sfx('secret_found', { vol: 0.6, x: cx });
       } else if (t === Tile.SKULL_ROCK && this.rng.chance(0.3)) {
         this.spawn(new Pickup('soul_half', cx, cy).pop());
       }
@@ -946,7 +1074,7 @@ export class World {
           p.keys--;
           d.state = 'open';
           this.map.nodes[d.to].locked = false;
-          playSfx('door_unlock');
+          this.sfx('door_unlock', { x: d.x });
           this.room.markDirty();
         }
         continue;
@@ -1000,8 +1128,9 @@ export class World {
     this.mapVersion++;
     this.run.stats.roomsCleared++;
     this.room.setDoorsClosed(false);
-    playSfx('door_open');
-    playSfx('room_clear', { vol: 0.6 });
+    this.sfx('door_open');
+    // the chime + door glow land a beat after the last death sound
+    this.clearMomentT = 0.16;
     // active item charge
     const p = this.player;
     const act = p.activeId ? Actives.get(p.activeId) : undefined;
@@ -1019,10 +1148,58 @@ export class World {
     this.items.onRoomClear();
   }
 
-  /** Go down the trapdoor. */
-  descend(): void {
+  /** The room-clear "moment": a soft chime and the opened doors glowing. */
+  private roomClearMoment(): void {
+    this.clearMomentT = -1;
+    this.sfx('room_clear', { vol: 0.6 });
+    this.renderer.screenFlash('#fff4d8', 0.06);
+    for (const d of this.room.doors) {
+      if (d.state === 'open') this.spawn(new DoorClearGlow(d));
+    }
+  }
+
+  /**
+   * Start the trapdoor descent: the player is pulled into the hole, shrinks and
+   * falls; then the screen fades and the next floor (and its card) appears.
+   */
+  beginDescend(x: number, y: number): void {
+    if (this.transitioning || this.descending || this.gameOver) return;
+    const p = this.player;
+    this.descending = { x, y, t: 0 };
+    p.frozen = true;
+    p.invuln = Math.max(p.invuln, 5);
+    p.vx = p.vy = p.kbx = p.kby = 0;
+    p.dashT = 0;
+    this.sfx('trapdoor', { x });
+    this.sfx('whoosh', { vol: 0.5, pitch: 0.7, x });
+    this.particles.burst(x, y, { count: 16, speed: [20, 70], life: [0.3, 0.7], colors: ['#c0b0d0', '#7a6a8a', '#40304a'], size: [1, 3], drag: 3, sizeEnd: 3, fade: true });
+    this.spawn(new RingFx(x, y, 22, 0.4, '#b080ff', 2));
+  }
+
+  private updateDescend(dt: number): void {
+    const d = this.descending!;
+    const p = this.player;
+    d.t += dt;
+    const k = clamp(d.t / DESCEND_FALL, 0, 1);
+    // pulled to the hole's center, then sinks into it
+    const pull = 1 - Math.exp(-dt * 14);
+    p.x += (d.x - p.x) * pull;
+    p.y += (d.y - p.y) * pull;
+    p.vx = p.vy = 0;
+    p.fall = k * k * (3 - 2 * k);
+    if (d.t >= DESCEND_FALL) {
+      this.descending = null;
+      this.descend(true);
+      p.fall = 0;
+      p.frozen = false;
+      p.invuln = Math.min(p.invuln, 1);
+    }
+  }
+
+  /** Go down the trapdoor (instant cut; the trapdoor itself uses `beginDescend`). */
+  descend(animated = false): void {
     if (this.transitioning) return;
-    playSfx('trapdoor');
+    if (!animated) this.sfx('trapdoor');
     const next = this.run.floor + 1;
     if (!Floors.all().some((f) => f.index === next)) {
       this.victory();
@@ -1030,6 +1207,8 @@ export class World {
     }
     this.beginTransition('fade', 0.9);
     this.startFloor(next);
+    // the floor card appears as the fade clears
+    if (animated && this.floorCard) this.floorCard.t = -0.3;
   }
 
   victory(): void {
@@ -1045,7 +1224,7 @@ export class World {
     this.deathT = 0;
     this.run.lastDamageSource = source;
     const p = this.player;
-    playSfx('player_die');
+    this.sfx('player_die');
     audio.stopMusic(1.2);
     this.slowmo = 0.35;
     this.slowmoT = 1.2;
@@ -1087,8 +1266,77 @@ export class World {
   }
 
   // ================================================================== feedback helpers
-  sfx(name: SfxName, o: SfxPlayOpts = {}): void {
-    playSfx(name, o);
+  /**
+   * Play a sound. Positional: pass `x` (world px), or it defaults to the entity
+   * whose update is running (enemy scripts, projectiles ...); the stereo pan is a
+   * subtle ±0.6 from the camera center. An explicit `pan` wins.
+   */
+  sfx(name: SfxName, o: SfxPlayOpts & { x?: number } = {}): void {
+    const x = o.x ?? this.sfxSource?.x;
+    if (o.pan === undefined && x !== undefined) {
+      const pan = this.panAt(x);
+      playSfx(name, pan ? { vol: o.vol, pitch: o.pitch, pan } : o);
+    } else playSfx(name, o);
+  }
+
+  /** Stereo pan for a world x position (0 when roughly centered). */
+  panAt(x: number): number {
+    const r = this.renderer;
+    if (!r) return 0;
+    const k = clamp((x - (r.camX + VIEW_W / 2)) / (VIEW_W / 2), -1, 1) * MAX_PAN;
+    return Math.abs(k) < 0.04 ? 0 : Math.round(k * 100) / 100;
+  }
+
+  /**
+   * Erase enemy bullets within `radius` of (x, y): enemy projectiles (with an
+   * impact puff) and `enemyHazard` entities (lobbed shots, puddles ...). Returns
+   * how many were cleared. Use from releases, shields and other bullet-clears.
+   */
+  clearEnemyBullets(x: number, y: number, radius = Infinity, impact = true): number {
+    const r2 = radius * radius;
+    const inRange = (e: Entity) => radius === Infinity || dist2(e.x, e.y, x, y) <= r2;
+    let n = 0;
+    for (const pr of this.projectiles) {
+      if (pr.dead || pr.team !== 'enemy' || !inRange(pr)) continue;
+      pr.expire(this, impact);
+      n++;
+    }
+    const clearList = (list: Entity[]) => {
+      for (const e of list) {
+        if (e.dead) continue;
+        if (e instanceof Projectile) {
+          // spawned this frame: not in the projectile cache yet
+          if (e.team !== 'enemy' || list !== this.pending || !inRange(e)) continue;
+          e.expire(this, impact);
+          n++;
+          continue;
+        }
+        if (!e.enemyHazard || !inRange(e)) continue;
+        if (e.onCleared) e.onCleared(this);
+        else e.dead = true;
+        e.enemyHazard = false;
+        n++;
+        this.particles.burst(e.x, e.y - e.z, { count: 8, speed: [20, 70], life: [0.2, 0.4], colors: ['#ffffff', '#fff0c0', '#c8b8a8'], size: [1, 2] });
+      }
+    };
+    clearList(this.entities);
+    clearList(this.pending);
+    return n;
+  }
+
+  /**
+   * Graphics quality knobs (e.g. a mobile "low" preset): `lighting: false` skips
+   * the whole light-map pass (flat lit), `particles` scales particle density/cap.
+   */
+  setQuality(o: { lighting?: boolean; particles?: number }): void {
+    if (o.lighting !== undefined) this.lights.enabled = o.lighting;
+    if (o.particles !== undefined) this.particles.density = clamp(o.particles, 0.1, 1);
+  }
+
+  /** Player-hurt screen feedback (red edges), scaled by damage in half hearts. */
+  playerHurtFx(halfHearts: number): void {
+    this.hurtT = 0.45;
+    this.hurtPower = clamp(0.55 + 0.25 * halfHearts, 0.6, 1.1);
   }
 
   shake(amount: number): void {
@@ -1142,31 +1390,91 @@ export class World {
     r.beginWorld('#06040a');
     this.room.drawBackground(r);
     this.particles.draw(r, true);
-    const sorted = this.entities.filter((e) => !e.dead || e === this.player);
-    for (const e of sorted) if (e.layer === 0) e.draw(r, this);
+    // reusable lists (no per-frame allocation); mid layer is y-sorted
+    const all = this.drawAll;
+    const mid = this.drawMid;
+    all.length = 0;
+    mid.length = 0;
+    for (const e of this.entities) {
+      if (e.dead && e !== this.player) continue;
+      all.push(e);
+      if (e.layer === 1) mid.push(e);
+    }
+    for (const e of all) if (e.layer === 0) e.draw(r, this);
     this.room.drawDoors(r, this.time);
-    const mid = sorted.filter((e) => e.layer === 1).sort((a, b) => a.sortY - b.sortY);
+    mid.sort(bySortY);
     for (const e of mid) e.draw(r, this);
     this.particles.draw(r, false);
-    for (const e of sorted) if (e.layer === 2) e.draw(r, this);
+    for (const e of all) if (e.layer === 2) e.draw(r, this);
 
     // lighting
     this.lights.begin(r, this.room.theme.ambient);
-    for (const e of sorted) e.light(this);
-    this.drawParticleLights();
+    for (const e of all) e.light(this);
+    if (this.lights.enabled) this.drawParticleLights();
     this.lights.apply();
 
-    for (const e of sorted) if (e.layer === 3) e.draw(r, this);
+    for (const e of all) if (e.layer === 3) e.draw(r, this);
     this.drawVignette();
 
     if (this.transition) this.drawTransition();
+    this.idleWork();
   }
 
+  /**
+   * Idle-time work after drawing a frame: pre-render the backgrounds of the
+   * neighbouring rooms in small time slices, so walking through a door never
+   * stalls on a first-visit render. Deterministic: room rendering only uses
+   * room-seeded RNGs, never the gameplay RNG.
+   */
+  private idleWork(): void {
+    if (this.transition || this.descending || this.roomTime < 0.2 || !this.map) return;
+    const t0 = performance.now();
+    do {
+      if (!this.bgJob) {
+        const next = this.nextPrerender();
+        if (!next) return;
+        this.bgWarm.add(next.id);
+        this.bgJob = { node: next, gen: roomBaseJob(this.buildRoom(next)) };
+      }
+      if (this.bgJob.gen.next().done) this.bgJob = null;
+    } while (performance.now() - t0 < IDLE_BUDGET_MS);
+  }
+
+  /** Next unvisited, reachable neighbour whose background isn't warm yet. */
+  private nextPrerender(): RoomNode | null {
+    for (const d of this.node.doors) {
+      if (this.bgWarm.has(d.to) || this.roomCache.has(d.to)) continue;
+      if (d.secret && this.node.kind !== 'secret' && !(d as NodeDoor & { revealed?: boolean }).revealed) continue;
+      return this.map.nodes[d.to] ?? null;
+    }
+    return null;
+  }
+
+  /**
+   * Lights of glowing particles. Huge bursts would mean hundreds of lights, so
+   * past a cap only every k-th particle emits (a bit bigger / brighter to keep
+   * the overall glow).
+   */
   private drawParticleLights(): void {
-    for (const p of this.particles.list) {
-      if (p.light > 0) this.lights.add(p.x, p.y - p.z, p.light, p.lightColor ?? p.colors[0].slice(0, 7), { intensity: 0.7 * (1 - p.age / p.life) });
+    const lights = this.lights;
+    const list = this.particles.list;
+    let n = 0;
+    for (let i = 0; i < list.length; i++) if (list[i].light > 0) n++;
+    if (!n) return;
+    const stride = n > PARTICLE_LIGHT_CAP ? Math.ceil(n / PARTICLE_LIGHT_CAP) : 1;
+    const grow = stride > 1 ? 1.3 : 1;
+    const boost = stride > 1 ? Math.min(1.6, Math.sqrt(stride)) : 1;
+    const o = this.lightOpts;
+    let k = 0;
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i];
+      if (p.light <= 0 || k++ % stride !== 0) continue;
+      o.intensity = 0.7 * boost * (1 - p.age / p.life);
+      lights.add(p.x, p.y - p.z, p.light * grow, p.lightColor ?? p.colors[0].slice(0, 7), o);
     }
   }
+
+  private lightOpts = { intensity: 1 };
 
   private vignette: HTMLCanvasElement | null = null;
   private drawVignette(): void {
@@ -1194,6 +1502,30 @@ export class World {
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
     }
+    // hurt: red edges flash in and fade
+    if (this.hurtT > 0) {
+      ctx.globalAlpha = clamp((this.hurtT / 0.45) * this.hurtPower, 0, 1);
+      ctx.drawImage(this.hurtVignette(), 0, 0);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  private hurtVig: HTMLCanvasElement | null = null;
+  private hurtVignette(): HTMLCanvasElement {
+    if (!this.hurtVig) {
+      const c = document.createElement('canvas');
+      c.width = VIEW_W;
+      c.height = VIEW_H;
+      const g = c.getContext('2d')!;
+      const grd = g.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.38, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.6);
+      grd.addColorStop(0, 'rgba(255,16,32,0)');
+      grd.addColorStop(0.6, 'rgba(200,8,24,0.35)');
+      grd.addColorStop(1, 'rgba(120,0,16,0.75)');
+      g.fillStyle = grd;
+      g.fillRect(0, 0, VIEW_W, VIEW_H);
+      this.hurtVig = c;
+    }
+    return this.hurtVig;
   }
 
   private transCanvas: HTMLCanvasElement | null = null;
@@ -1267,6 +1599,17 @@ function makeChampion(e: Enemy, rng: RNG): void {
   const k = rng.pick(kinds);
   e.championColor = k.color;
   k.apply();
+}
+
+function bySortY(a: Entity, b: Entity): number {
+  return a.sortY - b.sortY;
+}
+
+const NUMBER_OFFSETS: [number, number][] = [[0, 0], [11, 6], [-11, 6], [0, 10], [11, 11]];
+
+/** Damage-number merge slot per color (normal / burn / poison / bleed / other). */
+function numberSlot(col: string): number {
+  return col === '#ffffff' ? 0 : col === '#ff9a3a' ? 1 : col === '#9aff5a' ? 2 : col === '#ff4a5a' ? 3 : 4;
 }
 
 function statusColor(hit: HitInfo): string {

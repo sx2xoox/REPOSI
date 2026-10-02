@@ -16,11 +16,13 @@ import { frame, keyHintRow } from './frame';
 import { appear } from './anim';
 import { ROOM_ICONS, ROOM_LABELS } from './logic';
 import { actionLabel } from './keys';
+import { touchUiActive } from './touch-mode';
 
 const LEGEND: RoomKind[] = ['boss', 'treasure', 'shop', 'secret', 'challenge', 'shrine', 'curse'];
 
 export class MapOverlay implements Scene {
   transparent = true;
+  touchBack = 'close' as const;
   private game: GameScene;
   private t = 0;
   private closing = -1;
@@ -122,6 +124,6 @@ export class MapOverlay implements Scene {
     r.uiText(`방문 ${visited} / ${total}`, lx + 12, py + 12, { size: 10, font: 'small', color: C.textDim, alpha: k });
     r.uiText(`정화 ${cleared}`, lx + 12, py + 28, { size: 10, font: 'small', color: C.textDim, alpha: k });
     r.uiText(`시드 ${w.run.seed}`, lx + 12, py + 44, { size: 10, font: 'small', color: C.textMute, alpha: k });
-    keyHintRow(r, [[actionLabel(input.bindings, 'map', input.aimMode === 'pad'), '닫기']], x + W - 50, y + 24, { alpha: k * 0.85, pad: input.aimMode === 'pad' });
+    if (!touchUiActive()) keyHintRow(r, [[actionLabel(input.bindings, 'map', input.aimMode === 'pad'), '닫기']], x + W - 50, y + 24, { alpha: k * 0.85, pad: input.aimMode === 'pad' });
   }
 }

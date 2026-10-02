@@ -104,7 +104,7 @@ defineActive({
     w.sfx('slam');
     w.shake(0.4);
     w.spawn(new RingFx(p.x, p.y - 4, 80, 0.4, '#ffe080', 3));
-    for (const pr of w.projectiles) if (pr.team === 'enemy') pr.expire(w, true);
+    w.clearEnemyBullets(p.x, p.y);
     for (const e of w.enemiesInRadius(p.x, p.y, 80)) {
       const d = Math.hypot(e.x - p.x, e.y - p.y) || 1;
       w.applyHit(e, { damage: p.stats.damage * 2, kind: 'other', attacker: p, dirX: (e.x - p.x) / d, dirY: (e.y - p.y) / d, knockback: 400 });

@@ -295,7 +295,13 @@ interface BaseCache {
   sig: number;
   p: PixelPainter;
 }
-const baseCache = new WeakMap<Room, BaseCache>();
+/**
+ * The expensive part of a room background (floor, pits, AO, walls) only depends on
+ * the node (seed, theme, door positions) and its pit/wall/door layout, so it is
+ * cached per *node*: a Room rebuilt for the same node (pre-render in idle time,
+ * re-entering) reuses it.
+ */
+const baseCache = new WeakMap<object, BaseCache>();
 
 function baseSignature(room: Room): number {
   let h = 2166136261;
@@ -314,10 +320,10 @@ export function renderRoomBackground(room: Room): HTMLCanvasElement {
 /** Full background (walls, floor, pits, obstacles) as pixels; works without a DOM. */
 export function renderRoomPainter(room: Room): PixelPainter {
   const sig = baseSignature(room);
-  let base = baseCache.get(room);
+  let base = baseCache.get(room.node);
   if (!base || base.sig !== sig) {
-    base = { sig, p: buildBase(room) };
-    baseCache.set(room, base);
+    base = { sig, p: runSteps(buildBaseSteps(room)) };
+    baseCache.set(room.node, base);
   }
   const p = new PixelPainter(room.pxW, room.pxH);
   p.data.set(base.p.data);
@@ -326,11 +332,38 @@ export function renderRoomPainter(room: Room): PixelPainter {
   return p;
 }
 
+/** Is the expensive background base of this room already cached? */
+export function roomBaseReady(room: Room): boolean {
+  const base = baseCache.get(room.node);
+  return !!base && base.sig === baseSignature(room);
+}
+
+/**
+ * Time-sliceable pre-render of a room's background base: every `next()` does a
+ * small chunk of work (a row of floor tiles, a few rows of wall pixels ...).
+ * When done, `renderRoomPainter` for the same node is cheap (~1 ms).
+ * Pure function of the room (room-seeded RNGs only; never touches gameplay RNG).
+ */
+export function* roomBaseJob(room: Room): Generator<void, void, void> {
+  const sig = baseSignature(room);
+  const cached = baseCache.get(room.node);
+  if (cached && cached.sig === sig) return;
+  const p = yield* buildBaseSteps(room);
+  baseCache.set(room.node, { sig, p });
+}
+
+function runSteps<T>(g: Generator<void, T, void>): T {
+  for (;;) {
+    const r = g.next();
+    if (r.done) return r.value;
+  }
+}
+
 export function hasThemeArt(themeId: string): boolean {
   return artMap.has(themeId);
 }
 
-function buildBase(room: Room): PixelPainter {
+function* buildBaseSteps(room: Room): Generator<void, PixelPainter, void> {
   const p = new PixelPainter(room.pxW, room.pxH);
   const theme = room.theme;
   const art = themeArt(theme);
@@ -348,18 +381,25 @@ function buildBase(room: Room): PixelPainter {
       else paintDefaultFloor(tileP, pal, tx, ty, trng, room.variant[ty * room.w + tx]);
       p.blit(tileP, tx * TILE, ty * TILE);
     }
+    yield;
   }
   const isFloor = (tx: number, ty: number) => {
     const t = room.tileAt(tx, ty);
     return t !== Tile.PIT && t !== Tile.WALL && t !== Tile.DOOR;
   };
   art.paintFloorDecor?.(p, room, new RNG(seed ^ 0xf100), isFloor);
+  yield;
 
   // pits
   for (let ty = 2; ty < room.h - 2; ty++) {
+    let any = false;
     for (let tx = 2; tx < room.w - 2; tx++) {
-      if (room.tileAt(tx, ty) === Tile.PIT) paintPit(p, room, art, pal, tx, ty);
+      if (room.tileAt(tx, ty) === Tile.PIT) {
+        paintPit(p, room, art, pal, tx, ty);
+        any = true;
+      }
     }
+    if (any) yield;
   }
 
   // ambient occlusion: walls cast soft shadows onto the floor edges
@@ -374,9 +414,11 @@ function buildBase(room: Room): PixelPainter {
   }
   const botAO = [0.28, 0.14, 0.05];
   for (let i = 0; i < botAO.length; i++) for (let x = g.X0; x < g.X1; x++) shadePx(p, x, g.Y1 - 1 - i, botAO[i]);
+  yield;
 
   if (theme.paintWall && !artMap.has(theme.id)) paintLegacyWalls(p, room, theme);
-  else paintWalls(p, art, g, seed);
+  else yield* paintWalls(p, art, g, seed);
+  yield;
   art.paintWallDecor?.(p, room, new RNG(seed ^ 0xa11), g);
   return p;
 }
@@ -416,11 +458,13 @@ interface WallSample {
 
 const FACE_SHADE = [2.25, 1.45, 2.55, 1.55];
 
-function paintWalls(p: PixelPainter, art: ThemeArt, g: WallGeo, seed: number): void {
+function* paintWalls(p: PixelPainter, art: ThemeArt, g: WallGeo, seed: number): Generator<void, void, void> {
   const s: WallSample = { face: 0, along: 0, da: 1, h: 0, dh: 1, t: 0, x: 0, y: 0, shade: 0, seed: seed & 0xffff };
   const tex = WALL_TEX[art.wall] ?? texBrick;
   const depth = [g.DT, g.DS, g.DS, g.DB];
   for (let y = 0; y < g.H; y++) {
+    // time-slice point (pre-rendering); interior rows only touch the side walls
+    if ((y & 7) === 7) yield;
     for (let x = 0; x < g.W; x++) {
       if (x >= g.X0 && x < g.X1 && y >= g.Y0 && y < g.Y1) continue;
       const tT = (g.Y0 - 0.5 - y) / g.DT;

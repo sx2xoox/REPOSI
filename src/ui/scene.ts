@@ -4,12 +4,36 @@
 // frame, so every screen change (title -> select -> run -> results) is smooth.
 
 import type { Renderer } from '../engine/renderer';
+import type { Action } from '../engine/input';
+
+/** An extra on-screen button a scene shows in touch mode (see ui/touch.ts). */
+export interface TouchButtonSpec {
+  /** rect in UI space (768x432) */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label?: string;
+  icon?: string;
+  /** action tapped on release, or a callback run inside the touch handler (a user gesture) */
+  tap: Action | (() => void);
+  /** highlighted call-to-action */
+  primary?: boolean;
+  /** hit area only (the scene draws it itself) */
+  ghost?: boolean;
+}
 
 export interface Scene {
   /** draw the scene below as well (overlays) */
   transparent?: boolean;
   /** keep updating the scene below (rare) */
   passUpdate?: boolean;
+  /** touch mode: show a corner button that taps 'cancel' ('close' = ✕, 'back' = ◀) */
+  touchBack?: 'close' | 'back' | false;
+  /** which top corner the back button sits in (default right) */
+  touchBackAt?: 'left' | 'right';
+  /** touch mode: extra buttons for this screen */
+  touchButtons?(): TouchButtonSpec[];
   enter?(): void;
   exit?(): void;
   update(dt: number): void;

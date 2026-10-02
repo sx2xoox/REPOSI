@@ -71,6 +71,7 @@ export interface ProjectileOpts {
   behaviors?: ProjBehavior[];
 }
 
+const LIGHT_OPTS = { intensity: 0.8 };
 const orbCache = new Set<string>();
 /** Get (and lazily define) an outlined, shaded orb sprite of diameter d in color. */
 export function orbSprite(d: number, color: string, outline = '#1a0d14'): string {
@@ -263,7 +264,7 @@ export class Projectile extends Entity {
     w.particles.burst(this.x, this.y - this.z * (impact ? 1 : 0.3), {
       count: n, speed: [25, 70], life: [0.15, 0.35], colors: ['#ffffff', this.color, this.color + '90'], size: [1, 2],
     });
-    if (this.team === 'player') w.sfx('tear_splash', { vol: 0.35, pitch: fx.range(0.9, 1.15) });
+    if (this.team === 'player') w.sfx('tear_splash', { vol: 0.35, pitch: fx.range(0.9, 1.15), x: this.x });
   }
 
   /** Damage and effects for hitting `target` (called by the world collision pass). */
@@ -307,16 +308,33 @@ export class Projectile extends Entity {
     if (this.style === 'sprite' && this.sprite) {
       r.sprite(this.sprite, this.x, dy, { rot: this.spriteRotates ? this.angle : 0, sx: this.scale, sy: this.scale });
     } else {
-      const d = this.r * 2 + 1;
-      const name = orbSprite(d * this.scale, this.color);
+      const d = (this.r * 2 + 1) * this.scale;
+      // the sprite name is cached per projectile (no string building per frame)
+      if (d !== this.orbD || this.color !== this.orbColor) {
+        this.orbD = d;
+        this.orbColor = this.color;
+        this.orbName = orbSprite(d, this.color);
+      }
+      const name = this.orbName;
       // stretch a bit along movement for speed feel
       r.sprite(name, this.x, dy, this.style === 'tear' ? { rot: this.angle, sx: 1.15, sy: 0.92 } : undefined);
     }
     for (const b of this.behaviors) b.draw?.(this, r, w);
   }
 
+  private orbD = -1;
+  private orbColor = '';
+  private orbName = '';
+  private lightCol = '';
+  private lightSrc = '';
   override light(w: World): void {
-    if (this.lightR > 0) w.lights.add(this.x, this.y - this.z, this.lightR, this.color.slice(0, 7), { intensity: 0.8 });
+    if (this.lightR <= 0) return;
+    // color may be changed by behaviors: re-derive the #rrggbb only when it does
+    if (this.lightSrc !== this.color) {
+      this.lightSrc = this.color;
+      this.lightCol = this.color.slice(0, 7);
+    }
+    w.lights.add(this.x, this.y - this.z, this.lightR, this.lightCol, LIGHT_OPTS);
   }
 }
 

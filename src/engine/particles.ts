@@ -3,7 +3,7 @@
 // ramp, and optionally leave a decal where they land (blood drops, embers ...).
 
 import { fx } from './rng';
-import type { Renderer } from './renderer';
+import { VIEW_H, VIEW_W, type Renderer } from './renderer';
 import type { Lighting } from './lighting';
 import { TAU } from './math';
 
@@ -79,75 +79,141 @@ export interface BurstOpts {
   vrot?: number;
 }
 
-const MAX_PARTICLES = 2500;
+/** Hard cap on live particles (scaled down further by `density`). */
+export const MAX_PARTICLES = 2000;
+/** cosmetic draw margin outside the view (px) */
+const CULL = 6;
 
 export class Particles {
   list: P[] = [];
-  /** global density multiplier (settings) */
+  /** global density multiplier (settings / low quality: 0.25..1) */
   density = 1;
+  /** recycled particle objects (avoids GC churn during big bursts) */
+  private pool: P[] = [];
+  /** replacement cursor once the cap is reached (overwrites the oldest first) */
+  private over = 0;
 
+  /** Live particle cap for the current density. */
+  get cap(): number {
+    return Math.round(MAX_PARTICLES * Math.min(1, Math.max(0.3, this.density)));
+  }
+
+  /**
+   * Spawn one particle. Single spawns (trails, ambient motes) are thinned out
+   * when density < 1; bursts are scaled by `burst()` instead.
+   */
   spawn(s: ParticleSpec): void {
-    if (this.list.length >= MAX_PARTICLES) this.list.shift();
-    this.list.push({
-      x: s.x, y: s.y, z: s.z ?? 0,
-      vx: s.vx ?? 0, vy: s.vy ?? 0, vz: s.vz ?? 0,
-      gravity: s.gravity ?? 0, drag: s.drag ?? 0,
-      life: s.life, size: s.size ?? 1, sizeEnd: s.sizeEnd ?? s.size ?? 1,
-      colors: s.colors, shape: s.shape ?? 'pixel', rot: s.rot ?? 0, vrot: s.vrot ?? 0,
-      alpha: s.alpha ?? 1, fade: s.fade ?? true, additive: s.additive ?? false,
-      light: s.light ?? 0, lightColor: s.lightColor, bounce: s.bounce ?? 0.4,
-      sprite: s.sprite, onLand: s.onLand, ground: s.ground ?? false,
-      age: 0, landed: false,
-    });
+    if (this.density < 1 && fx.next() > this.density) return;
+    this.add(s);
+  }
+
+  /** A live particle slot: pooled, or (when full) one of the oldest recycled. */
+  private alloc(): P {
+    const l = this.list;
+    if (l.length >= this.cap) {
+      // full: recycle one of the oldest (the list is roughly ordered by age)
+      if (this.over >= l.length) this.over = 0;
+      return l[this.over++];
+    }
+    const p = this.pool.pop() ?? ({} as P);
+    l.push(p);
+    return p;
+  }
+
+  private add(s: ParticleSpec): void {
+    const p = this.alloc();
+    p.x = s.x;
+    p.y = s.y;
+    p.z = s.z ?? 0;
+    p.vx = s.vx ?? 0;
+    p.vy = s.vy ?? 0;
+    p.vz = s.vz ?? 0;
+    p.gravity = s.gravity ?? 0;
+    p.drag = s.drag ?? 0;
+    p.life = s.life;
+    p.size = s.size ?? 1;
+    p.sizeEnd = s.sizeEnd ?? s.size ?? 1;
+    p.colors = s.colors;
+    p.shape = s.shape ?? 'pixel';
+    p.rot = s.rot ?? 0;
+    p.vrot = s.vrot ?? 0;
+    p.alpha = s.alpha ?? 1;
+    p.fade = s.fade ?? true;
+    p.additive = s.additive ?? false;
+    p.light = s.light ?? 0;
+    // resolved once here instead of slicing a string every frame in the light pass
+    p.lightColor = s.lightColor ?? (p.light > 0 ? s.colors[0].slice(0, 7) : undefined);
+    p.bounce = s.bounce ?? 0.4;
+    p.sprite = s.sprite;
+    p.onLand = s.onLand;
+    p.ground = s.ground ?? false;
+    p.age = 0;
+    p.landed = false;
   }
 
   burst(x: number, y: number, o: BurstOpts): void {
     const n = Math.max(1, Math.round(o.count * this.density));
+    const light = o.light ?? 0;
+    const lightColor = o.lightColor ?? (light > 0 ? o.colors[0].slice(0, 7) : undefined);
     for (let i = 0; i < n; i++) {
+      // same RNG call order as a spec-based spawn; fields written straight into the pooled particle
       const a = o.angle === undefined ? fx.angle() : o.angle + (fx.next() - 0.5) * (o.spread ?? 0.6);
       const sp = fx.range(o.speed[0], o.speed[1]);
       const rr = o.radius ? fx.next() * o.radius : 0;
       const ra = fx.angle();
       const size = o.size ? fx.range(o.size[0], o.size[1]) : 1;
-      this.spawn({
-        x: x + Math.cos(ra) * rr,
-        y: y + Math.sin(ra) * rr,
-        z: o.z ?? 0,
-        vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp,
-        vz: o.vz ? fx.range(o.vz[0], o.vz[1]) : 0,
-        gravity: o.gravity ?? 0,
-        drag: o.drag ?? 2,
-        life: fx.range(o.life[0], o.life[1]),
-        size,
-        sizeEnd: o.sizeEnd ?? size,
-        colors: o.colors,
-        shape: o.shape ?? 'pixel',
-        additive: o.additive,
-        light: o.light,
-        lightColor: o.lightColor,
-        bounce: o.bounce,
-        onLand: o.onLand,
-        ground: o.ground,
-        fade: o.fade,
-        sprite: o.sprite,
-        rot: fx.angle(),
-        vrot: o.vrot ? fx.range(-o.vrot, o.vrot) : 0,
-      });
+      const p = this.alloc();
+      p.x = x + Math.cos(ra) * rr;
+      p.y = y + Math.sin(ra) * rr;
+      p.z = o.z ?? 0;
+      p.vx = Math.cos(a) * sp;
+      p.vy = Math.sin(a) * sp;
+      p.vz = o.vz ? fx.range(o.vz[0], o.vz[1]) : 0;
+      p.gravity = o.gravity ?? 0;
+      p.drag = o.drag ?? 2;
+      p.life = fx.range(o.life[0], o.life[1]);
+      p.size = size;
+      p.sizeEnd = o.sizeEnd ?? size;
+      p.colors = o.colors;
+      p.shape = o.shape ?? 'pixel';
+      p.rot = fx.angle();
+      p.vrot = o.vrot ? fx.range(-o.vrot, o.vrot) : 0;
+      p.alpha = 1;
+      p.fade = o.fade ?? true;
+      p.additive = o.additive ?? false;
+      p.light = light;
+      p.lightColor = lightColor;
+      p.bounce = o.bounce ?? 0.4;
+      p.sprite = o.sprite;
+      p.onLand = o.onLand;
+      p.ground = o.ground ?? false;
+      p.age = 0;
+      p.landed = false;
     }
   }
 
   clear(): void {
+    for (const p of this.list) this.release(p);
     this.list.length = 0;
+    this.over = 0;
+  }
+
+  private release(p: P): void {
+    p.onLand = undefined;
+    if (this.pool.length < MAX_PARTICLES) this.pool.push(p);
   }
 
   update(dt: number): void {
     const l = this.list;
     let w = 0;
+    this.over = 0;
     for (let i = 0; i < l.length; i++) {
       const p = l[i];
       p.age += dt;
-      if (p.age >= p.life) continue;
+      if (p.age >= p.life) {
+        this.release(p);
+        continue;
+      }
       if (p.drag) {
         const k = Math.exp(-p.drag * dt);
         p.vx *= k;
@@ -187,31 +253,45 @@ export class Particles {
     const c = r.ctx;
     const vx = r.viewX;
     const vy = r.viewY;
-    for (const p of this.list) {
+    const l = this.list;
+    // canvas state is only touched when it changes (most particles share it)
+    let curAdd = false;
+    let curCol = '';
+    c.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < l.length; i++) {
+      const p = l[i];
       if (p.ground !== ground) continue;
       const t = p.age / p.life;
-      const ci = Math.min(p.colors.length - 1, Math.floor(t * p.colors.length));
-      const col = p.colors[ci];
       const size = p.size + (p.sizeEnd - p.size) * t;
-      const a = p.fade ? p.alpha * (1 - t * t) : p.alpha;
-      if (a <= 0.01) continue;
       const sx = p.x - vx;
       const sy = p.y - p.z - vy;
+      const m = size + CULL;
+      if (sx < -m || sy < -m || sx > VIEW_W + m || sy > VIEW_H + m) continue;
+      const a = p.fade ? p.alpha * (1 - t * t) : p.alpha;
+      if (a <= 0.01) continue;
+      const cols = p.colors;
+      const col = cols.length === 1 ? cols[0] : cols[Math.min(cols.length - 1, Math.floor(t * cols.length))];
       c.globalAlpha = a;
-      c.globalCompositeOperation = p.additive ? 'lighter' : 'source-over';
-      c.fillStyle = col;
+      if (p.additive !== curAdd) {
+        curAdd = p.additive;
+        c.globalCompositeOperation = curAdd ? 'lighter' : 'source-over';
+      }
+      if (col !== curCol) {
+        curCol = col;
+        c.fillStyle = col;
+      }
       switch (p.shape) {
         case 'pixel': {
-          const s = Math.max(1, Math.round(size));
+          const s = size < 1.5 ? 1 : Math.round(size);
           c.fillRect(Math.round(sx - s / 2), Math.round(sy - s / 2), s, s);
           break;
         }
         case 'square': {
-          c.save();
-          c.translate(Math.round(sx), Math.round(sy));
-          c.rotate(p.rot);
+          const cs = Math.cos(p.rot);
+          const sn = Math.sin(p.rot);
+          c.setTransform(cs, sn, -sn, cs, Math.round(sx), Math.round(sy));
           c.fillRect(-size / 2, -size / 2, size, size);
-          c.restore();
+          c.setTransform(1, 0, 0, 1, 0, 0);
           break;
         }
         case 'circle': {
@@ -240,7 +320,12 @@ export class Particles {
           break;
         }
         case 'sprite': {
-          if (p.sprite) r.spriteScreen(p.sprite, sx, sy, { rot: p.rot, alpha: a, sx: size, sy: size, additive: p.additive });
+          if (p.sprite) {
+            r.spriteScreen(p.sprite, sx, sy, { rot: p.rot, alpha: a, sx: size, sy: size, additive: p.additive });
+            // spriteScreen resets the canvas state
+            curAdd = false;
+            curCol = '';
+          }
           break;
         }
       }

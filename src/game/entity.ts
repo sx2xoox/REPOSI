@@ -83,12 +83,22 @@ export abstract class Entity {
   /** participates in actor-actor separation */
   solid = false;
   mass = 1;
+  /**
+   * Enemy-made danger that isn't a Projectile (lobbed shots, puddles ...).
+   * Bullet-clearing effects (`World.clearEnemyBullets`) remove these too.
+   */
+  enemyHazard = false;
 
   update(_w: World, _dt: number): void {}
   draw(_r: Renderer, _w: World): void {}
   /** emit lights (called during the light pass) */
   light(_w: World): void {}
   onRemove(_w: World): void {}
+  /**
+   * Called when a bullet-clearing effect erases this `enemyHazard` entity.
+   * Default (when not overridden): the entity simply disappears.
+   */
+  onCleared?(w: World): void;
 
   get sortY(): number {
     return this.y;

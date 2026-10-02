@@ -48,6 +48,138 @@ export class FloatingText extends Entity {
   }
 }
 
+/** Seconds a damage number stays after its last hit (then fades). */
+const DMG_HOLD = 0.55;
+const DMG_FADE = 0.25;
+
+/**
+ * Damage number that accumulates rapid hits on the same enemy (beams, flames,
+ * DoT): it hovers over the target, grows and pops on every increase, then
+ * drifts up and fades once the hits stop.
+ */
+export class DamageNumber extends Entity {
+  amount: number;
+  color: string;
+  /** seconds since the last added hit */
+  sinceAdd = 0;
+  hits = 1;
+  private pop = 1;
+  private rise = 0;
+  private target: Entity | null;
+  private ox: number;
+  private baseY: number;
+  /** extra vertical offset from the anchor (status numbers sit beside the hit number) */
+  private oy: number;
+  constructor(target: Entity | null, x: number, y: number, amount: number, color = '#ffffff', ox = fx.range(-3, 3), oy = 0) {
+    super();
+    this.target = target;
+    this.ox = ox;
+    this.oy = oy;
+    this.x = x + this.ox;
+    this.y = this.baseY = y + oy;
+    this.amount = amount;
+    this.color = color;
+    this.layer = 2;
+    this.tileCollide = false;
+  }
+
+  /** Merge another hit into this number. */
+  add(amount: number): void {
+    // discrete hits pop the number; a continuous stream (beam ticks) just flashes
+    this.pop = this.sinceAdd > 0.12 ? 1 : Math.max(this.pop, 0.4);
+    this.amount += amount;
+    this.sinceAdd = 0;
+    this.hits++;
+  }
+
+  get text(): string {
+    return `${Math.max(1, Math.round(this.amount))}`;
+  }
+
+  override update(_w: World, dt: number): void {
+    this.age += dt;
+    this.sinceAdd += dt;
+    this.pop = Math.max(0, this.pop - dt * 9);
+    const t = this.target;
+    if (t && !t.dead) {
+      const r = (t as { r?: number }).r ?? 6;
+      this.x = t.x + this.ox;
+      this.baseY = t.y - r - 6 - t.z + this.oy;
+    }
+    // quick initial hop, slow climb while hits keep coming, then drift away
+    const speed = this.age < 0.12 ? 60 : this.sinceAdd < DMG_HOLD ? 6 : 26;
+    this.rise = Math.min(this.rise + speed * dt, 26);
+    this.y = this.baseY - this.rise;
+    if (this.sinceAdd >= DMG_HOLD + DMG_FADE) this.dead = true;
+  }
+
+  override draw(r: Renderer): void {
+    const fade = this.sinceAdd > DMG_HOLD ? 1 - (this.sinceAdd - DMG_HOLD) / DMG_FADE : 1;
+    // pop: one size up for a moment; flash: brighter color + 1px hop
+    const pop = this.pop > 0.6 ? 1 : 0;
+    const flash = this.pop > 0.15;
+    r.pixelText(this.text, this.x, this.y - (flash && !pop ? 1 : 0), flash ? '#fff6c8' : this.color, {
+      align: 'center',
+      outline: '#140c1c',
+      scale: 1 + pop,
+      alpha: clamp(fade, 0, 1),
+    });
+  }
+}
+
+/** Soft glow + sparkles in an opened doorway (room-clear moment). */
+export class DoorClearGlow extends Entity {
+  private dx: number;
+  private dy: number;
+  private color: string;
+  dur = 1.1;
+  constructor(d: { x: number; y: number; dir: 'N' | 'S' | 'E' | 'W'; kind: string }) {
+    super();
+    // inward normal of the doorway
+    this.dx = d.dir === 'W' ? 1 : d.dir === 'E' ? -1 : 0;
+    this.dy = d.dir === 'N' ? 1 : d.dir === 'S' ? -1 : 0;
+    this.x = d.x + this.dx * 4;
+    this.y = d.y + this.dy * 4;
+    this.color = d.kind === 'boss' ? '#ff8060' : d.kind === 'treasure' ? '#ffd860' : d.kind === 'secret' ? '#c0a0ff' : '#ffe0a0';
+    this.layer = 2;
+    this.tileCollide = false;
+  }
+
+  private get env(): number {
+    const t = this.age / this.dur;
+    return t < 0.15 ? t / 0.15 : Math.max(0, 1 - (t - 0.15) / 0.85);
+  }
+
+  override update(w: World, dt: number): void {
+    this.age += dt;
+    if (this.age >= this.dur) {
+      this.dead = true;
+      return;
+    }
+    if (this.age < 0.6 && fx.chance(dt * 30)) {
+      const side = fx.range(-9, 9);
+      w.particles.spawn({
+        x: this.x + (this.dy !== 0 ? side : 0), y: this.y + (this.dx !== 0 ? side : 0),
+        vx: this.dx * fx.range(15, 45) + fx.range(-6, 6), vy: this.dy * fx.range(15, 45) + fx.range(-6, 6) - 6,
+        life: fx.range(0.35, 0.7), colors: ['#ffffff', this.color, this.color + '80'], size: fx.range(1, 2), drag: 2, additive: true,
+      });
+    }
+  }
+
+  override draw(r: Renderer): void {
+    const e = this.env;
+    if (e <= 0) return;
+    r.ring(this.x, this.y, 6 + (this.age / this.dur) * 18, this.color, 1, 0.5 * e);
+  }
+
+  override light(w: World): void {
+    const e = this.env;
+    if (e <= 0) return;
+    w.lights.add(this.x, this.y, 46 + 20 * e, this.color, { intensity: 0.9 * e });
+    w.lights.glow(this.x, this.y, 22, this.color, 0.35 * e);
+  }
+}
+
 /** Plays an animation (or static sprite) once, then disappears. */
 export class AnimEffect extends Entity {
   anim: string;

@@ -41,6 +41,8 @@ export class ItemSystem {
   computed: InvComputed | null = null;
   buffs: TempBuff[] = [];
   private activeKeys = new Set<string>();
+  /** effects that implement a given hook (rebuilt lazily after recompute) */
+  private byHook = new Map<keyof ItemHooks, ActiveEffect[]>();
   private w: World;
   /** guard against re-entrant dispatch loops */
   private depth = 0;
@@ -67,6 +69,7 @@ export class ItemSystem {
     const newKeys = new Set(effects.map((e) => e.key));
     const oldEffects = this.effects;
     this.effects = effects;
+    this.byHook = new Map();
     for (const e of oldEffects) if (!newKeys.has(e.key)) safe(() => e.hooks.onRemove?.(w));
     for (const e of effects) if (!this.activeKeys.has(e.key)) safe(() => e.hooks.onAcquire?.(w, e.power));
     this.activeKeys = newKeys;
@@ -91,12 +94,29 @@ export class ItemSystem {
   }
 
   // ---------------------------------------------------------- dispatch
-  private each(fn: (e: ActiveEffect) => void): void {
+  /** Effects implementing `hook` (a fresh array per recompute: safe to iterate while hooks change the inventory). */
+  private with(hook: keyof ItemHooks): ActiveEffect[] {
+    let l = this.byHook.get(hook);
+    if (!l) {
+      l = this.effects.filter((e) => typeof e.hooks[hook] === 'function');
+      this.byHook.set(hook, l);
+    }
+    return l;
+  }
+
+  private each(hook: keyof ItemHooks, fn: (e: ActiveEffect) => void): void {
     if (this.depth > 4) return;
+    const list = this.with(hook);
+    if (!list.length) return;
     this.depth++;
     try {
-      // copy: hooks may change the inventory
-      for (const e of [...this.effects]) safe(() => fn(e));
+      for (let i = 0; i < list.length; i++) {
+        try {
+          fn(list[i]);
+        } catch (err) {
+          console.error('[items] hook error', err);
+        }
+      }
     } finally {
       this.depth--;
     }
@@ -115,24 +135,24 @@ export class ItemSystem {
       this.buffs = this.buffs.filter((b) => b.time > 0);
       this.recompute();
     }
-    this.each((e) => e.hooks.onUpdate?.(w, dt, e.power));
+    this.each('onUpdate', (e) => e.hooks.onUpdate!(w, dt, e.power));
   }
 
-  onShoot(p: Projectile): void { this.each((e) => e.hooks.onShoot?.(this.w, p, e.power)); }
-  onAttack(angle: number): void { this.each((e) => e.hooks.onAttack?.(this.w, angle, e.power)); }
-  modifyHit(target: Actor, hit: HitInfo): void { this.each((e) => e.hooks.modifyHit?.(this.w, target, hit, e.power)); }
-  onHit(target: Actor, hit: HitInfo): void { if (!hit.noProc) this.each((e) => e.hooks.onHit?.(this.w, target, hit, e.power)); }
-  onKill(enemy: Enemy): void { this.each((e) => e.hooks.onKill?.(this.w, enemy, e.power)); }
-  onHurt(amount: number): void { this.each((e) => e.hooks.onHurt?.(this.w, amount, e.power)); }
-  onDash(): void { this.each((e) => e.hooks.onDash?.(this.w, e.power)); }
-  onRoomEnter(): void { this.each((e) => e.hooks.onRoomEnter?.(this.w, e.power)); }
-  onRoomClear(): void { this.each((e) => e.hooks.onRoomClear?.(this.w, e.power)); }
-  onFloorStart(): void { this.each((e) => e.hooks.onFloorStart?.(this.w, e.power)); }
-  onBomb(x: number, y: number): void { this.each((e) => e.hooks.onBomb?.(this.w, x, y, e.power)); }
-  onPickup(kind: string): void { this.each((e) => e.hooks.onPickup?.(this.w, kind, e.power)); }
-  onRelease(): void { this.each((e) => e.hooks.onRelease?.(this.w, e.power)); }
-  onDeflect(p: Projectile): void { this.each((e) => e.hooks.onDeflect?.(this.w, p, e.power)); }
-  draw(r: Renderer): void { this.each((e) => e.hooks.draw?.(this.w, r, e.power)); }
+  onShoot(p: Projectile): void { this.each('onShoot', (e) => e.hooks.onShoot?.(this.w, p, e.power)); }
+  onAttack(angle: number): void { this.each('onAttack', (e) => e.hooks.onAttack?.(this.w, angle, e.power)); }
+  modifyHit(target: Actor, hit: HitInfo): void { this.each('modifyHit', (e) => e.hooks.modifyHit?.(this.w, target, hit, e.power)); }
+  onHit(target: Actor, hit: HitInfo): void { if (!hit.noProc) this.each('onHit', (e) => e.hooks.onHit?.(this.w, target, hit, e.power)); }
+  onKill(enemy: Enemy): void { this.each('onKill', (e) => e.hooks.onKill?.(this.w, enemy, e.power)); }
+  onHurt(amount: number): void { this.each('onHurt', (e) => e.hooks.onHurt?.(this.w, amount, e.power)); }
+  onDash(): void { this.each('onDash', (e) => e.hooks.onDash?.(this.w, e.power)); }
+  onRoomEnter(): void { this.each('onRoomEnter', (e) => e.hooks.onRoomEnter?.(this.w, e.power)); }
+  onRoomClear(): void { this.each('onRoomClear', (e) => e.hooks.onRoomClear?.(this.w, e.power)); }
+  onFloorStart(): void { this.each('onFloorStart', (e) => e.hooks.onFloorStart?.(this.w, e.power)); }
+  onBomb(x: number, y: number): void { this.each('onBomb', (e) => e.hooks.onBomb?.(this.w, x, y, e.power)); }
+  onPickup(kind: string): void { this.each('onPickup', (e) => e.hooks.onPickup?.(this.w, kind, e.power)); }
+  onRelease(): void { this.each('onRelease', (e) => e.hooks.onRelease?.(this.w, e.power)); }
+  onDeflect(p: Projectile): void { this.each('onDeflect', (e) => e.hooks.onDeflect?.(this.w, p, e.power)); }
+  draw(r: Renderer): void { this.each('draw', (e) => e.hooks.draw?.(this.w, r, e.power)); }
 
   // ---------------------------------------------------------- buffs
   /** Add a temporary effect (potions, actives). Same key refreshes. */

@@ -11,6 +11,24 @@ export interface Settings {
   showFps: boolean;
   /** brief freeze frames on heavy hits */
   hitStop: boolean;
+  /** graphics preset: resolution cap, particle density, lighting (mobile perf) */
+  graphicsQuality: GraphicsQuality;
+  /** on-screen touch controls: auto (shown while touch is used) / always / never */
+  touchControls: TouchControlsMode;
+}
+
+export type GraphicsQuality = 'high' | 'medium' | 'low';
+export type TouchControlsMode = 'auto' | 'on' | 'off';
+
+/** Coarse primary pointer (phones / tablets)? Safe outside the browser. */
+export function isTouchDevice(): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    if (typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches) return true;
+    return typeof navigator !== 'undefined' && (navigator.maxTouchPoints ?? 0) > 0 && !window.matchMedia?.('(pointer: fine)').matches;
+  } catch {
+    return false;
+  }
 }
 
 export interface Progress {
@@ -54,6 +72,8 @@ export const DEFAULT_SETTINGS: Settings = {
   particles: 1,
   showFps: false,
   hitStop: true,
+  graphicsQuality: isTouchDevice() ? 'medium' : 'high',
+  touchControls: 'auto',
 };
 
 export const DEFAULT_PROGRESS: Progress = {

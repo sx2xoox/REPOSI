@@ -273,6 +273,8 @@ export class Lob extends Entity {
   time: number;
   height: number;
   trailT = 0;
+  /** floor warning under the landing point (removed if the shot is cleared) */
+  warning: GroundWarning | null = null;
 
   constructor(x0: number, y0: number, x1: number, y1: number, o: LobOpts) {
     super();
@@ -286,10 +288,17 @@ export class Lob extends Entity {
     this.layer = 1;
     this.tileCollide = false;
     this.team = 'enemy';
+    this.enemyHazard = true;
   }
 
   override get sortY(): number {
     return this.y + 4;
+  }
+
+  /** Erased by a bullet-clear: vanish mid-air, no landing hit. */
+  override onCleared(): void {
+    this.dead = true;
+    if (this.warning) this.warning.dead = true;
   }
 
   override update(w: World, dt: number): void {
@@ -341,8 +350,9 @@ export class Lob extends Entity {
 /** Launch an arcing shot from (x0,y0) to (x1,y1) with a floor warning for its whole flight. */
 export function lob(w: World, x0: number, y0: number, x1: number, y1: number, o: LobOpts): Lob {
   const time = o.time ?? 0.9;
-  if ((o.warn ?? 12) > 0) w.spawn(new GroundWarning(x1, y1, o.warn ?? 12, time, undefined, o.warnColor ?? WARN_RED));
+  const warning = (o.warn ?? 12) > 0 ? w.spawn(new GroundWarning(x1, y1, o.warn ?? 12, time, undefined, o.warnColor ?? WARN_RED)) : null;
   const l = new Lob(x0, y0, x1, y1, o);
+  l.warning = warning;
   w.spawn(l);
   w.sfx('whoosh', { vol: 0.35, pitch: fx.range(1.1, 1.3) });
   return l;
@@ -375,6 +385,7 @@ export class Hazard extends Entity {
     this.source = source;
     this.layer = 0;
     this.tileCollide = false;
+    this.enemyHazard = true;
     const n = 4 + Math.floor(radius / 5);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * TAU + fx.range(-0.4, 0.4);
@@ -385,6 +396,11 @@ export class Hazard extends Entity {
 
   get fade(): number {
     return Math.min(1, this.age / this.arm, (this.life - this.age) / 0.4);
+  }
+
+  /** Erased by a bullet-clear: stops hurting at once and fades out. */
+  override onCleared(): void {
+    this.life = Math.min(this.life, this.age + 0.25);
   }
 
   override update(w: World, dt: number): void {

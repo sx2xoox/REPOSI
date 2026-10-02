@@ -50,6 +50,7 @@ export class FrostPatch extends Entity {
     this.life = life;
     this.layer = 0;
     this.tileCollide = false;
+    this.enemyHazard = true;
     const n = 3 + Math.floor(radius / 5);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * TAU + fx.range(-0.4, 0.4);
@@ -69,6 +70,11 @@ export class FrostPatch extends Entity {
 
   get armed(): boolean {
     return this.age > this.arm && this.age < this.life - 0.3;
+  }
+
+  /** Erased by a bullet-clear: disarms at once and fades out. */
+  override onCleared(): void {
+    this.life = Math.min(this.life, this.age + 0.3);
   }
 
   override update(w: World, dt: number): void {

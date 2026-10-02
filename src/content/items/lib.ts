@@ -13,7 +13,7 @@ import type { World } from '../../game/world';
 import { Entity, type Actor, type HitInfo, type StatusApply } from '../../game/entity';
 import { Enemy } from '../../game/enemy';
 import { Projectile, type ProjBehavior, type ProjectileOpts } from '../../game/projectile';
-import { Weapons } from '../../game/defs';
+import { Weapons, defineGlobalHooks } from '../../game/defs';
 import type { Renderer } from '../../engine/renderer';
 import { VIEW_H, VIEW_W } from '../../engine/renderer';
 import { fx } from '../../engine/rng';
@@ -609,10 +609,16 @@ export abstract class Familiar extends Entity {
   }
 }
 
+/** last requested familiar counts per world (so they can follow the player at once on room enter) */
+const familiarWant = new WeakMap<World, Map<string, { want: number; make: (w: World) => Familiar; power: number }>>();
+
 /** Keep exactly `want` familiars of `key` alive in the current room. */
 export function syncFamiliars<T extends Familiar>(w: World, key: string, want: number, make: (w: World) => T, power = 1): T[] {
   let reg = familiarReg.get(w);
   if (!reg) familiarReg.set(w, (reg = new Map()));
+  let wants = familiarWant.get(w);
+  if (!wants) familiarWant.set(w, (wants = new Map()));
+  wants.set(key, { want, make, power });
   let list = (reg.get(key) ?? []) as T[];
   // familiars left behind in the previous room are replaced silently (no spawn poof)
   let followed = false;
@@ -641,6 +647,20 @@ export function syncFamiliars<T extends Familiar>(w: World, key: string, want: n
   reg.set(key, list);
   return list;
 }
+
+/** Re-sync every familiar kind (room enter: they arrive with the player, visible during the room slide). */
+export function resyncFamiliars(w: World): void {
+  const wants = familiarWant.get(w);
+  if (!wants) return;
+  for (const [key, s] of [...wants]) syncFamiliars(w, key, s.want, s.make, s.power);
+}
+
+defineGlobalHooks({
+  id: 'familiars_follow',
+  onRoomEnter(w) {
+    resyncFamiliars(w);
+  },
+});
 
 export function familiarCount(w: World, key: string): number {
   return familiarReg.get(w)?.get(key)?.filter((f) => !f.dead).length ?? 0;

@@ -16,10 +16,12 @@ import { animFrame, hasAnim } from '../engine/sprites';
 import { C, formatTime, splitFloorName } from './theme';
 import { divider, fitScale, frame, glow, keycap, spriteCentered } from './frame';
 import { appear } from './anim';
-import { CONTROL_ROWS, PAD_NAMES, controlKeys } from './keys';
+import { CONTROL_ROWS, PAD_NAMES, TOUCH_CONTROL_ROWS, controlKeys } from './keys';
+import { touchUiActive } from './touch-mode';
 
 export class PauseOverlay implements Scene {
   transparent = true;
+  touchBack = 'close' as const;
   private menu: Menu;
   private game: GameScene;
   private t = 0;
@@ -118,7 +120,7 @@ export class PauseOverlay implements Scene {
       r.uiText(label, fx + 16, fy, { size: 10, font: 'small', color: C.textFaint, alpha: k });
       r.uiText(val, fx + 46, fy, { size: 10, font: 'small', color: C.text, alpha: k });
     });
-    r.uiText(`시드  ${run.seed}${run.seeded ? '  (지정)' : ''}`, rx + rw - 14, ry + 18, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: k });
+    r.uiText(`시드  ${run.seed}${run.seeded ? '  (지정)' : ''}`, rx + rw - 14 - (touchUiActive() ? 40 : 0), ry + 18, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: k });
     // collected items row
     const items: string[] = [];
     const wdef = Weapons.get(p.weaponId);
@@ -143,6 +145,16 @@ export class PauseOverlay implements Scene {
     r.uiText('조작법', rx + 14, cy0 + 10, { size: 10, font: 'small', color: C.gold, alpha: k });
     const pad = input.aimMode === 'pad';
     const colW = (rw - 28) / 2;
+    if (touchUiActive()) {
+      TOUCH_CONTROL_ROWS.forEach(([icon, label, desc], i) => {
+        const cx = rx + 14 + (i % 2) * colW;
+        const cyy = cy0 + 34 + Math.floor(i / 2) * 26;
+        if (icon) r.uiSprite(icon, cx + 8, cyy, fitScale(icon, 15, 1.5), { alpha: k });
+        r.uiText(label, cx + 22, cyy - 6, { size: 10, font: 'small', color: C.text, alpha: k });
+        if (desc) r.uiText(desc, cx + 22 + r.measureText(label, 10, false, 'small') + 6, cyy - 6, { size: 10, font: 'small', color: C.textFaint, alpha: k });
+      });
+      return;
+    }
     CONTROL_ROWS.forEach((row, i) => {
       const cx = rx + 14 + (i % 2) * colW;
       const cyy = cy0 + 34 + Math.floor(i / 2) * 22;

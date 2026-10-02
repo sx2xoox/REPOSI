@@ -18,6 +18,7 @@ import { fitScale, frame, gauge, iconSlot, keyHintRow, spriteCentered } from './
 import { Repeater, Spring, appear } from './anim';
 import { fullStatRows, gridMove, scrollToRow } from './logic';
 import { actionLabel } from './keys';
+import { touchUiActive } from './touch-mode';
 
 const COLS = 10;
 const CELL = 40;
@@ -28,6 +29,7 @@ const WEAPON_KIND: Record<string, string> = { ranged: '원거리', melee: '근�
 
 export class StatusOverlay implements Scene {
   transparent = true;
+  touchBack = 'close' as const;
   private game: GameScene;
   private sel = 0;
   private selT = 0;
@@ -116,8 +118,9 @@ export class StatusOverlay implements Scene {
     r.uiText(ch.name, 156, 22 + oy, { size: 12, bold: true, color: ch.color, alpha: k });
     r.uiText(ch.title, 156, 37 + oy, { size: 10, font: 'small', color: C.textFaint, alpha: k });
     const [no, fname] = splitFloorName(w.floor.name);
-    r.uiText(`${no} · ${fname}`, UI_W - 30, 20 + oy, { size: 12, align: 'right', color: C.textDim, alpha: k });
-    r.uiText(`${formatTime(w.run.stats.timeSec)}  ·  처치 ${w.run.stats.kills}  ·  시드 ${w.run.seed}`, UI_W - 30, 37 + oy, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: k });
+    const hx = UI_W - 30 - (touchUiActive() ? 46 : 0); // leave room for the touch ✕ button
+    r.uiText(`${no} · ${fname}`, hx, 20 + oy, { size: 12, align: 'right', color: C.textDim, alpha: k });
+    r.uiText(`${formatTime(w.run.stats.timeSec)}  ·  처치 ${w.run.stats.kills}  ·  시드 ${w.run.seed}`, hx, 37 + oy, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: k });
 
     this.drawArtifacts(r, k, oy);
     this.drawEquipment(r, k, oy);
@@ -132,7 +135,7 @@ export class StatusOverlay implements Scene {
     const total = arts.reduce((s, a) => s + a.power, 0);
     r.uiText('유물', GX, 64 + oy, { size: 12, bold: true, color: C.goldHi, alpha: k });
     r.uiText(`${arts.length}종 · ${total}개`, GX + 34, 66 + oy, { size: 10, font: 'small', color: C.textFaint, alpha: k });
-    keyHintRow(r, [['방향키', '선택'], [actionLabel(input.bindings, 'inventory', input.aimMode === 'pad'), '닫기']], GX + COLS * CELL - 80, 71 + oy, { alpha: k * 0.8, pad: input.aimMode === 'pad' });
+    if (!touchUiActive()) keyHintRow(r, [['방향키', '선택'], [actionLabel(input.bindings, 'inventory', input.aimMode === 'pad'), '닫기']], GX + COLS * CELL - 80, 71 + oy, { alpha: k * 0.8, pad: input.aimMode === 'pad' });
     const d = r.dctx;
     d.save();
     d.beginPath();

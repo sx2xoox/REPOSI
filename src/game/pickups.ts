@@ -407,6 +407,8 @@ export class FirePlace extends Actor {
 export class Trapdoor extends Entity {
   /** opens after a short delay so the player doesn't fall in immediately */
   openT = 0;
+  /** a player standing on it when it appears must step off once first */
+  private armed = false;
   constructor(x: number, y: number) {
     super();
     this.x = x;
@@ -420,7 +422,17 @@ export class Trapdoor extends Entity {
     this.age += dt;
     this.openT = Math.min(1, this.openT + dt * 1.5);
     const p = w.player;
-    if (this.openT >= 1 && dist(this.x, this.y, p.x, p.y) < 7 && !p.dead && !w.transitioning) w.descend();
+    const d = dist(this.x, this.y, p.x, p.y);
+    if (!this.armed && d > 14) this.armed = true;
+    if (this.armed && this.openT >= 1 && d < 7 && !p.dead && !w.transitioning && !w.descending) w.beginDescend(this.x, this.y);
+    // while the keeper falls in, the hole breathes out a little dust
+    if (w.descending && fx.chance(dt * 40)) {
+      const a = fx.angle();
+      w.particles.spawn({
+        x: this.x + Math.cos(a) * 9, y: this.y + Math.sin(a) * 4, vx: -Math.cos(a) * 12, vy: -Math.sin(a) * 6 - 4,
+        life: fx.range(0.3, 0.5), colors: ['#a090b0', '#504060'], size: 1, drag: 1,
+      });
+    }
   }
 
   override draw(r: Renderer): void {

@@ -30,7 +30,7 @@ export function defaultRelease(w: World, p: Player): void {
   w.renderer.screenFlash('#ffd080', 0.35);
   w.spawn(new RingFx(p.x, p.y - 4, radius, 0.45, '#ffd080', 4));
   w.particles.burst(p.x, p.y - 4, { count: 60, speed: [80, 260], life: [0.3, 0.7], colors: ['#ffffff', '#ffe080', '#ff9a30', '#c04010'], size: [1, 3], additive: true, light: 6 });
-  for (const pr of w.projectiles) if (pr.team === 'enemy' && Math.hypot(pr.x - p.x, pr.y - p.y) < radius * 1.4) pr.expire(w, true);
+  w.clearEnemyBullets(p.x, p.y, radius * 1.4);
   for (const e of w.enemiesInRadius(p.x, p.y, radius)) {
     const d = Math.hypot(e.x - p.x, e.y - p.y) || 1;
     w.applyHit(e, {
@@ -89,6 +89,8 @@ export class Player extends Actor {
   holdT = 0;
   /** input locked (cutscenes, transitions) */
   frozen = false;
+  /** 0..1 trapdoor fall (shrinks & sinks into the hole; driven by World.beginDescend) */
+  fall = 0;
   god = false;
   /** recoil offset for the weapon sprite */
   recoil = 0;
@@ -459,11 +461,16 @@ export class Player extends Actor {
     this.lastHurtAt = w.time;
     w.run.stats.damageTaken += halfHearts;
     w.run.lastDamageSource = source;
-    w.shake(0.45);
-    w.hitstop(0.09);
-    w.renderer.screenFlash('#ff2030', 0.28);
-    w.sfx('player_hurt');
-    w.particles.burst(this.x, this.y - 6, { count: 14, speed: [40, 120], life: [0.3, 0.6], colors: ['#ff5060', '#c01828', '#800010'], size: [1, 2], gravity: 300, vz: [40, 100] });
+    // feedback scales with the hit (1 = normal, 2+ = heavy attack)
+    const heavy = Math.max(0, Math.round(halfHearts) - 1);
+    w.shake(0.42 + 0.15 * heavy);
+    w.hitstop(0.08 + 0.025 * heavy);
+    w.renderer.screenFlash('#ff2030', 0.24 + 0.08 * heavy);
+    w.playerHurtFx?.(halfHearts);
+    this.squash(0.72, 1.3);
+    w.sfx('player_hurt', { pitch: heavy ? 0.9 : 1 });
+    w.spawn(new RingFx(this.x, this.y - 6, 16 + 6 * heavy, 0.25, '#ff5060', 2));
+    w.particles.burst(this.x, this.y - 6, { count: 14 + 6 * heavy, speed: [40, 120], life: [0.3, 0.6], colors: ['#ff5060', '#c01828', '#800010'], size: [1, 2], gravity: 300, vz: [40, 100] });
     w.items.onHurt(halfHearts);
     if (!this.alive) w.playerDied(source);
     return true;
@@ -493,6 +500,10 @@ export class Player extends Actor {
 
   override draw(r: Renderer, w: World): void {
     if (this.dead) return;
+    if (this.fall > 0) {
+      this.drawFalling(r);
+      return;
+    }
     const blink = this.invuln > 0 && !this.dashing && Math.floor(this.invuln * 14) % 2 === 0;
     // flying characters hover a little above their (smaller) shadow
     const hover = this.flying ? 2 + Math.sin(this.age * 3.2) : 0;
@@ -518,6 +529,22 @@ export class Player extends Actor {
     }
   }
 
+  /** Trapdoor fall: shrink, spin a little and sink into the hole. */
+  private drawFalling(r: Renderer): void {
+    const f = this.fall;
+    const s = 1 - f * 0.85;
+    r.shadow(this.x, this.y + 2, 11 * s, 4 * s, 0.35 * (1 - f));
+    r.sprite(this.frameName(), this.x, this.y + 3 + f * 4, {
+      flipX: this.flip,
+      sx: s * (1 + Math.sin(f * 9) * 0.08),
+      sy: s,
+      rot: f * f * 1.6 * (this.flip ? -1 : 1),
+      alpha: f > 0.75 ? Math.max(0, (1 - f) / 0.25) : 1,
+      tint: '#140c1c',
+      tintAmount: f * 0.7,
+    });
+  }
+
   private drawWeapon(r: Renderer, w: World, wdef = Weapons.get(this.weaponId)): void {
     // `weapon.mem.hideUntil` lets special moves hide the held weapon for a moment
     if (!wdef || this.holdT > 0 || (this.weapon.mem.hideUntil ?? -1) > w.time) return;
@@ -535,7 +562,7 @@ export class Player extends Actor {
   }
 
   override light(w: World): void {
-    const fl = 1 + Math.sin(this.age * 9) * 0.03 + Math.sin(this.age * 23) * 0.02;
+    const fl = (1 + Math.sin(this.age * 9) * 0.03 + Math.sin(this.age * 23) * 0.02) * (1 - this.fall * 0.6);
     w.lights.add(this.x, this.y - 6, 95 * fl, this.character.lightColor ?? '#ffd8a0', { intensity: 0.95 });
     w.lights.add(this.x, this.y - 6, 30, '#ffffff', { intensity: 0.35 });
   }

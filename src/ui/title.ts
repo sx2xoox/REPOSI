@@ -2,7 +2,9 @@
 // (새 게임 / 시드 입력 / 도감 / 설정 / 크레딧), custom-seed entry modal, run
 // record line and version text. Character select lives in charselect.ts.
 
-import type { Scene } from './scene';
+import type { Scene, TouchButtonSpec } from './scene';
+import { softKeyboard, touchUiActive } from './touch-mode';
+import { fullscreenSupported, isFullscreen, toggleFullscreen } from './fullscreen';
 import type { Renderer } from '../engine/renderer';
 import { UI_H, UI_W } from '../engine/renderer';
 import { Menu, applyTyped } from './widgets';
@@ -32,6 +34,29 @@ export class TitleScene implements Scene {
   private seedT = 0;
   private seed = '';
 
+  /** touch: ✕ closes the seed box */
+  get touchBack(): 'close' | false {
+    return this.seedOpen ? 'close' : false;
+  }
+
+  touchButtons(): TouchButtonSpec[] {
+    if (this.seedOpen) {
+      // inside the seed box (where the key hints are on desktop)
+      const y = UI_H / 2 - 60 + 80;
+      return [
+        // tapping the text box (re)opens the phone keyboard
+        { x: UI_W / 2 - 116, y: UI_H / 2 - 18, w: 232, h: 30, tap: () => softKeyboard.request(), ghost: true },
+        { x: UI_W / 2 - 116, y, w: 108, h: 28, label: '취소', tap: 'cancel' },
+        { x: UI_W / 2 + 8, y, w: 108, h: 28, label: '시작', tap: 'confirm', primary: true },
+      ];
+    }
+    if (app.scenes.top !== this) return [];
+    if (fullscreenSupported() && !isFullscreen()) {
+      return [{ x: UI_W - 44, y: 10, w: 34, h: 30, icon: 'tc_full', tap: () => toggleFullscreen() }];
+    }
+    return [];
+  }
+
   constructor() {
     this.menu = new Menu([
       { label: '새 게임', action: () => app.scenes.set(new CharacterSelectScene()), hint: '무작위 시드로 새로운 하강을 시작합니다.' },
@@ -58,10 +83,12 @@ export class TitleScene implements Scene {
     input.textCapture = true;
     input.releaseAll();
     sfx('ui_open');
+    if (touchUiActive()) softKeyboard.open('', (v) => { this.seed = v; });
   }
 
   private closeSeed(): void {
     this.seedOpen = false;
+    softKeyboard.close();
     input.textCapture = false;
     input.releaseAll();
   }
@@ -136,7 +163,7 @@ export class TitleScene implements Scene {
       : '첫 하강을 기다리는 중';
     r.uiText(rec, 12, UI_H - 16, { size: 10, font: 'small', color: C.textFaint, alpha: mA });
     r.uiText(VERSION, UI_W - 12, UI_H - 16, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: mA });
-    if (!this.seedOpen) keyHintRow(r, [['↑↓', '선택'], ['Enter', '결정']], UI_W / 2, UI_H - 10, { alpha: mA * 0.8, pad: input.aimMode === 'pad' });
+    if (!this.seedOpen && !touchUiActive()) keyHintRow(r, [['↑↓', '선택'], ['Enter', '결정']], UI_W / 2, UI_H - 10, { alpha: mA * 0.8, pad: input.aimMode === 'pad' });
 
     if (this.seedOpen) this.drawSeed(r);
   }
@@ -155,10 +182,11 @@ export class TitleScene implements Scene {
     frame(r, bx, y + 42, bw, 30, 'inset');
     const shown = this.seed || '';
     r.uiText(shown, UI_W / 2, y + 50, { size: 16, align: 'center', color: C.text });
-    if (!shown) r.uiText('비워두면 무작위', UI_W / 2, y + 51, { size: 12, align: 'center', color: C.textMute });
+    const touchUi = touchUiActive();
+    if (!shown) r.uiText(touchUi ? '눌러서 입력 · 비우면 무작위' : '비워두면 무작위', UI_W / 2, y + 51, { size: 12, align: 'center', color: C.textMute });
     const caretX = UI_W / 2 + r.measureText(shown, 16) / 2 + 2;
     if (Math.floor(this.seedT * 2.2) % 2 === 0 && shown) r.uiRect(caretX, y + 49, 2, 16, C.goldHi);
-    keyHintRow(r, [['Enter', '시작'], ['Esc', '취소']], UI_W / 2, y + h - 22);
+    if (!touchUi) keyHintRow(r, [['Enter', '시작'], ['Esc', '취소']], UI_W / 2, y + h - 22);
     glow(r, UI_W / 2, y + 57, 90, '#ffb050', 0.06);
   }
 }

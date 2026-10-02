@@ -17,16 +17,9 @@ import { swordWaveSprite } from '../weapons/sprites';
 import { glowSprite } from '../weapons/common';
 
 // ====================================================================== shared
-/** Erase enemy bullets within `radius` of (x, y) with a little spark each. */
+/** Erase enemy bullets (and lobbed shots / puddles) within `radius` of (x, y) with a little spark each. */
 export function clearBullets(w: World, x: number, y: number, radius: number): number {
-  let n = 0;
-  for (const pr of w.projectiles) {
-    if (pr.team !== 'enemy' || pr.dead) continue;
-    if (dist(pr.x, pr.y, x, y) > radius) continue;
-    pr.expire(w, true);
-    n++;
-  }
-  return n;
+  return w.clearEnemyBullets(x, y, radius);
 }
 
 /** A special-move hit on an enemy (no item procs, no ember). */
