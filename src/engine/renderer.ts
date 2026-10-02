@@ -156,6 +156,8 @@ export class Renderer {
   offsetX = 0;
   offsetY = 0;
   pixelPerfect = false;
+  /** cap on window.devicePixelRatio for the display canvas (graphics quality); call resize() after changing */
+  maxDpr = 2;
 
   // camera (world coords of the view's top-left corner)
   camX = 0;
@@ -184,7 +186,7 @@ export class Renderer {
   }
 
   resize(): void {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, Math.max(0.5, this.maxDpr));
     const w = Math.floor(window.innerWidth * dpr);
     const h = Math.floor(window.innerHeight * dpr);
     if (this.display.width !== w || this.display.height !== h) {
