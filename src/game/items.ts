@@ -85,6 +85,7 @@ export class ItemSystem {
   private cur: ActiveEffect | null = null;
   private curEvent = false;
   computed: InvComputed | null = null;
+  revision = 0;
   buffs: TempBuff[] = [];
   private activeKeys = new Set<string>();
   /** effects that implement a given hook (rebuilt lazily after recompute) */
@@ -103,6 +104,7 @@ export class ItemSystem {
     const p = w.player;
     const comp = p.inv.compute();
     this.computed = comp;
+    this.revision++;
     const effects: ActiveEffect[] = [];
     // the keeper's own passive runs first (before any artifact)
     if (p.character.passive) effects.push({ key: passiveKey(p.character), hooks: p.character.passive, power: 1 });

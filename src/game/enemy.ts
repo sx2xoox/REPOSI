@@ -380,6 +380,12 @@ export class Enemy extends Actor {
     if (this.hidden) return;
     const shadowW = this.def.shadow ?? this.r * 2;
     if (shadowW > 0) r.shadow(this.x, this.y + this.r * 0.5, shadowW * (1 - Math.min(0.5, this.z / 80)), undefined, 0.3);
+    if (this.champion) {
+      // A stable ground marker remains readable through hit flashes and tints.
+      r.ring(this.x, this.y + 2, this.r + 4, '#140c1c', 3, 0.8);
+      r.ring(this.x, this.y + 2, this.r + 4, this.championColor || '#ffba60', 1, 0.9);
+      r.sprite('ui_crown', this.x, this.y - this.z - this.r * 2 - 7, { sx: 0.65, sy: 0.65 });
+    }
     if (this.def.draw) {
       this.def.draw(this, r, w);
       return;

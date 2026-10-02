@@ -209,7 +209,7 @@ function paintHead(p: PixelPainter, o: CkPose, p2: boolean): void {
   p.line(hx, hy - 11, hx, hy - 13, BRASS7[3]);
   p.px(hx, hy - 13, VERD[5]);
   // gaunt porcelain face: a long skull, hollow cheeks
-  ball(p, hx, hy, 5.2, 6.6, PORC, true);
+  ball(p, hx, hy, 5.2, 6.6, PORC, false);
   for (let y = hy + 1; y <= hy + 3; y++) {
     p.pxIn(hx - 4, y, PORC[1]);
     p.pxIn(hx + 4, y, PORC[1]);
@@ -227,6 +227,8 @@ function paintHead(p: PixelPainter, o: CkPose, p2: boolean): void {
   p.circle(hx + 3, hy - 1, 2.1, VERD[4]);
   p.px(hx + 3, hy - 1, glow ? AMBER[4] : VERD[2]);
   p.px(hx + 2, hy - 2, VERD[5]);
+  p.px(hx + 3, hy - 3, PORC[5]);
+  p.px(hx + 4, hy, VERD[1]);
   p.line(hx + 6, hy, hx + 7, hy + 3, BRASS7[2]);
   // hinged jaw with brass pins at the corners
   p.line(hx - 2, hy + 4, hx + 2, hy + 4, PLUM[1]);
@@ -409,7 +411,7 @@ defineDrawnSprite('ck_portrait', 70, 88, (p) => {
   p.line(cx, 42, cx, 52, BRASS7[2]);
   p.rect(cx - 1, 44, 3, 1, BRASS7[4]);
   p.rect(cx - 1, 48, 3, 1, BRASS7[4]);
-  ball(p, cx, 30, 11, 15, PORC, true);
+  ball(p, cx, 30, 11, 15, PORC, false);
   for (let y = 30; y <= 38; y++) {
     p.pxIn(cx - 8, y, PORC[1]);
     p.pxIn(cx + 8, y, PORC[1]);
@@ -426,6 +428,8 @@ defineDrawnSprite('ck_portrait', 70, 88, (p) => {
   p.circle(cx + 5, 26.5, 4.6, VERD[3]);
   p.circle(cx + 4, 25.5, 2.4, VERD[4]);
   p.px(cx + 3, 24, VERD[5]);
+  p.line(cx + 3, 23, cx + 6, 22, PORC[5]);
+  p.px(cx + 8, 29, VERD[1]);
   p.rect(cx + 4, 26, 2, 2, AMBER[4]);
   p.line(cx + 11, 28, cx + 15, 36, BRASS7[2]);
   // hinged jaw + hairline cracks

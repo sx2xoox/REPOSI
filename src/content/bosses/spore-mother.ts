@@ -145,7 +145,11 @@ function paintCap(p: PixelPainter, o: MomPose, p2: boolean): void {
       if (y > cy + ry * 0.45) p.pxIn(x, y, CAP[1]);
     }
   }
-  p.shadeSphere(cx, cy, rx, ry, CAP, { dither: true });
+  p.shadeSphere(cx, cy, rx, ry, CAP, { dither: false });
+  // Layered cap scales follow its curve rather than scattered stippling.
+  for (const [dx, dy] of [[-0.6, -0.35], [-0.25, -0.72], [0.35, -0.48]] as const) {
+    p.line(cx + dx * rx, cy + dy * ry, cx + dx * rx + 3, cy + dy * ry - 1, CAP[3]);
+  }
   // rim lip
   for (let x = Math.floor(cx - rx + 2); x <= cx + rx - 2; x++) {
     const t = (x - cx) / rx;

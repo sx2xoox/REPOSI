@@ -295,6 +295,9 @@ export const BAEKGU_PASSIVE: PassiveDef = {
     if (!inCounter(w)) return;
     const left = (w.vars.__bgCounterUntil ?? 0) - w.time;
     const a = Math.min(1, left / 0.4);
+    const duration = BAEKGU_COUNTER_TIME + (hasAffinity(w) ? BAEKGU_COUNTER_TIME_AFFINITY : 0);
+    r.line(p.x - 9, p.y + 9, p.x + 9, p.y + 9, '#142030', 3, a);
+    r.line(p.x - 9, p.y + 9, p.x - 9 + 18 * Math.min(1, left / duration), p.y + 9, '#e8f0ff', 1, a);
     r.sprite(glowSprite(10, '#c8d8ff'), p.x + 8, p.y - 20 - p.z, { alpha: (0.5 + 0.3 * Math.sin(w.time * 18)) * a, additive: true });
     r.sprite('fx_bg_fang', p.x + 8, p.y - 20 - p.z + Math.sin(w.time * 6) * 0.8, { alpha: a });
   },

@@ -187,6 +187,10 @@ function paintHelm(p: PixelPainter, cx: number, cy: number, p2: boolean): void {
   p.px(vx + 3, cy + 5, DEEP);
   p.line(cx - 6, cy - 3, cx + 6, cy - 3, STEEL[5]);
   p.line(cx - 6, bot, cx + 6, bot, STEEL[0]);
+  // Etched frost along the temple and a bright cheek bevel.
+  p.line(cx - 5, cy + 2, cx - 5, cy + 5, STEEL[5]);
+  p.px(cx - 4, cy + 4, ICEC[3]);
+  p.line(cx + 3, top + 1, cx + 4, top + 3, ICEC[2]);
   // ice crest
   for (const [dx, h] of [[-2, 2], [0, 4], [2, 2]] as const) p.line(cx + dx, top - 1, cx + dx, top - 1 - h, dx === 0 ? ICEC[3] : ICEC[2]);
   if (p2) crack(p, cx - 4, top + 1, cx - 2, bot - 1, VISOR, 6, 0.8);

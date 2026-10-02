@@ -64,6 +64,11 @@ function paintBat(p: PixelPainter, wing: WingShape, screech: boolean): void {
   }
   p.px(8, 11, BAT_BONE);
   p.mirrorX();
+  // Break the mirrored lighting with a tufted brow and a warm muzzle.
+  p.px(8, 3, BAT_FUR[4]);
+  p.px(9, 4, BAT_FUR[3]);
+  p.px(9, 7, '#e8a094');
+  p.px(9, 8, BAT_BONE);
 }
 frames('cbat', 'fly', 4, 19, 13, (p, i) => paintBat(p, [WINGS.up, WINGS.mid, WINGS.down, WINGS.mid][i], false), { fps: 14 });
 frames('cbat', 'screech', 2, 19, 13, (p, i) => paintBat(p, i ? WINGS.wide : WINGS.up, true), { fps: 16 });
@@ -153,6 +158,8 @@ function paintRat(p: PixelPainter, step: number, mode: 'run' | 'sniff' | 'pounce
   // body
   p.ellipse(8, 5.2 + lift * 0.5, 4.6, 2.9, RAT_FUR[2]);
   sphere(p, 8, 5 + lift * 0.5, 4.6, 2.9, RAT_FUR);
+  p.line(5, 3 + lift * 0.5, 8, 3 + lift * 0.5, RAT_FUR[4]);
+  p.px(6, 4 + lift * 0.5, RAT_FUR[3]);
   p.line(5, 7 + lift * 0.5, 10, 7 + lift * 0.5, RAT_FUR[1]);
   // head
   const hy = 4.6 + headDy + lift;
@@ -165,6 +172,7 @@ function paintRat(p: PixelPainter, step: number, mode: 'run' | 'sniff' | 'pounce
   p.px(11, Math.round(hy - 2.4), RAT_PINK);
   // eye
   p.px(13, Math.round(hy - 1), '#ff2a2a');
+  p.px(13, Math.round(hy - 2), '#ffe0b0');
   // whisker
   p.px(16, Math.round(hy) + 1, '#d8d0d8');
 }
@@ -428,6 +436,10 @@ function paintShade(p: PixelPainter, k: number, cast: boolean): void {
   const pts = [4, 9 + bob, 13, 9 + bob, 16, 16, ...hemPts, 1, 16];
   p.poly(pts, SHADE[2]);
   p.shadeVertical(1, 9, 16, 12, [SHADE[3], SHADE[2], SHADE[1], SHADE[0]]);
+  // Broad robe folds, not scattered texture, keep the silhouette legible.
+  p.line(6, 12 + bob, 4, 17, SHADE[3]);
+  p.line(11, 12 + bob, 13, 17, SHADE[1]);
+  p.px(8, 15, SHADE[4]);
   // sleeves / hands
   if (cast) {
     p.poly([2, 10 + bob, 0, 3 + bob, 3, 2 + bob, 5, 9 + bob], SHADE[3]);
@@ -442,6 +454,7 @@ function paintShade(p: PixelPainter, k: number, cast: boolean): void {
   p.circle(8.5, 6.5 + bob, 5.6, SHADE[3]);
   sphere(p, 8.5, 6.5 + bob, 5.6, 5.6, SHADE, false);
   p.poly([8, 0 + bob, 11, 2 + bob, 6, 2 + bob], SHADE[3]);
+  p.line(5, 3 + bob, 7, 2 + bob, SHADE[4]);
   // dark face
   p.ellipse(9, 7.5 + bob, 3.7, 3.4, '#140a22');
   // eyes

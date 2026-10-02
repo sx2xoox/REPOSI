@@ -238,6 +238,10 @@ function paintHead(p: PixelPainter, o: SaintPose, p2: boolean): void {
   }
   // the hood's brim casts a shadow on the brow
   p.line(hx - 3, hy - 2, hx + 3, hy - 2, SKIN[0]);
+  // Frost beads on the veil, kept outside the expressive eye area.
+  p.line(hx - 6, hy, hx - 6, hy + 4, ICEC[2]);
+  p.px(hx - 6, hy + 5, ICEC[3]);
+  p.px(hx + 6, hy + 3, ICEC[3]);
   const ey = hy + 2;
   if (p2) {
     // eyes open, burning rose; the porcelain cracks

@@ -151,7 +151,8 @@ export class SpiritSheep extends Familiar {
     super(w);
     this.z = 0;
     this.r = 5;
-    this.x = w.player.x + (fx.chance(0.5) ? 1 : -1) * 2;
+    // Spawn positions affect herding and must agree across lockstep peers.
+    this.x = w.player.x + (w.rng.chance(0.5) ? 1 : -1) * 2;
   }
 
   /** Pick the enemy this sheep works: the n-th nearest to the herd point (n = slot). */
@@ -262,6 +263,12 @@ export const MORI_PASSIVE: PassiveDef = {
     const h = herdPoint(w);
     const pen = penActive(w);
     const a = pen ? 0.9 : 0.5;
+    if (pen) {
+      const remaining = Math.max(0, (w.vars.__moriPenUntil ?? 0) - w.time) / MORI_PEN_TIME;
+      r.ring(h.x, h.y + 1, 17, '#9af0e0', 1, 0.3);
+      r.line(h.x - 10, h.y + 13, h.x + 10, h.y + 13, '#143a34', 3, 0.9);
+      r.line(h.x - 10, h.y + 13, h.x - 10 + 20 * remaining, h.y + 13, '#9af0e0', 1, 0.9);
+    }
     r.ring(h.x, h.y + 1, 8 + Math.sin(w.time * 4) * 1.5, '#9af0e0', 1, 0.35 * a);
     r.sprite('fx_mori_post', h.x, h.y - 4 + Math.sin(w.time * 3) * 0.5, { alpha: a });
   },

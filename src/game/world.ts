@@ -154,6 +154,7 @@ export class World {
   /** red edge flash after the player got hurt (seconds left) */
   private hurtT = 0;
   private hurtPower = 0;
+  private hurtAngle: number | null = null;
   /** strongest hit shake applied this frame */
   private hitShake = 0;
   /** delayed room-clear "moment" (chime + door glow) */
@@ -600,7 +601,7 @@ export class World {
         if (dist2(pr.x, pr.y, p.x, p.y - 4) < rr * rr) {
           if (p.invuln > 0 && !p.dashing) continue;
           if (p.dashing) continue; // dodge through
-          if (p.hurt(this, pr.damage, pr.owner instanceof Enemy ? pr.owner.def.name : '탄환')) {
+          if (p.hurt(this, pr.damage, pr.owner instanceof Enemy ? pr.owner.def.name : '탄환', false, { x: p.x - pr.vx, y: p.y - pr.vy })) {
             p.knock(Math.cos(pr.angle), Math.sin(pr.angle), 120);
           }
           pr.expire(this, true);
@@ -615,7 +616,7 @@ export class World {
       if (e.harmful && e.dormant <= 0 && e.contactDamage > 0 && e.z < 10 && p.alive && !e.hasStatus('charm')) {
         const rr = e.r + p.r - 2;
         if (dist2(e.x, e.y, p.x, p.y) < rr * rr) {
-          if (p.hurt(this, e.contactDamage, e.def.name)) {
+          if (p.hurt(this, e.contactDamage, e.def.name, false, e)) {
             const d = Math.hypot(p.x - e.x, p.y - e.y) || 1;
             p.knock((p.x - e.x) / d, (p.y - e.y) / d, 160);
           }
@@ -688,7 +689,7 @@ export class World {
         const dealt = Math.max(0, before - Math.max(0, target.hp));
         this.run.stats.damageDealt += dealt;
         // bosses fill the gauge at half rate: a release is a burst, not the main boss-killing tool
-        if (hit.kind !== 'status' && !hit.noProc) p.addEmber(Math.min(6, 1.2 + dealt / Math.max(1, p.stats.damage) * 1.3) * (target.isBoss ? 0.5 : 1));
+        if (hit.kind !== 'status' && !hit.noProc) p.addEmber(Math.min(6, 1.2 + dealt / Math.max(1, p.stats.damage) * 1.3) * (target.isBoss ? 0.5 : 1) * (p.flags.has('kindleBlessing') ? 1.35 : 1));
         this.hitFeedback(target, hit, dealt);
         this.items.onHit(target, hit);
         if (target.hp <= 0) this.killEnemy(target);
@@ -872,7 +873,7 @@ export class World {
     if ((o.hurtsPlayer ?? true) && !p.flags.has('bombImmune') && dist(x, y, p.x, p.y) < radius + p.r - 4) {
       // enemy blasts (e.g. bursting bloaters) name their owner on the death screen
       // enemy blasts scale with the floor's enemy damage; the keeper's own bombs do not
-      if (p.hurt(this, 2, o.source instanceof Enemy ? o.source.def.name : '폭발', !(o.source instanceof Enemy))) {
+      if (p.hurt(this, 2, o.source instanceof Enemy ? o.source.def.name : '폭발', !(o.source instanceof Enemy), { x, y })) {
         const d = dist(x, y, p.x, p.y) || 1;
         p.knock((p.x - x) / d, (p.y - y) / d, 240);
       }
@@ -1426,8 +1427,9 @@ export class World {
   }
 
   /** Player-hurt screen feedback (red edges), scaled by damage in half hearts. */
-  playerHurtFx(halfHearts: number): void {
+  playerHurtFx(halfHearts: number, origin?: { x: number; y: number }): void {
     this.hurtT = 0.45;
+    this.hurtAngle = origin ? Math.atan2(origin.y - this.player.y, origin.x - this.player.x) : null;
     this.hurtPower = clamp(0.55 + 0.25 * halfHearts, 0.6, 1.1);
   }
 
@@ -1697,9 +1699,16 @@ export class World {
     }
     // hurt: red edges flash in and fade
     if (this.hurtT > 0) {
-      ctx.globalAlpha = clamp((this.hurtT / 0.45) * this.hurtPower, 0, 1);
+      ctx.globalAlpha = clamp((this.hurtT / 0.45) * this.hurtPower * this.renderer.flashIntensity, 0, 1);
       ctx.drawImage(this.hurtVignette(), 0, 0);
       ctx.globalAlpha = 1;
+      if (this.hurtAngle !== null) {
+        const dx = Math.cos(this.hurtAngle), dy = Math.sin(this.hurtAngle);
+        const x = p.x + dx * 22, y = p.y - 6 + dy * 22;
+        const a = this.hurtT / 0.45;
+        this.renderer.line(x - dx * 5 - dy * 4, y - dy * 5 + dx * 4, x, y, '#ff9a9a', 2, a);
+        this.renderer.line(x - dx * 5 + dy * 4, y - dy * 5 - dx * 4, x, y, '#ff9a9a', 2, a);
+      }
     }
   }
 

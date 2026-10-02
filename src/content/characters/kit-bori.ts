@@ -354,6 +354,7 @@ export class BodyBlock extends Entity {
       if (w.applyHit(e, { damage: d, kind: 'melee', attacker: p, dirX: kx / kl, dirY: ky / kl, knockback: BORI_SHOVE_KNOCK, statuses: stun ? [stun] : undefined })) {
         w.sfx('hit_metal', { vol: 0.4, pitch: 0.75, x: e.x });
         w.spawn(new RingFx(e.x, e.y - e.z - 4, 16, 0.22, '#ffd9b0', 2));
+        w.particles.burst(e.x, e.y - e.z - 4, { count: 8, angle: Math.atan2(this.dy, this.dx), spread: 0.6, speed: [60, 150], life: [0.12, 0.25], colors: WARM, shape: 'spark', size: [1, 2] });
         w.renderer.kick(this.dx * 2, this.dy * 2);
         w.hitstop(0.03, true);
       }
@@ -433,7 +434,7 @@ export function releaseRescueHowl(w: World, p: Player): void {
   for (const e of w.enemiesInRadius(p.x, p.y, BORI_HOWL_RADIUS)) {
     const d = Math.hypot(e.x - p.x, e.y - p.y) || 1;
     const stun = bossSafe(e, { kind: 'stun', duration: 0.7 });
-    w.applyHit(e, { damage: s.damage * BORI_HOWL_DMG, kind: 'explosion', attacker: p, dirX: (e.x - p.x) / d, dirY: (e.y - p.y) / d, knockback: 320, noProc: true, statuses: stun ? [stun] : undefined });
+    w.applyHit(e, { damage: s.damage * BORI_HOWL_DMG, kind: 'explosion', attacker: p, dirX: (e.x - p.x) / d, dirY: (e.y - p.y) / d, knockback: 320, noProc: true, release: true, statuses: stun ? [stun] : undefined });
   }
   p.heal(2);
   p.shields = Math.min(BORI_SHIELD_CAP, p.shields + 1);

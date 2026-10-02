@@ -32,8 +32,11 @@ export function shotFade(st: WeaponState, w: World, dur = 0.1): number {
 
 /** A held gun / wand: pushed back by recoil and flashing right after a shot. */
 export function drawGun(r: Renderer, w: World, p: Player, st: WeaponState, sprite: string, dist0 = 6, recoil = 2.5, o: DrawOpts = {}): void {
-  const f = shotFade(st, w, 0.1);
-  drawHeld(r, p, sprite, p.aim, dist0 - f * recoil, { flash: f > 0.55 ? 0.4 : 0, ...o });
+  const f = shotFade(st, w, 0.16);
+  // Fast kick, smooth recovery and a small muzzle rise; damage timing is unchanged.
+  const kick = f * f;
+  const rise = Math.sin(f * Math.PI) * Math.min(0.09, recoil * 0.025) * (Math.cos(p.aim) < 0 ? 1 : -1);
+  drawHeld(r, p, sprite, p.aim + rise, dist0 - kick * recoil, { flash: f > 0.8 ? 0.35 : 0, ...o });
 }
 
 /** Common attack bookkeeping: onAttack hook (exactly once), timers. */

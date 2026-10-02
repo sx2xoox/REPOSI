@@ -17,6 +17,7 @@ import { sfx } from '../audio/audio';
 import { C, formatTime, splitFloorName } from './theme';
 import { divider, fitScale, frame, glow, spriteCentered } from './frame';
 import { appear } from './anim';
+import { SYNERGIES, synergyActive } from '../game/synergies';
 
 /** Pick a sprite for the cause of death (enemy sprite by name, else a themed icon). */
 export function killerSprite(source: string): string {
@@ -187,7 +188,7 @@ export class GameOverOverlay implements Scene {
     r.uiText(`지녔던 것 ${this.items.length}`, x + w / 2, y + 12, { size: 10, font: 'small', align: 'center', color: C.gold, alpha: a });
     const cols = 7;
     const cell = 28;
-    const max = cols * 5;
+    const max = cols * 3;
     this.items.slice(0, max).forEach((icon, i) => {
       const k = clamp((this.t - 0.9 - i * 0.04) / 0.25, 0, 1);
       if (k <= 0) return;
@@ -199,6 +200,18 @@ export class GameOverOverlay implements Scene {
     });
     if (!this.items.length) r.uiText('빈손이었다.', x + w / 2, y + 80, { size: 12, align: 'center', color: C.textMute, alpha: a });
     if (this.items.length > max) r.uiText(`+${this.items.length - max}`, x + w - 14, y + 158, { size: 10, font: 'small', align: 'right', color: C.textDim, alpha: a });
+    const world = this.game.world;
+    const p = world.player;
+    [p.weaponId, p.weapon2Id].forEach((id, i) => {
+      const weapon = id ? Weapons.get(id) : undefined;
+      if (weapon) r.uiText(`${i + 1} · ${weapon.name}`, x + 14, y + 122 + i * 14, { size: 10, font: 'small', color: C.textDim, alpha: a });
+    });
+    const counts = world.items.computed?.tagCounts ?? {};
+    const mixed = SYNERGIES.filter((s) => synergyActive(counts, s.tags)).map((s) => s.name);
+    const active = world.items.computed?.sets.filter((s) => s.active.length).map((s) => s.def.name) ?? [];
+    const build = mixed.length ? mixed.join(' · ') : active.length ? active.join(' · ') : '공명 없음';
+    const line = r.wrapText(build, w - 54, 10, false, 'small')[0];
+    r.uiText(line ?? '', x + 14, y + 155, { size: 10, font: 'small', color: C.goldHi, alpha: a });
   }
 }
 

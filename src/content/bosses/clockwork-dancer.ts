@@ -231,7 +231,7 @@ function paintHead(p: PixelPainter, o: DancerPose, p2: boolean): void {
     p.px(kx - 1, ky + 6, BRASS7[5]);
   }
   // porcelain head
-  ball(p, hx, hy, side ? 3.8 : 4.6, 5.2, PORC, true);
+  ball(p, hx, hy, side ? 3.8 : 4.6, 5.2, PORC, false);
   // brass hair pulled into a bun, a verdigris jewel in the tiara
   for (let y = hy - 6; y <= hy - 2; y++) {
     for (let x = hx - 5; x <= hx + 5; x++) {
@@ -245,6 +245,9 @@ function paintHead(p: PixelPainter, o: DancerPose, p2: boolean): void {
   p.px(hx + (back ? 0 : 1) - 1, hy - 8, BRASS7[4]);
   p.px(hx + (back ? 0 : 1), hy - 9, BRASS7[5]);
   p.px(hx - (back ? 0 : 2), hy - 5, VERD[5]);
+  // A delicate three-point tiara above the porcelain brow.
+  p.line(hx - 3, hy - 4, hx + 3, hy - 4, BRASS7[3]);
+  for (const dx of [-2, 0, 2]) p.px(hx + dx, hy - 5 - (dx === 0 ? 1 : 0), BRASS7[5]);
   if (!back) {
     // painted face: dark glass eyes with a glint, rosy cheeks, a tiny mouth
     const ex = side ? hx + 1 : hx;
@@ -358,7 +361,7 @@ defineDrawnSprite('dancer_portrait', 64, 86, (p) => {
   p.ring(cx + 27, 44, 5, 2, BRASS7[3]);
   p.px(cx + 25, 41, BRASS7[5]);
   // the head
-  ball(p, cx, 28, 15, 18, PORC, true);
+  ball(p, cx, 28, 15, 18, PORC, false);
   // brass hair swept up into a bun, a verdigris tiara
   for (let y = 8; y <= 24; y++) {
     for (let x = cx - 16; x <= cx + 16; x++) {
@@ -374,6 +377,11 @@ defineDrawnSprite('dancer_portrait', 64, 86, (p) => {
   p.px(cx - 4, 15, VERD[5]);
   p.px(cx - 5, 16, VERD[3]);
   p.px(cx - 3, 16, VERD[3]);
+  p.line(cx - 10, 18, cx + 10, 18, BRASS7[3]);
+  for (const dx of [-7, 0, 7]) {
+    p.line(cx + dx, 18, cx + dx, dx === 0 ? 12 : 14, BRASS7[4]);
+    p.px(cx + dx, dx === 0 ? 11 : 13, VERD[5]);
+  }
   // painted eyes with lashes and glints, rosy cheeks, a small mouth; a hairline crack
   for (const sd of [-1, 1]) {
     const ex = cx + sd * 6;

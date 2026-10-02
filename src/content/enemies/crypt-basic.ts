@@ -23,6 +23,9 @@ frames('gloomfly', 'fly', 3, 15, 12, (p, i) => {
   // body + head
   p.circle(7.5, 7.5, 3.9, FLY_BODY[2]);
   sphere(p, 7.5, 7.5, 3.9, 3.9, FLY_BODY);
+  // Chitin plates: a lit shoulder and a dark seam above the ember sac.
+  p.line(5, 6, 6, 6, FLY_BODY[4]);
+  p.line(6, 8, 9, 8, FLY_BODY[1]);
   p.circle(7.5, 4.6, 2.4, FLY_BODY[2]);
   sphere(p, 7.5, 4.6, 2.4, 2.4, FLY_BODY, false);
   // ember glow in the belly
@@ -122,6 +125,11 @@ function paintSkeleton(p: import('../../engine/painter').PixelPainter, s: SkelPo
   // skull
   p.circle(7.5, 4.5 + by, 4.2, BONE[3]);
   sphere(p, 7.5, 4.5 + by, 4.2, 4.2, BONE, false);
+  // A chipped brow, short fracture and shaded cheek give the skull a face.
+  p.line(5, 2 + by, 7, 1 + by, BONE[4]);
+  p.px(9, 1 + by, BONE[1]);
+  p.px(8, 2 + by, BONE[1]);
+  p.px(9, 3 + by, BONE[2]);
   p.rect(5, 7 + by, 6, 2, BONE[2]);
   // eye sockets with ember pupils
   p.rect(6, 4 + by, 2, 2, SOCKET);
@@ -129,6 +137,8 @@ function paintSkeleton(p: import('../../engine/painter').PixelPainter, s: SkelPo
   p.px(7, 4 + by, '#ff4a32');
   p.px(10, 4 + by, '#ff4a32');
   p.px(8, 6 + by, SOCKET);
+  p.px(5, 6 + by, BONE[4]);
+  p.px(11, 6 + by, BONE[1]);
   // jaw / teeth
   const jaw = s.jaw ?? 0;
   p.rect(6, 8 + by, 5, 1 + jaw, SOCKET);

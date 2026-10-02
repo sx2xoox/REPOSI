@@ -31,6 +31,7 @@ export class App {
     audio.applyVolumes();
     if (this.renderer) {
       this.renderer.shakeIntensity = s.screenShake;
+      this.renderer.flashIntensity = s.screenFlash ?? 1;
       this.renderer.pixelPerfect = s.pixelPerfect;
       this.renderer.resize();
     }

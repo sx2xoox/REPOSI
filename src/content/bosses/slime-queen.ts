@@ -68,6 +68,7 @@ function paintCrown(p: PixelPainter, crx: number, cry: number, k: number, tilt: 
   }
   const [g1x, g1y] = pt(0, chh * 0.2);
   p.circle(g1x, g1y, 1.1 * k + 0.2, GEM_R);
+  p.px(g1x + 1, g1y + 1, GOLD[0]);
   p.px(g1x - 0.5, g1y - 0.5, '#ffb0c0');
   const [g2x, g2y] = pt(-cw * 0.6, chh * 0.22);
   const [g3x, g3y] = pt(cw * 0.6, chh * 0.22);
@@ -130,6 +131,11 @@ function paintQueen(p: PixelPainter, W: number, H: number, k: number, o: QPose):
     p.ring(cx + rx * dx, base + ry * dy, r * k + 0.6, 1, JELLY[4]);
   }
   // darker rim where the jelly meets the floor
+  // A second reflected edge gives the right shoulder a wet, glassy surface.
+  const glx = cx + rx * 0.72;
+  const gly = base - ry * 0.52;
+  p.line(glx, gly - 2 * k, glx + k, gly, JELLY[4]);
+  p.px(glx + k, gly + 2 * k, JELLY[3]);
   for (let x = 0; x < W; x++) {
     if (p.isSet(x, base)) p.px(x, base, JELLY[1]);
     if (p.isSet(x, base + 1)) p.px(x, base + 1, JELLY[0]);

@@ -26,6 +26,9 @@ defineDrawnSprite('w_twin_lamp', 14, 8, (p) => {
   p.px(6, 0, '#ffe0a0');
   p.px(13, 1, '#ffe080');
   p.px(13, 4, '#ffe080');
+  p.px(4, 3, '#ffe4a0');
+  p.px(7, 3, '#634422');
+  p.line(10, 2, 12, 2, '#a87a48');
 }, { outline: O, origin: [1, 5] });
 
 defineDrawnSprite('icon_twin_lamp', 16, 16, (p) => {
@@ -113,6 +116,9 @@ defineDrawnSprite('w_frost_wand', 17, 7, (p) => {
   p.poly([11, 3.5, 14, 0, 17, 3.5, 14, 7], '#7ad0ff');
   p.poly([12.5, 3.5, 14, 1.5, 15.5, 3.5, 14, 5.5], '#e0f6ff');
   p.px(14, 2, '#ffffff');
+  p.line(14, 4, 15, 5, '#3890c8');
+  p.px(12, 3, '#ffffff');
+  p.px(6, 3, '#e0f6ff');
 }, { outline: '#14284a', origin: [3, 3] });
 
 defineDrawnSprite('icon_frost_wand', 16, 16, (p) => {
@@ -374,5 +380,10 @@ defineWeapon({
   },
   draw(w, p, r, st) {
     drawGun(r, w, p, st, 'w_star_launcher', 5, 3);
+    const f = shotFade(st, w, 0.2);
+    if (f > 0) {
+      const h = handPos(p, p.aim, 18);
+      r.ring(h.x, h.y, 2 + (1 - f) * 5, '#ffe890', 1, f * 0.75);
+    }
   },
 });

@@ -5,6 +5,7 @@ export interface Settings {
   musicVolume: number;
   sfxVolume: number;
   screenShake: number; // 0..1.5
+  screenFlash?: number; // 0..1; optional for older saves
   pixelPerfect: boolean;
   damageNumbers: boolean;
   particles: number; // 0.25..1

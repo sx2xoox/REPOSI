@@ -57,8 +57,8 @@ export function frames(
   return defineAnim(`${prefix}_${state}`, names, o.fps ?? 8, o.loop ?? true);
 }
 
-/** Sphere shading lit from the top-left (PixelPainter.shadeSphere default light). */
-export function sphere(p: PixelPainter, cx: number, cy: number, rx: number, ry: number, colors: string[], dither = true): void {
+/** Clean color clusters read better at game scale; opt into grain for rough materials. */
+export function sphere(p: PixelPainter, cx: number, cy: number, rx: number, ry: number, colors: string[], dither = false): void {
   p.shadeSphere(cx, cy, rx, ry, colors, { dither });
 }
 

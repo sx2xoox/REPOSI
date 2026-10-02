@@ -17,7 +17,7 @@ import { divider, frame, glow, keyHintRow, spriteCentered } from './frame';
 import { Repeater, appear } from './anim';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
-import { applyBlessing } from '../game/blessings';
+import { applyBlessing, blessingRole } from '../game/blessings';
 
 const CARD_W = 156;
 const CARD_H = 196;
@@ -124,6 +124,7 @@ export class BlessingOverlay implements Scene {
     const cx = c.x + c.w / 2;
     if (sel) glow(r, cx, y + 60, 110, '#ffd060', (0.22 + 0.08 * Math.sin(this.t * 4)) * a);
     frame(r, c.x, y, c.w, c.h, sel ? 'ornate' : 'panel', { alpha: a });
+    r.uiText(blessingRole(id), cx, y + 13, { size: 10, font: 'small', align: 'center', color: C.gold, alpha: a });
     // icon medallion
     glow(r, cx, y + 52, 40, '#ffe080', 0.3 * a);
     spriteCentered(r, def.icon, cx, y + 52, 3, { alpha: a, flash: picked ? Math.max(0, 0.8 - this.chosenT * 2) : 0 });

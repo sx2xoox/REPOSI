@@ -62,7 +62,7 @@ function makeSim(def: WeaponDef, enemyDist: number): Sim {
   };
   const s: Sim = { w: null as unknown as World, p, events: [], damage: 0, entities: [] };
   const w = {
-    time: 0, dt: 1 / 60, rng: new RNG('weapons2'), player: p, node: { id: 1, kind: 'normal', seed: 1 }, flags: new Set<string>(),
+    time: 0, dt: 1 / 60, rng: new RNG('weapons2'), player: p, node: { id: 1, kind: 'normal', seed: 1 }, flags: new Set<string>(), vars: {},
     enemies: [enemy], hittables: [], projectiles: [] as Projectile[],
     room: {
       tileAt: () => 0, tileAtPx: () => 0, damageTile() {}, destroyTile() {}, centerX: 200, centerY: 100,

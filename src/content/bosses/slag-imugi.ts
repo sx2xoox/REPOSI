@@ -49,6 +49,9 @@ function paintSegment(p: PixelPainter, w: number, h: number, hot: number, seed: 
   const ry = h / 2 - 1.5;
   ball(p, cx, cy, rx, ry, SLAG.slice(0, 5), false);
   cracks(p, cx, cy, Math.min(rx, ry) * 1.1, seed, hot + (p2 ? 1 : 0));
+  // Overlapping cooled plates frame the molten seams.
+  p.line(cx - rx * 0.7, cy, cx - rx * 0.3, cy + ry * 0.3, SLAG[4]);
+  p.line(cx - rx * 0.3, cy + ry * 0.3, cx + rx * 0.4, cy + ry * 0.3, SLAG[1]);
   // dorsal crest plate
   p.poly([cx - rx * 0.4, cy - ry * 0.55, cx, cy - ry - 2.5, cx + rx * 0.4, cy - ry * 0.55], SLAG[3]);
   p.line(cx, cy - ry - 2, cx, cy - ry * 0.4, SLAG[5]);

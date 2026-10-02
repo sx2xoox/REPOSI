@@ -43,6 +43,7 @@ export interface Variant {
   /** the local hit-stop SETTING (the run's rule is fixed) */
   hitStopSetting: boolean;
   screenShake: number;
+  screenFlash?: number;
   /** draw after every n-th step (0 = never), at interpolation alpha `drawAlpha` */
   drawEvery: number;
   drawAlpha: number;
@@ -115,6 +116,7 @@ function applyVariant(v: Variant): Renderer {
   s.hitStop = v.hitStopSetting;
   s.screenShake = v.screenShake;
   renderer.shakeIntensity = v.screenShake;
+  renderer.flashIntensity = v.screenFlash ?? 1;
   if (v.warmSprites) warmAllSprites();
   return renderer;
 }
@@ -489,7 +491,7 @@ export type { Player };
 // ------------------------------------------------------------------ shared test helpers
 /** narrow view (304), low quality, effect settings off, drawn every 2nd step mid-interpolation, caches pre-warmed */
 export const NARROW: Variant = {
-  ...BASE_VARIANT, name: 'narrow', fxSeed: 0x9e3779b9, display: [960, 720], quality: 'low', particles: 0.25, damageNumbers: false,
+  ...BASE_VARIANT, name: 'narrow', fxSeed: 0x9e3779b9, display: [960, 720], quality: 'low', particles: 0.25, damageNumbers: false, screenFlash: 0,
   hitStopSetting: false, screenShake: 0, drawEvery: 2, drawAlpha: 0.37, warmSprites: true,
 };
 /** wide view (512), medium quality, drawn every 3rd step */

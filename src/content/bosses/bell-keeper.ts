@@ -207,7 +207,7 @@ function paintHood(p: PixelPainter, hx: number, hy: number, eyes: KeepPose['eyes
   const y = 18 + hy;
   // hood: drooping pointed tip and fabric falling onto the shoulders
   p.poly([x - 9, y + 10, x - 11, y - 2, x - 5, y - 11, x + 2, y - 15, x + 7, y - 17, x + 6, y - 12, x + 11, y - 3, x + 10, y + 10], ROBE[3]);
-  ball(p, x, y - 1, 10.5, 10.5, ROBE, true);
+  ball(p, x, y - 1, 10.5, 10.5, ROBE, false);
   limb(p, x + 3, y - 10, 2.8, x + 7, y - 17, 0.8, ROBE.slice(1));
   p.poly([x - 13, y + 11, x - 8, y + 4, x + 8, y + 4, x + 13, y + 11, x + 9, y + 13, x - 9, y + 13], ROBE[2]);
   p.line(x - 12, y + 11, x - 7, y + 5, ROBE[4]);
@@ -218,6 +218,9 @@ function paintHood(p: PixelPainter, hx: number, hy: number, eyes: KeepPose['eyes
   // the hood's brim throws a shadow across the brow
   p.ellipse(x, y - 2.2, 7, 3.2, HOOD_IN);
   p.line(x - 4, y + 1, x + 4, y + 1, MASK[1]);
+  // Porcelain ridge and a chipped cheek catch the lantern light.
+  p.line(x, y + 3, x, y + 5, MASK[MASK.length - 1]);
+  p.px(x - 3, y + 6, MASK[MASK.length - 1]);
   // painted eye slits + crimson tears
   const glow = eyes === 'glare' ? '#ffffff' : '#c8d8ff';
   const ey = y + 2;

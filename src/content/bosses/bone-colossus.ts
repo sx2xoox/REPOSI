@@ -283,7 +283,11 @@ function paintSkull(p: PixelPainter, hx: number, hy: number, jaw: number, eyes: 
     p.px(x, y + 5 + Math.floor(jaw / 2), '#ff6a5a');
   }
   // cranium: long and heavy
-  ball(p, x, y - 2, 9.5, 8.2, BONE, true);
+  ball(p, x, y - 2, 9.5, 8.2, BONE, false);
+  // Broad forehead planes with an old fracture above the brow.
+  p.line(x - 5, y - 7, x - 2, y - 8, BONE[4]);
+  p.line(x + 3, y - 8, x + 2, y - 5, BONE[1]);
+  p.line(x + 2, y - 5, x + 4, y - 4, BONE[1]);
   // cheekbones + maxilla
   ball(p, x - 5.5, y + 3, 3.2, 2.2, BONE, false);
   ball(p, x + 5.5, y + 3, 3.2, 2.2, BONE, false);
@@ -479,7 +483,10 @@ function paintPortrait(p: PixelPainter): void {
   p.rect(cx - 8, 39, 1, 4, BONE[4]);
   p.rect(cx + 8, 39, 1, 4, BONE[4]);
   // cranium
-  ball(p, cx, 20, 16, 14, BONE, true);
+  ball(p, cx, 20, 16, 14, BONE, false);
+  p.line(cx - 9, 12, cx - 4, 10, BONE[4]);
+  p.line(cx + 5, 8, cx + 3, 15, BONE[1]);
+  p.line(cx + 3, 15, cx + 7, 18, BONE[1]);
   ball(p, cx - 9, 28, 5, 3.4, BONE, false);
   ball(p, cx + 9, 28, 5, 3.4, BONE, false);
   ball(p, cx, 31, 9, 4, BONE, false);

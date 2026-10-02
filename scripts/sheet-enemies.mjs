@@ -1,25 +1,28 @@
-// Renders a sheet PNG of every enemy and boss. Usage: node scripts/sheet-enemies.mjs out.png [floor]
+// Renders a sheet PNG. Usage: node scripts/sheet-enemies.mjs out.png [floor|bosses|bosses-live]
 // With a floor number only the regular enemies of that floor (and its bosses) are drawn.
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 const out = process.argv[2];
-const onlyFloor = process.argv[3] ? Number(process.argv[3]) : 0;
+const liveBosses = process.argv[3] === 'bosses-live';
+const bossesOnly = process.argv[3] === 'bosses' || liveBosses;
+const onlyFloor = !bossesOnly && process.argv[3] ? Number(process.argv[3]) : 0;
 const port = 6100 + Math.floor(Math.random() * 300);
-const server = spawn('node_modules/.bin/vite', ['--port', String(port), '--strictPort'], { stdio: 'pipe' });
+const server = spawn(process.execPath, [fileURLToPath(new URL('../node_modules/vite/bin/vite.js', import.meta.url)), '--port', String(port), '--strictPort'], { stdio: 'pipe' });
 await new Promise((res, rej) => { const t = setTimeout(() => rej(new Error('vite timeout')), 30000); server.stdout.on('data', (d) => { if (String(d).includes('Local')) { clearTimeout(t); res(); } }); });
-const browser = await chromium.launch();
+const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? undefined });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   page.on('pageerror', (e) => console.log('pageerror', e.message));
   await page.goto(`http://localhost:${port}/`);
   await page.waitForFunction(() => !!window.__lk, null, { timeout: 30000 });
   await page.waitForTimeout(500);
-  const h = await page.evaluate(async (onlyFloor) => {
+  const h = await page.evaluate(async ({ onlyFloor, bossesOnly, liveBosses }) => {
     const sp = await import('/src/engine/sprites.ts');
     const defs = await import('/src/game/defs.ts');
     const all = defs.Enemies.all();
     const regular = all
-      .filter((e) => !e.boss && (!onlyFloor || (e.floors ?? []).includes(onlyFloor)))
+      .filter((e) => !bossesOnly && !e.boss && (!onlyFloor || (e.floors ?? []).includes(onlyFloor)))
       .sort((a, b) => (Math.min(...(a.floors ?? [99])) - Math.min(...(b.floors ?? [99]))));
     const bosses = all.filter((e) => e.boss && (!onlyFloor || (e.bossFloors ?? []).includes(onlyFloor)));
     const S = 4;
@@ -35,7 +38,7 @@ try {
     c.imageSmoothingEnabled = false;
     c.fillStyle = '#14111b'; c.fillRect(0, 0, W, H);
     c.fillStyle = '#ffe0a0'; c.font = "bold 32px 'Galmuri11'";
-    c.fillText(`등불지기 — 적 (${regular.length}종)${onlyFloor ? ` · ${onlyFloor}층` : ''}`, 30, 50);
+    c.fillText(bossesOnly ? '등불지기 — 보스 외형' : `등불지기 — 적 (${regular.length}종)${onlyFloor ? ` · ${onlyFloor}층` : ''}`, 30, 50);
     const floorCol = { 1: '#9aa0c8', 2: '#7ad08a', 3: '#ff9a50', 4: '#8ae0ff', 5: '#c08aff', 6: '#56e8d0', 7: '#e0c070', 8: '#ff7aa0', 9: '#a0ff70', 10: '#ffffff' };
     const draw = (e, cx, cy, scale) => {
       const name = e.sprite;
@@ -67,7 +70,7 @@ try {
         const x = 20 + (i % 4) * (bossCellW + 10);
         const y = y0 + Math.floor(i / 4) * bossCellH;
         c.fillStyle = '#ff40400c'; c.fillRect(x, y, bossCellW, bossCellH - 10);
-        const name = e.portrait ?? e.sprite;
+        const name = liveBosses ? e.sprite : e.portrait ?? e.sprite;
         const frame = sp.hasAnim(name) ? sp.animFrame(name, 0.1) : name;
         if (sp.hasSprite(frame)) {
           const s = sp.getSprite(frame);
@@ -86,7 +89,7 @@ try {
     cv.style.display = 'block';
     document.body.appendChild(cv);
     return H;
-  }, onlyFloor);
+  }, { onlyFloor, bossesOnly, liveBosses });
   await page.setViewportSize({ width: 1280, height: h });
   await page.screenshot({ path: out });
 } finally {

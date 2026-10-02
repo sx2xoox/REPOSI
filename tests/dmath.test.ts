@@ -1,9 +1,11 @@
 // Deterministic math (engine/dmath.ts): the fdlibm port must agree with the
-// engine's own Math within 1 ulp everywhere, and bit for bit with V8 for the
-// functions the simulation leans on. Also checks the 2/pi and pi/2 tables
+// engine's own Math within 1 ulp everywhere. Native pow can differ by one ulp
+// between runtimes; its lockstep output is checked against a frozen digest.
+// Also checks the 2/pi and pi/2 tables
 // against values computed here with BigInt arithmetic, and the speed cost.
 
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import * as D from '../src/engine/dmath';
 
 const native = D.nativeMath;
@@ -59,7 +61,7 @@ type Fn1 = (x: number) => number;
 type Fn2 = (x: number, y: number) => number;
 
 /** functions that must match V8 bit for bit (the ones the simulation uses most) */
-const EXACT = new Set(['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'exp', 'log', 'pow', 'hypot']);
+const EXACT = new Set(['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'exp', 'log', 'hypot']);
 
 describe('deterministic math install', () => {
   it('compares against the real engine functions, and the test setup installed the ports', () => {
@@ -112,20 +114,37 @@ describe('deterministic math (fdlibm port) vs the engine', () => {
   for (let i = 0; i < 40_000; i++) pairs.push([Math.abs(randBits()), (rnd() - 0.5) * 4]); // pow: subnormal / huge bases
 
   for (const name of ['atan2', 'pow', 'hypot'] as const) {
-    it(`${name}: bit-identical to V8 on ${pairs.length} argument pairs (incl. special cases)`, () => {
+    it(`${name}: ${EXACT.has(name) ? 'bit-identical to V8' : 'within 1 ulp of native'} on ${pairs.length} argument pairs (incl. special cases)`, () => {
       const d = (D as unknown as Record<string, Fn2>)[name];
       const m = native[name] as Fn2;
-      let diff = 0;
+      let worst = 0;
       let example = '';
       for (const [x, y] of pairs) {
-        if (ulps(d(x, y), m(x, y)) > 0) {
-          diff++;
-          example ||= `${name}(${x}, ${y}) = ${d(x, y)} vs ${m(x, y)}`;
+        const distance = ulps(d(x, y), m(x, y));
+        if (distance > worst) {
+          worst = distance;
+          example = `${name}(${x}, ${y}) = ${d(x, y)} vs ${m(x, y)}`;
         }
       }
-      expect(diff, example).toBe(0);
+      expect(worst, example).toBeLessThanOrEqual(EXACT.has(name) ? 0 : 1);
     });
   }
+
+  it('pow preserves the lockstep baseline independently of native Math', () => {
+    // Freeze the original port, including signed zero and special values.
+    // Never update this baseline just to accommodate a different host runtime.
+    const hash = createHash('sha256');
+    const bytes = new DataView(new ArrayBuffer(8));
+    for (const [x, y] of pairs) {
+      const result = D.pow(x, y);
+      if (Number.isNaN(result)) hash.update('NaN');
+      else {
+        bytes.setFloat64(0, result, false);
+        hash.update(new Uint8Array(bytes.buffer));
+      }
+    }
+    expect(hash.digest('hex')).toBe('fc66155d487f34aea05b4b17a5ff7d3eb0a14b276bb019f615857035d93be18d');
+  });
 
   it('hypot handles 0, 1 and 3+ arguments like the engine', () => {
     const cases: number[][] = [[], [3], [-0], [1, 2, 3], [NaN, Infinity], [NaN, 1, 2], [1e300, 1e300, 1e300], [3, 4, 12, 84]];

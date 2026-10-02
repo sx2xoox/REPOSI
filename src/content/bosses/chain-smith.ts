@@ -257,6 +257,13 @@ function paintSmith(p: PixelPainter, o: SmithPose, p2: boolean): void {
   p.rect(hx - 8, hy - 8, 16, 2, IRON[3]);
   p.rect(hx - 8, hy - 8, 16, 1, IRON[4]);
   p.rect(hx - 8, hy + 6, 16, 1, IRON[1]);
+  // Riveted cheek plates and a bevel across the brow.
+  p.line(hx - 6, hy - 5, hx - 3, hy - 5, IRON[5]);
+  p.line(hx + 4, hy - 5, hx + 4, hy + 4, IRON[1]);
+  for (const dy of [-5, 3]) {
+    p.px(hx - 6, hy + dy, IRON[5]);
+    p.px(hx + 5, hy + dy, IRON[4]);
+  }
   // T visor
   const flare = o.visor === 'flare' || p2;
   p.rect(hx - 5, hy - 2, 10, 2, '#0a0606');

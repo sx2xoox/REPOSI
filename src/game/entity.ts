@@ -52,6 +52,8 @@ export interface HitInfo {
   procs?: string[];
   /** do not trigger item onHit hooks */
   noProc?: boolean;
+  /** Explicit direct release damage attribution (not passive/familiar damage). */
+  release?: boolean;
 }
 
 // Entity ids are simulation state (hit lists, per-shot wobble phases ...): every

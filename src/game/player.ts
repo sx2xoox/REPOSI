@@ -37,7 +37,7 @@ export function defaultRelease(w: World, p: Player): void {
     const d = Math.hypot(e.x - p.x, e.y - p.y) || 1;
     w.applyHit(e, {
       damage: p.stats.damage * 4, kind: 'explosion', attacker: p, dirX: (e.x - p.x) / d, dirY: (e.y - p.y) / d, knockback: 300,
-      statuses: [{ kind: 'burn', duration: 3, power: p.stats.damage * 0.6 }], noProc: true,
+      statuses: [{ kind: 'burn', duration: 3, power: p.stats.damage * 0.6 }], noProc: true, release: true,
     });
   }
 }
@@ -532,7 +532,7 @@ export class Player extends Actor {
    * amount is scaled by the floor's enemy damage (FloorDef.enemyDamage) unless
    * `raw` (the keeper's own bombs, status ticks).
    */
-  hurt(w: World, halfHearts: number, source = '???', raw = false): boolean {
+  hurt(w: World, halfHearts: number, source = '???', raw = false, origin?: { x: number; y: number }): boolean {
     if (!this.alive || this.invuln > 0 || this.god || w.transitioning) return false;
     if (this.shields > 0) {
       this.shields--;
@@ -565,7 +565,8 @@ export class Player extends Actor {
     w.shake(0.42 + 0.15 * heavy);
     w.hitstop(0.08 + 0.025 * heavy);
     w.renderer.screenFlash('#ff2030', 0.24 + 0.08 * heavy);
-    w.playerHurtFx?.(halfHearts);
+    w.playerHurtFx?.(halfHearts, origin);
+    w.floatText(this.x, this.y - 22, `-${halfHearts / 2}♥`, fromSoul === halfHearts ? '#a8c8ff' : '#ff7a8a');
     this.squash(0.72, 1.3);
     w.sfx('player_hurt', { pitch: heavy ? 0.9 : 1 });
     w.spawn(new RingFx(this.x, this.y - 6, 16 + 6 * heavy, 0.25, '#ff5060', 2));
@@ -577,7 +578,7 @@ export class Player extends Actor {
 
   /** Enemy-side Actor API: interpret damage as half hearts. */
   override takeHit(w: World, hit: HitInfo): boolean {
-    return this.hurt(w, hit.damage, hit.attacker && 'def' in hit.attacker ? (hit.attacker as { def: { name: string } }).def.name : '???');
+    return this.hurt(w, hit.damage, hit.attacker && 'def' in hit.attacker ? (hit.attacker as { def: { name: string } }).def.name : '???', false, hit.source ?? hit.attacker ?? undefined);
   }
 
   // -------------------------------------------------------------- drawing

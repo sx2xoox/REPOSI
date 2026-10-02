@@ -11,7 +11,8 @@ import type { World } from '../game/world';
 import type { Entity } from '../game/entity';
 import { input } from '../engine/input';
 import { clamp, ease } from '../engine/math';
-import { Actives, Artifacts, Potions, RARITY_COLOR, RARITY_NAME, Sets, Weapons, type Rarity } from '../game/defs';
+import { Actives, Artifacts, Potions, RARITY_COLOR, RARITY_NAME, Sets, Weapons, weaponMatchesAffinity, type Rarity } from '../game/defs';
+import { SYNERGIES, synergyActive } from '../game/synergies';
 import { Pedestal, Pickup, itemInfo, potionSpriteFor, type PickupKind } from '../game/pickups';
 import { BASE_STATS, StatMods, computeStats, type Stats } from '../game/stats';
 import { frame, iconSlot, keycap } from './frame';
@@ -97,7 +98,7 @@ export function weaponCompare(newId: string, heldId: string): Seg[] {
   const ra = RARITY_ORDER.indexOf(Weapons.get(newId)?.rarity ?? 'common');
   const rb = RARITY_ORDER.indexOf(Weapons.get(heldId)?.rarity ?? 'common');
   if (ra !== rb) out.push(ra > rb ? { t: '등급 ▲', c: C.good } : { t: '등급 ▼', c: C.bad });
-  if (!out.length) out.push({ t: '비슷한 위력', c: C.textDim });
+  if (!out.length) out.push({ t: '비슷한 기본 능력치', c: C.textDim });
   return out;
 }
 
@@ -119,13 +120,26 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
       sub.push({ t: ' · 유물', c: C.textDim });
       const owned = w.items.powerOf(it.id);
       if (owned > 0) sub.push({ t: `  보유 x${owned}`, c: C.goldHi });
-      const tags: Seg[] = [];
+      const counts = w.items.computed?.tagCounts ?? {};
+      const after = { ...counts };
       for (const tag of def?.tags ?? []) {
         const s = Sets.get(tag);
         if (!s) continue;
-        tags.push({ t: tags.length ? ` · ${s.name}` : `공명 ${s.name}`, c: s.color });
+        const count = counts[tag] ?? 0;
+        after[tag] = count + (owned ? 0 : 1);
+        const next = [...s.tiers].sort((a, b) => a.count - b.count).find((t) => t.count > count);
+        const unlocked = next && after[tag] >= next.count;
+        extra.push([{ t: `공명 ${s.name} ${count} → ${after[tag]}${next ? ` / ${next.count}` : ' (완성)'}${unlocked ? ' 달성!' : ''}`, c: s.color }]);
+        if (next) extra.push([{ t: next.desc, c: unlocked ? C.goldHi : C.textFaint }]);
       }
-      if (tags.length) extra.push(tags);
+      if (owned) extra.push([{ t: '중복은 효과 강화 · 공명 개수 유지', c: C.textFaint }]);
+      for (const s of SYNERGIES) {
+        if (!s.tags.some((t) => def?.tags.includes(t))) continue;
+        if (!s.tags.every((t) => (after[t] ?? 0) > 0)) continue;
+        const active = synergyActive(after, s.tags);
+        extra.push([{ t: `혼합 · ${s.name} ${active ? '발동 가능' : s.tags.map((t) => `${Sets.get(t)?.name} ${after[t] ?? 0}/2`).join(' · ')}`, c: s.color }]);
+        if (active) extra.push([{ t: s.desc, c: C.textDim }]);
+      }
     } else if (it.kind === 'active') {
       const def = Actives.get(it.id);
       sub.push({ t: ' · 액티브', c: C.textDim });
@@ -139,6 +153,10 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
       const def = Weapons.get(it.id);
       sub.push({ t: ` · 무기 · ${def?.archetype ?? WEAPON_KIND[def?.kind ?? ''] ?? ''}`, c: C.textDim });
       extra.push(weaponCompare(it.id, p.weaponId));
+      extra.push([{ t: '기본 능력치 비교 · 연타/폭발 별도', c: C.textFaint }]);
+      if (p.character.affinity && weaponMatchesAffinity(p.character.affinity, def)) {
+        extra.push([{ t: `${p.character.name} 선호 무기 · ${p.character.affinity.name}`, c: C.goldHi }]);
+      }
       if (p.weapon2Id) {
         const held = Weapons.get(p.weaponId);
         if (held) extra.push([{ t: `${held.name}을(를) 내려놓는다`, c: C.textFaint }]);
@@ -209,7 +227,7 @@ function signature(w: World, e: Entity): string {
   let s = `${e.id}|${p.weaponId}|${p.weapon2Id ?? ''}|${p.activeId ?? ''}|${p.potionId ?? ''}|${input.aimMode === 'pad' ? 1 : 0}|${touchUiActive() ? 1 : 0}`;
   if (e instanceof Pedestal) s += `|${e.item?.kind}:${e.item?.id}|${e.price}|${e.heartPrice}|${e.affordable(w) ? 1 : 0}|${p.coins >= e.price ? 1 : 0}|${e.item ? w.items.powerOf(e.item.id) : 0}`;
   else if (e instanceof Pickup) s += `|${e.kind}|${e.potionId}|${w.run.identified.has(e.potionId) ? 1 : 0}|${e.price}|${p.coins >= e.price ? 1 : 0}|${e.canCollect(w) ? 1 : 0}`;
-  return s;
+  return `${s}|${w.items.revision}`;
 }
 
 export class ItemTooltip {
@@ -219,6 +237,7 @@ export class ItemTooltip {
   private card: ItemCard | null = null;
   private sig = '';
   private lines: string[] = [];
+  private extraLines: Seg[][] = [];
   private h = 0;
   /** 0..1 appear progress */
   private a = 0;
@@ -262,7 +281,11 @@ export class ItemTooltip {
       if (this.card) {
         const c = this.card;
         this.lines = r.wrapText(c.desc, CARD_W - PAD * 2, 10, false, 'small').slice(0, 3);
-        this.h = PAD + 32 + 3 + this.lines.length * LINE + c.extra.length * LINE + 5;
+        this.extraLines = c.extra.flatMap((row) => {
+          if (row.length !== 1) return [row];
+          return r.wrapText(row[0].t, CARD_W - PAD * 2, 10, false, 'small').map((t) => [{ t, c: row[0].c }]);
+        });
+        this.h = PAD + 32 + 3 + this.lines.length * LINE + this.extraLines.length * LINE + 5;
       }
     }
     const c = this.card;
@@ -398,7 +421,7 @@ export class ItemTooltip {
       r.uiText(l, PAD, y, { size: 10, font: 'small', color: C.text });
       y += LINE;
     }
-    for (const row of c.extra) {
+    for (const row of this.extraLines) {
       let ex = PAD;
       for (const sg of row) {
         r.uiText(sg.t, ex, y, { size: 10, font: 'small', color: sg.c });

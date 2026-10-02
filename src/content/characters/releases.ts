@@ -51,7 +51,7 @@ export function clearBullets(w: World, x: number, y: number, radius: number): nu
 export function releaseHit(w: World, e: Enemy, damage: number, fromX: number, fromY: number, knockback = 120, statuses?: { kind: 'burn' | 'slow' | 'fear'; duration: number; power?: number }[]): boolean {
   const d = Math.hypot(e.x - fromX, e.y - fromY) || 1;
   return w.applyHit(e, {
-    damage, kind: 'explosion', attacker: w.player, dirX: (e.x - fromX) / d, dirY: (e.y - fromY) / d, knockback, noProc: true, statuses,
+    damage, kind: 'explosion', attacker: w.player, dirX: (e.x - fromX) / d, dirY: (e.y - fromY) / d, knockback, noProc: true, release: true, statuses,
   });
 }
 
@@ -294,7 +294,7 @@ export function releaseWhirlwind(w: World, p: Player): void {
       n++;
       ww.spawn(new MeleeSwing(pl, {
         angle: t * 22, arc: TAU, reach: whirlReach(pl.stats.range), damage: pl.stats.damage * 1.1, knockback: 160,
-        color: WHIRL_COLORS[n % 2 ? 0 : 1], reflect: true, visual: 0.14, duration: 0.08, noProc: true, hitKick: 0.8,
+        color: WHIRL_COLORS[n % 2 ? 0 : 1], reflect: true, visual: 0.14, duration: 0.08, noProc: true, release: true, hitKick: 0.8,
         swingDir: 1,
       }));
       ww.sfx('swing', { vol: 0.5, pitch: 0.9 + (n % 3) * 0.08 });

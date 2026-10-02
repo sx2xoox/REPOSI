@@ -143,6 +143,8 @@ function paintHead(p: PixelPainter, o: ArchPose, p2: boolean): void {
     // gold edging of the hood
     p.line(hx - 7, hy + 9, hx - 4, hy - 7, GOLD6[2]);
     p.line(hx + 7, hy + 9, hx + 4, hy - 7, GOLD6[1]);
+    // Broken gold stitches in the scholar's hood.
+    for (let y = -5; y <= 7; y += 4) p.px(hx - 8, hy + y, GOLD6[3]);
     paintHair(p, hx, hy, o.hem, false);
     // the face sits in deep shadow
     p.ellipse(hx, hy + 3, 7, 9, DEEP);
@@ -154,6 +156,7 @@ function paintHead(p: PixelPainter, o: ArchPose, p2: boolean): void {
   }
   // long drowned face, set back in the hood's shadow
   ball(p, hx, hy + 3, 4.6, 7.2, DROWNED, false);
+  p.line(hx, hy + 2, hx - 1, hy + 5, DROWNED[DROWNED.length - 1]);
   // the brow is lost in shadow; sunken cheeks
   for (let y = hy - 4; y <= hy - 2; y++) for (let x = hx - 5; x <= hx + 5; x++) p.pxIn(x, y, y < hy - 3 ? DEEP : DROWNED[0]);
   p.rect(hx - 4, hy + 5, 2, 2, DROWNED[1]);

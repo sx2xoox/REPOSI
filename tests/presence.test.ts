@@ -152,17 +152,18 @@ describe('등불의 축복 (floor blessings)', () => {
 });
 
 describe('getting stronger', () => {
-  it('enemy hp grows gently per floor (items outpace it)', () => {
+  it('enemy hp rises each floor without exceeding a 50% step', () => {
     const sorted = Floors.all().sort((x, y) => x.index - y.index);
     const m = sorted.map((f) => f.hpMult);
-    expect(m[0]).toBe(1);
+    expect(m[0]).toBe(1.3);
     for (let i = 1; i < m.length; i++) {
       expect(m[i]).toBeGreaterThan(m[i - 1]);
-      expect(m[i] / m[i - 1]).toBeLessThanOrEqual(1.32);
+      expect(m[i] / m[i - 1]).toBeLessThanOrEqual(1.5);
     }
-    // act 1 (floors 1–5) stays flat on purpose; act 2 keeps growing gently below it
+    // The revised curve reaches 4.9x at the act-1 finale; floors.test.ts
+    // separately checks every floor against the full difficulty table.
     const act1 = sorted.filter((f) => f.index <= 5).map((f) => f.hpMult);
-    expect(act1[act1.length - 1]).toBeLessThanOrEqual(2.8);
+    expect(act1[act1.length - 1]).toBe(4.9);
   });
 
   it('the power number rises with damage and with every artifact', () => {

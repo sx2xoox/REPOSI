@@ -1,11 +1,12 @@
 // Renders a sprite sheet PNG of every playable character (all poses, 6x). Usage: node scripts/sheet-characters.mjs out.png
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 const out = process.argv[2];
 const port = 5600 + Math.floor(Math.random() * 300);
-const server = spawn('node_modules/.bin/vite', ['--port', String(port), '--strictPort'], { stdio: 'pipe' });
+const server = spawn(process.execPath, [fileURLToPath(new URL('../node_modules/vite/bin/vite.js', import.meta.url)), '--port', String(port), '--strictPort'], { stdio: 'pipe' });
 await new Promise((res, rej) => { const t = setTimeout(() => rej(new Error('vite timeout')), 30000); server.stdout.on('data', (d) => { if (String(d).includes('Local')) { clearTimeout(t); res(); } }); });
-const browser = await chromium.launch();
+const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? undefined });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 page.on('pageerror', (e) => console.log('pageerror', e.message)); page.on('console', (m) => console.log('console', m.type(), m.text().slice(0,200))); console.log('vite up', port);
 await page.goto(`http://localhost:${port}/`);

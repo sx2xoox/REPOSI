@@ -332,6 +332,7 @@ export class Renderer {
   // full-screen overlays
   flashColor = '#ffffff';
   flashAlpha = 0;
+  flashIntensity = 1;
 
   /**
    * Frame interpolation (set by the main loop for each drawn frame): the
@@ -619,7 +620,7 @@ export class Renderer {
     d.imageSmoothingEnabled = false;
     d.drawImage(this.world, ox, oy, ww, wh);
     if (this.flashAlpha > 0) {
-      d.globalAlpha = clamp(this.flashAlpha, 0, 1);
+      d.globalAlpha = clamp(this.flashAlpha * this.flashIntensity, 0, 1);
       d.fillStyle = this.flashColor;
       d.fillRect(this.offsetX, this.offsetY, VIEW_W * this.scale, VIEW_H * this.scale);
       d.globalAlpha = 1;

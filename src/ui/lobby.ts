@@ -898,7 +898,7 @@ export class LobbyScene implements Scene {
   private drawMain(r: Renderer, A: number): void {
     r.uiText('함께하기', UI_W_BASE / 2, 22, { size: 24, bold: true, align: 'center', color: C.text, outline: C.ink, alpha: A });
     divider(r, UI_W_BASE / 2, 54, 240, C.goldDark, A);
-    r.uiText('방 코드로 친구와 최대 4명까지 함께 하강합니다.', UI_W_BASE / 2, 66, { size: 12, align: 'center', color: C.textDim, alpha: A });
+    r.uiText('시험 운영 · 같은 시드로 각자 플레이합니다. 협동 전투는 준비 중입니다.', UI_W_BASE / 2, 66, { size: 12, align: 'center', color: C.textDim, alpha: A });
     // name plate
     const { x, y, w, h } = NAME_PLATE;
     const hot = this.hover === 'name';

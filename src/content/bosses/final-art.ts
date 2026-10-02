@@ -102,6 +102,10 @@ export function paintLantern(p: PixelPainter, k: number, cracked: boolean, strai
     }
   }
   // crossbars on the side faces
+  // Pale chipped edges around the cage frame sharpen its silhouette.
+  p.line(16, 25, 16, 31, IRON[6]);
+  p.line(29, 48, 29, 55, GLASS[3]);
+  p.line(68, 25, 68, 28, IRON[4]);
   for (const [x0, x1] of [[20, 28], [59, 66]] as const) {
     p.line(x0, 41, x1, 41, IRON[3]);
     p.line(x0, 42, x1, 42, IRON[1]);

@@ -10,7 +10,7 @@ import { ramp, type PixelPainter } from '../../engine/painter';
 import { Chest, Pickup } from '../../game/pickups';
 import { RingFx } from '../../game/effects';
 import type { ArtifactLook } from '../../game/look';
-import { grantPerCopy, hitWeight, isAttack, proc } from '../items/lib';
+import { grantPerCopy, isAttack, proc } from '../items/lib';
 
 const O = '#140c1c';
 const GOLD = '#ffd060';
@@ -72,10 +72,10 @@ bless({
 });
 
 bless({
-  id: 'bless_kindle', name: '불씨의 축복', desc: '등불 게이지가 50% 더 빨리 찬다', quote: '작은 불씨도 모이면 횃불이 된다.',
+  id: 'bless_kindle', name: '불씨의 축복', desc: '피해로 얻는 등불 게이지 +35%', quote: '작은 불씨도 모이면 횃불이 된다.',
   disk: '#7a3010', glyph: (p) => { p.poly([8, 2, 11.5, 8, 10, 12.5, 6, 12.5, 4.5, 8], '#ff9a30'); p.poly([8, 6, 9.6, 9.5, 8, 12, 6.4, 9.5], '#ffe080'); }, look: { mote: '#ffb040' },
-  onHit(w, _t, hit, power) {
-    if (isAttack(hit)) w.player.addEmber(1.25 * power * hitWeight(hit));
+  stats(m) {
+    m.flag('kindleBlessing');
   },
 });
 
@@ -89,12 +89,14 @@ bless({
 });
 
 bless({
-  id: 'bless_gold', name: '황금의 축복', desc: '동전 +10. 방을 클리어하면 동전 1개', quote: '등불 아래 반짝이는 것.',
+  id: 'bless_gold', name: '황금의 축복', desc: '동전 +8. 방 2개 클리어마다 동전 1개', quote: '등불 아래 반짝이는 것.',
   disk: '#6a4a10', glyph: (p) => { p.circle(8, 8, 4, '#ffd040'); p.ring(8, 8, 4, 1, '#b08020'); p.line(8, 6, 8, 10, '#fff6c0'); }, look: { mote: '#ffd040' },
   onAcquire(w, power) {
-    grantPerCopy(w, 'bless_gold', power, () => { w.player.coins = Math.min(999, w.player.coins + 10); });
+    grantPerCopy(w, 'bless_gold', power, () => { w.player.coins = Math.min(999, w.player.coins + 8); });
   },
   onRoomClear(w, power) {
+    w.vars.__goldRooms = (w.vars.__goldRooms ?? 0) + 1;
+    if (w.vars.__goldRooms % 2 !== 0) return;
     const pos = w.room.nearestFree(w.room.centerX - 18, w.room.centerY, 6);
     for (let i = 0; i < power; i++) w.spawn(new Pickup('coin', pos.x, pos.y).pop());
     proc(w, 'bless_gold');
@@ -128,14 +130,15 @@ bless({
 });
 
 bless({
-  id: 'bless_hearth', name: '쉼터의 온기', desc: '방 3개를 클리어할 때마다 체력 반 칸 회복', quote: '잠시 쉬어 가도 괜찮다.',
+  id: 'bless_hearth', name: '쉼터의 온기', desc: '방 3개마다 체력 반 칸 회복. 최대 체력이 없으면 영혼 하트 2칸까지 회복', quote: '잠시 쉬어 가도 괜찮다.',
   disk: '#6a3a1a', glyph: (p) => { p.line(4, 12, 12, 10, '#8a5a30'); p.line(4, 10, 12, 12, '#6a4020'); p.poly([8, 3, 10.5, 8, 8, 10, 5.5, 8], '#ffb040'); p.px(8, 7, '#fff0a0'); }, look: { aura: '#ffc080' },
   onRoomClear(w, power) {
     w.vars.__hearthN = (w.vars.__hearthN ?? 0) + 1;
     if (w.vars.__hearthN % 3 !== 0) return;
     const p = w.player;
     if (p.maxRed > 0 && p.red < p.maxRed) p.heal(power);
-    else p.addSoul(1);
+    else if (p.maxRed <= 0 && p.soul < 4) p.addSoul(Math.min(power, 4 - p.soul));
+    else return;
     w.sfx('heal', { vol: 0.6 });
     w.particles.burst(p.x, p.y - 8, { count: 14, speed: [20, 60], life: [0.4, 0.8], colors: ['#ffffff', '#ffc080', '#ff8a5a'], size: [1, 2], additive: true });
     proc(w, 'bless_hearth');
@@ -143,10 +146,11 @@ bless({
 });
 
 bless({
-  id: 'bless_magnet', name: '끌림의 축복', desc: '줍기 범위가 크게 늘어난다', quote: '필요한 것은 스스로 다가온다.',
+  id: 'bless_magnet', name: '끌림의 축복', desc: '줍기 범위 +55, 이동 속도 +5%', quote: '필요한 것은 스스로 다가온다.',
   disk: '#3a3a6a', glyph: (p) => { p.ring(8, 7, 4.5, 2, '#e04050'); p.rect(3, 7, 3, 5, '#e04050'); p.rect(10, 7, 3, 5, '#e04050'); p.rect(3, 10, 3, 2, '#e0e0f0'); p.rect(10, 10, 3, 2, '#e0e0f0'); p.rect(6, 7, 4, 6, null); }, look: { aura: '#c8d0ff' },
   stats(m, power) {
     m.addStat('magnet', 55 * power);
+    m.mulStat('moveSpeed', 1 + 0.05 * power);
   },
 });
 
@@ -245,7 +249,7 @@ bless({
 });
 
 bless({
-  id: 'bless_release_heal', name: '해방의 온기', desc: '등불 해방 시 체력 반 칸 회복 (방마다 한 번)', quote: '불꽃을 놓아줄 때 따뜻해진다.',
+  id: 'bless_release_heal', name: '해방의 온기', desc: '해방 시 반 칸 회복 (방마다 한 번). 최대 체력이 없으면 영혼 하트 2칸까지 회복', quote: '불꽃을 놓아줄 때 따뜻해진다.',
   disk: '#6a4a2a', glyph: (p) => { p.rect(6, 5, 4, 7, '#ffd890'); p.rect(5, 4, 6, 1, '#a07040'); p.rect(5, 12, 6, 1, '#a07040'); p.px(8, 8, '#ff8a30'); p.px(8, 7, '#fff0a0'); }, look: { aura: '#ffe0a0' },
   onRelease(w, power) {
     // once per room: several releases a floor would otherwise out-heal every other source
@@ -254,7 +258,8 @@ bless({
     w.vars.__releaseHealRoom = room;
     const p = w.player;
     if (p.maxRed > 0 && p.red < p.maxRed) p.heal(power);
-    else p.addSoul(1);
+    else if (p.maxRed <= 0 && p.soul < 4) p.addSoul(Math.min(power, 4 - p.soul));
+    else return;
     proc(w, 'bless_release_heal');
   },
 });

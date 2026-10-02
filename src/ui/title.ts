@@ -63,7 +63,7 @@ export class TitleScene implements Scene {
   constructor() {
     this.menu = new Menu([
       { label: '새 게임', action: () => app.scenes.set(new CharacterSelectScene()), hint: '무작위 시드로 새로운 하강을 시작합니다.' },
-      { label: '함께하기', action: () => app.scenes.set(new LobbyScene()), hint: '방 코드로 친구와 최대 4명까지 함께 하강합니다.' },
+      { label: '함께하기', action: () => app.scenes.set(new LobbyScene()), hint: '시험 운영: 최대 4명이 같은 시드로 각자 플레이합니다. 협동 전투는 준비 중입니다.' },
       { label: '시드 입력', action: () => this.openSeed(), hint: '같은 시드는 같은 던전을 만듭니다. (기록에는 남지 않음)' },
       { label: '도감', action: () => app.scenes.push(new CollectionScene()), hint: '발견한 유물과 마주친 적들의 기록.' },
       { label: '설정', action: () => app.scenes.push(new SettingsOverlay({ fromTitle: true })), hint: '소리, 화면, 조작 설정.' },

@@ -51,6 +51,7 @@ export interface DpsOpts {
   /** dash toward / through the target every `dash` seconds (0 = never) */
   dash?: number;
   seed?: string;
+  artifacts?: string[];
 }
 
 export interface DpsResult {
@@ -120,6 +121,7 @@ export function measureDps(o: DpsOpts): DpsResult {
   const p = w.player;
   for (const e of [...w.enemies]) w.killEnemy(e);
   if (p.weaponId !== o.weapon) p.equipWeapon(w, o.weapon);
+  for (const id of o.artifacts ?? []) w.items.give(id);
   p.god = true;
   const cx = p.x + dist;
   const cy = p.y;

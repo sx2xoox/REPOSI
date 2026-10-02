@@ -101,6 +101,10 @@ function paintShaft(p: PixelPainter, sway: number, crouch: number, p2: boolean):
     p.px(CX + 5, 42, CYAN[3]);
   }
   // a barred window
+  // Worn stone lintel and sill separate the window from the wet masonry.
+  const wx = CX + Math.round(sway * 0.5);
+  p.line(wx - 3, 35, wx + 2, 35, STONE[5]);
+  p.line(wx - 3, 42, wx + 3, 42, STONE[1]);
   p.rect(CX - 2 + Math.round(sway * 0.5), 36, 4, 5, DEEP);
   p.line(CX + Math.round(sway * 0.5), 36, CX + Math.round(sway * 0.5), 40, IRON[2]);
   p.px(CX - 1 + Math.round(sway * 0.5), 37, p2 ? CYAN[2] : INKC[3]);

@@ -87,7 +87,7 @@ else if (args.ab) {
 const DESKTOP = { viewport: { width: 1512, height: 945 }, deviceScaleFactor: 2 }; // MacBook Pro 14" class
 const PHONE = { viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true }; // iPhone 14 class, landscape
 
-const CHARS = ['bern', 'niel', 'ria', 'serin'];
+const CHARS = ['bern', 'niel', 'ria', 'serin', 'bori', 'baekgu', 'mori'];
 
 /** in-page helpers (stringified into the page) */
 const PAGE_HELPERS = () => {
@@ -204,7 +204,7 @@ const PAGE_HELPERS = () => {
 const scenarios = [
   { name: 'room25', ctx: DESKTOP, char: 'bern', setup: `__perfBot.keepEnemies(25); __perfBot.shoot();` },
   { name: 'boss', ctx: DESKTOP, char: 'bern', room: 'boss', setup: `__perfBot.shoot();` },
-  { name: 'boss-void', ctx: DESKTOP, char: 'bern', setup: `__lk.spawn('void_moth'); __perfBot.shoot();` },
+  { name: 'boss-clock', ctx: DESKTOP, char: 'bern', setup: `__lk.gotoFloor(7); __lk.spawn('clockmaker'); __perfBot.shoot();` },
   { name: 'boss-final', ctx: DESKTOP, char: 'bern', setup: `__perfBot.finalDark(); __perfBot.shoot();` },
   ...CHARS.map((c) => ({ name: `release-${c}`, ctx: DESKTOP, char: c, setup: `__perfBot.keepEnemies(18); __perfBot.shoot(); __perfBot.releases(3.2);` })),
   { name: 'particles', ctx: DESKTOP, char: 'bern', setup: `__perfBot.keepEnemies(8); __perfBot.shoot(); __perfBot.explosions(110);` },

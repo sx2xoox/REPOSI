@@ -12,6 +12,12 @@ export const BLESSING_CHOICES = 3;
 /** floor-card time (s) after which the blessing choice opens */
 export const BLESSING_DELAY = 1.6;
 
+const OFFENSE = new Set(['bless_might', 'bless_haste', 'bless_keen', 'bless_pierce', 'bless_first_strike', 'bless_kindle', 'bless_hunter']);
+const DEFENSE = new Set(['bless_vigor', 'bless_soul', 'bless_hearth', 'bless_aegis', 'bless_shade', 'bless_release_heal', 'bless_blastproof']);
+export function blessingRole(id: string): string {
+  return OFFENSE.has(id) ? '공격' : DEFENSE.has(id) ? '생존' : '탐험·기동';
+}
+
 /** Every blessing definition. */
 export function blessingPool(): ArtifactDef[] {
   return Artifacts.all().filter((a) => a.blessing);
@@ -21,7 +27,15 @@ export function blessingPool(): ArtifactDef[] {
 export function rollBlessings(seed: string, floor: number, owned: (id: string) => boolean, n = BLESSING_CHOICES): string[] {
   const rng = new RNG(`${seed}#blessing${floor}`);
   const pool = blessingPool().filter((b) => !owned(b.id)).map((b) => b.id);
-  return rng.shuffle(pool).slice(0, n);
+  const shuffled = rng.shuffle(pool);
+  const chosen: string[] = [];
+  // Diverse choices without changing the pool weights within each role.
+  for (const role of rng.shuffle(['공격', '생존', '탐험·기동'])) {
+    const id = shuffled.find((id) => blessingRole(id) === role);
+    if (id && chosen.length < n) chosen.push(id);
+  }
+  for (const id of shuffled) if (chosen.length < n && !chosen.includes(id)) chosen.push(id);
+  return chosen;
 }
 
 /** Choices for the world's current floor. */

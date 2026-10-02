@@ -142,7 +142,7 @@ function botMain(opts) {
       if (ok && t !== p && t.team === 'enemy' && h.attacker === p) {
         const dealt = Math.max(0, before - Math.max(0, t.hp));
         const f = balFloor(w);
-        const rel = h.noProc && h.kind !== 'status' && w.time - bal.relT < 3.6;
+        const rel = h.release === true;
         f.allDmg += dealt;
         if (rel) f.relDmg += dealt;
         if (bal.boss) { bal.boss.allDmg += dealt; if (rel) bal.boss.relDmg += dealt; }
@@ -150,12 +150,12 @@ function botMain(opts) {
       return ok;
     };
     const origHurt = p.hurt.bind(p);
-    p.hurt = (ww, hh, src) => {
+    p.hurt = (ww, hh, src, raw, origin) => {
       // immortal: before a possibly lethal hit (no hit deals more than 4 half-hearts) lend
       // soul hearts; HP minus what was lent is the "real" HP: at 0 the keeper would have died
       if (opts.immortal && p.red + p.soul <= 4) { p.soul += 6; bal.debt += 6; }
       const mid = p.red + p.soul;
-      const ok = origHurt(ww, hh, src);
+      const ok = origHurt(ww, hh, src, raw, origin);
       const taken = mid - (p.red + p.soul);
       if (ok && taken > 0) {
         const f = balFloor(w);
@@ -1121,7 +1121,7 @@ async function runSweep(browser) {
 }
 
 // ------------------------------------------------------------------ main
-const browser = await chromium.launch({ args: args.audio ? ['--autoplay-policy=no-user-gesture-required'] : [] });
+const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? undefined, args: args.audio ? ['--autoplay-policy=no-user-gesture-required'] : [] });
 // the floor-start blessing choice ("등불의 축복") auto-picks the first card for the bots
 {
   const newContext = browser.newContext.bind(browser);

@@ -26,6 +26,7 @@ import { fullStatRows, gridMove, scrollToRow } from './logic';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
 import { estimateDps, powerScore } from '../game/power';
+import { SYNERGIES, synergyActive } from '../game/synergies';
 
 const COLS = 10;
 const CELL = 40;
@@ -495,6 +496,15 @@ export class StatusOverlay implements Scene {
     frame(r, x, y, ww, h, 'panel', { alpha: k });
     r.uiText('등불 공명', x + 12, y + 8, { size: 12, bold: true, color: C.goldHi, alpha: k });
     const sets = [...(w.items.computed?.sets ?? [])].sort((a, b) => b.active.length - a.active.length || b.count - a.count);
+    const counts = w.items.computed?.tagCounts ?? {};
+    for (const s of SYNERGIES) {
+      if (!s.tags.some((tag) => (counts[tag] ?? 0) > 0)) continue;
+      const active = synergyActive(counts, s.tags);
+      const tier = { count: 4, desc: s.desc, hooks: {} };
+      const def = { tag: s.id, name: `혼합 · ${s.name}`, color: s.color, icon: `res_${s.tags[0]}`, tiers: [tier] };
+      const count = s.tags.reduce((n, tag) => n + Math.min(2, counts[tag] ?? 0), 0);
+      sets.unshift({ def, count, active: active ? [tier] : [], next: active ? undefined : { ...tier, desc: s.tags.map((t) => `${Sets.get(t)?.name} ${counts[t] ?? 0}/2`).join(' · ') } });
+    }
     if (!sets.length) {
       r.uiText('같은 속성의 유물을 모으면', x + 12, y + 34, { size: 10, font: 'small', color: C.textFaint, alpha: k });
       r.uiText('공명이 깨어납니다.', x + 12, y + 48, { size: 10, font: 'small', color: C.textFaint, alpha: k });
