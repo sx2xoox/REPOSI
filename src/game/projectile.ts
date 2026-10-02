@@ -4,7 +4,7 @@
 
 import { Entity, type Actor, type HitInfo, type StatusApply, type Team } from './entity';
 import type { World } from './world';
-import type { Renderer } from '../engine/renderer';
+import type { DrawOpts, Renderer } from '../engine/renderer';
 import { defineDrawnSprite, hasSprite } from '../engine/sprites';
 import { ramp } from '../engine/painter';
 import { angleOf, rotateToward, TAU } from '../engine/math';
@@ -319,7 +319,11 @@ export class Projectile extends Entity {
     }
     if (this.look) drawShot(this, r, this.look, dy);
     else if (this.style === 'sprite' && this.sprite) {
-      r.sprite(this.sprite, this.x, dy, { rot: this.spriteRotates ? this.angle : 0, sx: this.scale, sy: this.scale });
+      const o = SPRITE_OPTS;
+      o.rot = this.spriteRotates ? this.angle : 0;
+      o.sx = this.scale;
+      o.sy = this.scale;
+      r.sprite(this.sprite, this.x, dy, o);
     } else {
       const d = (this.r * 2 + 1) * this.scale;
       // the sprite name is cached per projectile (no string building per frame)
@@ -330,7 +334,8 @@ export class Projectile extends Entity {
       }
       const name = this.orbName;
       // stretch a bit along movement for speed feel
-      r.sprite(name, this.x, dy, this.style === 'tear' ? { rot: this.angle, sx: 1.15, sy: 0.92 } : undefined);
+      if (this.style === 'tear') TEAR_OPTS.rot = this.angle;
+      r.sprite(name, this.x, dy, this.style === 'tear' ? TEAR_OPTS : undefined);
     }
     for (const b of this.behaviors) b.draw?.(this, r, w);
   }
@@ -361,6 +366,10 @@ export class Projectile extends Entity {
     w.lights.add(this.x, this.y - this.z, this.lightR, this.lightCol, LIGHT_OPTS);
   }
 }
+
+/** reused draw options (projectiles are drawn every frame, many at once) */
+const SPRITE_OPTS: DrawOpts = { rot: 0, sx: 1, sy: 1 };
+const TEAR_OPTS: DrawOpts = { rot: 0, sx: 1.15, sy: 0.92 };
 
 /** Spawn `count` projectiles in a ring. */
 export function ringAngles(count: number, offset = 0): number[] {

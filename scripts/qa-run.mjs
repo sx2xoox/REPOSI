@@ -478,7 +478,9 @@ function botMain(opts) {
     const p = w.player;
     let loot = 0;
     for (const e of w.entities) if (e.persistent && !e.dead && !(e.opened || e.used || ('item' in e && !e.item))) loot++;
-    const sig = `${w.run.floor}|${w.node.id}|${w.enemies.length}|${p.coins}|${p.keys}|${p.bombs}|${p.inv?.items?.length}|${loot}|${p.red}|${p.soul}|${p.weaponId}|${p.activeId}`;
+    // (immortal: lent soul hearts change HP on every hit, which is no progress)
+    const hpSig = opts.immortal ? '' : `${p.red}|${p.soul}`;
+    const sig = `${w.run.floor}|${w.node.id}|${w.enemies.length}|${p.coins}|${p.keys}|${p.bombs}|${p.inv?.items?.length}|${loot}|${hpSig}|${p.weaponId}|${p.activeId}`;
     if (hp < B.lastHp - 0.5 || w.enemies.length === 0) B.dmgT = w.time;
     if (sig !== B.progressSig || hp < B.lastHp - 0.5) {
       B.progressSig = sig;
