@@ -6,6 +6,7 @@ import { fx } from './rng';
 import { VIEW_H, VIEW_W, type DrawOpts, type Renderer } from './renderer';
 import type { Lighting } from './lighting';
 import { TAU } from './math';
+import { nativeMath } from './dmath';
 
 export type ParticleShape = 'pixel' | 'square' | 'circle' | 'spark' | 'ring' | 'sprite';
 
@@ -378,8 +379,9 @@ export class Particles {
           break;
         }
         case 'square': {
-          const cs = Math.cos(p.rot);
-          const sn = Math.sin(p.rot);
+          // drawing only: the engine's native (fast) cos / sin, not the deterministic ports
+          const cs = nativeMath.cos(p.rot);
+          const sn = nativeMath.sin(p.rot);
           c.setTransform(cs, sn, -sn, cs, Math.round(sx), Math.round(sy));
           c.fillRect(-size / 2, -size / 2, size, size);
           c.setTransform(1, 0, 0, 1, 0, 0);
@@ -392,7 +394,7 @@ export class Particles {
           break;
         }
         case 'spark': {
-          const sp = Math.hypot(p.vx, p.vy);
+          const sp = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
           const f = sp > 0 ? Math.min(size * 3, sp * 0.04 + 1) / sp : 0;
           c.strokeStyle = col;
           c.lineWidth = Math.max(1, size * 0.5);
