@@ -16,6 +16,7 @@ import { Afterimage, RingFx } from './effects';
 import { Bomb } from './pickups';
 import { Tile } from './tiles';
 import { fx } from '../engine/rng';
+import { DIR_VEC } from './constants';
 
 export type Facing = 'down' | 'up' | 'side';
 
@@ -227,6 +228,7 @@ export class Player extends Actor {
         this.vy = ty;
       }
     }
+    if (this.dashT <= 0) this.doorAssist(w, mv, dt);
     this.moving = Math.hypot(this.vx, this.vy) > 12;
 
     const vx = this.vx;
@@ -304,6 +306,27 @@ export class Player extends Actor {
 
   weaponSlowsMove(): boolean {
     return Weapons.get(this.weaponId)?.kind === 'charge';
+  }
+
+  /**
+   * Doorways are one tile wide: when pushing into an open door slightly off-center,
+   * slide sideways toward its middle instead of snagging on the frame.
+   */
+  private doorAssist(w: World, mv: { x: number; y: number }, dt: number): void {
+    if (!mv.x && !mv.y) return;
+    for (const d of w.room.doors) {
+      if (d.state !== 'open' || d.open < 0.6) continue;
+      const v = DIR_VEC[d.dir];
+      if (mv.x * v.x + mv.y * v.y < 0.5) continue;
+      const along = v.x !== 0 ? (this.x - d.x) * v.x : (this.y - d.y) * v.y;
+      if (along < -12 || along > 8) continue;
+      const off = v.x !== 0 ? this.y - d.y : this.x - d.x;
+      if (Math.abs(off) < 0.25 || Math.abs(off) > 12) continue;
+      const slide = -Math.sign(off) * Math.min(Math.abs(off) / dt, this.stats.moveSpeed);
+      if (v.x !== 0) this.vy = slide;
+      else this.vx = slide;
+      return;
+    }
   }
 
   /** Start a dash toward the move input (or the aim). Returns false while on cooldown. */

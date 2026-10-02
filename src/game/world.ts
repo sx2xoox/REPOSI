@@ -291,6 +291,12 @@ export class World {
       const back = matchingDoor(this.map, prevNode, via);
       const door = back ? room.doors.find((d) => d.to === prevNode.id && d.dir === back.dir && sameCell(d, back, node, room)) : undefined;
       if (door) {
+        // walked out of a secret room: the wall we came through is a doorway now
+        if (door.state === 'hidden' && back) {
+          room.revealDoor(door);
+          (back as NodeDoor & { revealed?: boolean }).revealed = true;
+          (via as NodeDoor & { revealed?: boolean }).revealed = true;
+        }
         const v = DIR_VEC[door.dir];
         p.x = door.x - v.x * 14;
         p.y = door.y - v.y * 14 + (door.dir === 'N' ? 2 : 0);
@@ -871,6 +877,11 @@ export class World {
 
   revealSecretDoor(d: Door): void {
     this.room.revealDoor(d);
+    // blown open mid-fight (doors shut): it stays shut until the room is cleared,
+    // so a lockdown (e.g. a trial in progress) can't be walked out of
+    if (d.state === 'open' && this.room.doors.some((x) => x !== d && x.state === 'closed')) d.state = 'closed';
+    // a secret room counts once, however many of its walls get blown open
+    const firstWay = !this.map.nodes[d.to].doors.some((x) => (x as NodeDoor & { revealed?: boolean }).revealed);
     const nd = this.node.doors.find((x) => x.to === d.to && x.dir === d.dir) as (NodeDoor & { revealed?: boolean }) | undefined;
     if (nd) {
       nd.revealed = true;
@@ -879,7 +890,7 @@ export class World {
     }
     this.map.nodes[d.to].discovered = true;
     this.mapVersion++;
-    this.run.stats.secretsFound++;
+    if (firstWay) this.run.stats.secretsFound++;
     this.sfx('secret_found', { x: d.x });
   }
 
@@ -966,6 +977,7 @@ export class World {
           const old = new Pickup('potion', p.x, p.y).pop();
           old.potionId = p.potionId;
           old.grace = 1.2;
+          old.waitForLeave = true;
           this.spawn(old);
         }
         p.potionId = pk.potionId;

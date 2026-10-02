@@ -215,6 +215,9 @@ function tryGenerate(floor: FloorDef, rng: RNG, opts: GenOpts): FloorMap | null 
 
   // merge normal cells into big rooms
   if (opts.allowBigRooms !== false && floor.index >= 1) mergeBigRooms(nodes, grid, rng, floor.index);
+  // merging re-indexes the nodes: look the start / boss ids up again
+  startId = nodes.findIndex((n) => n.kind === 'start');
+  bossId = nodes.findIndex((n) => n.kind === 'boss');
 
   // doors between all adjacent different nodes
   for (const n of nodes) {

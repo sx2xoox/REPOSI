@@ -25,6 +25,8 @@ export interface DebugApi {
   press(code: string, frames?: number): void;
   list(): Record<string, string[]>;
   errors: string[];
+  /** the live input state (bots drive `touchMove` / `touchAim` / `touchTap`) */
+  input: typeof input;
 }
 
 export function installDebug(): void {
@@ -38,6 +40,7 @@ export function installDebug(): void {
   };
   const api: DebugApi = {
     errors,
+    input,
     start(seed = 'TEST-SEED', character) {
       const ch = character ?? Characters.all()[0]?.id;
       app.startRun(seed, ch, true);

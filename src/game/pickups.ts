@@ -31,6 +31,8 @@ export class Pickup extends Entity {
   potionId = '';
   /** can't be picked up for a short while after spawning (so drops are visible) */
   grace = 0.35;
+  /** swapped-out potion: not collected (or magnet-pulled) until the player steps away once */
+  waitForLeave = false;
   bobT = fx.range(0, 6);
 
   constructor(kind: PickupKind, x: number, y: number) {
@@ -71,14 +73,15 @@ export class Pickup extends Entity {
     this.vy *= k;
     const p = w.player;
     const d = dist(this.x, this.y, p.x, p.y);
-    // magnet (free pickups only)
-    if (this.price === 0 && this.grace <= 0 && d < p.stats.magnet + 10 && this.canCollect(w)) {
+    if (this.waitForLeave && d > this.r + p.r + 8) this.waitForLeave = false;
+    // magnet (free pickups only; never pulls a potion into a full hand)
+    if (this.price === 0 && this.grace <= 0 && d < p.stats.magnet + 10 && this.canCollect(w) && !(this.kind === 'potion' && p.potionId)) {
       const pull = 260 * (1 - d / (p.stats.magnet + 10)) + 30;
       this.vx += ((p.x - this.x) / (d || 1)) * pull * dt * 6;
       this.vy += ((p.y - this.y) / (d || 1)) * pull * dt * 6;
     }
     this.move(w, dt);
-    if (this.grace <= 0 && d < this.r + p.r + 1 && this.z < 6 && !p.dead) this.tryCollect(w);
+    if (this.grace <= 0 && !this.waitForLeave && d < this.r + p.r + 1 && this.z < 6 && !p.dead) this.tryCollect(w);
   }
 
   canCollect(w: World): boolean {
