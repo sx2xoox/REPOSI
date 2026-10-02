@@ -22,6 +22,8 @@ export const SFX_NAMES = [
   'ink_splash', 'paper_flutter', 'water_surge',
   // bosses
   'boss_roar', 'boss_die', 'boss_phase',
+  // floor 6 bosses (drowned archive)
+  'quill_write', 'page_rip', 'ink_burst', 'lamp_hum', 'foghorn', 'tide_slam',
   // world
   'explosion', 'bomb_place', 'fuse', 'rock_break', 'pot_break', 'door_open', 'door_close',
   'door_unlock', 'secret_found', 'trapdoor', 'floor_start', 'room_clear', 'teleport',
@@ -30,11 +32,13 @@ export const SFX_NAMES = [
   'buy', 'no_money', 'active_use', 'active_ready', 'potion',
   // ui
   'ui_move', 'ui_select', 'ui_back', 'ui_open', 'ui_close', 'ui_error', 'ui_place',
+  // character kits (passives / dashes; see content/characters/kit-*.ts)
+  'ember_burst', 'momentum', 'rush', 'scent', 'vault', 'echo', 'blink', 'rift',
 ] as const;
 export type SfxName = (typeof SFX_NAMES)[number];
 
 export const MUSIC_IDS = [
-  'title', 'floor1', 'floor2', 'floor3', 'floor4', 'floor5', 'floor6', 'boss', 'boss_final',
+  'title', 'floor1', 'floor2', 'floor3', 'floor4', 'floor5', 'floor6', 'boss', 'boss_final', 'boss_drowned',
   'shop', 'secret', 'victory', 'gameover',
 ] as const;
 export type MusicId = (typeof MUSIC_IDS)[number];
