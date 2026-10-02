@@ -1,0 +1,25 @@
+{
+  "name": "lanternkeeper",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "등불지기 — Isaac/Sephiria-style roguelike dungeon crawler (TypeScript + Canvas)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:single": "vite build --mode single",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "tsc --noEmit && vitest run",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "galmuri": "^2.40.3",
+    "playwright": "1.56",
+    "typescript": "~5.9",
+    "vite": "^7.3.6",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^3.2.7"
+  }
+}

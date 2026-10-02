@@ -1,0 +1,45 @@
+@font-face {
+  font-family: 'Galmuri11';
+  font-weight: 400;
+  font-display: block;
+  src: url('./assets/fonts/Galmuri11.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Galmuri11';
+  font-weight: 700;
+  font-display: block;
+  src: url('./assets/fonts/Galmuri11-Bold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Galmuri9';
+  font-weight: 400;
+  font-display: block;
+  src: url('./assets/fonts/Galmuri9.woff2') format('woff2');
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+canvas#game {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  outline: none;
+  cursor: crosshair;
+  image-rendering: pixelated;
+}
+#boot {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c8b090;
+  font: 16px 'Galmuri11', monospace;
+  background: #07050c;
+  transition: opacity 0.4s;
+}
