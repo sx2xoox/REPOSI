@@ -62,6 +62,14 @@ export abstract class Entity {
   y = 0;
   /** height above the floor (for jumps, arcs); drawn as y - z */
   z = 0;
+  /**
+   * Position at the start of the latest simulation step (NaN = spawned since).
+   * Drawing interpolates between it and x/y/z on high-refresh displays; see
+   * `World.draw` / `World.savePrev`. Draw-only: never read by gameplay code.
+   */
+  px = NaN;
+  py = NaN;
+  pz = NaN;
   vx = 0;
   vy = 0;
   vz = 0;

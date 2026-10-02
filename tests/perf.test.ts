@@ -1,11 +1,13 @@
-// Performance guards: frame pacing on high-refresh displays, the hit-stop chain
+// Performance guards: frame pacing on high-refresh displays (fixed 60 Hz steps,
+// interpolated drawing up to the frame-rate cap), the hit-stop chain
 // guard (a stream of release hits must not freeze the game most of the time),
 // blend-mode batching of particles, and release assets defined up front (so the
 // boot warm-up compiles them instead of the first 등불 해방).
 
 import { describe, expect, it } from 'vitest';
 import { loadContent } from '../src/content';
-import { FramePacer, snapDelta } from '../src/engine/pacing';
+import { FramePacer, capDivisor, snapDelta } from '../src/engine/pacing';
+import { effectiveMaxFps } from '../src/engine/save';
 import { Particles } from '../src/engine/particles';
 import { hasSprite } from '../src/engine/sprites';
 import { World, HITSTOP_GAP } from '../src/game/world';
@@ -69,6 +71,111 @@ describe('frame pacing', () => {
     p.reset(0);
     expect(p.advance(5000)).toBe(5); // hidden tab: capped, backlog dropped
     expect(p.acc).toBe(0);
+  });
+});
+
+/** Drive `tick()` on a display at `hz` (+-jitter ms) with frame cap `cap`: steps, draws, alphas per frame. */
+function ticks(hz: number, frames: number, jitter: number, cap: number) {
+  const p = new FramePacer(FIXED_DT);
+  p.maxFps = cap;
+  const ts = stamps(hz, frames, jitter);
+  p.reset(ts[0] - 1000 / hz);
+  const steps: number[] = [];
+  const draws: boolean[] = [];
+  const alphas: number[] = [];
+  for (const t of ts) {
+    steps.push(p.tick(t));
+    draws.push(p.draw);
+    alphas.push(p.alpha);
+  }
+  return { p, steps, draws, alphas };
+}
+
+describe('frame pacing: interpolated drawing and the frame-rate cap', () => {
+  it('120 Hz at cap 120: draws every frame, evenly spaced in simulation time', () => {
+    const { steps, draws, alphas } = ticks(120, 1200, 0.3, 120);
+    const skip = 20; // refresh-rate estimate settling
+    expect(draws.slice(skip).every(Boolean)).toBe(true);
+    expect(Math.max(...steps)).toBe(1);
+    // drawn time = steps so far + alpha: advances half a step every frame
+    let total = 0;
+    const drawnAt: number[] = [];
+    steps.forEach((n, i) => {
+      total += n;
+      drawnAt.push(total - 1 + alphas[i]);
+    });
+    for (let i = skip + 1; i < drawnAt.length; i++) expect(drawnAt[i] - drawnAt[i - 1]).toBeCloseTo(0.5, 1);
+    expect(alphas.every((a) => a >= 0 && a <= 1)).toBe(true);
+  });
+
+  it('60 Hz display (cap 120 or 60): classic behaviour, draw after each step with the latest state', () => {
+    for (const cap of [120, 60, 0]) {
+      const { steps, draws, alphas } = ticks(60, 600, 0.4, cap);
+      expect(steps.every((n) => n === 1)).toBe(true);
+      expect(draws.every(Boolean)).toBe(true);
+      expect(alphas.slice(2).every((a) => a === 1)).toBe(true);
+    }
+  });
+
+  it('cap 60 on a 120 Hz display draws only the frames in which a step ran (as before)', () => {
+    const { steps, draws, alphas } = ticks(120, 1200, 0.3, 60);
+    for (let i = 1; i < steps.length; i++) expect(draws[i]).toBe(steps[i] > 0);
+    expect(alphas.every((a) => a === 1)).toBe(true);
+  });
+
+  it('caps with an even rhythm: 240 Hz at 120 draws every other refresh, 144 Hz at 120 draws at 72', () => {
+    const fps = (hz: number, cap: number) => {
+      const { draws } = ticks(hz, hz * 10, 0.2, cap);
+      const d = draws.slice(hz); // after a second
+      for (let i = 2; i < d.length; i++) expect(d[i] || d[i - 1]).toBe(true); // never two skips in a row
+      return d.filter(Boolean).length / 9;
+    };
+    expect(fps(240, 120)).toBeCloseTo(120, -1);
+    expect(fps(240, 0)).toBeCloseTo(240, -1);
+    expect(fps(144, 120)).toBeCloseTo(72, -1);
+    expect(fps(144, 0)).toBeCloseTo(144, -1);
+    expect(fps(120, 120)).toBeCloseTo(120, -1);
+    expect(fps(90, 120)).toBeCloseTo(90, -1);
+  });
+
+  it('the simulation runs exactly 60 steps/s whatever the display rate and cap', () => {
+    for (const hz of [60, 90, 120, 144, 240]) {
+      for (const cap of [60, 120, 0]) {
+        const { steps } = ticks(hz, hz * 10, 0.2, cap);
+        expect(Math.abs(steps.reduce((a, b) => a + b, 0) - 600)).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it('a dropped frame keeps the refresh estimate; a display that really slows down is followed', () => {
+    const p = new FramePacer(FIXED_DT);
+    p.maxFps = 120;
+    p.reset(0);
+    let t = 0;
+    for (let i = 0; i < 60; i++) p.tick((t += 1000 / 120));
+    expect(p.refresh).toBeCloseTo(1 / 120, 4);
+    p.tick((t += 2000 / 120)); // one dropped frame
+    expect(p.refresh).toBeCloseTo(1 / 120, 4);
+    expect(p.interpolating).toBe(true);
+    for (let i = 0; i < 40; i++) p.tick((t += 1000 / 60)); // throttled to 60 Hz
+    expect(p.refresh).toBeCloseTo(1 / 60, 4);
+    expect(p.interpolating).toBe(false);
+    for (let i = 0; i < 3; i++) p.tick((t += 1000 / 120)); // back to 120 Hz at once
+    expect(p.interpolating).toBe(true);
+  });
+
+  it('capDivisor tolerates panels slightly faster than nominal', () => {
+    expect(capDivisor(1 / 120.4, 120)).toBe(1);
+    expect(capDivisor(1 / 240, 120)).toBe(2);
+    expect(capDivisor(1 / 360, 120)).toBe(3);
+    expect(capDivisor(1 / 144, 0)).toBe(1);
+  });
+
+  it('effective frame cap: chosen value, else 120 (60 at graphics quality 낮음)', () => {
+    expect(effectiveMaxFps({ graphicsQuality: 'high' })).toBe(120);
+    expect(effectiveMaxFps({ graphicsQuality: 'low' })).toBe(60);
+    expect(effectiveMaxFps({ graphicsQuality: 'low', maxFps: 120 })).toBe(120);
+    expect(effectiveMaxFps({ graphicsQuality: 'high', maxFps: 0 })).toBe(0);
   });
 });
 

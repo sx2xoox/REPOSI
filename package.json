@@ -16,10 +16,14 @@
   },
   "devDependencies": {
     "galmuri": "^2.40.3",
+    "peer": "^1.0.2",
     "playwright": "1.56",
     "typescript": "~5.9",
     "vite": "^7.3.6",
     "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^3.2.7"
+  },
+  "dependencies": {
+    "peerjs": "^1.5.5"
   }
 }

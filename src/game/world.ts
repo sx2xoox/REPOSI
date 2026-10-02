@@ -27,8 +27,9 @@ import { Bomb, Chest, FirePlace, Pedestal, Pickup, Trapdoor, itemInfo, type Pede
 import { Tile } from './tiles';
 import { findFocus } from './interact';
 import { roomBaseJob } from './roomart';
+import { Interpolator } from './interp';
 
-/** Max wall-clock ms per rendered frame spent pre-rendering neighbour rooms. */
+/** Max wall-clock ms per 1/60 s spent pre-rendering neighbour rooms (split over the frames drawn in it). */
 const IDLE_BUDGET_MS = 2.5;
 /** Duration of the trapdoor fall animation before the floor fade. */
 const DESCEND_FALL = 0.62;
@@ -69,6 +70,8 @@ interface Transition {
   snapshot: HTMLCanvasElement;
   dir: Dir | 'fade';
   t: number;
+  /** t at the start of the latest step (draw interpolation) */
+  pt: number;
   dur: number;
 }
 
@@ -444,6 +447,7 @@ export class World {
 
   // ================================================================== update
   update(dt: number): void {
+    this.savePrev();
     this.dt = dt;
     if (this.renderer) this.renderer.updateEffects(dt);
     this.updateUiTimers(dt);
@@ -451,6 +455,7 @@ export class World {
     if (this.transition) {
       // anything spawned while sliding (room-enter hooks ...) is shown right away
       this.flushPending();
+      this.transition.pt = this.transition.t;
       this.transition.t += dt;
       if (this.transition.t >= this.transition.dur) {
         this.transition = null;
@@ -1170,7 +1175,7 @@ export class World {
     const sc = this.snapCanvas.getContext('2d')!;
     sc.clearRect(0, 0, VIEW_W, VIEW_H);
     sc.drawImage(this.renderer.world, 0, 0);
-    this.transition = { snapshot: this.snapCanvas, dir, t: 0, dur };
+    this.transition = { snapshot: this.snapCanvas, dir, t: 0, pt: 0, dur };
     this.transitioning = true;
   }
 
@@ -1467,7 +1472,53 @@ export class World {
     }
   }
 
-  draw(): void {
+  // ------------------------------------------------------------ interpolation
+  // The simulation steps at a fixed 60 Hz; high-refresh displays draw in
+  // between (game/interp.ts). `savePrev()` runs at the top of every `update`
+  // (also while paused / in hit-stop / sliding, so a frozen world never
+  // drifts); `draw(alpha)` moves everything to its interpolated position,
+  // draws, and restores the exact simulated values.
+
+  private interp = new Interpolator();
+  /** room of the latest step: a room change (door, teleport, new floor) never interpolates */
+  private prevNode: RoomNode | null = null;
+  /** `renderer.simStep` of the latest `update` (a world not stepped in the latest step draws as is) */
+  private prevStep = -1;
+
+  /** Record the current state as "previous" (called at the start of every simulation step). */
+  savePrev(): void {
+    const r = this.renderer;
+    this.interp.save(this.entities, this.particles, r ?? null);
+    if (r) this.prevStep = r.simStep;
+    this.prevNode = this.node ?? null;
+  }
+
+  /**
+   * Interpolation factor for drawing this frame: the renderer's frame alpha when
+   * the world was stepped in the latest simulation step, else 1 (paused under
+   * an overlay, game over ...: draw the current state, nothing drifts).
+   */
+  interpAlpha(): number {
+    const r = this.renderer;
+    return r && this.prevStep === r.simStep ? r.alpha : 1;
+  }
+
+  /**
+   * Draw the world. `alpha` (0..1) interpolates between the previous and the
+   * current simulation step (high-refresh displays); default: the renderer's
+   * frame alpha when this world was stepped in the latest step, else 1.
+   */
+  draw(alpha = this.interpAlpha()): void {
+    const lerp = alpha < 1 && !this.transition && this.prevNode === this.node;
+    if (lerp) this.interp.begin(alpha, this.entities, this.particles, this.renderer, this.dt);
+    try {
+      this.drawFrame(alpha);
+    } finally {
+      this.interp.end();
+    }
+  }
+
+  private drawFrame(alpha: number): void {
     const r = this.renderer;
     r.beginWorld('#06040a');
     this.room.drawBackground(r);
@@ -1498,7 +1549,7 @@ export class World {
     for (const e of all) if (e.layer === 3) e.draw(r, this);
     this.drawVignette();
 
-    if (this.transition) this.drawTransition();
+    if (this.transition) this.drawTransition(alpha);
     this.idleWork();
   }
 
@@ -1513,6 +1564,10 @@ export class World {
     // while falling only the next floor's first room is pre-rendered
     if (this.descending && !this.bgJob) return;
     const t0 = performance.now();
+    // the budget is per 1/60 s: a 120 Hz display drawing twice as often spends half per frame
+    const since = this.idleAt > 0 ? t0 - this.idleAt : 16.7;
+    this.idleAt = t0;
+    const budget = IDLE_BUDGET_MS * clamp(since / 16.7, 0.25, 1);
     do {
       if (!this.bgJob) {
         if (this.descending) return;
@@ -1522,8 +1577,10 @@ export class World {
         this.bgJob = { node: next, gen: roomBaseJob(this.buildRoom(next)) };
       }
       if (this.bgJob.gen.next().done) this.bgJob = null;
-    } while (performance.now() - t0 < IDLE_BUDGET_MS);
+    } while (performance.now() - t0 < budget);
   }
+
+  private idleAt = 0;
 
   /** Next unvisited, reachable neighbour whose background isn't warm yet. */
   private nextPrerender(): RoomNode | null {
@@ -1550,12 +1607,21 @@ export class World {
     const grow = stride > 1 ? 1.3 : 1;
     const boost = stride > 1 ? Math.min(1.6, Math.sqrt(stride)) : 1;
     const o = this.lightOpts;
+    const a = this.particles.alpha;
+    const lerp = a < 1;
     let k = 0;
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
       if (p.light <= 0 || k++ % stride !== 0) continue;
+      let x = p.x;
+      let y = p.y - p.z;
+      if (lerp) {
+        if (p.fresh) continue;
+        x = p.px + (x - p.px) * a;
+        y = p.py - p.pz + (y - (p.py - p.pz)) * a;
+      }
       o.intensity = 0.7 * boost * (1 - p.age / p.life);
-      lights.add(p.x, p.y - p.z, p.light * grow, p.lightColor ?? p.colors[0].slice(0, 7), o);
+      lights.add(x, y, p.light * grow, p.lightColor ?? p.colors[0].slice(0, 7), o);
     }
   }
 
@@ -1614,10 +1680,10 @@ export class World {
   }
 
   private transCanvas: HTMLCanvasElement | null = null;
-  private drawTransition(): void {
+  private drawTransition(alpha: number): void {
     const tr = this.transition!;
     const ctx = this.renderer.ctx;
-    const t = clamp(tr.t / tr.dur, 0, 1);
+    const t = clamp((tr.pt + (tr.t - tr.pt) * clamp(alpha, 0, 1)) / tr.dur, 0, 1);
     if (tr.dir === 'fade') {
       // fade out old -> black -> new
       if (t < 0.5) {

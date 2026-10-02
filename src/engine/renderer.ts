@@ -280,6 +280,19 @@ export class Renderer {
   flashColor = '#ffffff';
   flashAlpha = 0;
 
+  /**
+   * Frame interpolation (set by the main loop for each drawn frame): the
+   * fraction (0..1) of a fixed simulation step elapsed since the latest step.
+   * 1 = draw the latest simulated state as is.
+   */
+  alpha = 1;
+  /**
+   * Fixed simulation steps run so far (incremented by the main loop before
+   * each step), so a simulation can tell whether it was stepped in the latest
+   * one (a paused / covered world must not interpolate).
+   */
+  simStep = 0;
+
   constructor(display: HTMLCanvasElement) {
     this.display = display;
     this.dctx = display.getContext('2d', { alpha: false })!;

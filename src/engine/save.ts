@@ -17,11 +17,26 @@ export interface Settings {
   touchControls: TouchControlsMode;
   /** touch attack scheme: auto-aim attack button (default) / twin sticks */
   touchScheme: TouchSchemeSetting;
+  /**
+   * 최대 프레임: frame-rate cap (60 / 120 / 0 = display max). Unset = automatic
+   * (120, or 60 at graphics quality 낮음); see `effectiveMaxFps`.
+   */
+  maxFps?: FrameCap;
 }
 
 export type GraphicsQuality = 'high' | 'medium' | 'low';
 export type TouchControlsMode = 'auto' | 'on' | 'off';
 export type TouchSchemeSetting = 'auto' | 'twin';
+/** frame-rate cap in fps; 0 = draw at the display's own rate */
+export type FrameCap = 60 | 120 | 0;
+export const FRAME_CAPS: FrameCap[] = [60, 120, 0];
+
+/** The frame-rate cap in effect: the chosen one, else 120 (60 at graphics quality 낮음). */
+export function effectiveMaxFps(s: Pick<Settings, 'maxFps' | 'graphicsQuality'>): FrameCap {
+  const v = s.maxFps;
+  if (v === 60 || v === 120 || v === 0) return v;
+  return s.graphicsQuality === 'low' ? 60 : 120;
+}
 
 /** Coarse primary pointer (phones / tablets)? Safe outside the browser. */
 export function isTouchDevice(): boolean {

@@ -13,6 +13,8 @@ import { GameScene } from './ui/game-scene';
 import { installDebug } from './debug';
 import { touch } from './ui/touch';
 import { applyGraphics } from './ui/quality';
+import { perfmon } from './engine/perfmon';
+import { effectiveMaxFps, save } from './engine/save';
 
 async function boot(): Promise<void> {
   const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -75,37 +77,58 @@ async function boot(): Promise<void> {
     setTimeout(() => bootEl.remove(), 450);
   }
 
-  // fixed 60 Hz steps; snapped rAF deltas and no redraw of an unchanged state
-  // (a 120 Hz ProMotion display draws a steady 60 fps, see engine/pacing.ts)
+  // fixed 60 Hz simulation steps (exactly FIXED_DT each, whatever the display
+  // rate); frames are drawn at the display rate up to the 최대 프레임 cap with the
+  // world interpolated between the last two steps (see engine/pacing.ts)
   const pacer = new FramePacer(FIXED_DT);
   pacer.reset(performance.now());
-  let fpsAcc = 0;
+  let fpsT = performance.now();
   let fpsFrames = 0;
-  let drawn = false;
-  const frame = (now: number) => {
-    const delta = pacer.delta(now);
-    fpsAcc += delta;
+  let lastDrawAt = -1;
+  (window as unknown as { __lkPerf: typeof perfmon }).__lkPerf = perfmon;
+  (window as unknown as { __lkApp: typeof app }).__lkApp = app;
+  const r = app.renderer;
+  const frame = (now: number): void => {
+    pacer.maxFps = effectiveMaxFps(save.settings);
     touch.frame();
-    const steps = pacer.steps(delta);
+    const steps = pacer.tick(now);
+    const t0 = perfmon.on ? performance.now() : 0;
     for (let i = 0; i < steps; i++) {
       input.update();
+      r.simStep++;
       app.scenes.update(FIXED_DT);
     }
-    if (steps > 0 || !drawn) {
+    const t1 = perfmon.on ? performance.now() : 0;
+    if (pacer.draw) {
+      r.alpha = pacer.alpha;
       app.scenes.draw();
-      touch.draw(app.renderer);
-      drawn = true;
+      touch.draw(r);
+      r.alpha = 1;
       fpsFrames++;
-    }
-    if (fpsAcc >= 0.5) {
-      app.fps = fpsFrames / fpsAcc;
-      fpsAcc = 0;
+      if (perfmon.on) {
+        const t2 = performance.now();
+        if (perfmon.flush) r.dctx.getImageData(0, 0, 1, 1);
+        const t3 = perfmon.flush ? performance.now() : t2;
+        perfmon.record(lastDrawAt < 0 ? 0 : now - lastDrawAt, t1 - t0, t2 - t1, t3 - t2, steps);
+      }
+      lastDrawAt = now;
+    } else if (perfmon.on && steps > 0) perfmon.addUpdate(t1 - t0, steps);
+    if (now - fpsT >= 500) {
+      app.fps = (fpsFrames * 1000) / (now - fpsT);
+      fpsT = now;
       fpsFrames = 0;
     }
     input.endFrame();
-    requestAnimationFrame(frame);
   };
-  requestAnimationFrame(frame);
+  // `__lkLoop.manual = true` stops the rAF driver so tools can run frames at
+  // synthetic timestamps (`__lkLoop.frame(ms)`), e.g. a 120 Hz display in tests
+  const loop = { manual: false, frame, pacer };
+  (window as unknown as { __lkLoop: typeof loop }).__lkLoop = loop;
+  const raf = (now: number) => {
+    if (!loop.manual) frame(now);
+    requestAnimationFrame(raf);
+  };
+  requestAnimationFrame(raf);
 }
 
 // offline play: register the service worker in production web builds only

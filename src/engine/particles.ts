@@ -3,7 +3,7 @@
 // ramp, and optionally leave a decal where they land (blood drops, embers ...).
 
 import { fx } from './rng';
-import { VIEW_H, VIEW_W, type Renderer } from './renderer';
+import { VIEW_H, VIEW_W, type DrawOpts, type Renderer } from './renderer';
 import type { Lighting } from './lighting';
 import { TAU } from './math';
 
@@ -50,6 +50,12 @@ interface P extends Required<Omit<ParticleSpec, 'sprite' | 'onLand' | 'lightColo
   lightColor?: string;
   age: number;
   landed: boolean;
+  /** position at the start of the latest simulation step (draw interpolation) */
+  px: number;
+  py: number;
+  pz: number;
+  /** spawned during the latest step: not drawn while interpolating (it does not exist yet at the drawn time) */
+  fresh: boolean;
 }
 
 export interface BurstOpts {
@@ -88,6 +94,11 @@ export class Particles {
   list: P[] = [];
   /** global density multiplier (settings / low quality: 0.25..1) */
   density = 1;
+  /**
+   * Draw interpolation factor between the previous and the current step
+   * (set by the world around its draw; 1 = current positions, no interpolation).
+   */
+  alpha = 1;
   /** recycled particle objects (avoids GC churn during big bursts) */
   private pool: P[] = [];
   /** replacement cursor once the cap is reached (overwrites the oldest first) */
@@ -149,6 +160,10 @@ export class Particles {
     p.ground = s.ground ?? false;
     p.age = 0;
     p.landed = false;
+    p.px = p.x;
+    p.py = p.y;
+    p.pz = p.z;
+    p.fresh = true;
   }
 
   burst(x: number, y: number, o: BurstOpts): void {
@@ -189,6 +204,22 @@ export class Particles {
       p.ground = o.ground ?? false;
       p.age = 0;
       p.landed = false;
+      p.px = p.x;
+      p.py = p.y;
+      p.pz = p.z;
+      p.fresh = true;
+    }
+  }
+
+  /** Record every particle's position as "previous" (start of a simulation step; see `alpha`). */
+  savePrev(): void {
+    const l = this.list;
+    for (let i = 0; i < l.length; i++) {
+      const p = l[i];
+      p.px = p.x;
+      p.py = p.y;
+      p.pz = p.z;
+      p.fresh = false;
     }
   }
 
@@ -263,6 +294,10 @@ export class Particles {
     c.globalCompositeOperation = 'source-over';
   }
 
+  /** reused draw options of 'sprite' particles (no per-particle object) */
+  private spriteOpts: DrawOpts = { rot: 0, alpha: 1, sx: 1, sy: 1, additive: false };
+  private lightOpts = { intensity: 1 };
+
   /** Draw the particles of one layer and blend mode. Returns true if the layer has additive particles. */
   private drawPass(r: Renderer, ground: boolean, additive: boolean, lights?: Lighting): boolean {
     const c = r.ctx;
@@ -270,8 +305,11 @@ export class Particles {
     const vy = r.viewY;
     const l = this.list;
     const mode = additive ? 'lighter' : 'source-over';
+    const k = this.alpha;
+    const lerp = k < 1;
     // canvas state is only touched when it changes (most particles share it)
     let curCol = '';
+    let curAlpha = -1;
     let sawAdditive = false;
     for (let i = 0; i < l.length; i++) {
       const p = l[i];
@@ -280,17 +318,29 @@ export class Particles {
         if (p.additive) sawAdditive = true;
         continue;
       }
+      // interpolated position (a particle born in the latest step is not shown yet)
+      let wx = p.x;
+      let wy = p.y - p.z;
+      if (lerp) {
+        if (p.fresh) continue;
+        const py = p.py - p.pz;
+        wx = p.px + (wx - p.px) * k;
+        wy = py + (wy - py) * k;
+      }
       const t = p.age / p.life;
       const size = p.size + (p.sizeEnd - p.size) * t;
-      const sx = p.x - vx;
-      const sy = p.y - p.z - vy;
+      const sx = wx - vx;
+      const sy = wy - vy;
       const m = size + CULL;
       if (sx < -m || sy < -m || sx > VIEW_W + m || sy > VIEW_H + m) continue;
       const a = p.fade ? p.alpha * (1 - t * t) : p.alpha;
       if (a <= 0.01) continue;
       const cols = p.colors;
       const col = cols.length === 1 ? cols[0] : cols[Math.min(cols.length - 1, Math.floor(t * cols.length))];
-      c.globalAlpha = a;
+      if (a !== curAlpha) {
+        curAlpha = a;
+        c.globalAlpha = a;
+      }
       if (col !== curCol) {
         curCol = col;
         c.fillStyle = col;
@@ -317,12 +367,12 @@ export class Particles {
         }
         case 'spark': {
           const sp = Math.hypot(p.vx, p.vy);
-          const k = sp > 0 ? Math.min(size * 3, sp * 0.04 + 1) / sp : 0;
+          const f = sp > 0 ? Math.min(size * 3, sp * 0.04 + 1) / sp : 0;
           c.strokeStyle = col;
           c.lineWidth = Math.max(1, size * 0.5);
           c.beginPath();
           c.moveTo(sx, sy);
-          c.lineTo(sx - p.vx * k, sy - p.vy * k);
+          c.lineTo(sx - p.vx * f, sy - p.vy * f);
           c.stroke();
           break;
         }
@@ -336,15 +386,26 @@ export class Particles {
         }
         case 'sprite': {
           if (p.sprite) {
-            r.spriteScreen(p.sprite, sx, sy, { rot: p.rot, alpha: a, sx: size, sy: size, additive: p.additive });
+            const o = this.spriteOpts;
+            o.rot = p.rot;
+            o.alpha = a;
+            o.sx = size;
+            o.sy = size;
+            o.additive = p.additive;
+            r.spriteScreen(p.sprite, sx, sy, o);
             // spriteScreen resets the canvas state
             c.globalCompositeOperation = mode;
             curCol = '';
+            curAlpha = -1;
           }
           break;
         }
       }
-      if (lights && p.light > 0) lights.add(p.x, p.y - p.z, p.light * (1 - t * 0.5), p.lightColor ?? col.slice(0, 7), { intensity: a });
+      if (lights && p.light > 0) {
+        const lo = this.lightOpts;
+        lo.intensity = a;
+        lights.add(wx, wy, p.light * (1 - t * 0.5), p.lightColor ?? col.slice(0, 7), lo);
+      }
     }
     return sawAdditive;
   }
