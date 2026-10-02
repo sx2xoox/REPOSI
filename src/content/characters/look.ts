@@ -7,6 +7,8 @@
 //   `${prefix}_hurt`                 recoil pose with squeezed eyes
 //   `${prefix}_portrait`             front pose with the starting weapon
 // Light comes from the top-left; every frame gets the shared dark outline.
+// Optional animal parts: a `tail` that wags (drawn behind the body, or over it in
+// the back view), floppy `ears` that lag a pixel behind on walk steps, and `paws`.
 
 import { defineAnim, defineDrawnSprite } from '../../engine/sprites';
 import { PixelPainter } from '../../engine/painter';
@@ -47,6 +49,25 @@ export interface CharSpec {
   overlay?(p: PixelPainter, pose: Pose, frame: FrameInfo): void;
   /** portrait extras (e.g. weapon in hand), painted after the front pose */
   portrait?(p: PixelPainter): void;
+  /** wagging tail, per pose (moves with the body; behind it unless `over`) */
+  tail?: Partial<Record<Pose, TailPose>>;
+  /** ear pixels (palette keys); floppy ears stretch a pixel down while the body is raised */
+  ears?: { keys: string; flop?: boolean };
+  /** fur paws instead of boots: feet = [paw top, leg fur & toes, toe shadow] */
+  paws?: boolean;
+}
+
+export interface TailPose {
+  /** top-left of the tail frames in pose coordinates */
+  x: number;
+  y: number;
+  /**
+   * wag frames (ASCII rows in the spec palette). Idle alternates the first and last
+   * frame, walking cycles 0, 1, last, 1; dash / hurt / portrait use frame 1 (or 0).
+   */
+  frames: string[][];
+  /** paint over the body instead of behind it (back view) */
+  over?: boolean;
 }
 
 export interface FrameInfo {
@@ -55,14 +76,30 @@ export interface FrameInfo {
   step: number;
   /** vertical body offset applied this frame (0 = resting, -1 = raised) */
   bob: number;
+  /** idle tail wag phase (0 / 1 = first / last tail frame); defaults to `step` */
+  wag?: number;
 }
 
 /** Copy an ASCII pose into a painter with an optional per-row x shift and y shift. */
-function stampPose(p: PixelPainter, rows: string[], pal: Record<string, string>, opts: { dy?: number; headDy?: number; headRows?: number; skipBottom?: number; shear?: (row: number) => number } = {}): void {
+function stampPose(p: PixelPainter, rows: string[], pal: Record<string, string>, opts: { dy?: number; headDy?: number; headRows?: number; skipBottom?: number; shear?: (row: number) => number; earKeys?: string } = {}): void {
   const n = rows.length - (opts.skipBottom ?? 0);
-  for (let r = 0; r < n; r++) {
+  if (opts.earKeys) {
+    // floppy ears lag behind the raised body: paint them one row lower first,
+    // the regular pass then leaves a 1px longer ear
+    for (let r = 0; r < n; r++) {
+      const row = rows[r];
+      const dy = (opts.dy ?? 0) + (r < (opts.headRows ?? 10) ? opts.headDy ?? 0 : 0) + 1;
+      const dx = opts.shear ? opts.shear(r) : 0;
+      for (let c = 0; c < row.length; c++) if (opts.earKeys.includes(row[c])) p.px(c + dx, r + dy, pal[row[c]]);
+    }
+  }
+  // a lowered head (breathing) is painted after the body so it rests on the collar
+  // instead of sinking behind it (keeps the chin / muzzle visible)
+  const headRows = Math.min(n, opts.headRows ?? 10);
+  const order = opts.headDy ? [...Array(n).keys()].slice(headRows).concat([...Array(headRows).keys()]) : [...Array(n).keys()];
+  for (const r of order) {
     const row = rows[r];
-    const isHead = r < (opts.headRows ?? 10);
+    const isHead = r < headRows;
     const dy = (opts.dy ?? 0) + (isHead ? opts.headDy ?? 0 : 0);
     const dx = opts.shear ? opts.shear(r) : 0;
     for (let c = 0; c < row.length; c++) {
@@ -84,9 +121,38 @@ function drawFeet(p: PixelPainter, spec: CharSpec, xs: [number, number], lifts: 
     const lift = lifts[i];
     const y = base - lift;
     // shin connects the hem to the boot
-    for (let yy = CHAR_H + 1 - (spec.feetRows ?? 3); yy < y - 1; yy++) p.rect(x, yy, 2, 1, shin);
-    p.rect(x, y - 1, 2, 1, boot);
-    p.rect(x, y, 2, 1, sole);
+    for (let yy = CHAR_H + 1 - (spec.feetRows ?? 3); yy < y - 1; yy++) p.rect(x, yy, 2, 1, spec.paws ? boot : shin);
+    if (spec.paws) {
+      // fur paw: lit top row, toes below with a shadow on the outer side
+      p.rect(x, y - 1, 2, 1, shin);
+      p.px(x, y, i === 0 ? boot : sole);
+      p.px(x + 1, y, i === 0 ? sole : boot);
+    } else {
+      p.rect(x, y - 1, 2, 1, boot);
+      p.rect(x, y, 2, 1, sole);
+    }
+  }
+}
+
+/** Wag frame for a frame description (see TailPose.frames). */
+function wagIndex(info: FrameInfo, n: number): number {
+  if (info.kind === 'walk') return [0, 1, n - 1, 1][info.step % 4] % n;
+  if (info.kind === 'idle') return (info.wag ?? info.step) % 2 ? n - 1 : 0;
+  return Math.min(1, n - 1);
+}
+
+function drawTail(p: PixelPainter, spec: CharSpec, pose: Pose, info: FrameInfo, over: boolean, dy: number, shear?: (row: number) => number): void {
+  const t = spec.tail?.[pose];
+  if (!t || !!t.over !== over || !t.frames.length) return;
+  const rows = t.frames[wagIndex(info, t.frames.length)];
+  for (let r = 0; r < rows.length; r++) {
+    const dx = shear ? shear(t.y + r) : 0;
+    for (let c = 0; c < rows[r].length; c++) {
+      const ch = rows[r][c];
+      if (ch === '.' || ch === ' ') continue;
+      const col = spec.palette[ch];
+      if (col) p.px(t.x + c + dx, t.y + r + dy, col);
+    }
   }
 }
 
@@ -111,18 +177,23 @@ export function paintFrame(p: PixelPainter, spec: CharSpec, pose: Pose, info: Fr
   const headRows = spec.headRows ?? 10;
   const fx = spec.feetX ?? [5, 9];
   const sfx = spec.sideFeetX ?? [6, 8];
+  const earKeys = spec.ears?.flop ? spec.ears.keys : undefined;
   if (info.kind === 'dash') {
     // lean forward: upper rows shift ahead (side pose), feet trail behind
     const shear = (r: number) => (pose === 'side' ? (r < headRows ? 2 : r < CHAR_H - feetRows - 2 ? 1 : 0) : 0);
-    stampPose(p, rows, spec.palette, { dy: 1, skipBottom: feetRows, shear, headRows });
+    drawTail(p, spec, pose, info, false, 1, shear);
+    // floppy ears lag behind the lunge
+    stampPose(p, rows, spec.palette, { dy: 1, skipBottom: feetRows, shear, headRows, earKeys });
     if (!spec.float) {
       if (pose === 'side') drawFeet(p, spec, [sfx[0] - 2, sfx[1] + 1], [1, 0]);
       else drawFeet(p, spec, fx, [1, 1]);
     }
+    drawTail(p, spec, pose, info, true, 1, shear);
   } else if (info.kind === 'walk') {
     const s = info.step;
     const bob = info.bob;
-    stampPose(p, rows, spec.palette, { dy: 1 + bob, skipBottom: feetRows, headRows });
+    drawTail(p, spec, pose, info, false, 1 + bob);
+    stampPose(p, rows, spec.palette, { dy: 1 + bob, skipBottom: feetRows, headRows, earKeys: bob < 0 ? earKeys : undefined });
     if (!spec.float) {
       if (pose === 'side') {
         // stride: feet swap front/back
@@ -134,12 +205,16 @@ export function paintFrame(p: PixelPainter, spec: CharSpec, pose: Pose, info: Fr
         drawFeet(p, spec, fx, lift);
       }
     }
+    drawTail(p, spec, pose, info, true, 1 + bob);
   } else {
     // idle / hurt / portrait (floating characters hover instead of breathing)
     const hover = spec.float && info.kind === 'idle' && info.step === 1 ? -1 : 0;
     const headDy = !spec.float && info.kind === 'idle' && info.step === 1 ? 1 : 0;
-    stampPose(p, rows, spec.palette, { dy: 1 + info.bob + hover, headDy, skipBottom: feetRows, headRows });
+    const dy = 1 + info.bob + hover;
+    drawTail(p, spec, pose, info, false, dy);
+    stampPose(p, rows, spec.palette, { dy, headDy, skipBottom: feetRows, headRows });
     if (!spec.float) drawFeet(p, spec, pose === 'side' ? sfx : fx, [0, 0]);
+    drawTail(p, spec, pose, info, true, dy);
     if (info.kind === 'hurt' && spec.eyes) {
       // squeezed eyes: >  <
       const fill = spec.hurtFill ?? spec.palette.s ?? '#f0d0b8';
@@ -166,12 +241,16 @@ export function defineCharacter2D(spec: CharSpec): void {
   for (const f of facings) {
     const pose = POSE_OF[f];
     const idle: string[] = [];
-    for (let i = 0; i < 2; i++) {
+    // with a tail the breathing loop is doubled so the tail wags twice per breath
+    const wags = spec.tail?.[pose] ? 2 : 1;
+    for (let i = 0; i < 2 * wags; i++) {
       const n = frameName(pre, 'idle', f, i);
-      defineDrawnSprite(n, CHAR_W, CHAR_H + 1, (p) => paintFrame(p, spec, pose, { kind: 'idle', step: i, bob: 0 }), opts);
+      const step = Math.floor(i / wags);
+      const wag = wags > 1 ? i % 2 : undefined;
+      defineDrawnSprite(n, CHAR_W, CHAR_H + 1, (p) => paintFrame(p, spec, pose, { kind: 'idle', step, bob: 0, wag }), opts);
       idle.push(n);
     }
-    defineAnim(`${pre}_idle_${f}`, idle, 2.2);
+    defineAnim(`${pre}_idle_${f}`, idle, 2.2 * wags);
     const walk: string[] = [];
     for (let i = 0; i < 4; i++) {
       const n = frameName(pre, 'walk', f, i);
@@ -210,6 +289,12 @@ export function validateSpec(spec: CharSpec): string[] {
       if (r.length !== CHAR_W) out.push(`${spec.prefix}.${pose}[${i}]: width ${r.length} (want ${CHAR_W}) "${r}"`);
       for (const ch of r) if (ch !== '.' && ch !== ' ' && !(ch in spec.palette)) out.push(`${spec.prefix}.${pose}[${i}]: unknown key '${ch}'`);
     });
+    const tail = spec.tail?.[pose];
+    tail?.frames.forEach((f, fi) => f.forEach((r, i) => {
+      if (tail.x + r.length > CHAR_W || tail.y + i >= CHAR_H) out.push(`${spec.prefix}.tail.${pose}[${fi}][${i}]: outside the sprite`);
+      for (const ch of r) if (ch !== '.' && ch !== ' ' && !(ch in spec.palette)) out.push(`${spec.prefix}.tail.${pose}[${fi}][${i}]: unknown key '${ch}'`);
+    }));
   }
+  for (const ch of spec.ears?.keys ?? '') if (!(ch in spec.palette)) out.push(`${spec.prefix}.ears: unknown key '${ch}'`);
   return out;
 }

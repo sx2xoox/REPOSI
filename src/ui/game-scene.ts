@@ -1,5 +1,5 @@
-// Gameplay scene: owns the World, draws HUD, and opens overlays
-// (pause, collection/status, full map, game over).
+// Gameplay scene: owns the World and the HUD, and opens overlays
+// (pause, status (Tab), full map (M), game over / victory).
 
 import type { Scene } from './scene';
 import type { Renderer } from '../engine/renderer';
@@ -7,7 +7,7 @@ import { World, type GameOverInfo, type WorldHost } from '../game/world';
 import { RunState } from '../game/run';
 import { app } from '../game/app';
 import { input } from '../engine/input';
-import { drawHud } from './hud';
+import { Hud } from './hud';
 import { PauseOverlay } from './pause';
 import { StatusOverlay } from './status';
 import { MapOverlay } from './map-overlay';
@@ -18,6 +18,7 @@ import { save } from '../engine/save';
 export class GameScene implements Scene, WorldHost {
   world: World;
   run: RunState;
+  hud = new Hud();
   private overlayOpen: Scene | null = null;
 
   constructor(seed: string, character: string, seeded: boolean) {
@@ -69,6 +70,7 @@ export class GameScene implements Scene, WorldHost {
       won: info.won, timeSec: Math.round(this.run.stats.timeSec), kills: this.run.stats.kills, killedBy: info.won ? undefined : info.source,
     });
     if (!info.won) audio.playMusic('gameover');
+    if (this.overlayOpen) app.scenes.remove(this.overlayOpen);
     this.overlayOpen = null;
     this.world.paused = true;
     app.scenes.push(new GameOverOverlay(this, info));
@@ -91,11 +93,12 @@ export class GameScene implements Scene, WorldHost {
       }
     }
     w.update(dt);
+    this.hud.update(w, dt);
   }
 
   draw(r: Renderer): void {
     this.world.draw();
     r.presentWorld();
-    drawHud(r, this.world, app.fps);
+    this.hud.draw(r, this.world, app.fps);
   }
 }

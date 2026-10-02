@@ -1,98 +1,194 @@
-// Title screen and character select.
+// Title screen: animated stairwell backdrop, glowing pixel logo, main menu
+// (새 게임 / 시드 입력 / 도감 / 설정 / 크레딧), custom-seed entry modal, run
+// record line and version text. Character select lives in charselect.ts.
 
 import type { Scene } from './scene';
 import type { Renderer } from '../engine/renderer';
 import { UI_H, UI_W } from '../engine/renderer';
-import { Menu } from './widgets';
+import { Menu, applyTyped } from './widgets';
 import { app } from '../game/app';
 import { input } from '../engine/input';
 import { audio, sfx } from '../audio/audio';
 import { SettingsOverlay } from './settings';
-import { Characters } from '../game/defs';
 import { save } from '../engine/save';
-import { randomSeedString } from '../engine/rng';
+import { clamp, ease } from '../engine/math';
+import { backdrop } from './backdrop';
+import { drawLogo } from './logo';
+import { C, VERSION, formatTime } from './theme';
+import { divider, frame, glow, keyHintRow } from './frame';
+import { CharacterSelectScene } from './charselect';
+import { CollectionScene } from './collection';
+import { CreditsScene } from './credits';
+import { Characters } from '../game/defs';
+import { appear } from './anim';
+
+export { CharacterSelectScene } from './charselect';
 
 export class TitleScene implements Scene {
   private menu: Menu;
   private t = 0;
+  private chrome = 0;
+  private seedOpen = false;
+  private seedT = 0;
+  private seed = '';
 
   constructor() {
     this.menu = new Menu([
-      { label: '새 게임', action: () => app.goCharacterSelect() },
-      { label: '설정', action: () => app.scenes.push(new SettingsOverlay()) },
-    ], UI_W / 2, UI_H * 0.6, { width: 240, size: 16, lineH: 32 });
+      { label: '새 게임', action: () => app.scenes.set(new CharacterSelectScene()), hint: '무작위 시드로 새로운 하강을 시작합니다.' },
+      { label: '시드 입력', action: () => this.openSeed(), hint: '같은 시드는 같은 던전을 만듭니다. (기록에는 남지 않음)' },
+      { label: '도감', action: () => app.scenes.push(new CollectionScene()), hint: '발견한 유물과 마주친 적들의 기록.' },
+      { label: '설정', action: () => app.scenes.push(new SettingsOverlay({ fromTitle: true })), hint: '소리, 화면, 조작 설정.' },
+      { label: '크레딧', action: () => app.scenes.push(new CreditsScene()), hint: '등불지기를 만든 사람들.' },
+    ], UI_W / 2, 238, { width: 196, size: 13, lineH: 26, hintY: 382 });
+    const last = save.history[0]?.character;
+    const ch = (last && Characters.get(last)) || Characters.all()[0];
+    if (ch) backdrop().keeper = ch.spritePrefix;
+    installUiDebug(this);
   }
 
   enter(): void {
     audio.playMusic('title');
+    backdrop().setDim(0);
+  }
+
+  openSeed(): void {
+    this.seedOpen = true;
+    this.seedT = 0;
+    this.seed = '';
+    input.textCapture = true;
+    input.releaseAll();
+    sfx('ui_open');
+  }
+
+  private closeSeed(): void {
+    this.seedOpen = false;
+    input.textCapture = false;
+    input.releaseAll();
+  }
+
+  private isTop(): boolean {
+    return app.scenes.top === this;
   }
 
   update(dt: number): void {
     this.t += dt;
-    this.menu.update(app.renderer);
+    const bd = backdrop();
+    bd.update(dt);
+    const top = this.isTop();
+    this.chrome = clamp(this.chrome + (top ? dt * 3 : -dt * 5), 0, 1);
+    if (top) bd.setDim(this.seedOpen ? 0.5 : 0);
+    if (!top) return;
+    if (this.seedOpen) {
+      this.seedT += dt;
+      const typed = input.typed;
+      this.seed = applyTyped(this.seed, typed);
+      if (typed.length) sfx('ui_move', { vol: 0.5, pitch: 1.2 });
+      if (input.pressed('cancel') && !typed.includes('\b')) {
+        sfx('ui_back');
+        this.closeSeed();
+        return;
+      }
+      if (input.pressed('confirm') && !typed.includes(' ')) {
+        sfx('ui_select');
+        const seed = this.seed;
+        this.closeSeed();
+        app.scenes.set(new CharacterSelectScene(seed || undefined));
+      }
+      return;
+    }
+    this.menu.update(app.renderer, dt);
   }
 
   draw(r: Renderer): void {
-    r.beginWorld('#07050c');
+    r.beginWorld('#05030a');
+    backdrop().draw(r);
     r.presentWorld();
     r.beginUI();
-    r.uiText('등불지기', UI_W / 2, UI_H * 0.25, { size: 48, align: 'center', bold: true, color: '#ffe0a0', outline: '#3a1a08' });
-    r.uiText('LANTERNKEEPER', UI_W / 2, UI_H * 0.25 + 58, { size: 12, align: 'center', color: '#a08870' });
-    this.menu.draw(r);
-    r.uiText('WASD 이동 · 마우스/방향키 공격 · Space 대시 · E 폭탄 · Q 액티브 · F 등불 해방', UI_W / 2, UI_H - 24, { size: 10, align: 'center', color: '#6a6078' });
+    const a = ease.inOutQuad(this.chrome);
+    if (a <= 0.01) return;
+    // logo
+    const intro = appear(this.t, 1.2, 0.1);
+    const ly = 34 - (1 - intro) * 12;
+    const { h } = drawLogo(r, UI_W / 2 + 8, ly, this.t, { alpha: a * intro, scale: 4 });
+    const sub = appear(this.t, 0.8, 0.6);
+    r.uiText('L A N T E R N K E E P E R', UI_W / 2, ly + h + 4, { size: 10, font: 'small', align: 'center', color: '#c8a070', alpha: a * sub });
+    divider(r, UI_W / 2 - 132, ly + h + 9, 70, C.goldDark, a * sub);
+    divider(r, UI_W / 2 + 132, ly + h + 9, 70, C.goldDark, a * sub);
+    r.uiText('— 꺼져가는 등불을 들고, 아래로 —', UI_W / 2, ly + h + 22, { size: 10, font: 'small', align: 'center', color: C.textFaint, alpha: a * sub });
+
+    // menu backing: soft darkness pooled over the abyss
+    const mA = a * appear(this.t, 0.6, 0.5);
+    const d = r.dctx;
+    d.save();
+    const grd = d.createRadialGradient(UI_W / 2, 296, 10, UI_W / 2, 296, 150);
+    grd.addColorStop(0, 'rgba(5,3,10,0.8)');
+    grd.addColorStop(1, 'rgba(5,3,10,0)');
+    d.globalAlpha = mA;
+    d.fillStyle = grd;
+    d.fillRect(UI_W / 2 - 200, 150, 400, 300);
+    d.restore();
+    if (this.t > 0.5) this.menu.draw(r, mA);
+
+    // footer
+    const p = save.progress;
+    const rec = p.runs > 0
+      ? `하강 ${p.runs}회 · 귀환 ${p.wins}회 · 최고 ${p.bestFloor}층${p.bestTimeSec ? ` · 최단 ${formatTime(p.bestTimeSec)}` : ''}`
+      : '첫 하강을 기다리는 중';
+    r.uiText(rec, 12, UI_H - 16, { size: 10, font: 'small', color: C.textFaint, alpha: mA });
+    r.uiText(VERSION, UI_W - 12, UI_H - 16, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: mA });
+    if (!this.seedOpen) keyHintRow(r, [['↑↓', '선택'], ['Enter', '결정']], UI_W / 2, UI_H - 10, { alpha: mA * 0.8, pad: input.aimMode === 'pad' });
+
+    if (this.seedOpen) this.drawSeed(r);
+  }
+
+  private drawSeed(r: Renderer): void {
+    const k = appear(this.seedT, 0.25, 0, ease.outBack);
+    const w = 300;
+    const h = 120;
+    const x = UI_W / 2 - w / 2;
+    const y = UI_H / 2 - h / 2 + (1 - k) * 16;
+    r.uiRect(0, 0, UI_W, UI_H, C.void, 0.5 * clamp(this.seedT / 0.2, 0, 1));
+    frame(r, x, y, w, h, 'ornate', { alpha: clamp(k, 0, 1) });
+    r.uiText('시드 입력', UI_W / 2, y + 14, { size: 16, bold: true, align: 'center', color: C.goldHi });
+    const bx = x + 34;
+    const bw = w - 68;
+    frame(r, bx, y + 42, bw, 30, 'inset');
+    const shown = this.seed || '';
+    r.uiText(shown, UI_W / 2, y + 50, { size: 16, align: 'center', color: C.text });
+    if (!shown) r.uiText('비워두면 무작위', UI_W / 2, y + 51, { size: 12, align: 'center', color: C.textMute });
+    const caretX = UI_W / 2 + r.measureText(shown, 16) / 2 + 2;
+    if (Math.floor(this.seedT * 2.2) % 2 === 0 && shown) r.uiRect(caretX, y + 49, 2, 16, C.goldHi);
+    keyHintRow(r, [['Enter', '시작'], ['Esc', '취소']], UI_W / 2, y + h - 22);
+    glow(r, UI_W / 2, y + 57, 90, '#ffb050', 0.06);
   }
 }
 
-export class CharacterSelectScene implements Scene {
-  private idx = 0;
-  private t = 0;
+// ---------------------------------------------------------------- debug hooks (screenshots / automation)
+interface UiDebug {
+  openSeed(): void;
+  openCollection(): void;
+  openCredits(): void;
+  openSettings(): void;
+  openCharSelect(): void;
+  seedCollection(): void;
+}
 
-  private get chars() {
-    return Characters.all();
-  }
-
-  private unlocked(id: string): boolean {
-    const c = Characters.get(id);
-    return !!c && (c.unlocked || save.hasFlag(`unlock:${id}`));
-  }
-
-  update(dt: number): void {
-    this.t += dt;
-    const n = this.chars.length;
-    if (input.pressed('uiRight')) { this.idx = (this.idx + 1) % n; sfx('ui_move'); }
-    if (input.pressed('uiLeft')) { this.idx = (this.idx - 1 + n) % n; sfx('ui_move'); }
-    if (input.pressed('cancel')) { sfx('ui_back'); app.goTitle(); return; }
-    if (input.pressed('confirm')) {
-      const c = this.chars[this.idx];
-      if (c && this.unlocked(c.id)) {
-        sfx('ui_select');
-        app.startRun(randomSeedString(), c.id);
-      } else sfx('ui_error');
-    }
-  }
-
-  draw(r: Renderer): void {
-    r.beginWorld('#07050c');
-    r.presentWorld();
-    r.beginUI();
-    r.uiText('등불지기를 선택하세요', UI_W / 2, 40, { size: 18, align: 'center', bold: true, color: '#f8e8c8' });
-    const cs = this.chars;
-    cs.forEach((c, i) => {
-      const x = UI_W / 2 + (i - (cs.length - 1) / 2) * 150;
-      const sel = i === this.idx;
-      const open = this.unlocked(c.id);
-      r.uiPanel(x - 60, 90, 120, 150, { alpha: sel ? 0.95 : 0.6, border: sel ? c.color : undefined });
-      r.uiSprite(c.portrait, x, 160, 4, { tint: open ? undefined : '#000000', tintAmount: 1 });
-      r.uiText(open ? c.name : '???', x, 206, { size: 13, align: 'center', bold: true, color: sel ? c.color : '#b8acc8' });
-      r.uiText(open ? c.title : '잠김', x, 222, { size: 10, align: 'center', color: '#8a7f9a' });
-    });
-    const c = cs[this.idx];
-    if (c) {
-      const open = this.unlocked(c.id);
-      const lines = r.wrapText(open ? c.desc : c.unlockHint ?? '아직 잠겨 있습니다.', 460, 12);
-      lines.forEach((l, k) => r.uiText(l, UI_W / 2, 270 + k * 16, { size: 12, align: 'center', color: '#d8d0c8' }));
-      if (open && c.releaseDesc) r.uiText(`등불 해방 — ${c.releaseDesc}`, UI_W / 2, 280 + lines.length * 16, { size: 11, align: 'center', color: '#ffd080' });
-    }
-    r.uiText('◀ ▶ 선택 · Enter 시작 · Esc 뒤로', UI_W / 2, UI_H - 30, { size: 10, align: 'center', color: '#6a6078' });
-  }
+function installUiDebug(title: TitleScene): void {
+  if (typeof window === 'undefined') return;
+  const api: UiDebug = {
+    openSeed: () => title.openSeed(),
+    openCollection: () => app.scenes.push(new CollectionScene()),
+    openCredits: () => app.scenes.push(new CreditsScene()),
+    openSettings: () => app.scenes.push(new SettingsOverlay({ fromTitle: true })),
+    openCharSelect: () => app.scenes.set(new CharacterSelectScene()),
+    seedCollection: () => {
+      // mark a sample of content as discovered (debug only)
+      void import('../game/defs').then(({ Artifacts, Enemies, Weapons, Actives }) => {
+        const pick = <T extends { id: string }>(arr: T[], k: number) => arr.filter((_, i) => i % k === 0).map((d) => d.id);
+        for (const id of [...pick(Artifacts.all(), 2), ...pick(Weapons.all(), 2), ...pick(Actives.all(), 1)]) save.markSeenItem(id);
+        for (const id of pick(Enemies.all(), 2)) save.markSeenEnemy(id);
+      });
+    },
+  };
+  (window as unknown as { __lkui: UiDebug }).__lkui = api;
 }

@@ -3,6 +3,10 @@
 // - Music tracks are registered by id as factories that start a sequencer and
 //   return a handle that can be stopped (with fade-out).
 // The AudioContext is created lazily on the first user gesture (browser policy).
+// Synths receive a BaseAudioContext so they can also be rendered offline
+// (OfflineAudioContext) for automated loudness checks (see src/audio/offline.ts).
+
+import { routeSfxSends } from './synth';
 
 export const SFX_NAMES = [
   // player / weapons
@@ -42,8 +46,11 @@ export interface SfxPlayOpts {
   pan?: number;
 }
 
-/** A synth receives a destination node and must schedule its own nodes starting at `t`. */
-export type SfxSynth = (ctx: AudioContext, out: AudioNode, t: number, o: Required<SfxPlayOpts>) => void;
+/**
+ * A synth receives a destination node and must schedule its own nodes starting at `t`.
+ * It must not keep nodes alive after it finished (see `Patch` in synth.ts).
+ */
+export type SfxSynth = (ctx: BaseAudioContext, out: AudioNode, t: number, o: Required<SfxPlayOpts>) => void;
 
 export interface TrackHandle {
   /** Stop with a fade-out of `fade` seconds. Must clean up its timers. */
@@ -51,7 +58,7 @@ export interface TrackHandle {
   /** Optional: change intensity (0..1), e.g. when enemies are present. */
   setIntensity?(v: number): void;
 }
-export type TrackFactory = (ctx: AudioContext, out: AudioNode) => TrackHandle;
+export type TrackFactory = (ctx: BaseAudioContext, out: AudioNode) => TrackHandle;
 
 const sfxRegistry = new Map<string, SfxSynth>();
 const trackRegistry = new Map<string, TrackFactory>();
@@ -71,6 +78,19 @@ export function hasSfx(name: string): boolean {
 export function hasTrack(id: string): boolean {
   return trackRegistry.has(id);
 }
+
+/** Registered synth (for offline rendering / tests). */
+export function getSfxSynth(name: string): SfxSynth | undefined {
+  return sfxRegistry.get(name);
+}
+
+/** Registered track factory (for offline rendering / tests). */
+export function getTrackFactory(id: string): TrackFactory | undefined {
+  return trackRegistry.get(id);
+}
+
+/** Longest a one-shot sfx may ring (used to release per-sound panners). */
+const SFX_MAX_SECONDS = 4;
 
 class AudioEngine {
   ctx: AudioContext | null = null;
@@ -107,6 +127,7 @@ class AudioEngine {
       this.musicBus.connect(this.master);
       this.master.connect(this.compressor);
       this.compressor.connect(this.ctx.destination);
+      routeSfxSends(this.ctx, this.sfxBus);
       this.applyVolumes();
       if (this.pendingMusic) {
         const id = this.pendingMusic;
@@ -146,16 +167,22 @@ class AudioEngine {
     this.lastPlayed.set(name, now);
     const synth = sfxRegistry.get(name) ?? fallbackSynth;
     let out: AudioNode = this.sfxBus;
+    let panner: StereoPannerNode | null = null;
     if (o.pan) {
-      const p = ctx.createStereoPanner();
-      p.pan.value = Math.max(-1, Math.min(1, o.pan));
-      p.connect(this.sfxBus);
-      out = p;
+      panner = ctx.createStereoPanner();
+      panner.pan.value = Math.max(-1, Math.min(1, o.pan));
+      panner.connect(this.sfxBus);
+      out = panner;
     }
     try {
       synth(ctx, out, now + 0.005, { vol: o.vol ?? 1, pitch: o.pitch ?? 1, pan: o.pan ?? 0 });
     } catch (e) {
       console.error(`[audio] sfx "${name}" failed`, e);
+    }
+    // the synth's own nodes clean themselves up; release the shared panner too
+    if (panner) {
+      const p = panner;
+      setTimeout(() => p.disconnect(), SFX_MAX_SECONDS * 1000);
     }
   }
 

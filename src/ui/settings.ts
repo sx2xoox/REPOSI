@@ -1,65 +1,148 @@
-// Settings overlay (volume, screen shake, display, accessibility).
+// Settings overlay: audio / display / gameplay options with sliders and
+// toggles, progress reset (double confirm), and a full controls reference for
+// keyboard + mouse and gamepad. Used from the title and from the pause menu.
 
 import type { Scene } from './scene';
 import type { Renderer } from '../engine/renderer';
 import { UI_H, UI_W } from '../engine/renderer';
-import { Menu, pct } from './widgets';
+import { Menu, pct, type MenuItem } from './widgets';
 import { input } from '../engine/input';
 import { app } from '../game/app';
 import { save } from '../engine/save';
 import { clamp } from '../engine/math';
 import { audio, sfx } from '../audio/audio';
+import { C } from './theme';
+import { frame, keycap } from './frame';
+import { appear } from './anim';
+import { CONTROL_ROWS, PAD_NAMES, controlKeys } from './keys';
+
+type NumKey = 'masterVolume' | 'musicVolume' | 'sfxVolume' | 'screenShake' | 'particles';
+type BoolKey = 'pixelPerfect' | 'damageNumbers' | 'showFps' | 'hitStop';
 
 export class SettingsOverlay implements Scene {
   transparent = true;
+  passUpdate: boolean;
   private menu: Menu;
+  private t = 0;
+  private closing = -1;
+  private resetStage = 0;
 
-  constructor() {
+  constructor(o: { fromTitle?: boolean } = {}) {
+    this.passUpdate = !!o.fromTitle;
     const s = save.settings;
-    const step = (k: 'masterVolume' | 'musicVolume' | 'sfxVolume' | 'screenShake' | 'particles', min: number, max: number) => (d: number) => {
-      s[k] = clamp(Math.round((s[k] + d * 0.1) * 10) / 10, min, max);
+    const step = (k: NumKey, min: number, max: number, inc = 0.1) => (d: number) => {
+      s[k] = clamp(Math.round((s[k] + d * inc) * 100) / 100, min, max);
       app.applySettings();
       save.saveSettings();
+      if (k === 'sfxVolume' || k === 'masterVolume') sfx('coin', { vol: 0.5 });
     };
-    const toggle = (k: 'pixelPerfect' | 'damageNumbers' | 'showFps' | 'hitStop') => () => {
+    const toggle = (k: BoolKey) => () => {
       s[k] = !s[k];
       app.applySettings();
       save.saveSettings();
     };
-    const onoff = (v: boolean) => (v ? '켜짐' : '꺼짐');
+    const slider = (label: string, k: NumKey, min: number, max: number, hint: string, inc = 0.1): MenuItem => ({
+      label, adjust: step(k, min, max, inc), value: () => (s[k] - min) / (max - min), valueText: () => pct(s[k]), hint,
+    });
+    const sw = (label: string, k: BoolKey, hint: string): MenuItem => ({ label, adjust: toggle(k), action: toggle(k), toggle: () => s[k], hint });
     this.menu = new Menu([
-      { label: () => `전체 음량  ◀ ${pct(s.masterVolume)} ▶`, adjust: step('masterVolume', 0, 1) },
-      { label: () => `음악  ◀ ${pct(s.musicVolume)} ▶`, adjust: step('musicVolume', 0, 1) },
-      { label: () => `효과음  ◀ ${pct(s.sfxVolume)} ▶`, adjust: step('sfxVolume', 0, 1) },
-      { label: () => `화면 흔들림  ◀ ${pct(s.screenShake)} ▶`, adjust: step('screenShake', 0, 1.5) },
-      { label: () => `파티클 양  ◀ ${pct(s.particles)} ▶`, adjust: step('particles', 0.3, 1) },
-      { label: () => `역경직 (히트스톱)  ${onoff(s.hitStop)}`, adjust: toggle('hitStop'), action: toggle('hitStop') },
-      { label: () => `데미지 숫자  ${onoff(s.damageNumbers)}`, adjust: toggle('damageNumbers'), action: toggle('damageNumbers') },
-      { label: () => `정수배 픽셀  ${onoff(s.pixelPerfect)}`, adjust: toggle('pixelPerfect'), action: toggle('pixelPerfect') },
-      { label: () => `FPS 표시  ${onoff(s.showFps)}`, adjust: toggle('showFps'), action: toggle('showFps') },
+      { label: '소리', header: true },
+      slider('전체 음량', 'masterVolume', 0, 1, '모든 소리의 크기.'),
+      slider('음악', 'musicVolume', 0, 1, '배경 음악의 크기.'),
+      slider('효과음', 'sfxVolume', 0, 1, '공격, 피격, 아이템 등 효과음의 크기.'),
+      { label: '화면', header: true },
+      slider('화면 흔들림', 'screenShake', 0, 1.5, '폭발과 피격 시 화면 흔들림 강도.'),
+      slider('파티클 양', 'particles', 0.3, 1, '파편, 불꽃 등 입자 효과의 양. 낮추면 가벼워집니다.'),
+      sw('정수배 픽셀', 'pixelPerfect', '픽셀을 정수배로만 확대해 가장 선명하게 보여줍니다.'),
+      sw('FPS 표시', 'showFps', '오른쪽 아래에 프레임 수를 표시합니다.'),
+      { label: '게임플레이', header: true },
+      sw('역경직 (히트스톱)', 'hitStop', '강한 타격 순간 화면이 잠깐 멈춰 타격감을 살립니다.'),
+      sw('데미지 숫자', 'damageNumbers', '적에게 준 피해량을 숫자로 띄웁니다.'),
+      { label: '기록', header: true },
+      {
+        label: () => (this.resetStage === 0 ? '모든 기록 초기화' : this.resetStage === 1 ? '정말 지울까요? (한 번 더)' : '초기화 완료'),
+        danger: true,
+        hint: '도감, 해금, 기록과 설정을 모두 지웁니다. 되돌릴 수 없습니다.',
+        action: () => this.reset(),
+      },
       { label: '돌아가기', action: () => this.close() },
-    ], UI_W / 2, 110, { width: 360, lineH: 26, size: 13 });
+    ], 196, 74, { width: 300, lineH: 19, size: 12, align: 'left', hintY: UI_H - 44 });
   }
 
-  private close(): void {
-    sfx('ui_back');
-    audio.applyVolumes();
-    app.scenes.remove(this);
+  enter(): void {
+    sfx('ui_open', { vol: 0.6 });
     input.releaseAll();
   }
 
-  update(): void {
+  private reset(): void {
+    if (this.resetStage === 0) {
+      this.resetStage = 1;
+      sfx('warn', { vol: 0.5 });
+      return;
+    }
+    if (this.resetStage === 1) {
+      save.resetAll();
+      app.applySettings();
+      audio.applyVolumes();
+      this.resetStage = 2;
+      sfx('explosion', { vol: 0.4 });
+    }
+  }
+
+  private close(): void {
+    if (this.closing >= 0) return;
+    sfx('ui_back');
+    audio.applyVolumes();
+    this.closing = 0;
+  }
+
+  update(dt: number): void {
+    this.t += dt;
+    if (this.closing >= 0) {
+      this.closing += dt;
+      if (this.closing > 0.14) {
+        app.scenes.remove(this);
+        input.releaseAll();
+      }
+      return;
+    }
     if (input.pressed('cancel') || input.pressed('pause')) {
       this.close();
       return;
     }
-    this.menu.update(app.renderer);
+    if (this.resetStage === 1 && this.menu.index !== this.menu.items.length - 2) this.resetStage = 0;
+    this.menu.update(app.renderer, dt);
   }
 
   draw(r: Renderer): void {
     r.beginUI();
-    r.uiRect(0, 0, UI_W, UI_H, '#05030a', 0.8);
-    r.uiText('설정', UI_W / 2, 60, { size: 24, align: 'center', bold: true, color: '#f8e8c8' });
-    this.menu.draw(r);
+    const k = this.closing >= 0 ? 1 - clamp(this.closing / 0.14, 0, 1) : appear(this.t, 0.22);
+    r.uiRect(0, 0, UI_W, UI_H, C.void, 0.72 * k);
+    const W = 700;
+    const H = 404;
+    const x = UI_W / 2 - W / 2;
+    const y = UI_H / 2 - H / 2 + (1 - k) * 12;
+    frame(r, x, y, W, H, 'ornate', { alpha: k });
+    r.uiText('설정', x + 24, y + 14, { size: 24, bold: true, color: C.text, outline: C.ink, alpha: k });
+    r.uiText('Esc  닫기', x + W - 22, y + 22, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: k });
+    this.menu.y = y + 56;
+    this.menu.x = x + 24 + 150;
+    this.menu.hintY = y + H - 26;
+    this.menu.draw(r, k);
+    // controls reference
+    const cx = x + 360;
+    const cy = y + 54;
+    frame(r, cx, cy, W - 384, 270, 'inset', { alpha: k });
+    r.uiText('조작키', cx + 14, cy + 10, { size: 12, bold: true, color: C.goldHi, alpha: k });
+    r.uiSprite('ui_gamepad', cx + W - 384 - 64, cy + 16, 2, { alpha: k * 0.9 });
+    r.uiText('패드', cx + W - 384 - 40, cy + 10, { size: 10, font: 'small', color: C.textFaint, alpha: k });
+    CONTROL_ROWS.forEach((row, i) => {
+      const ry = cy + 36 + i * 22;
+      r.uiText(row.label, cx + 14, ry - 6, { size: 12, color: C.textDim, alpha: k });
+      const keys = controlKeys(input.bindings, row.actions);
+      r.uiText(keys, cx + 112, ry - 6, { size: 10, font: 'small', color: C.text, alpha: k });
+      const pad = row.padLabel ?? PAD_NAMES[row.actions[0]] ?? '';
+      if (pad) keycap(r, pad, cx + W - 384 - 14, ry, { align: 'right', alpha: k, pad: true });
+    });
   }
 }
