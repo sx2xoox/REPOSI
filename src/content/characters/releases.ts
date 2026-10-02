@@ -235,7 +235,8 @@ export function releaseLanternBloom(w: World, p: Player): void {
   for (const e of w.enemiesInRadius(p.x, p.y, 60)) {
     releaseHit(w, e, p.stats.damage * 2.5, p.x, p.y, 260, [{ kind: 'burn', duration: 3, power: p.stats.damage * 0.5 }]);
   }
-  const dmg = p.stats.damage * 0.95;
+  // 리아 fills the gauge fastest (her passive), so each bloom bolt hits a little softer
+  const dmg = p.stats.damage * 0.85;
   const falloff = new HitFalloff(BLOOM_FALLOFF);
   let acc = 0;
   let k = 0;

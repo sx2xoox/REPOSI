@@ -393,6 +393,13 @@ export interface CharacterDef {
   pitch?: string;
   /** lantern light radius in px (default 95) */
   lightRadius?: number;
+  /**
+   * Online co-op hints, read by the multiplayer code (pure data, no logic in the
+   * simulation): `reviveSpeed` multiplies how fast this keeper revives a downed
+   * ally (1 = normal), `reviveHearts` is how many hearts the revived ally comes
+   * back with (default: the co-op default). Absent = plain keeper.
+   */
+  coop?: { reviveSpeed?: number; reviveHearts?: number };
 }
 
 // ------------------------------------------------------------------ world content

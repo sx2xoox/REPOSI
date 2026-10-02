@@ -34,6 +34,10 @@ export const SFX_NAMES = [
   'ui_move', 'ui_select', 'ui_back', 'ui_open', 'ui_close', 'ui_error', 'ui_place',
   // character kits (passives / dashes; see content/characters/kit-*.ts)
   'ember_burst', 'momentum', 'rush', 'scent', 'vault', 'echo', 'blink', 'rift',
+  // 보리 / 백구 / 모리 kits (content/audio/sfx-characters2.ts)
+  'bori_barrel', 'bori_drink', 'bori_block', 'bori_shove', 'bori_howl',
+  'baekgu_parry', 'baekgu_counter', 'baekgu_flash',
+  'mori_whistle', 'mori_baa', 'mori_stampede',
 ] as const;
 export type SfxName = (typeof SFX_NAMES)[number];
 

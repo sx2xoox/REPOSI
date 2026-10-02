@@ -104,7 +104,8 @@ export class Pickup extends Entity {
     switch (this.kind) {
       case 'heart_half':
       case 'heart':
-        return p.red < p.maxRed;
+        // 'overheal' keepers (보리's rescue barrel) store hearts they cannot use
+        return p.red < p.maxRed || p.flags.has('overheal');
       case 'soul_heart':
       case 'soul_half':
         return p.red + p.soul < 24;

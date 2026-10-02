@@ -28,7 +28,7 @@ export const DIFFICULTY: Record<number, FloorDifficulty> = {
   2: { hpMult: 1.75, bossHpMult: 2.05, enemyDamage: [1, 2], enemySpeed: 1.02, shotSpeed: 1.02, budget: [4, 6], championChance: 0.06, roomCount: [10, 12] },
   3: { hpMult: 2.4, bossHpMult: 2.9, enemyDamage: [1, 2], enemySpeed: 1.03, shotSpeed: 1.04, budget: [5, 7], championChance: 0.08, roomCount: [11, 13] },
   4: { hpMult: 3.6, bossHpMult: 3.7, enemyDamage: [1, 2], enemySpeed: 1.05, shotSpeed: 1.06, budget: [6, 8], championChance: 0.1, roomCount: [12, 14] },
-  5: { hpMult: 4.9, bossHpMult: 6, enemyDamage: [1, 2], enemySpeed: 1.06, shotSpeed: 1.08, budget: [7, 9], championChance: 0.12, roomCount: [12, 15] },
+  5: { hpMult: 4.9, bossHpMult: 5.6, enemyDamage: [1, 2], enemySpeed: 1.06, shotSpeed: 1.08, budget: [7, 9], championChance: 0.12, roomCount: [12, 15] },
   6: { hpMult: 6.3, bossHpMult: 9.5, enemyDamage: [1, 3], enemySpeed: 1.08, shotSpeed: 1.1, budget: [7, 10], championChance: 0.14, roomCount: [13, 15] },
   7: { hpMult: 7.7, bossHpMult: 11.9, enemyDamage: [2, 3], enemySpeed: 1.09, shotSpeed: 1.12, budget: [8, 10], championChance: 0.16, roomCount: [13, 16] },
   8: { hpMult: 9.4, bossHpMult: 14.9, enemyDamage: [2, 3], enemySpeed: 1.1, shotSpeed: 1.14, budget: [8, 11], championChance: 0.18, roomCount: [14, 16] },
