@@ -219,7 +219,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['shadow'],
   icon: 'icon_hollow_mask',
-  pools: ['treasure', 'curse'],
+  pools: ['treasure', 'curse', 'challenge'],
   modifyHit(w, t, hit, power) {
     if (t.hasStatus('fear')) hit.damage *= 1.25;
     else if (isAttack(hit) && rollHit(w, hit, 0.1, power)) addHitStatus(w, t, hit, { kind: 'fear', duration: 2.5 });

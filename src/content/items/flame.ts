@@ -192,7 +192,7 @@ defineArtifact({
   rarity: 'epic',
   tags: ['flame'],
   icon: 'icon_kiln_core',
-  pools: ['treasure', 'boss'],
+  pools: ['treasure', 'boss', 'challenge'],
   onHit(w, t, hit, power) {
     if (!isPrimary(hit)) return;
     const k = '__kilnT';

@@ -165,7 +165,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['clockwork'],
   icon: 'icon_rusted_nail',
-  pools: ['treasure', 'shop', 'curse'],
+  pools: ['treasure', 'shop', 'curse', 'challenge'],
   modifyHit(w, t, hit, power) {
     if (isAttack(hit) && !t.hasStatus('weak') && rollHit(w, hit, 0.15, power)) addHitStatus(w, t, hit, { kind: 'weak', duration: 4 });
   },
@@ -295,6 +295,12 @@ defineArtifact({
   },
   onShoot(w, p) {
     if (p.generation > 0 || p.mem.lance || w.vars.__armOn !== w.time) return;
+    // spread the orbiting shots of one volley around the circle
+    const idx = w.vars.__armIdxT === w.time ? (w.vars.__armIdx ?? 0) + 1 : 0;
+    w.vars.__armIdxT = w.time;
+    w.vars.__armIdx = idx;
+    p.mem.orbA = Math.atan2(p.y - (w.player.y - 5), p.x - w.player.x) + idx * 2.4;
+    p.mem.orbR = 6;
     p.damage *= 1.5;
     p.color = '#ffe880';
     p.lightR = 22;

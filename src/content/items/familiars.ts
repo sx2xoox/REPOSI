@@ -304,6 +304,7 @@ export class TwinShadow extends Familiar {
   hist: number[] = [];
   frame = '';
   flip = false;
+  facing = 'down';
   constructor(w: World) {
     super(w);
     this.z = 0;
@@ -324,6 +325,7 @@ export class TwinShadow extends Familiar {
     this.y = damp(this.y, ty, 12, dt);
     this.frame = p.frameName();
     this.flip = p.flip;
+    this.facing = p.facing;
     if (fx.chance(dt * 12)) {
       w.particles.spawn({ x: this.x + fx.range(-4, 4), y: this.y - fx.range(0, 12), vy: -12, life: 0.5, colors: ['#9a6aff', '#3a1a70'], size: 1 });
     }
@@ -344,10 +346,13 @@ export class TwinShadow extends Familiar {
     if (!this.frame) return;
     r.shadow(this.x, this.y + 4, 10, 3, 0.25);
     r.sprite(this.frame, this.x, this.y + 5, { flipX: this.flip, alpha: 0.72, tint: '#3a1a78', tintAmount: 0.85 });
-    // glowing eyes
-    const ex = this.x + (this.flip ? -2 : 2) * 0;
-    r.rect(ex - 2, this.y - 8, 1, 1, '#d8b8ff', 0.9);
-    r.rect(ex + 2, this.y - 8, 1, 1, '#d8b8ff', 0.9);
+    // glowing eyes (not when walking away from the camera)
+    if (this.facing === 'down') {
+      r.rect(this.x - 2, this.y - 7, 1, 1, '#e8d8ff', 0.95);
+      r.rect(this.x + 2, this.y - 7, 1, 1, '#e8d8ff', 0.95);
+    } else if (this.facing === 'side') {
+      r.rect(this.x + (this.flip ? -3 : 3), this.y - 7, 1, 1, '#e8d8ff', 0.95);
+    }
   }
 }
 

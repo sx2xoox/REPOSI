@@ -166,4 +166,10 @@ defineWeapon({
     w.sfx('orb', { vol: 0.55, pitch: 0.9 });
     w.sfx('whoosh', { vol: 0.25, pitch: 1.6 });
   },
+  draw(w, p, r) {
+    // no held object: a faint wisp in the casting hand
+    const x = p.x + Math.cos(p.aim) * 6;
+    const y = p.y - 5 + Math.sin(p.aim) * 5;
+    r.sprite(glowSprite(7 + Math.sin(w.time * 9), '#b080ff'), x, y, { alpha: 0.7, additive: true });
+  },
 });

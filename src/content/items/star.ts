@@ -216,7 +216,7 @@ defineArtifact({
   rarity: 'epic',
   tags: ['star'],
   icon: 'icon_comet_tail',
-  pools: ['treasure', 'boss', 'shrine'],
+  pools: ['treasure', 'boss', 'shrine', 'challenge'],
   stats(m, power) {
     m.addStat('critMult', 0.5 * power);
   },

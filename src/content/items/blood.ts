@@ -115,7 +115,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['blood'],
   icon: 'icon_iron_quill',
-  pools: ['treasure', 'shop'],
+  pools: ['treasure', 'shop', 'challenge'],
   stats(m, power) {
     m.addStat('pierce', power);
     m.mulStat('shotSpeed', 1.1);

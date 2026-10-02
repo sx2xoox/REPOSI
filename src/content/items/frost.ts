@@ -127,7 +127,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['frost'],
   icon: 'icon_glacier_lens',
-  pools: ['treasure', 'boss'],
+  pools: ['treasure', 'boss', 'challenge'],
   stats(m, power) {
     m.addStat('projSize', 1.2 * power);
     m.mulStat('shotSpeed', Math.pow(0.88, power));

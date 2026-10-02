@@ -37,7 +37,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['storm'],
   icon: 'icon_copper_coil',
-  pools: ['treasure', 'shop'],
+  pools: ['treasure', 'shop', 'challenge'],
   onHit(w, t, hit, power) {
     if (!isPrimary(hit) || !rollHit(w, hit, 0.1, power)) return;
     chainLightning(w, t.x, t.y - t.z - 4, { jumps: 2, damage: dmg(w) * 0.7, exclude: new Set([t.id]) });
@@ -71,7 +71,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['storm', 'shadow'],
   icon: 'icon_static_cape',
-  pools: ['treasure', 'shop'],
+  pools: ['treasure', 'shop', 'challenge'],
   stats(m, power) {
     m.mulStat('dashSpeed', 1 + 0.15 * power);
     m.mulStat('dashCooldown', Math.pow(0.92, power));
@@ -113,7 +113,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['storm'],
   icon: 'icon_paper_fan',
-  pools: ['treasure', 'shop', 'boss'],
+  pools: ['treasure', 'shop', 'boss', 'challenge'],
   stats(m, power) {
     m.addStat('shots', 1 + power);
     m.mulStat('damage', 0.8);
@@ -225,7 +225,7 @@ defineArtifact({
   rarity: 'epic',
   tags: ['storm', 'star'],
   icon: 'icon_stormcaller_rod',
-  pools: ['treasure', 'boss'],
+  pools: ['treasure', 'boss', 'challenge'],
   stats(m, power) {
     m.addStat('critChance', 0.06 * power);
   },

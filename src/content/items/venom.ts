@@ -150,7 +150,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['venom'],
   icon: 'icon_swelling_seed',
-  pools: ['treasure', 'shop'],
+  pools: ['treasure', 'shop', 'challenge'],
   stats(m, power) {
     m.mulStat('range', 1 + 0.1 * power);
   },

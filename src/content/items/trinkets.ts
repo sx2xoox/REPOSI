@@ -263,7 +263,7 @@ defineArtifact({
   rarity: 'common',
   tags: [],
   icon: 'icon_jade_marble',
-  pools: ['treasure', 'shop'],
+  pools: ['treasure', 'shop', 'challenge'],
   stats(m, power) {
     m.addStat('bounce', 2 * power);
     m.mulStat('range', 1 + 0.15 * power);
