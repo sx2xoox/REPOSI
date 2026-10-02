@@ -7,6 +7,7 @@ import './serin';
 import { defineCharacter } from '../../game/defs';
 import { defineCharacter2D, type CharSpec } from './look';
 import { releaseAbyss } from './releases';
+import { NIEL_AFFINITY, NIEL_DASH, NIEL_PASSIVE } from './kit-niel';
 
 export const NIEL: CharSpec = {
   prefix: 'niel',
@@ -144,23 +145,31 @@ defineCharacter({
   id: 'niel',
   name: '니엘',
   title: '공허를 삼킨 아이',
-  desc: '심연의 틈에서 떠오른 까만 강아지. 발이 땅에 닿지 않아 함정 위를 떠다니며, 공허의 눈으로 모든 것을 꿰뚫는 광선을 쏟아낸다.',
+  desc: '심연의 틈에서 떠오른 까만 강아지. 발이 땅에 닿지 않아 함정 위를 떠다니고, 모든 공격이 공허 속에서 메아리친다.',
   spritePrefix: 'niel',
   portrait: 'niel_portrait',
   color: '#c890ff',
   hearts: 2,
   soulHearts: 2,
   weapon: 'void_gaze',
-  artifacts: ['void_body'],
   bombs: 0,
   baseStats: {
     moveSpeed: 90,
-    range: 150,
+    range: 200,
     dashCooldown: 0.75,
+    dashSpeed: 330,
+    dashTime: 0.14,
   },
   unlocked: false,
   unlockHint: '3층의 보스를 쓰러뜨리면 심연 속에서 누군가 깨어난다.',
   lightColor: '#c8a0ff',
   release: releaseAbyss,
+  releaseName: '심연 개방',
   releaseDesc: '조준한 곳에 심연을 열어 적과 탄환을 빨아들인 뒤, 붕괴시켜 폭발시킨다.',
+  passive: NIEL_PASSIVE,
+  dash: NIEL_DASH,
+  affinity: NIEL_AFFINITY,
+  playstyle: ['마법', '메아리', '순간이동'],
+  difficulty: 3,
+  pitch: '공격이 메아리치고 발은 땅에 닿지 않는다. 변칙을 즐기는 이에게.',
 });

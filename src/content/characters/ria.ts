@@ -6,6 +6,7 @@
 import { defineCharacter } from '../../game/defs';
 import { defineCharacter2D, type CharSpec } from './look';
 import { releaseLanternBloom } from './releases';
+import { RIA_DASH, RIA_PASSIVE } from './kit-ria';
 
 export const RIA: CharSpec = {
   prefix: 'ria',
@@ -132,19 +133,25 @@ defineCharacter({
   id: 'ria',
   name: '리아',
   title: '마지막 등불지기',
-  desc: '꺼져가는 마을의 등불을 되살리기 위해 지하로 내려간 강아지 소녀. 모든 능력이 고르다.',
+  desc: '꺼져가는 마을의 등불을 되살리기 위해 지하로 내려간 강아지 소녀. 모든 능력이 고르고, 등불이 누구보다 빨리 타오른다.',
   spritePrefix: 'ria',
   portrait: 'ria_portrait',
   color: '#ffd078',
   hearts: 3,
   weapon: 'lantern_bolt',
-  artifacts: ['keeper_wick'],
   bombs: 1,
   baseStats: {
     dashCooldown: 0.72,
   },
   unlocked: true,
   lightColor: '#ffd8a0',
+  lightRadius: 125,
   release: releaseLanternBloom,
+  releaseName: '등불 개화',
   releaseDesc: '탄환을 지우는 섬광 뒤, 유도 불꽃탄이 꽃잎처럼 사방으로 피어난다.',
+  passive: RIA_PASSIVE,
+  dash: RIA_DASH,
+  playstyle: ['균형', '등불 해방', '불꽃'],
+  difficulty: 1,
+  pitch: '해방을 가장 자주 터뜨리는 등불지기. 어떤 무기든 불씨를 남긴다.',
 });

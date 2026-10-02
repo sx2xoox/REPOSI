@@ -6,7 +6,6 @@
 //   affinity 근접 무기: +12% damage, +20% knockback with melee weapons
 
 import type { World } from '../../game/world';
-import type { Renderer } from '../../engine/renderer';
 import type { AffinityDef, DashDef, PassiveDef } from '../../game/defs';
 import { RingFx } from '../../game/effects';
 import { defineDrawnSprite } from '../../engine/sprites';
@@ -167,10 +166,3 @@ export const BERN_AFFINITY: AffinityDef = {
     m.mulStat('knockback', 1.2);
   },
 };
-
-/** Render helper for tests / tools: the momentum aura color at `n` stacks. */
-export function momentumColor(n: number): string {
-  return FROST[Math.min(FROST.length - 1, Math.max(0, FROST.length - 1 - Math.floor(n / 2)))];
-}
-
-export type { Renderer };

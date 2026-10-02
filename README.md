@@ -31,6 +31,7 @@ npm run build:single # dist-single/index.html — 파일 하나로 어디서나 
 
 - 강아지 등불지기 4명(리아·베른·세린·니엘), 캐릭터마다 다른 무기와 등불 해방
 - 5개 층(지하묘지 · 포자 동굴 · 잿불 대장간 · 얼어붙은 성소 · 공허의 심장), 시드 기반 층 생성
+  — 층마다 적 체력 · 밀도 · 속도가 오르고, 가장 깊은 층의 보스를 쓰러뜨리면 귀환 (층 수는 `content/floors.ts` 정의만큼)
 - 일반·보물·상점·보스·비밀·시련·제단·저주의 방, 방 배치 69종 이상
 - 일반 적 40여 종, 보스 9종(최종 보스 포함)
 - 유물 73종 + 등불 공명 8종, 액티브 11종, 물약 12종, 무기 12종
@@ -40,6 +41,7 @@ npm run build:single # dist-single/index.html — 파일 하나로 어디서나 
 
 - `npm run typecheck`, `npm test`
 - `node scripts/smoke.mjs --out <dir>` — 헤드리스 봇 스모크 테스트
+- `node scripts/qa-run.mjs --suite balance --seeds 3` — QA 봇 밸런스 측정 (층별 방 · 보스 시간, 받은 피해, 해방 비중)
 - `node scripts/sheet-{characters,enemies,items}.mjs out.png` — 스프라이트 시트 렌더링
 - 구조와 규칙은 [CLAUDE.md](CLAUDE.md) 참고
 

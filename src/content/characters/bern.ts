@@ -7,6 +7,7 @@ import './ria';
 import { defineCharacter } from '../../game/defs';
 import { defineCharacter2D, type CharSpec } from './look';
 import { releaseWhirlwind } from './releases';
+import { BERN_AFFINITY, BERN_DASH, BERN_PASSIVE } from './kit-bern';
 
 export const BERN: CharSpec = {
   prefix: 'bern',
@@ -145,23 +146,32 @@ defineCharacter({
   id: 'bern',
   name: '베른',
   title: '검을 든 파수꾼',
-  desc: '무너진 성문을 끝까지 지켰던 허스키 파수꾼. 단단하지만 느리고, 장검 3연격으로 탄환까지 베어낸다.',
+  desc: '무너진 성문을 끝까지 지켰던 허스키 파수꾼. 썰매를 끌던 다리는 느리게 출발하지만, 한 번 기세가 붙으면 아무도 따라잡지 못한다.',
   spritePrefix: 'bern',
   portrait: 'bern_portrait',
   color: '#8fb0ff',
   hearts: 4,
   weapon: 'sentinel_blade',
-  artifacts: ['sentinel_oath'],
   bombs: 1,
   keys: 1,
   baseStats: {
-    moveSpeed: 84,
+    moveSpeed: 86,
     damage: 13,
+    range: 160,
     knockback: 90,
     dashCooldown: 0.8,
+    dashSpeed: 370,
+    dashTime: 0.17,
   },
   unlocked: true,
   lightColor: '#b8d0ff',
   release: releaseWhirlwind,
+  releaseName: '등불 회전베기',
   releaseDesc: '등불을 두른 검으로 회전베기를 휘몰아친 뒤, 사방으로 검기를 날린다.',
+  passive: BERN_PASSIVE,
+  dash: BERN_DASH,
+  affinity: BERN_AFFINITY,
+  playstyle: ['근접', '기세', '돌진'],
+  difficulty: 2,
+  pitch: '때릴수록 빨라진다. 멈추지 않고 몰아붙이는 이에게.',
 });

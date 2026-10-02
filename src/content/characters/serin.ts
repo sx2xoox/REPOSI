@@ -6,6 +6,7 @@ import './bern';
 import { defineCharacter } from '../../game/defs';
 import { defineCharacter2D, type CharSpec } from './look';
 import { releaseArrowRain } from './releases';
+import { SERIN_AFFINITY, SERIN_DASH, SERIN_PASSIVE } from './kit-serin';
 
 export const SERIN: CharSpec = {
   prefix: 'serin',
@@ -144,24 +145,33 @@ defineCharacter({
   id: 'serin',
   name: '세린',
   title: '잿빛 숲의 사냥꾼',
-  desc: '불타 버린 숲에서 홀로 살아남은 비글 사냥꾼. 몸은 약하지만 누구보다 빠르고, 활시위를 끝까지 당기면 화살이 모든 것을 꿰뚫는다.',
+  desc: '불타 버린 숲에서 홀로 살아남은 비글 사냥꾼. 몸은 약하지만 누구보다 빠르고, 한 번 맡은 냄새는 놓치지 않는다.',
   spritePrefix: 'serin',
   portrait: 'serin_portrait',
   color: '#a8e070',
   hearts: 2,
   weapon: 'hunter_bow',
-  artifacts: ['hunter_eye'],
   bombs: 1,
   coins: 5,
   baseStats: {
     moveSpeed: 106,
+    damage: 11,
+    range: 215,
     dashCooldown: 0.6,
-    dashSpeed: 360,
+    dashSpeed: 400,
+    dashTime: 0.16,
     critChance: 0.1,
     luck: 1,
   },
   unlocked: true,
   lightColor: '#d8f0b0',
   release: releaseArrowRain,
+  releaseName: '별똥 화살비',
   releaseDesc: '하늘로 쏘아 올린 등불 화살이 별똥처럼 갈라져 방 안의 모든 적에게 쏟아진다.',
+  passive: SERIN_PASSIVE,
+  dash: SERIN_DASH,
+  affinity: SERIN_AFFINITY,
+  playstyle: ['원거리', '표식', '치명타'],
+  difficulty: 2,
+  pitch: '첫 발은 반드시 치명타. 거리를 재며 한 발씩 끊어 쏘는 이에게.',
 });

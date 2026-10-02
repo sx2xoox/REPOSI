@@ -6,7 +6,7 @@
 
 import type { World } from '../../game/world';
 import type { Renderer } from '../../engine/renderer';
-import type { AffinityDef, DashDef, PassiveDef } from '../../game/defs';
+import type { DashDef, PassiveDef } from '../../game/defs';
 import { Enemy } from '../../game/enemy';
 import { RingFx } from '../../game/effects';
 import { defineDrawnSprite } from '../../engine/sprites';
@@ -137,6 +137,3 @@ export const RIA_DASH: DashDef = {
     HazardZone.add(w, new HazardZone(w, p.x, p.y + 3, 'fire', { radius: 8, life: RIA_TRAIL_LIFE, tick: 0.3, damage: d * RIA_TRAIL_DMG, statuses: [{ kind: 'burn', duration: 1.5, power: d * 0.2 }] }), 12);
   },
 };
-
-/** No favoured class: the lantern keeper is at home with every weapon (kept for the select screen). */
-export const RIA_AFFINITY: AffinityDef | undefined = undefined;
