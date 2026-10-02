@@ -552,6 +552,17 @@ function botMain(opts) {
           if (l.ped) B.retreat = { x: w.room.centerX, y: w.room.centerY + 30, until: w.time + 0.8 };
         }
         move = navTo(w, l.x, l.y, !opts.god) ?? { x: 0, y: 0 };
+        // pedestal items are taken with the interact action (G / touch "줍기") while standing at them
+        if (l.ped && d < 12 && typeof rec === 'object' && !rec.tapped && w.focus === l.e) {
+          rec.tapped = true;
+          rec.itemId = l.e.item?.id;
+          input.touchTap('interact');
+        }
+        if (l.ped && typeof rec === 'object' && rec.tapped && l.e.item?.id !== rec.itemId) {
+          // taken (an artifact empties the pedestal; a weapon / active swaps in the old one)
+          B.tried.set(key, 'done');
+          if (l.e.item) B.retreat = { x: w.room.centerX, y: w.room.centerY + 30, until: w.time + 0.8 };
+        }
         if (l.ped && d < 14 && B.tried.get(key) !== 'done' && l.e.item == null) B.tried.set(key, 'done');
       } else if (hidden && p.bombs > 0 && !B.secretTried.has(B.roomKey + hidden.dir + hidden.x)) {
         // bomb the hidden secret door

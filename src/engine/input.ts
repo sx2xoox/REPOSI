@@ -8,9 +8,19 @@
 export type Action =
   | 'up' | 'down' | 'left' | 'right'
   | 'shootUp' | 'shootDown' | 'shootLeft' | 'shootRight'
-  | 'fire' | 'dash' | 'bomb' | 'active' | 'consumable' | 'special' | 'swap'
+  | 'fire' | 'dash' | 'bomb' | 'active' | 'consumable' | 'special' | 'swap' | 'interact'
   | 'inventory' | 'map' | 'pause' | 'confirm' | 'cancel'
-  | 'uiUp' | 'uiDown' | 'uiLeft' | 'uiRight' | 'restart';
+  | 'uiUp' | 'uiDown' | 'uiLeft' | 'uiRight' | 'restart'
+  | 'tabPrev' | 'tabNext' | 'discard';
+
+/**
+ * Actions read during gameplay: no two of them may share a key or gamepad button
+ * (menu-only actions such as `confirm` / `uiUp` / `tabNext` may reuse gameplay keys).
+ */
+export const GAMEPLAY_ACTIONS: readonly Action[] = [
+  'up', 'down', 'left', 'right', 'shootUp', 'shootDown', 'shootLeft', 'shootRight',
+  'fire', 'dash', 'bomb', 'active', 'consumable', 'special', 'swap', 'interact', 'inventory', 'map', 'pause',
+];
 
 export type AimMode = 'mouse' | 'keys' | 'pad' | 'touch';
 
@@ -35,6 +45,8 @@ export const DEFAULT_BINDINGS: Record<Action, string[]> = {
   special: ['KeyF', 'Mouse1'],
   /** switch between the two weapon slots ("Wheel" = any mouse-wheel step over the game) */
   swap: ['KeyC', 'Wheel'],
+  /** take the item on the pedestal the keeper stands at (read its card first) */
+  interact: ['KeyG'],
   inventory: ['Tab', 'KeyI'],
   map: ['KeyM'],
   pause: ['Escape', 'KeyP'],
@@ -45,10 +57,14 @@ export const DEFAULT_BINDINGS: Record<Action, string[]> = {
   uiLeft: ['ArrowLeft', 'KeyA'],
   uiRight: ['ArrowRight', 'KeyD'],
   restart: ['KeyR'],
+  // menu-only (Tab screen): switch tabs / discard the selected artifact
+  tabPrev: ['KeyQ', 'PageUp'],
+  tabNext: ['KeyE', 'PageDown'],
+  discard: ['KeyX', 'Delete'],
 };
 
 // Standard gamepad mapping button indices
-const PAD_BUTTONS: Partial<Record<Action, number[]>> = {
+export const PAD_BUTTONS: Partial<Record<Action, number[]>> = {
   dash: [0, 5],          // A, RB
   bomb: [2],             // X
   active: [3],           // Y
@@ -65,6 +81,11 @@ const PAD_BUTTONS: Partial<Record<Action, number[]>> = {
   fire: [7],             // RT (fires in last aim direction)
   special: [6],          // LT (lantern release)
   swap: [11],            // R3 (right stick click: weapon swap)
+  interact: [13],        // D-pad down (take a pedestal item)
+  // menu-only
+  tabPrev: [4],          // LB
+  tabNext: [5],          // RB
+  discard: [2],          // X
 };
 
 export class Input {

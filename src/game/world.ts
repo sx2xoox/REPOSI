@@ -25,6 +25,7 @@ import { roomHandler } from './roomkinds';
 import { DamageNumber, DoorClearGlow, FloatingText, RingFx } from './effects';
 import { Bomb, Chest, FirePlace, Pedestal, Pickup, Trapdoor, itemInfo, type PedestalItem, type PickupKind } from './pickups';
 import { Tile } from './tiles';
+import { findFocus } from './interact';
 import { roomBaseJob } from './roomart';
 
 /** Max wall-clock ms per rendered frame spent pre-rendering neighbour rooms. */
@@ -127,6 +128,8 @@ export class World {
   /** free-form per-run flags for content (e.g. "devilDealTaken") */
   flags = new Set<string>();
   vars: Record<string, number> = {};
+  /** the item the keeper is next to (preview card / interact target; see game/interact.ts) */
+  focus: Entity | null = null;
   /** entity whose update() is running: default position of sounds played via `sfx()` */
   private sfxSource: Entity | null = null;
   /** accumulating damage numbers per (enemy, color) */
@@ -258,6 +261,7 @@ export class World {
     }
     const prevNode = this.node;
     this.node = node;
+    this.focus = null;
     const cached = this.roomCache.get(node.id);
     let room: Room;
     const firstVisit = !cached;
@@ -502,6 +506,7 @@ export class World {
       es[n++] = e;
     }
     es.length = n;
+    this.focus = findFocus(this);
     if (this.clearMomentT >= 0) {
       this.clearMomentT -= sdt;
       if (this.clearMomentT < 0) this.roomClearMoment();
@@ -997,6 +1002,35 @@ export class World {
     }
     this.particles.burst(pk.x, pk.y - 3, { count: 6, speed: [20, 60], life: [0.2, 0.4], colors: ['#ffffff', '#ffe8a0'], size: [1, 2] });
     this.items.onPickup(pk.kind);
+  }
+
+  /**
+   * The keeper pressed 'interact': take the focused pedestal's item (paying its
+   * price). Returns true when something was taken.
+   */
+  interact(): boolean {
+    const p = this.player;
+    if (!p || !p.alive || this.paused || this.transitioning) return false;
+    const f = this.focus ?? findFocus(this);
+    if (f instanceof Pedestal) return this.tryTakePedestal(f);
+    return false;
+  }
+
+  /** Take a pedestal's item if its price can be paid (feedback when it cannot). */
+  tryTakePedestal(ped: Pedestal): boolean {
+    const p = this.player;
+    if (!ped.item || ped.dead || !p.alive) return false;
+    if (!ped.affordable(this)) {
+      playSfx('no_money');
+      if (!ped.mem.t || this.time - ped.mem.t > 0.6) {
+        ped.mem.t = this.time;
+        this.floatText(ped.x, ped.y - 24, ped.price > 0 && p.coins < ped.price ? '코인 부족' : '체력 부족', '#ff7070');
+      }
+      ped.mem.denyT = this.time;
+      return false;
+    }
+    this.takePedestal(ped);
+    return true;
   }
 
   takePedestal(ped: Pedestal): void {

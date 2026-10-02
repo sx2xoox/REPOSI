@@ -38,7 +38,7 @@ export interface Insets {
   b: number;
 }
 
-export type TouchButtonId = 'dash' | 'bomb' | 'active' | 'consumable' | 'special' | 'swap' | 'pause' | 'map' | 'inventory';
+export type TouchButtonId = 'dash' | 'bomb' | 'active' | 'consumable' | 'special' | 'swap' | 'interact' | 'pause' | 'map' | 'inventory';
 
 export type TouchScheme = 'auto' | 'twin';
 export const TOUCH_SCHEMES: TouchScheme[] = ['auto', 'twin'];
@@ -48,7 +48,7 @@ export function touchScheme(v: string | undefined): TouchScheme {
   return v === 'twin' ? 'twin' : 'auto';
 }
 
-export const GAME_BUTTONS: TouchButtonId[] = ['dash', 'bomb', 'special', 'active', 'consumable', 'swap'];
+export const GAME_BUTTONS: TouchButtonId[] = ['dash', 'bomb', 'special', 'active', 'consumable', 'swap', 'interact'];
 export const SYSTEM_BUTTONS: TouchButtonId[] = ['pause', 'map', 'inventory'];
 
 // ---------------------------------------------------------------- joystick math
@@ -174,6 +174,9 @@ export function computeTouchLayout(view: { w: number; h: number }, safe: Insets,
     place(cx, cy, 'swap', 74, outer, rad(22));
     const sw = buttons.swap;
     sw.x = Math.min(sw.x, view.w - r - 6 * u - sw.r);
+    // "줍기" (take the item at the keeper's feet; only shown next to an item): left of dash
+    const rInt = rad(24);
+    place(cx, cy, 'interact', 186, AR + gap + 2 * rDash + gap * 0.8 + rInt, rInt);
   } else {
     rightRest = { x: view.w - r - 26 * u - stickR, y: restY };
     const cx = rightRest.x;
@@ -186,6 +189,7 @@ export function computeTouchLayout(view: { w: number; h: number }, safe: Insets,
     place(cx, cy, 'active', 120, D2, rad(22));
     place(cx, cy, 'consumable', 80, D2, rad(22));
     place(cx, cy, 'swap', 58, D, rad(22));
+    place(cx, cy, 'interact', 194, D2 + 2 * u, rad(24));
   }
 
   // system buttons: a column in the right pillarbox bar when it is wide enough,

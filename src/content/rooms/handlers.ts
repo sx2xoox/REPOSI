@@ -25,8 +25,9 @@ const HINTS: { keys: string[]; label: string; dx: number; row: number }[] = [
   { keys: ['방향키'], label: '· 마우스  공격', dx: 0, row: 1 },
   { keys: ['E'], label: '폭탄', dx: -84, row: 2 },
   { keys: ['F'], label: '등불 해방', dx: 70, row: 2 },
-  { keys: ['Q'], label: '액티브', dx: -36, row: 3 },
-  { keys: ['R'], label: '물약', dx: 44, row: 3 },
+  { keys: ['Q'], label: '액티브', dx: -84, row: 3 },
+  { keys: ['R'], label: '물약', dx: -6, row: 3 },
+  { keys: ['G'], label: '줍기', dx: 70, row: 3 },
 ];
 
 // touch screens: the on-screen buttons carry icons, only the sticks need explaining

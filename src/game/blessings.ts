@@ -48,11 +48,18 @@ export function applyBlessing(w: World, id: string): void {
   const def = Artifacts.get(id);
   if (!def) return;
   w.items.give(id);
+  // remembered for the Tab screen ("N층에서 받은 축복")
+  w.vars[`blessedAt:${id}`] = w.run.floor;
   const p = w.player;
   w.banner(def.name, def.desc, { icon: def.icon, color: '#ffd060', small: true });
   w.sfx('power_up', { vol: 0.8 });
   w.particles.burst(p.x, p.y - 8, { count: 28, speed: [40, 140], life: [0.4, 0.9], colors: ['#ffffff', '#fff0a0', '#ffd060', '#e0a848'], size: [1, 2], additive: true, light: 4 });
   w.items.proc(id);
+}
+
+/** Floor on which blessing `id` was received (0 if unknown). */
+export function blessingFloor(w: World, id: string): number {
+  return w.vars[`blessedAt:${id}`] ?? 0;
 }
 
 /** Automation (smoke / QA bots): pick the first blessing without an overlay. */

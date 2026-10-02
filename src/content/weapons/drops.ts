@@ -124,6 +124,11 @@ export class WeaponChest extends Entity {
     this.tileCollide = false;
   }
 
+  /** the crate shows a preview card (its rarity) until it is opened */
+  override previewable(): boolean {
+    return !this.opened && !this.dead;
+  }
+
   override update(w: World, dt: number): void {
     this.age += dt;
     if (this.opened) {

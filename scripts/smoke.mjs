@@ -68,6 +68,8 @@ try {
     if (Math.random() < 0.08) await page.keyboard.press('KeyE');
     if (Math.random() < 0.1) await page.keyboard.press('Space');
     if (Math.random() < 0.05) await page.keyboard.press('KeyF');
+    // pedestal items are taken with the interact key while standing next to them
+    if (Math.random() < 0.15) await page.keyboard.press('KeyG');
     if (Math.random() < 0.12) {
       await page.screenshot({ path: `${out}/${String(shot++).padStart(2, '0')}-play.png` });
       report.states.push(await page.evaluate(() => window.__lk.state()));
@@ -77,6 +79,23 @@ try {
     const ok = await page.evaluate((k) => window.__lk.gotoRoom(k), kind);
     await page.waitForTimeout(kind === 'boss' ? 2500 : 900);
     if (ok) await page.screenshot({ path: `${out}/${String(shot++).padStart(2, '0')}-${kind}.png` });
+    if (ok && kind === 'treasure') {
+      // walk onto the treasure pedestal: its preview card shows, then the interact key takes it
+      const ped = await page.evaluate(() => {
+        const w = window.__lk.world();
+        const e = w.entities.find((x) => 'heartPrice' in x && x.item && !x.dead);
+        if (!e) return null;
+        w.player.x = e.x; w.player.y = e.y + 10;
+        return { x: e.x, y: e.y, item: e.item.id };
+      });
+      if (ped) {
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: `${out}/${String(shot++).padStart(2, '0')}-treasure-preview.png` });
+        await page.keyboard.press('KeyG');
+        await page.waitForTimeout(300);
+        report.pickedUp = await page.evaluate((id) => window.__lk.state().items.includes(id) || window.__lk.world().player.weaponId === id || window.__lk.world().player.weapon2Id === id || window.__lk.world().player.activeId === id, ped.item);
+      }
+    }
     if (kind === 'boss') {
       await page.keyboard.down('ArrowUp');
       await page.waitForTimeout(3000);

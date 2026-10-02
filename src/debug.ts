@@ -5,6 +5,7 @@ import { app } from './game/app';
 import { Actives, Artifacts, Characters, Enemies, Weapons, Potions } from './game/defs';
 import type { World } from './game/world';
 import { input } from './engine/input';
+import { Pedestal, Pickup } from './game/pickups';
 import { FIXED_DT } from './game/constants';
 
 function world(): World | undefined {
@@ -19,6 +20,10 @@ export interface DebugApi {
   give(id: string): boolean;
   /** switch to the second weapon slot (returns false when it is empty) */
   swap(): boolean;
+  /** press 'interact': take the focused pedestal item (returns true if taken) */
+  interact(): boolean;
+  /** the focused item (pedestal / pickup / crate) near the keeper, if any */
+  focus(): Record<string, unknown> | null;
   spawn(id: string, x?: number, y?: number): boolean;
   killAll(): void;
   gotoRoom(kind: string): boolean;
@@ -91,6 +96,17 @@ export function installDebug(): void {
     swap() {
       const w = world();
       return !!w && w.player.swapWeapon(w);
+    },
+    interact() {
+      const w = world();
+      return !!w && w.interact();
+    },
+    focus() {
+      const f = world()?.focus;
+      if (!f) return null;
+      if (f instanceof Pedestal) return { type: 'pedestal', id: f.id, x: f.x, y: f.y, item: f.item, price: f.price };
+      if (f instanceof Pickup) return { type: 'pickup', id: f.id, x: f.x, y: f.y, kind: f.kind, price: f.price };
+      return { type: 'other', id: f.id, x: f.x, y: f.y };
     },
     spawn(id, x, y) {
       const w = world();

@@ -84,6 +84,11 @@ export class Pickup extends Entity {
     if (this.grace <= 0 && !this.waitForLeave && d < this.r + p.r + 1 && this.z < 6 && !p.dead) this.tryCollect(w);
   }
 
+  /** shop wares and potions show a preview card when the keeper comes close */
+  override previewable(): boolean {
+    return (this.price > 0 || this.kind === 'potion') && this.z < 6 && !this.dead;
+  }
+
   canCollect(w: World): boolean {
     const p = w.player;
     switch (this.kind) {
@@ -213,25 +218,28 @@ export class Pedestal extends Entity {
     this.age += dt;
     this.bobT += dt;
     if (this.spawnFx > 0) this.spawnFx -= dt;
+    if (w.focus === this) this.focusT = Math.min(1, this.focusT + dt * 6);
+    else if (this.focusT > 0) this.focusT = Math.max(0, this.focusT - dt * 4);
+    // items are no longer taken on touch: the keeper reads the preview card and
+    // presses 'interact' (World.interact). `waitForLeave` only matters to bots now.
+    if (this.waitForLeave && dist(this.x, this.y, w.player.x, w.player.y) > 20) this.waitForLeave = false;
+  }
+
+  override previewable(): boolean {
+    return !!this.item && !this.dead;
+  }
+
+  /** the price (coins or hearts) can be paid right now */
+  affordable(w: World): boolean {
     const p = w.player;
-    const d = dist(this.x, this.y, p.x, p.y);
-    if (this.waitForLeave) {
-      if (d > 20) this.waitForLeave = false;
-      return;
-    }
-    if (!this.item || d > this.r + p.r || p.dead) return;
-    if (this.price > 0 && p.coins < this.price) {
-      if (!this.mem.t || w.time - this.mem.t > 1) {
-        w.sfx('no_money');
-        this.mem.t = w.time;
-      }
-      return;
-    }
-    if (this.heartPrice > 0 && p.maxRed < this.heartPrice * 2 + 2 && p.soul < this.heartPrice * 2) return;
-    w.takePedestal(this);
+    if (this.price > 0 && p.coins < this.price) return false;
+    if (this.heartPrice > 0 && p.maxRed < this.heartPrice * 2 + 2 && p.soul < this.heartPrice * 2) return false;
+    return true;
   }
 
   mem: Record<string, number> = {};
+  /** 0..1 highlight while this is the keeper's focus (preview card shown) */
+  focusT = 0;
 
   override draw(r: Renderer, w: World): void {
     // stone pedestal
@@ -242,8 +250,11 @@ export class Pedestal extends Entity {
     const y = this.y - 10 + bob;
     r.shadow(this.x, this.y - 1, 10 - bob, 3, 0.25);
     const glowCol = RARITY_COLOR[info.rarity];
-    r.sprite(orbSprite(16, glowCol), this.x, y, { alpha: 0.12 + 0.05 * Math.sin(this.bobT * 4), additive: true });
-    r.sprite(info.icon, this.x, y, { flash: this.spawnFx > 0 ? this.spawnFx * 2 : 0 });
+    const f = this.focusT;
+    r.sprite(orbSprite(16, glowCol), this.x, y, { alpha: 0.12 + 0.05 * Math.sin(this.bobT * 4) + f * 0.16, additive: true });
+    // focused (preview card open): a soft rarity ring on the pedestal top
+    if (f > 0.02) r.ring(this.x, this.y + 3, 9 + (1 - f) * 3, glowCol, 1, f * (0.45 + 0.2 * Math.sin(this.bobT * 6)));
+    r.sprite(info.icon, this.x, y, { flash: this.spawnFx > 0 ? this.spawnFx * 2 : f * 0.12 * (1 + Math.sin(this.bobT * 6)) });
     if (this.price > 0) {
       const col = w.player.coins >= this.price ? '#ffe680' : '#ff7070';
       r.pixelText(`${this.price}`, this.x, this.y + 9, col, { align: 'center', outline: '#140c1c' });

@@ -1,6 +1,9 @@
-// Status overlay (Tab): artifact grid with a detail card (name, rarity, tags,
-// description, quote, copies), equipped weapon / active / potion, lantern
-// resonance with tier progress pips, and the full stat sheet.
+// Status overlay (Tab): two tabs — 유물 (artifacts) and 축복 (floor blessings) —
+// each with its own grid and detail card (name, rarity, tags, description, quote,
+// copies; blessings: the floor they came from). An artifact can be discarded
+// (X / Del / pad X / the "버리기" button, pressed twice) back onto a pedestal.
+// Also: equipped weapon / active / potion, lantern resonance with tier progress
+// pips, and the full stat sheet.
 
 import type { Scene } from './scene';
 import type { Renderer } from '../engine/renderer';
@@ -8,13 +11,16 @@ import { UI_H, UI_W, UI_W_BASE, uiCenterX } from '../engine/renderer';
 import type { GameScene } from './game-scene';
 import { input } from '../engine/input';
 import { app } from '../game/app';
-import { Actives, Potions, RARITY_COLOR, RARITY_NAME, Sets, Weapons } from '../game/defs';
+import { Actives, Floors, Potions, RARITY_COLOR, RARITY_NAME, Sets, Weapons } from '../game/defs';
+import type { ComputedArtifact } from '../game/inventory';
+import { discardArtifact, discardBlockFor } from '../game/interact';
+import { blessingFloor } from '../game/blessings';
 import { sfx } from '../audio/audio';
 import { clamp } from '../engine/math';
 import { BASE_STATS } from '../game/stats';
 import { potionSpriteFor } from '../game/pickups';
 import { C, formatTime, roman, splitFloorName } from './theme';
-import { fitScale, frame, gauge, iconSlot, keyHintRow, spriteCentered } from './frame';
+import { fitScale, frame, gauge, iconSlot, keyHintRow, keyHintWidth, keycap, spriteCentered } from './frame';
 import { Repeater, Spring, appear } from './anim';
 import { fullStatRows, gridMove, scrollToRow } from './logic';
 import { actionLabel } from './keys';
@@ -23,9 +29,17 @@ import { estimateDps, powerScore } from '../game/power';
 
 const COLS = 10;
 const CELL = 40;
-const ROWS = 5;
+const ROWS = 4;
 const GX = 30;
-const GY = 86;
+const GY = 90;
+/** detail card height (below the grid) */
+const DETAIL_H = 136;
+const TABS = [
+  { label: '유물', icon: 'hud_power' },
+  { label: '축복', icon: 'ui_rarity_legendary' },
+] as const;
+/** seconds the discard stays armed ("한 번 더 눌러 버리기") */
+const ARM_TIME = 3;
 const WEAPON_KIND: Record<string, string> = { ranged: '원거리', melee: '근접', charge: '차지', beam: '광선' };
 
 export class StatusOverlay implements Scene {
@@ -41,6 +55,14 @@ export class StatusOverlay implements Scene {
   private rep = { l: new Repeater(), r: new Repeater(), u: new Repeater(), d: new Repeater() };
   private resScroll = 0;
   private hover = -1;
+  /** 0 = 유물, 1 = 축복 */
+  private tab = 0;
+  private tabT = 9;
+  /** artifact id armed for discarding (second press discards) and when */
+  private armedId = '';
+  private armedT = -9;
+  /** feedback line under the detail card */
+  private msg: { text: string; color: string; t: number } | null = null;
 
   constructor(game: GameScene) {
     this.game = game;
@@ -60,9 +82,81 @@ export class StatusOverlay implements Scene {
     return { x: GX + (i % COLS) * CELL, y: GY + (Math.floor(i / COLS) - this.scrollS.value) * CELL };
   }
 
+  /** Entries of the current tab (artifacts incl. innate traits, or blessings). */
+  private list(): ComputedArtifact[] {
+    const all = this.game.world.items.computed?.artifacts ?? [];
+    return all.filter((a) => !!a.def.blessing === (this.tab === 1));
+  }
+
+  private tabRect(i: number): { x: number; y: number; w: number; h: number } {
+    return { x: GX + i * 96, y: 56, w: 92, h: 26 };
+  }
+
+  private discardRect(): { x: number; y: number; w: number; h: number } {
+    const dy = GY + ROWS * CELL + 6;
+    const armed = this.isArmed();
+    const w = armed ? 150 : 92;
+    return { x: GX + COLS * CELL - 2 - 10 - w, y: dy + DETAIL_H - 34, w, h: 24 };
+  }
+
+  private isArmed(): boolean {
+    const cur = this.list()[this.sel];
+    return !!cur && this.armedId === cur.def.id && this.t - this.armedT < ARM_TIME;
+  }
+
+  private setTab(i: number): void {
+    const n = (i + TABS.length) % TABS.length;
+    if (n === this.tab) return;
+    this.tab = n;
+    this.tabT = 0;
+    this.sel = 0;
+    this.selT = 0;
+    this.scroll = 0;
+    this.armedId = '';
+    this.msg = null;
+    sfx('ui_move');
+  }
+
+  private say(text: string, color: string): void {
+    this.msg = { text, color, t: this.t };
+  }
+
+  /** First press arms, second press (within ARM_TIME) discards one copy. */
+  private tryDiscard(): void {
+    const w = this.game.world;
+    const cur = this.list()[this.sel];
+    if (!cur) return;
+    const why = discardBlockFor(w, cur.def.id);
+    if (why) {
+      sfx('ui_error');
+      this.say(why, C.bad);
+      return;
+    }
+    if (!this.isArmed()) {
+      this.armedId = cur.def.id;
+      this.armedT = this.t;
+      this.msg = null;
+      sfx('ui_select', { vol: 0.7 });
+      return;
+    }
+    this.armedId = '';
+    const ped = discardArtifact(w, cur.def.id);
+    if (!ped) {
+      sfx('ui_error');
+      return;
+    }
+    sfx('ui_place');
+    w.particles.burst(ped.x, ped.y - 10, { count: 12, speed: [20, 60], life: [0.3, 0.6], colors: ['#ffffff', RARITY_COLOR[cur.def.rarity]], size: [1, 2] });
+    this.say(`${cur.def.name}을(를) 곁에 내려놓았다`, C.textDim);
+    const n = this.list().length;
+    if (this.sel >= n) this.sel = Math.max(0, n - 1);
+    this.selT = 0;
+  }
+
   update(dt: number): void {
     this.t += dt;
     this.selT += dt;
+    this.tabT += dt;
     this.scrollS.target = this.scroll;
     this.scrollS.update(dt);
     if (this.closing >= 0) {
@@ -74,33 +168,47 @@ export class StatusOverlay implements Scene {
       this.close();
       return;
     }
-    const n = this.game.world.items.computed?.artifacts.length ?? 0;
+    const m = app.renderer.displayToUI(input.mouseX, input.mouseY);
+    m.x -= uiCenterX();
+    const click = input.pressed('fire');
+    const inRect = (q: { x: number; y: number; w: number; h: number }) => m.x >= q.x && m.x < q.x + q.w && m.y >= q.y && m.y < q.y + q.h;
+    // tabs: Q / E (pad LB / RB), or click / tap a tab
+    if (input.pressed('tabPrev')) this.setTab(this.tab - 1);
+    else if (input.pressed('tabNext')) this.setTab(this.tab + 1);
+    if (click) for (let i = 0; i < TABS.length; i++) if (inRect(this.tabRect(i))) this.setTab(i);
+    const n = this.list().length;
     const old = this.sel;
     if (n > 0) {
       if (this.rep.r.update(input.held('uiRight'), dt)) this.sel = gridMove(this.sel, n, COLS, 1, 0);
       if (this.rep.l.update(input.held('uiLeft'), dt)) this.sel = gridMove(this.sel, n, COLS, -1, 0);
       if (this.rep.d.update(input.held('uiDown'), dt)) this.sel = gridMove(this.sel, n, COLS, 0, 1);
       if (this.rep.u.update(input.held('uiUp'), dt)) this.sel = gridMove(this.sel, n, COLS, 0, -1);
-      const m = app.renderer.displayToUI(input.mouseX, input.mouseY);
-      m.x -= uiCenterX();
       this.hover = -1;
       for (let i = 0; i < n; i++) {
         const { x, y } = this.cellPos(i);
         if (y < GY - 4 || y > GY + (ROWS - 1) * CELL + 4) continue;
         if (m.x >= x && m.x < x + CELL - 2 && m.y >= y && m.y < y + CELL - 2) {
           this.hover = i;
-          if (input.mouseMoved) this.sel = i;
+          if (input.mouseMoved || click) this.sel = i;
         }
       }
       if (input.wheel) {
         if (m.x > 460) this.resScroll = Math.max(0, this.resScroll + Math.sign(input.wheel));
         else this.scroll = clamp(this.scroll + Math.sign(input.wheel), 0, Math.max(0, Math.ceil(n / COLS) - ROWS));
       }
-    }
+    } else this.hover = -1;
     if (this.sel !== old) {
       sfx('ui_move', { vol: 0.5 });
       this.selT = 0;
+      this.armedId = '';
+      this.msg = null;
       this.scroll = scrollToRow(this.scroll, Math.floor(this.sel / COLS), ROWS);
+    }
+    // discard (artifacts tab): key / pad X, or click / tap the button
+    if (this.tab === 0 && n > 0 && (input.pressed('discard') || (click && inRect(this.discardRect())))) this.tryDiscard();
+    else if (this.tab === 1 && input.pressed('discard') && n > 0) {
+      sfx('ui_error');
+      this.say('축복은 등불에 새겨져 버릴 수 없다', C.bad);
     }
   }
 
@@ -139,14 +247,32 @@ export class StatusOverlay implements Scene {
     this.drawStats(r, k, oy);
   }
 
-  // ---------------------------------------------------------------- artifacts
+  // ---------------------------------------------------------------- artifacts / blessings
   private drawArtifacts(r: Renderer, k: number, oy: number): void {
     const w = this.game.world;
-    const arts = w.items.computed?.artifacts ?? [];
-    const total = arts.reduce((s, a) => s + a.power, 0);
-    r.uiText('유물', GX, 64 + oy, { size: 12, bold: true, color: C.goldHi, alpha: k });
-    r.uiText(`${arts.length}종 · ${total}개`, GX + 34, 66 + oy, { size: 10, font: 'small', color: C.textFaint, alpha: k });
-    if (!touchUiActive()) keyHintRow(r, [['방향키', '선택'], [actionLabel(input.bindings, 'inventory', input.aimMode === 'pad'), '닫기']], GX + COLS * CELL - 80, 71 + oy, { alpha: k * 0.8, pad: input.aimMode === 'pad' });
+    const arts = this.list();
+    const all = w.items.computed?.artifacts ?? [];
+    const pad = input.aimMode === 'pad';
+    const touch = touchUiActive();
+    // tabs
+    TABS.forEach((tb, i) => {
+      const q = this.tabRect(i);
+      const on = i === this.tab;
+      const count = all.filter((a) => !!a.def.blessing === (i === 1)).length;
+      frame(r, q.x, q.y + oy, q.w, q.h, on ? 'buttonHi' : 'button', { alpha: k });
+      r.uiSprite(tb.icon, q.x + 14, q.y + 13 + oy, tb.icon === 'hud_power' ? 1.5 : 2, { alpha: k * (on ? 1 : 0.55) });
+      r.uiText(tb.label, q.x + 26, q.y + 6 + oy, { size: 12, bold: on, color: on ? C.goldHi : C.textDim, alpha: k });
+      r.uiText(`${count}`, q.x + q.w - 10, q.y + 8 + oy, { size: 10, font: 'small', align: 'right', color: on ? C.text : C.textFaint, alpha: k });
+    });
+    if (!touch) {
+      const tabKey = pad ? 'LB/RB' : `${actionLabel(input.bindings, 'tabPrev')}/${actionLabel(input.bindings, 'tabNext')}`;
+      const hints: [string, string][] = [[tabKey, '전환']];
+      if (this.tab === 0) hints.push([actionLabel(input.bindings, 'discard', pad), '버리기']);
+      hints.push([actionLabel(input.bindings, 'inventory', pad), '닫기']);
+      const total = hints.reduce((sum, [kk, l]) => sum + keyHintWidth(r, kk, l, pad), 0) + 12 * (hints.length - 1);
+      keyHintRow(r, hints, GX + COLS * CELL - 2 - total / 2, 69 + oy, { alpha: k * 0.8, pad, gap: 12 });
+    }
+    const tk = k * appear(this.tabT, 0.2);
     const d = r.dctx;
     d.save();
     d.beginPath();
@@ -157,7 +283,7 @@ export class StatusOverlay implements Scene {
       if (y < GY - CELL || y > GY + ROWS * CELL) continue;
       const a = arts[i];
       const isSel = i === this.sel && !!a;
-      const stagger = clamp(k * 1.5 - (i % 40) * 0.015, 0, 1);
+      const stagger = clamp(tk * 1.5 - (i % 40) * 0.015, 0, 1);
       const cx = x + (CELL - 2) / 2;
       const cy = y + (CELL - 2) / 2 + oy;
       if (!a) {
@@ -167,20 +293,23 @@ export class StatusOverlay implements Scene {
       const pop = isSel ? 1 + 0.12 * Math.max(0, 1 - this.selT * 5) : 1;
       iconSlot(r, null, cx, cy, CELL - 2, { selected: isSel, alpha: stagger });
       spriteCentered(r, a.def.icon, cx, cy, fitScale(a.def.icon, CELL - 8, 2) * pop, { alpha: stagger });
-      r.uiSprite(`ui_rarity_${a.def.rarity}`, x + CELL - 9, y + 7 + oy, 1.5, { alpha: stagger });
+      if (!a.def.blessing) r.uiSprite(`ui_rarity_${a.def.rarity}`, x + CELL - 9, y + 7 + oy, 1.5, { alpha: stagger });
       if (a.power > 1) r.uiText(`x${a.power}`, x + CELL - 5, y + CELL - 16 + oy, { size: 10, font: 'small', align: 'right', color: C.goldHi, alpha: stagger, outline: C.ink });
+      // armed for discarding: red pulse on the cell
+      if (isSel && this.isArmed()) r.uiStrokeRect(x + 1, y + 1 + oy, CELL - 4, CELL - 4, C.bad, 2, stagger * (0.6 + 0.4 * Math.sin(this.t * 12)));
     }
     d.restore();
     if (this.hover >= 0 && arts[this.hover] && input.aimMode === 'mouse') {
       const a = arts[this.hover];
       const { x, y } = this.cellPos(this.hover);
       const name = a.def.name;
-      const sub = `${RARITY_NAME[a.def.rarity]}${a.power > 1 ? ` · x${a.power}` : ''}`;
+      const sub = a.def.blessing ? '등불의 축복' : `${RARITY_NAME[a.def.rarity]}${a.power > 1 ? ` · x${a.power}` : ''}`;
       const tw = Math.max(r.measureText(name, 12, true), r.measureText(sub, 10, false, 'small')) + 20;
       const tx = Math.min(GX + COLS * CELL - tw, x + CELL / 2 - tw / 2);
       const ty = y + oy - 36;
-      frame(r, tx, ty, tw, 32, 'tooltip', { color: RARITY_COLOR[a.def.rarity], alpha: k });
-      r.uiText(name, tx + 10, ty + 4, { size: 12, bold: true, color: RARITY_COLOR[a.def.rarity], alpha: k });
+      const col = a.def.blessing ? '#ffd060' : RARITY_COLOR[a.def.rarity];
+      frame(r, tx, ty, tw, 32, 'tooltip', { color: col, alpha: k });
+      r.uiText(name, tx + 10, ty + 4, { size: 12, bold: true, color: col, alpha: k });
       r.uiText(sub, tx + 10, ty + 18, { size: 10, font: 'small', color: C.textDim, alpha: k });
     }
     const rows = Math.ceil(arts.length / COLS);
@@ -193,32 +322,41 @@ export class StatusOverlay implements Scene {
     // detail card
     const dy = GY + ROWS * CELL + 6 + oy;
     const dw = COLS * CELL - 2;
-    frame(r, GX, dy, dw, 106, 'panel', { alpha: k });
+    frame(r, GX, dy, dw, DETAIL_H, 'panel', { alpha: k });
     const cur = arts[this.sel];
     if (!cur) {
-      r.uiText('아직 유물이 없습니다.', GX + 16, dy + 20, { size: 12, color: C.textDim, alpha: k });
-      r.uiText('보물방, 상점, 보스에게서 유물을 찾아 등불을 키우세요.', GX + 16, dy + 40, { size: 10, font: 'small', color: C.textFaint, alpha: k });
+      if (this.tab === 1) {
+        r.uiText('아직 받은 축복이 없습니다.', GX + 16, dy + 20, { size: 12, color: C.textDim, alpha: tk });
+        r.uiText('층에 내려설 때마다 등불이 축복 하나를 내려 줍니다.', GX + 16, dy + 40, { size: 10, font: 'small', color: C.textFaint, alpha: tk });
+      } else {
+        r.uiText('아직 유물이 없습니다.', GX + 16, dy + 20, { size: 12, color: C.textDim, alpha: tk });
+        r.uiText('보물방, 상점, 보스에게서 유물을 찾아 등불을 키우세요.', GX + 16, dy + 40, { size: 10, font: 'small', color: C.textFaint, alpha: tk });
+      }
       return;
     }
     const def = cur.def;
-    const col = RARITY_COLOR[def.rarity];
-    const ka = k * appear(this.selT, 0.18);
+    const col = def.blessing ? '#ffd060' : RARITY_COLOR[def.rarity];
+    const ka = tk * appear(this.selT, 0.18);
     frame(r, GX + 12, dy + 12, 52, 52, 'slot', { alpha: k });
     spriteCentered(r, def.icon, GX + 38, dy + 38, fitScale(def.icon, 44, 2.5), { alpha: ka });
     r.uiText(def.name, GX + 76, dy + 10, { size: 16, bold: true, color: col, alpha: ka });
     if (cur.power > 1) r.uiText(`보유 x${cur.power}`, GX + dw - 14, dy + 13, { size: 10, font: 'small', align: 'right', color: C.goldHi, alpha: ka });
     // rarity + tags
-    r.uiSprite(`ui_rarity_${def.rarity}`, GX + 81, dy + 39, 2, { alpha: ka });
+    let tx = GX + 76;
+    if (!def.blessing) {
+      r.uiSprite(`ui_rarity_${def.rarity}`, GX + 81, dy + 39, 2, { alpha: ka });
+      tx = GX + 90;
+    }
     const rname = def.blessing ? '등불의 축복' : RARITY_NAME[def.rarity];
-    r.uiText(rname, GX + 90, dy + 33, { size: 10, font: 'small', color: def.blessing ? '#ffd060' : col, alpha: ka });
-    let tx = GX + 96 + r.measureText(rname, 10, false, 'small');
+    r.uiText(rname, tx, dy + 33, { size: 10, font: 'small', color: col, alpha: ka });
+    tx += 6 + r.measureText(rname, 10, false, 'small');
     for (const tag of def.tags) {
-      const s = Sets.get(tag);
-      if (!s) continue;
-      const tw = r.measureText(s.name, 10, false, 'small') + 24;
-      frame(r, tx, dy + 30, tw, 18, 'tooltip', { color: s.color, alpha: ka });
-      r.uiSprite(s.icon, tx + 9, dy + 39, 1.5, { alpha: ka });
-      r.uiText(s.name, tx + 17, dy + 33, { size: 10, font: 'small', color: s.color, alpha: ka });
+      const st = Sets.get(tag);
+      if (!st) continue;
+      const tw = r.measureText(st.name, 10, false, 'small') + 24;
+      frame(r, tx, dy + 30, tw, 18, 'tooltip', { color: st.color, alpha: ka });
+      r.uiSprite(st.icon, tx + 9, dy + 39, 1.5, { alpha: ka });
+      r.uiText(st.name, tx + 17, dy + 33, { size: 10, font: 'small', color: st.color, alpha: ka });
       tx += tw + 4;
     }
     const lines = r.wrapText(def.desc, dw - 92, 12);
@@ -226,6 +364,43 @@ export class StatusOverlay implements Scene {
     const qy = dy + 57 + Math.min(2, lines.length) * 15;
     if (def.signature) r.uiText(`특징 · ${def.signature}`, GX + 76, qy, { size: 10, font: 'small', color: C.info, alpha: ka });
     else if (def.quote) r.uiText(`“${def.quote}”`, GX + 76, qy, { size: 10, font: 'small', color: '#a89878', alpha: ka });
+    // bottom strip: source / discard
+    const by = dy + DETAIL_H - 34;
+    r.uiRect(GX + 12, by - 6, dw - 24, 1, C.rimDark, ka);
+    const msg = this.msg && this.t - this.msg.t < 3 ? this.msg : null;
+    if (def.blessing) {
+      const fl = blessingFloor(w, def.id);
+      const fname = fl ? Floors.all().find((f) => f.index === fl)?.name : undefined;
+      const src = fname ? `${fname}에서 받은 축복` : '등불이 내려 준 축복';
+      r.uiSprite('ui_rarity_legendary', GX + 20, by + 12, 1.5, { alpha: ka });
+      r.uiText(msg?.text ?? src, GX + 30, by + 6, { size: 10, font: 'small', color: msg?.color ?? '#e8d090', alpha: ka });
+      r.uiText('버릴 수 없음', GX + dw - 14, by + 6, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: ka });
+      return;
+    }
+    const why = discardBlockFor(w, def.id);
+    if (why) {
+      r.uiText(msg?.text ?? why, GX + 14, by + 6, { size: 10, font: 'small', color: msg?.color ?? C.textFaint, alpha: ka });
+      r.uiText('버릴 수 없음', GX + dw - 14, by + 6, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: ka });
+      return;
+    }
+    const armed = this.isArmed();
+    const q = this.discardRect();
+    const left = armed ? '버리면 곁의 받침대에 놓여 다시 주울 수 있다' : cur.power > 1 ? `한 개만 내려놓는다 (남은 수 x${cur.power - 1})` : '내려놓은 유물은 다시 주울 수 있다';
+    r.uiText(msg?.text ?? left, GX + 14, by + 6, { size: 10, font: 'small', color: msg?.color ?? (armed ? C.textDim : C.textFaint), alpha: ka });
+    const hot = this.hover < 0 && input.aimMode === 'mouse' && (() => {
+      const m = app.renderer.displayToUI(input.mouseX, input.mouseY);
+      m.x -= uiCenterX();
+      return m.x >= q.x && m.x < q.x + q.w && m.y >= q.y && m.y < q.y + q.h;
+    })();
+    frame(r, q.x, q.y + oy, q.w, q.h, armed || hot ? 'buttonHi' : 'button', { alpha: ka });
+    if (armed) r.uiStrokeRect(q.x, q.y + oy, q.w, q.h, C.bad, 2, ka * (0.5 + 0.5 * Math.sin(this.t * 10)));
+    const key = touch ? '' : actionLabel(input.bindings, 'discard', pad);
+    const label = armed ? '한 번 더 눌러 버리기' : '버리기';
+    const lw = r.measureText(label, 10, false, 'small');
+    const kw = key ? Math.max(18, Math.ceil((r.measureText(key, 10, false, 'small') + 10) / 2) * 2) + 4 : 0;
+    const lx = q.x + (q.w - lw - kw) / 2;
+    if (key) keycap(r, key, lx, q.y + q.h / 2 + oy, { align: 'left', alpha: ka, pad });
+    r.uiText(label, lx + kw, q.y + 6 + oy, { size: 10, font: 'small', color: armed ? C.bad : C.text, alpha: ka });
   }
 
   // ---------------------------------------------------------------- equipment

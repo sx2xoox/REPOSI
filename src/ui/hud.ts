@@ -31,6 +31,7 @@ import { C, splitFloorName } from './theme';
 import { formatDelta, heartSlots, hudStats, type HeartKind } from './logic';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
+import { ItemTooltip } from './item-tooltip';
 import { UiLayer } from './layer-cache';
 import { ArtifactBar } from './artifact-bar';
 import type { HudStat } from './logic';
@@ -117,6 +118,8 @@ export class Hud {
   readonly hints = new HintSystem();
   /** collected artifacts / blessings row + power readout + proc pops */
   readonly artifacts = new ArtifactBar();
+  /** preview card of the item the keeper stands next to */
+  readonly tooltip = new ItemTooltip();
   /** HUD area inside the safe insets (UI units); corner elements are drawn translated to its top-left */
   private W = UI_W;
   private H = UI_H;
@@ -302,6 +305,7 @@ export class Hud {
     this.minimap.update(w, dt);
     this.hints.update(w, dt);
     this.artifacts.update(w, dt);
+    this.tooltip.update(w, dt);
   }
 
   private spawnShards(slot: number, color: string): void {
@@ -341,6 +345,7 @@ export class Hud {
     this.cr = null;
     this.cw = null;
     this.artifacts.draw(r, w, A, sa.l, sa.t, 196, this.W - MINIMAP_W - MINIMAP_MARGIN - 10);
+    this.tooltip.draw(r, w, A);
     drawBanners(r, w);
     if (this.clearT >= 0) drawRoomClear(r, this.clearT, w.banners.length === 0 && !w.floorCard);
     if (w.floorCard) drawFloorCard(r, w.floorCard);

@@ -180,7 +180,7 @@ export class SettingsOverlay implements Scene {
     if (this.touch) {
       r.uiText('터치 조작', cx + 14, cy + 10, { size: 12, bold: true, color: C.goldHi, alpha: k });
       touchControlRows().forEach(([icon, label, desc], i) => {
-        const ry = cy + 38 + i * 25;
+        const ry = cy + 38 + i * Math.min(25, 222 / Math.max(1, touchControlRows().length - 1));
         if (icon) r.uiSprite(icon, cx + 24, ry, fitScale(icon, 18, 2), { alpha: k });
         else r.uiRect(cx + 18, ry - 6, 12, 12, C.rim, k * 0.6);
         r.uiText(label, cx + 42, ry - 7, { size: 12, color: C.text, alpha: k });
@@ -192,7 +192,7 @@ export class SettingsOverlay implements Scene {
     r.uiSprite('ui_gamepad', cx + W - 384 - 64, cy + 16, 2, { alpha: k * 0.9 });
     r.uiText('패드', cx + W - 384 - 40, cy + 10, { size: 10, font: 'small', color: C.textFaint, alpha: k });
     CONTROL_ROWS.forEach((row, i) => {
-      const ry = cy + 36 + i * 22;
+      const ry = cy + 36 + i * Math.min(22, 222 / Math.max(1, CONTROL_ROWS.length - 1));
       r.uiText(row.label, cx + 14, ry - 6, { size: 12, color: C.textDim, alpha: k });
       const keys = controlKeys(input.bindings, row.actions);
       r.uiText(keys, cx + 112, ry - 6, { size: 10, font: 'small', color: C.text, alpha: k });

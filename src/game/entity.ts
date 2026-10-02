@@ -90,6 +90,15 @@ export abstract class Entity {
   enemyHazard = false;
 
   update(_w: World, _dt: number): void {}
+
+  /**
+   * Holds something the keeper can read up close (item pedestal, priced pickup,
+   * potion, weapon crate): the nearest such entity gets the item preview card
+   * and is the target of the 'interact' action (see game/interact.ts).
+   */
+  previewable(_w: World): boolean {
+    return false;
+  }
   draw(_r: Renderer, _w: World): void {}
   /** emit lights (called during the light pass) */
   light(_w: World): void {}

@@ -203,6 +203,7 @@ export class Player extends Actor {
       if (input.pressed('consumable')) this.usePotion(w);
       if (input.pressed('special')) this.release(w);
       if (input.pressed('swap')) this.swapWeapon(w);
+      if (input.pressed('interact')) w.interact();
     }
     this.firing = wantFire && this.holdT <= 0;
 

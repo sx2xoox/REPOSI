@@ -28,7 +28,7 @@ import { clamp } from '../engine/math';
 import { Actives, Weapons } from '../game/defs';
 import type { Enemy } from '../game/enemy';
 import { EMBER_MAX } from '../game/player';
-import { potionSpriteFor } from '../game/pickups';
+import { Pedestal, itemInfo, potionSpriteFor } from '../game/pickups';
 import type { World } from '../game/world';
 import { GameScene } from './game-scene';
 import { minimapBlockRect } from './hud';
@@ -47,6 +47,7 @@ const BUTTON_ACTION: Record<TouchButtonId, Action> = {
   consumable: 'consumable',
   special: 'special',
   swap: 'swap',
+  interact: 'interact',
   pause: 'pause',
   map: 'map',
   inventory: 'inventory',
@@ -94,6 +95,18 @@ definePixelSprite('tc_swap', { w: '#ffe8b0', g: '#e0a848', d: '#8a5a20' }, [
   '...wg....',
   '..gwwwwww',
   '...wg....',
+], { outline: O });
+// open hand (the contextual "줍기" button in the controls reference)
+definePixelSprite('tc_pick', { w: '#f4dcb8', d: '#b07a50', g: '#ffe09a' }, [
+  '..w.w.w..',
+  '..w.w.w.w',
+  '.ww.w.w.w',
+  '.wwwwwwww',
+  'wwwwwwwwd',
+  '.wwwwwwd.',
+  '..wwwwd..',
+  '..dddd...',
+  '...g.....',
 ], { outline: O });
 definePixelSprite('tc_attack', { w: '#f4ead8', d: '#b4a8c0', g: '#e0a848', h: '#7a4e1c' }, [
   '.......ww',
@@ -322,6 +335,7 @@ export class TouchControls {
     if (id === 'active') return !!p.activeId;
     if (id === 'consumable') return !!p.potionId;
     if (id === 'swap') return !!p.weapon2Id;
+    if (id === 'interact') return w.focus instanceof Pedestal && !!w.focus.item;
     return true;
   }
 
@@ -909,6 +923,13 @@ export class TouchControls {
     // weapon swap: shows the weapon in the other slot (only with two weapons)
     const w2 = p.weapon2Id ? Weapons.get(p.weapon2Id) : undefined;
     if (w2) this.drawBtn(r, 'swap', A, held.has('swap'), w2.icon, true, false, 1, '', '교체');
+    // take the focused pedestal item (shows the item; "구매" when it has a price)
+    const f = w.focus;
+    if (f instanceof Pedestal && f.item) {
+      const ok = f.affordable(w);
+      const label = f.price > 0 || f.heartPrice > 0 ? '구매' : '줍기';
+      this.drawBtn(r, 'interact', A, held.has('interact'), itemInfo(f.item).icon, ok, ok, 1, '', label);
+    }
     // system
     this.drawBtn(r, 'pause', A, held.has('pause'), 'tc_pause');
     this.drawBtn(r, 'map', A, held.has('map'), 'tc_map');
