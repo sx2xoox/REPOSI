@@ -25,6 +25,7 @@ const KEY_NAMES: Record<string, string> = {
   Mouse0: '좌클릭',
   Mouse1: '휠클릭',
   Mouse2: '우클릭',
+  Wheel: '휠',
 };
 
 /** Display name of a KeyboardEvent.code / "MouseN" binding. */
@@ -49,6 +50,7 @@ export const PAD_NAMES: Partial<Record<Action, string>> = {
   cancel: 'B',
   fire: 'RT',
   special: 'LT',
+  swap: 'R3',
 };
 
 /**
@@ -83,6 +85,7 @@ export const CONTROL_ROWS: { label: string; actions: Action[]; padLabel?: string
   { label: '액티브 아이템', actions: ['active'] },
   { label: '물약 마시기', actions: ['consumable'] },
   { label: '등불 해방', actions: ['special'] },
+  { label: '무기 교체', actions: ['swap'] },
   { label: '소지품', actions: ['inventory'] },
   { label: '지도', actions: ['map'] },
   { label: '일시정지', actions: ['pause'] },
@@ -96,6 +99,7 @@ export const TOUCH_CONTROL_ROWS: [string, string, string][] = [
   ['hud_bomb', '폭탄', '금 간 벽을 부순다'],
   ['ui_flame', '등불 해방', '게이지가 차면 사용'],
   ['ui_gem', '아이템 · 물약', '가지고 있을 때 나타남'],
+  ['tc_swap', '무기 교체', '무기를 두 개 들면 나타남'],
   ['tc_pause', '일시정지', ''],
   ['tc_map', '지도', ''],
   ['tc_bag', '소지품', ''],

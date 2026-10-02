@@ -50,6 +50,8 @@ export class GameOverOverlay implements Scene {
     const p = w.player;
     const wdef = Weapons.get(p.weaponId);
     if (wdef) this.items.push(wdef.icon);
+    const w2 = p.weapon2Id ? Weapons.get(p.weapon2Id) : undefined;
+    if (w2) this.items.push(w2.icon);
     const act = p.activeId ? Actives.get(p.activeId) : undefined;
     if (act) this.items.push(act.icon);
     for (const a of w.items.computed?.artifacts ?? []) for (let i = 0; i < Math.min(3, a.power); i++) this.items.push(a.def.icon);

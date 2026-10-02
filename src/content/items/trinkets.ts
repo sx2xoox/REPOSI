@@ -10,6 +10,7 @@ import { fx } from '../../engine/rng';
 import { TAU } from '../../engine/math';
 import { O, addHitStatus, grantPerCopy, isAttack, roll, rollHit, spawnShards, syncFamiliars, watch } from './lib';
 import { MirrorShard } from './familiars';
+import { proc } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 const GOLD = ['#6a4410', '#b07818', '#e8b830', '#ffe070', '#fff8c8'];
@@ -34,6 +35,7 @@ defineArtifact({
   rarity: 'common',
   tags: [],
   icon: 'icon_gilded_tooth',
+  look: { trail: 'coin', mote: '#ffd040' },
   pools: ['treasure', 'shop'],
   stats(m, power, w) {
     const coins = w?.player?.coins ?? 0;
@@ -77,12 +79,14 @@ defineArtifact({
   rarity: 'common',
   tags: [],
   icon: 'icon_alchemist_scale',
+  look: { mote: '#a080ff', hit: '#ffd040' },
   pools: ['shop', 'treasure'],
   onPickup(w, kind, power) {
     if (kind !== 'coin' && kind !== 'nickel' && kind !== 'dime') return;
     if (!roll(w, 0.08, power, 0.005)) return;
     const p = w.player;
     w.spawn(new Pickup(w.rng.chance(0.5) ? 'bomb' : 'key', p.x, p.y).pop());
+    proc(w, 'alchemist_scale');
     w.particles.burst(p.x, p.y - 6, { count: 12, speed: [20, 70], life: [0.3, 0.6], colors: ['#ffffff', GOLD[3], '#a080ff'], size: [1, 2], additive: true });
     w.sfx('coin', { pitch: 1.4 });
   },
@@ -113,12 +117,14 @@ defineArtifact({
   rarity: 'common',
   tags: [],
   icon: 'icon_paper_ward',
+  look: { aura: '#d8f4ff', mote: '#f0d870' },
   pools: ['treasure', 'shop', 'shrine'],
   onRoomEnter(w, power) {
     if (w.node.cleared) return;
     const p = w.player;
     if (p.shields < power) {
       p.shields = power;
+      proc(w, 'paper_ward');
       w.particles.burst(p.x, p.y - 6, { count: 12, speed: [20, 60], life: [0.3, 0.6], colors: ['#ffffff', '#c8f0ff', '#f0d870'], size: [1, 2] });
     }
   },
@@ -162,6 +168,7 @@ defineArtifact({
   rarity: 'common',
   tags: [],
   icon: 'icon_soul_wax',
+  look: { mote: '#a8d8ff', aura: '#8ac0ff' },
   pools: ['treasure', 'shop', 'shrine'],
   onAcquire(w, power) {
     grantPerCopy(w, 'soul_wax', power, () => w.player.addSoul(2));
@@ -171,6 +178,7 @@ defineArtifact({
   },
   onFloorStart(w, power) {
     w.player.addSoul(power);
+    proc(w, 'soul_wax');
   },
 });
 
@@ -197,15 +205,25 @@ defineDrawnSprite('icon_stone_amulet', 16, 16, (p) => {
 defineArtifact({
   id: 'stone_amulet',
   name: '돌거북 부적',
-  desc: '최대 체력 +1. 피격 후 무적 시간 +30%',
+  desc: '최대 체력 +1, 피격 무적 +30%. 피격 시 탄환 제거',
+  signature: '피격당하면 돌 파편이 튀어 주변 적 탄환을 지운다',
   quote: '느리지만, 단단하다.',
   rarity: 'common',
   tags: [],
   icon: 'icon_stone_amulet',
+  look: { aura: '#a09890', step: '#c8c0b8' },
   pools: ['treasure', 'boss', 'shop'],
   stats(m, power) {
     m.addStat('maxHearts', power);
     m.mulStat('invuln', 1 + 0.3 * power);
+  },
+  onHurt(w, _a, power) {
+    const p = w.player;
+    if (!p.alive) return;
+    const R = 46 + 10 * (power - 1);
+    w.clearEnemyBullets(p.x, p.y, R);
+    w.particles.burst(p.x, p.y - 6, { count: 18, speed: [60, 160], life: [0.25, 0.5], colors: ['#e0d8d0', '#a09890', '#605850'], shape: 'square', size: [1, 3], drag: 3, vrot: 8 });
+    proc(w, 'stone_amulet');
   },
 });
 
@@ -232,10 +250,12 @@ defineArtifact({
   rarity: 'common',
   tags: [],
   icon: 'icon_lamp_oil',
+  look: { mote: '#ffc040', step: '#ffc040' },
   pools: ['treasure', 'shop', 'shrine'],
   onRoomClear(w, power) {
     const p = w.player;
     p.addEmber(20 * power);
+    proc(w, 'lamp_oil');
     w.particles.burst(p.x, p.y - 8, { count: 14, speed: [20, 60], life: [0.4, 0.8], colors: ['#fff0a0', '#ffc040', '#c06010'], size: [1, 2], additive: true, light: 3 });
   },
 });
@@ -263,6 +283,7 @@ defineArtifact({
   rarity: 'common',
   tags: [],
   icon: 'icon_jade_marble',
+  look: { shot: '#5ad8a0', shape: 'bubble' },
   pools: ['treasure', 'shop', 'challenge'],
   stats(m, power) {
     m.addStat('bounce', 2 * power);
@@ -294,9 +315,13 @@ defineArtifact({
   rarity: 'rare',
   tags: [],
   icon: 'icon_greedy_purse',
+  look: { mote: '#ffd040', hit: '#ffe060' },
   pools: ['shop', 'curse', 'treasure'],
   onKill(w, e, power) {
-    if (!e.isMinion && roll(w, 0.12, power, 0.005)) w.spawn(new Pickup('coin', e.x, e.y).pop());
+    if (!e.isMinion && roll(w, 0.12, power, 0.005)) {
+      w.spawn(new Pickup('coin', e.x, e.y).pop());
+      proc(w, 'greedy_purse');
+    }
   },
   onHurt(w) {
     const p = w.player;
@@ -334,6 +359,7 @@ defineArtifact({
   rarity: 'rare',
   tags: [],
   icon: 'icon_mirror_shard',
+  look: { mote: '#e0f0ff', hit: '#e0f0ff' },
   pools: ['treasure', 'shop', 'secret'],
   onUpdate(w, _dt, power) {
     syncFamiliars(w, 'mirror_shard', Math.min(2, power), (w2) => new MirrorShard(w2), power);
@@ -368,6 +394,7 @@ defineArtifact({
   rarity: 'rare',
   tags: [],
   icon: 'icon_sweet_sachet',
+  look: { shot: '#ff9ad8', trail: 'petal', hit: '#ffc0e8' },
   pools: ['treasure', 'shop', 'shrine'],
   modifyHit(w, t, hit, power) {
     if (isAttack(hit) && !t.hasStatus('charm') && rollHit(w, hit, 0.07, power)) addHitStatus(w, t, hit, { kind: 'charm', duration: 4 });
@@ -410,6 +437,7 @@ defineArtifact({
   rarity: 'epic',
   tags: [],
   icon: 'icon_cluster_powder',
+  look: { mote: '#ffb040', aura: '#ff7a20' },
   pools: ['treasure', 'shop', 'secret'],
   onAcquire(w, power) {
     grantPerCopy(w, 'cluster_powder', power, () => { w.player.bombs = Math.min(99, w.player.bombs + 2); });
@@ -427,6 +455,7 @@ defineArtifact({
       if (!b.dead) continue;
       m.delete(b);
       if (b.fuse > 0) continue;
+      proc(w, 'cluster_powder');
       spawnShards(w, b.x, b.y - 4, {
         count: 8 + 2 * (power - 1), damage: dmg(w) * 1.2 + 6, sprite: 'proj_shrapnel', color: '#ffb040', speed: 240, range: 120, radius: 2.5,
         statuses: [{ kind: 'burn', duration: 2, power: dmg(w) * 0.3 }], spectral: true,

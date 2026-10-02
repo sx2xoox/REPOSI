@@ -19,6 +19,7 @@ import { Repeater, Spring, appear } from './anim';
 import { fullStatRows, gridMove, scrollToRow } from './logic';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
+import { estimateDps, powerScore } from '../game/power';
 
 const COLS = 10;
 const CELL = 40;
@@ -124,6 +125,14 @@ export class StatusOverlay implements Scene {
     r.uiText(`${no} · ${fname}`, hx, 20 + oy, { size: 12, align: 'right', color: C.textDim, alpha: k });
     r.uiText(`${formatTime(w.run.stats.timeSec)}  ·  처치 ${w.run.stats.kills}  ·  시드 ${w.run.seed}`, hx, 37 + oy, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: k });
 
+    // power: grows with every artifact / blessing (also shown in the HUD)
+    const comp = w.items.computed;
+    const nBless = comp?.artifacts.filter((a) => a.def.blessing).length ?? 0;
+    const nArts = (comp?.artifacts.length ?? 0) - nBless;
+    r.uiSprite('hud_power', 268, 32 + oy, 2, { alpha: k });
+    r.uiText(`위력 ${powerScore(p.stats, comp)}`, 282, 18 + oy, { size: 16, bold: true, color: C.goldHi, outline: C.ink, alpha: k });
+    r.uiText(`초당 피해 약 ${Math.round(estimateDps(p.stats))} · 유물 ${nArts} · 축복 ${nBless}`, 282, 38 + oy, { size: 10, font: 'small', color: C.textFaint, alpha: k });
+
     this.drawArtifacts(r, k, oy);
     this.drawEquipment(r, k, oy);
     this.drawResonance(r, k, oy);
@@ -200,8 +209,9 @@ export class StatusOverlay implements Scene {
     if (cur.power > 1) r.uiText(`보유 x${cur.power}`, GX + dw - 14, dy + 13, { size: 10, font: 'small', align: 'right', color: C.goldHi, alpha: ka });
     // rarity + tags
     r.uiSprite(`ui_rarity_${def.rarity}`, GX + 81, dy + 39, 2, { alpha: ka });
-    r.uiText(RARITY_NAME[def.rarity], GX + 90, dy + 33, { size: 10, font: 'small', color: col, alpha: ka });
-    let tx = GX + 96 + r.measureText(RARITY_NAME[def.rarity], 10, false, 'small');
+    const rname = def.blessing ? '등불의 축복' : RARITY_NAME[def.rarity];
+    r.uiText(rname, GX + 90, dy + 33, { size: 10, font: 'small', color: def.blessing ? '#ffd060' : col, alpha: ka });
+    let tx = GX + 96 + r.measureText(rname, 10, false, 'small');
     for (const tag of def.tags) {
       const s = Sets.get(tag);
       if (!s) continue;
@@ -213,7 +223,9 @@ export class StatusOverlay implements Scene {
     }
     const lines = r.wrapText(def.desc, dw - 92, 12);
     lines.slice(0, 2).forEach((l, i) => r.uiText(l, GX + 76, dy + 54 + i * 15, { size: 12, color: C.text, alpha: ka }));
-    if (def.quote) r.uiText(`“${def.quote}”`, GX + 76, dy + 57 + Math.min(2, lines.length) * 15, { size: 10, font: 'small', color: '#a89878', alpha: ka });
+    const qy = dy + 57 + Math.min(2, lines.length) * 15;
+    if (def.signature) r.uiText(`특징 · ${def.signature}`, GX + 76, qy, { size: 10, font: 'small', color: C.info, alpha: ka });
+    else if (def.quote) r.uiText(`“${def.quote}”`, GX + 76, qy, { size: 10, font: 'small', color: '#a89878', alpha: ka });
   }
 
   // ---------------------------------------------------------------- equipment
@@ -227,9 +239,21 @@ export class StatusOverlay implements Scene {
     r.uiText('장비', x + 12, y + 8, { size: 10, font: 'small', color: C.gold, alpha: k });
     const wdef = Weapons.get(p.weaponId);
     if (wdef) {
-      iconSlot(r, wdef.icon, x + 30, y + 42, 36, { alpha: k });
-      r.uiText(wdef.name, x + 54, y + 24, { size: 12, bold: true, color: C.text, alpha: k });
-      r.uiText(`무기 · ${WEAPON_KIND[wdef.kind] ?? ''}`, x + 54, y + 40, { size: 10, font: 'small', color: C.textFaint, alpha: k });
+      iconSlot(r, wdef.icon, x + 30, y + 42, 36, { alpha: k, selected: true });
+      r.uiText(wdef.name, x + 54, y + 22, { size: 12, bold: true, color: C.text, alpha: k });
+      r.uiText(`무기 · ${wdef.archetype ?? WEAPON_KIND[wdef.kind] ?? ''}`, x + 54, y + 37, { size: 10, font: 'small', color: C.textFaint, alpha: k });
+    }
+    // second weapon slot (swap key)
+    const w2 = p.weapon2Id ? Weapons.get(p.weapon2Id) : undefined;
+    if (w2) {
+      // the second slot: small icon + name (swap key in the HUD)
+      r.uiSprite(w2.icon, x + 54, y + 49, 1, { alpha: k * 0.9 });
+      const maxW = ww / 2 - 84;
+      let nm = w2.name;
+      while (nm.length > 1 && r.measureText(nm, 10, false, 'small') > maxW) nm = nm.slice(0, -1);
+      r.uiText(nm === w2.name ? nm : `${nm}…`, x + 73, y + 51, { size: 10, font: 'small', color: C.textDim, alpha: k });
+    } else {
+      r.uiText('보조 무기 없음', x + 54, y + 51, { size: 10, font: 'small', color: C.textMute, alpha: k });
     }
     const half = x + ww / 2 + 6;
     const act = p.activeId ? Actives.get(p.activeId) : undefined;

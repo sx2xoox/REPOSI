@@ -17,6 +17,8 @@ export interface DebugApi {
   state(): Record<string, unknown>;
   god(on?: boolean): void;
   give(id: string): boolean;
+  /** switch to the second weapon slot (returns false when it is empty) */
+  swap(): boolean;
   spawn(id: string, x?: number, y?: number): boolean;
   killAll(): void;
   gotoRoom(kind: string): boolean;
@@ -81,10 +83,14 @@ export function installDebug(): void {
       if (!w) return false;
       if (Artifacts.has(id)) w.items.give(id);
       else if (Actives.has(id)) w.player.setActive(id, w);
-      else if (Weapons.has(id)) { w.player.weaponId = id; w.items.recompute(); }
+      else if (Weapons.has(id)) w.player.equipWeapon(w, id);
       else if (Potions.has(id)) w.player.potionId = id;
       else return false;
       return true;
+    },
+    swap() {
+      const w = world();
+      return !!w && w.player.swapWeapon(w);
     },
     spawn(id, x, y) {
       const w = world();

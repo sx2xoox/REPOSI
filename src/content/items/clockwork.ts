@@ -12,6 +12,7 @@ import {
   syncFamiliars, tickTimeStop, timeStop, timeStopped, watch,
 } from './lib';
 import { GearTurret } from './familiars';
+import { proc } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 const BRASS = ['#5a3a18', '#8a6028', '#c89848', '#f0d080', '#fff4c0'];
@@ -38,15 +39,33 @@ defineDrawnSprite('icon_cracked_hourglass', 16, 16, (p) => {
 defineArtifact({
   id: 'cracked_hourglass',
   name: '금 간 모래시계',
-  desc: '공격 속도 +0.45, 사거리 -10%',
+  desc: '공격 속도 +0.6, 사거리 -10%. 전투 시작 시 적 둔화',
+  signature: '전투가 시작되면 모래시계가 뒤집혀 적이 2초간 느려진다',
   quote: '모래가 새도 시간은 흐른다.',
   rarity: 'common',
   tags: ['clockwork'],
   icon: 'icon_cracked_hourglass',
+  look: { trail: 'sand', mote: '#f0d8a0' },
   pools: ['treasure', 'shop', 'boss'],
   stats(m, power) {
-    m.addStat('fireRate', 0.45 * power);
+    m.addStat('fireRate', 0.6 * power);
     m.mulStat('range', Math.pow(0.9, power));
+  },
+  onRoomEnter(w) {
+    if (!w.node.cleared) w.vars.__hourglassT = w.time + 0.5;
+  },
+  onUpdate(w, _dt, power) {
+    const t = w.vars.__hourglassT ?? 0;
+    if (t <= 0 || w.time < t) return;
+    w.vars.__hourglassT = 0;
+    const es = w.enemies.filter((e) => e.alive && !e.hidden && e.vulnerable);
+    if (!es.length) return;
+    const p = w.player;
+    w.sfx('ui_select', { vol: 0.4, pitch: 0.6 });
+    w.spawn(new RingFx(p.x, p.y - 6, 70, 0.5, '#f0d8a0', 2));
+    for (const e of es) inflict(w, e, { kind: 'slow', duration: 2 + 0.5 * (power - 1), power: 0.4 }, false);
+    w.particles.burst(p.x, p.y - 6, { count: 16, speed: [30, 90], life: [0.4, 0.7], colors: ['#fff0c0', '#f0d8a0', '#c8a060'], size: [1, 2], gravity: 120 });
+    proc(w, 'cracked_hourglass');
   },
 });
 
@@ -76,6 +95,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['clockwork'],
   icon: 'icon_wind_up_key',
+  look: { mote: '#c8a060', orbit: '#e8c880' },
   pools: ['treasure', 'shop'],
   stats(m, power, w) {
     const keys = w?.player?.keys ?? 0;
@@ -118,6 +138,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['clockwork'],
   icon: 'icon_tick_bomb',
+  look: { aura: '#f0d080', hit: '#f0d080' },
   pools: ['treasure', 'shop'],
   onAcquire(w, power) {
     grantPerCopy(w, 'tick_bomb', power, () => { w.player.bombs = Math.min(99, w.player.bombs + 3); });
@@ -165,6 +186,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['clockwork'],
   icon: 'icon_rusted_nail',
+  look: { shot: '#b87a50', shape: 'needle', hit: '#d8a070' },
   pools: ['treasure', 'shop', 'curse', 'challenge'],
   modifyHit(w, t, hit, power) {
     if (isAttack(hit) && !t.hasStatus('weak') && rollHit(w, hit, 0.15, power)) addHitStatus(w, t, hit, { kind: 'weak', duration: 4 });
@@ -206,6 +228,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['clockwork'],
   icon: 'icon_gear_turret',
+  look: { mote: '#c8a060', step: '#c8a060' },
   pools: ['treasure', 'shop', 'challenge'],
   onUpdate(w, _dt, power) {
     syncFamiliars(w, 'gear_turret', Math.min(3, power), (w2) => new GearTurret(w2), power);
@@ -240,6 +263,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['clockwork'],
   icon: 'icon_pendulum_weight',
+  look: { shape: 'gear', shot: '#f0d080' },
   pools: ['treasure', 'shop'],
   stats(m) {
     m.mulStat('knockback', 1.3);
@@ -277,6 +301,7 @@ defineArtifact({
   rarity: 'epic',
   tags: ['clockwork', 'star'],
   icon: 'icon_armillary',
+  look: { orbit: '#ffe880', mote: '#ffe880' },
   pools: ['treasure', 'shrine'],
   onAttack(w, angle, power) {
     w.vars.__armN = (w.vars.__armN ?? 0) + 1;
@@ -303,6 +328,7 @@ defineArtifact({
     p.mem.orbR = 6;
     p.damage *= 1.5;
     p.color = '#ffe880';
+    proc(w, 'armillary', true);
     p.lightR = 22;
     p.addBehavior(orbitBehavior(1.2, 20));
   },
@@ -340,6 +366,7 @@ defineArtifact({
   rarity: 'epic',
   tags: ['clockwork'],
   icon: 'icon_metronome_heart',
+  look: { aura: '#ffd080', step: '#ffd080' },
   pools: ['treasure', 'boss'],
   stats(m, power, w) {
     if (w?.player && metronomeOn(w)) m.mulStat('fireRate', 1 + 0.4 * power);
@@ -351,6 +378,7 @@ defineArtifact({
     const p = w.player;
     if (on && was === 0) {
       shout(w, '템포!', '#ffd080');
+      proc(w, 'metronome_heart');
       w.sfx('ui_select', { vol: 0.4, pitch: 1.3 });
     }
     if (on && Math.floor(w.time * 2) !== Math.floor((w.time - dt) * 2)) {
@@ -395,6 +423,7 @@ defineArtifact({
   rarity: 'legendary',
   tags: ['clockwork', 'shadow'],
   icon: 'icon_abyssal_hourglass',
+  look: { aura: '#9a6aff', shot: '#b080ff', trail: 'sand' },
   pools: ['treasure', 'secret', 'curse'],
   unique: true,
   stats(m) {

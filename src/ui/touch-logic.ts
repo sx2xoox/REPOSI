@@ -38,7 +38,7 @@ export interface Insets {
   b: number;
 }
 
-export type TouchButtonId = 'dash' | 'bomb' | 'active' | 'consumable' | 'special' | 'pause' | 'map' | 'inventory';
+export type TouchButtonId = 'dash' | 'bomb' | 'active' | 'consumable' | 'special' | 'swap' | 'pause' | 'map' | 'inventory';
 
 export type TouchScheme = 'auto' | 'twin';
 export const TOUCH_SCHEMES: TouchScheme[] = ['auto', 'twin'];
@@ -48,7 +48,7 @@ export function touchScheme(v: string | undefined): TouchScheme {
   return v === 'twin' ? 'twin' : 'auto';
 }
 
-export const GAME_BUTTONS: TouchButtonId[] = ['dash', 'bomb', 'special', 'active', 'consumable'];
+export const GAME_BUTTONS: TouchButtonId[] = ['dash', 'bomb', 'special', 'active', 'consumable', 'swap'];
 export const SYSTEM_BUTTONS: TouchButtonId[] = ['pause', 'map', 'inventory'];
 
 // ---------------------------------------------------------------- joystick math
@@ -170,6 +170,10 @@ export function computeTouchLayout(view: { w: number; h: number }, safe: Insets,
     const outer = AR + gap + 2 * rDash + 8 * u + rItem * 0.3;
     place(cx, cy, 'active', 112, outer, rItem);
     place(cx, cy, 'consumable', 157, outer, rItem);
+    // weapon swap (shows the other weapon): outer arc above the attack button
+    place(cx, cy, 'swap', 74, outer, rad(22));
+    const sw = buttons.swap;
+    sw.x = Math.min(sw.x, view.w - r - 6 * u - sw.r);
   } else {
     rightRest = { x: view.w - r - 26 * u - stickR, y: restY };
     const cx = rightRest.x;
@@ -181,6 +185,7 @@ export function computeTouchLayout(view: { w: number; h: number }, safe: Insets,
     place(cx, cy, 'special', 96, D, rad(24));
     place(cx, cy, 'active', 120, D2, rad(22));
     place(cx, cy, 'consumable', 80, D2, rad(22));
+    place(cx, cy, 'swap', 58, D, rad(22));
   }
 
   // system buttons: a column in the right pillarbox bar when it is wide enough,

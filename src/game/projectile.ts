@@ -11,6 +11,7 @@ import { angleOf, rotateToward, TAU } from '../engine/math';
 import { fx } from '../engine/rng';
 import { TILE } from './constants';
 import { Tile, tileProps } from './tiles';
+import { drawShot, shotTrail, type ShotLook } from './look';
 
 export interface ProjBehavior {
   /** optional id so items can avoid adding the same behavior twice */
@@ -127,6 +128,14 @@ export class Projectile extends Entity {
   generation = 0;
   scale = 1;
   trailT = 0;
+  /** composed artifact look (player weapon shots; see game/look.ts) */
+  look: ShotLook | null = null;
+  /** color right after the look was applied (a later recolor by an item wins) */
+  lookBase = '';
+  lookD = -1;
+  lookBody = '';
+  lookName = '';
+  trailN = 0;
 
   constructor(o: ProjectileOpts) {
     super();
@@ -211,7 +220,8 @@ export class Projectile extends Entity {
       this.trailT += dt;
       if (this.trailT > 0.03) {
         this.trailT = 0;
-        w.particles.spawn({
+        if (this.look) shotTrail(this, w, this.look);
+        else w.particles.spawn({
           x: this.x + fx.range(-1, 1), y: this.y - this.z + fx.range(-1, 1), life: 0.18,
           colors: this.fxCols()[0], size: Math.max(1, this.r * 0.6), sizeEnd: 0.5, shape: 'pixel',
         });
@@ -305,7 +315,8 @@ export class Projectile extends Entity {
       if (Math.floor(this.age * 20) % 2 === 0) r.sprite(orbSprite(this.r * 2 + 1, this.color), this.x, dy, { alpha: 0.5 });
       return;
     }
-    if (this.style === 'sprite' && this.sprite) {
+    if (this.look) drawShot(this, r, this.look, dy);
+    else if (this.style === 'sprite' && this.sprite) {
       r.sprite(this.sprite, this.x, dy, { rot: this.spriteRotates ? this.angle : 0, sx: this.scale, sy: this.scale });
     } else {
       const d = (this.r * 2 + 1) * this.scale;

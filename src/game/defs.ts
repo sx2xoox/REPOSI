@@ -15,6 +15,7 @@ import type { Enemy } from './enemy';
 import type { Player } from './player';
 import type { Projectile } from './projectile';
 import type { Actor, HitInfo } from './entity';
+import type { ArtifactLook } from './look';
 
 // ------------------------------------------------------------------ enemies
 export type DeathFx = 'blood' | 'goo' | 'bone' | 'ember' | 'ice' | 'void' | 'spore' | 'metal' | 'none';
@@ -160,6 +161,15 @@ export interface ArtifactDef extends ItemHooks {
   unique?: boolean;
   /** not dropped randomly */
   hidden?: boolean;
+  /**
+   * Visible traces while held (shot color / shape / trail, motes, aura ...),
+   * composed with every other held artifact (see game/look.ts).
+   */
+  look?: ArtifactLook;
+  /** short Korean line naming the artifact's signature side effect (Tab screen) */
+  signature?: string;
+  /** a "등불의 축복" floor blessing (hidden, offered at floor start; see game/blessings.ts) */
+  blessing?: boolean;
 }
 
 export interface SetTier {
@@ -244,6 +254,13 @@ export interface WeaponDef {
   update(w: World, p: Player, st: WeaponState, dt: number, firing: boolean, aim: number): void;
   /** custom draw of the held weapon (world space, called after the player sprite) */
   draw?(w: World, p: Player, r: Renderer, st: WeaponState): void;
+  /**
+   * The weapon was put away (swapped to the other slot or dropped): clean up
+   * anything it keeps in the world (orbiting shots, channels ...). Optional.
+   */
+  onHolster?(w: World, p: Player, st: WeaponState): void;
+  /** short Korean archetype label for UI (e.g. '산탄', '대검'); falls back to `kind` */
+  archetype?: string;
 }
 
 export interface CharacterDef {

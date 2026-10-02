@@ -32,6 +32,7 @@ import { formatDelta, heartSlots, hudStats, type HeartKind } from './logic';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
 import { UiLayer } from './layer-cache';
+import { ArtifactBar } from './artifact-bar';
 import type { HudStat } from './logic';
 
 /** HUD minimap size and margin (UI units). */
@@ -91,7 +92,10 @@ export class Hud {
   private activePop = 0;
   private activeUse = 0;
   private weaponId = '';
+  private weapon2Id: string | null = null;
   private weaponPop = 0;
+  /** 1 -> 0 while the two weapon slots trade places after a swap */
+  private swapAnim = 0;
   private potionId: string | null = null;
   private potionPop = 0;
   private bossShown = 0;
@@ -111,6 +115,8 @@ export class Hud {
   private lastHp = -1;
   readonly minimap = new MinimapView();
   readonly hints = new HintSystem();
+  /** collected artifacts / blessings row + power readout + proc pops */
+  readonly artifacts = new ArtifactBar();
   /** HUD area inside the safe insets (UI units); corner elements are drawn translated to its top-left */
   private W = UI_W;
   private H = UI_H;
@@ -229,11 +235,15 @@ export class Hud {
     this.activeReady = ready;
     this.activeUse = Math.max(0, this.activeUse - dt * 2.2);
     this.activeFlash = Math.max(0, this.activeFlash - dt * 2);
-    if (p.weaponId !== this.weaponId) {
-      if (this.weaponId) this.weaponPop = 1;
+    if (p.weaponId !== this.weaponId || p.weapon2Id !== this.weapon2Id) {
+      const swapped = !!this.weaponId && p.weaponId === this.weapon2Id && p.weapon2Id === this.weaponId;
+      if (swapped) this.swapAnim = 1;
+      else if (this.weaponId) this.weaponPop = 1;
       this.weaponId = p.weaponId;
+      this.weapon2Id = p.weapon2Id;
     }
     this.weaponPop = Math.max(0, this.weaponPop - dt * 2.5);
+    this.swapAnim = Math.max(0, this.swapAnim - dt * 5);
     if (p.potionId !== this.potionId) {
       if (p.potionId) this.potionPop = 1;
       this.potionId = p.potionId;
@@ -291,6 +301,7 @@ export class Hud {
     }
     this.minimap.update(w, dt);
     this.hints.update(w, dt);
+    this.artifacts.update(w, dt);
   }
 
   private spawnShards(slot: number, color: string): void {
@@ -329,6 +340,7 @@ export class Hud {
     d.restore();
     this.cr = null;
     this.cw = null;
+    this.artifacts.draw(r, w, A, sa.l, sa.t, 196, this.W - MINIMAP_W - MINIMAP_MARGIN - 10);
     drawBanners(r, w);
     if (this.clearT >= 0) drawRoomClear(r, this.clearT, w.banners.length === 0 && !w.floorCard);
     if (w.floorCard) drawFloorCard(r, w.floorCard);
@@ -383,11 +395,11 @@ export class Hud {
     if (touchUi) return; // the touch buttons carry the ember gauge, weapon and potion
     if (this.emberFull || this.emberFlash > 0 || this.releaseFlash > 0) this.drawEmber(r, w, A);
     else this.lyEmber.draw(r, `${Math.round(108 * clamp(this.emberShown, 0, 1))}`, ox, oy, 0, this.H - 44, 160, 44, A, this.paintEmber);
-    if (this.potionPop > 0 || this.weaponPop > 0) this.drawSlots(r, w, A);
+    if (this.potionPop > 0 || this.weaponPop > 0 || this.swapAnim > 0) this.drawSlots(r, w, A);
     else {
       const known = p.potionId ? w.run.identified.has(p.potionId) : false;
-      const key = `${p.potionId ?? ''}|${known ? 1 : 0}|${p.weaponId}|${input.aimMode === 'pad' ? 1 : 0}|${p.potionId ? potionSpriteFor(w, p.potionId) : ''}`;
-      this.lySlots.draw(r, key, ox, oy, this.W - 150, this.H - 64, 150, 64, A, this.paintSlots);
+      const key = `${p.potionId ?? ''}|${known ? 1 : 0}|${p.weaponId}|${p.weapon2Id ?? ''}|${input.aimMode === 'pad' ? 1 : 0}|${actionLabel(input.bindings, 'swap', input.aimMode === 'pad')}|${p.potionId ? potionSpriteFor(w, p.potionId) : ''}`;
+      this.lySlots.draw(r, key, ox, oy, this.W - 190, this.H - 70, 190, 70, A, this.paintSlots);
     }
   }
 
@@ -593,13 +605,38 @@ export class Hud {
       keycap(r, actionLabel(input.bindings, 'consumable', input.aimMode === 'pad'), px - 2, py + s - 2, { align: 'left', alpha: A * 0.95, pad: input.aimMode === 'pad' });
       r.uiText(known && def ? def.name : '정체불명', px + s, py - 13, { size: 10, font: 'small', align: 'right', color: known ? C.text : C.textFaint, alpha: A, outline: C.ink });
     }
-    // weapon
+    // weapons (Soul Knight style): the held weapon in a big highlighted box, the
+    // second slot smaller and dimmed beside it (with the swap key); a swap makes
+    // the two icons trade places
+    const M = 40;
+    const S = 30;
+    const mx = p.potionId ? px - M - 8 : this.W - M - 10;
+    const my = this.H - M - 8;
+    const sx = mx - S - 6;
+    const sy = my + M - S;
     const wdef = Weapons.get(p.weaponId);
-    if (wdef) {
-      const wx = p.potionId ? px - s - 6 : px;
-      frame(r, wx, py, s, s, this.weaponPop > 0 ? 'slotHi' : 'slot', { alpha: A * 0.9 });
-      spriteCentered(r, wdef.icon, wx + s / 2, py + s / 2, fitScale(wdef.icon, 26, 2) * popScale(this.weaponPop, 0.4), { alpha: A });
+    const w2 = p.weapon2Id ? Weapons.get(p.weapon2Id) : undefined;
+    const k = ease.outCubic(1 - this.swapAnim);
+    const mcx = mx + M / 2;
+    const mcy = my + M / 2;
+    const scx = sx + S / 2;
+    const scy = sy + S / 2;
+    frame(r, sx, sy, S, S, 'slot', { alpha: A * (w2 ? 0.95 : 0.4) });
+    frame(r, mx, my, M, M, 'slotHi', { alpha: A * 0.92 });
+    if (w2) {
+      const cx = scx + (mcx - scx) * (1 - k);
+      const cy = scy + (mcy - scy) * (1 - k);
+      const box = 20 + 10 * (1 - k);
+      spriteCentered(r, w2.icon, cx, cy, fitScale(w2.icon, box, 2), { alpha: A * (0.75 + 0.25 * (1 - k)), tint: '#140c1c', tintAmount: 0.22 * k });
     }
+    if (wdef) {
+      const cx = mcx + (scx - mcx) * (1 - k);
+      const cy = mcy + (scy - mcy) * (1 - k);
+      const box = 30 - 10 * (1 - k);
+      spriteCentered(r, wdef.icon, cx, cy, fitScale(wdef.icon, box, 2) * popScale(this.weaponPop, 0.4), { alpha: A, flash: this.swapAnim * 0.6 });
+    }
+    if (this.swapAnim > 0) glow(r, mcx, mcy, 30, '#ffe8a0', this.swapAnim * 0.35 * A);
+    if (w2) keycap(r, actionLabel(input.bindings, 'swap', input.aimMode === 'pad'), sx - 3, sy + S / 2, { align: 'right', alpha: A * 0.9, pad: input.aimMode === 'pad' });
   }
 
   private drawBoss(r: Renderer, A: number): void {

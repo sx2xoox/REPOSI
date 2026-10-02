@@ -9,6 +9,7 @@ import { fx } from '../../engine/rng';
 import {
   O, HazardZone, addHitStatus, enemiesNear, isAttack, hitWeight, isPrimary, itemHit, miniBlast, roll, rollHit, shout, stackMul,
 } from './lib';
+import { proc } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 
@@ -45,6 +46,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['flame'],
   icon: 'icon_tinder_pouch',
+  look: { shot: '#ff9a3a', trail: 'ember', hit: '#ffb040' },
   pools: ['treasure', 'shop'],
   modifyHit(w, t, hit, power) {
     if (isAttack(hit) && rollHit(w, hit, 0.15, power)) addHitStatus(w, t, hit, { kind: 'burn', duration: 3, power: dmg(w) * 0.4 });
@@ -76,9 +78,13 @@ defineArtifact({
   rarity: 'common',
   tags: ['flame'],
   icon: 'icon_smoldering_coal',
+  look: { shot: '#ff6a20', trail: 'smoke', hit: '#ff6a20' },
   pools: ['treasure', 'shop', 'boss'],
   modifyHit(_w, t, hit, power) {
-    if (t.hasStatus('burn')) hit.damage *= 1 + 0.3 * power;
+    if (t.hasStatus('burn')) {
+      hit.damage *= 1 + 0.3 * power;
+      proc(_w, 'smoldering_coal', true);
+    }
   },
 });
 
@@ -109,10 +115,12 @@ defineArtifact({
   rarity: 'common',
   tags: ['flame', 'clockwork'],
   icon: 'icon_bellows',
+  look: { aura: '#ffb040', mote: '#ffd060' },
   pools: ['treasure', 'shop', 'shrine'],
   onHit(w, _t, hit, power) {
     if (!isAttack(hit)) return;
     w.player.addEmber(1.0 * power * hitWeight(hit));
+    proc(w, 'bellows', true);
   },
 });
 
@@ -142,10 +150,12 @@ defineArtifact({
   rarity: 'rare',
   tags: ['flame', 'shadow'],
   icon: 'icon_ashwalk_boots',
+  look: { step: '#ff7a20', aura: '#ff7a20' },
   pools: ['treasure', 'challenge'],
   onDash(w) {
     const p = w.player;
     w.vars.__ashT = w.time + p.stats.dashTime + 0.04;
+    proc(w, 'ashwalk_boots');
     w.vars.__ashX = p.x;
     w.vars.__ashY = p.y;
     HazardZone.add(w, new HazardZone(w, p.x, p.y + 2, 'fire', { radius: 9, life: 2.4, tick: 0.3, damage: dmg(w) * 0.35, statuses: [{ kind: 'burn', duration: 2, power: dmg(w) * 0.3 }] }), 28);
@@ -192,6 +202,7 @@ defineArtifact({
   rarity: 'epic',
   tags: ['flame'],
   icon: 'icon_kiln_core',
+  look: { shot: '#ff7a20', grow: 1, hit: '#ffd060' },
   pools: ['treasure', 'boss', 'challenge'],
   onHit(w, t, hit, power) {
     if (!isPrimary(hit)) return;
@@ -225,11 +236,13 @@ defineArtifact({
   rarity: 'epic',
   tags: ['flame', 'blood'],
   icon: 'icon_rekindle_plume',
+  look: { mote: '#ffe080', aura: '#ff9a30' },
   pools: ['secret', 'shrine', 'boss'],
   unique: true,
   onHurt(w) {
     const p = w.player;
     if (p.alive) return;
+    proc(w, 'rekindle_plume');
     if (p.maxRed > 0) p.red = Math.min(p.maxRed, 4);
     else p.addSoul(4);
     p.invuln = 2.2;
@@ -273,6 +286,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['flame'],
   icon: 'icon_ember_reservoir',
+  look: { mote: '#ff8a30', hit: '#ffe080' },
   pools: ['treasure', 'shrine'],
   onRelease(w, power) {
     const k = 1 + 0.4 * power;
@@ -323,6 +337,7 @@ defineArtifact({
   rarity: 'epic',
   tags: ['flame'],
   icon: 'icon_twin_wick',
+  look: { mote: '#ffd060', orbit: '#ffd060' },
   pools: ['treasure', 'shrine', 'secret'],
   onRelease(w, power) {
     w.vars.__twinWickT = w.time + 0.55;
@@ -336,6 +351,7 @@ defineArtifact({
     w.vars.__twinWickN = (w.vars.__twinWickN ?? 1) - 1;
     w.vars.__twinWickT = w.vars.__twinWickN > 0 ? w.time + 0.55 : 0;
     shout(w, '한 번 더!', '#ffd080');
+    proc(w, 'twin_wick');
     if (p.character.release) p.character.release(w, p);
     else defaultRelease(w, p);
   },

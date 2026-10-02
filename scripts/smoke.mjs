@@ -34,6 +34,8 @@ if (!url) {
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? undefined, args: ['--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+// the floor-start blessing choice ("등불의 축복") auto-picks the first card for the bot
+await page.addInitScript(() => { window.__lkAutoBless = true; });
 const logs = [];
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') logs.push(`[${m.type()}] ${m.text()}`); });
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}\n${e.stack}`));

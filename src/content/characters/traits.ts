@@ -5,6 +5,7 @@ import { defineArtifact } from '../../game/defs';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { ramp } from '../../engine/painter';
 import { glowSprite } from '../weapons/common';
+import { proc } from '../items/lib';
 
 const O = '#0c0810';
 
@@ -32,6 +33,7 @@ defineArtifact({
   rarity: 'rare',
   tags: [],
   icon: 'icon_keeper_wick',
+  look: { aura: '#ffd8a0' },
   pools: [],
   hidden: true,
   unique: true,
@@ -61,6 +63,7 @@ defineArtifact({
   rarity: 'rare',
   tags: [],
   icon: 'icon_sentinel_oath',
+  look: { aura: '#b8d0ff', hit: '#e0ecff' },
   pools: [],
   hidden: true,
   unique: true,
@@ -69,6 +72,7 @@ defineArtifact({
   },
   onFloorStart(w) {
     w.player.shields = Math.max(w.player.shields, 1);
+    proc(w, 'sentinel_oath');
   },
   draw(w, r) {
     const p = w.player;
@@ -101,6 +105,7 @@ defineArtifact({
   rarity: 'rare',
   tags: [],
   icon: 'icon_hunter_eye',
+  look: { orbit: '#ffe08a', hit: '#ffe08a' },
   pools: [],
   hidden: true,
   unique: true,
@@ -114,6 +119,7 @@ defineArtifact({
     hit.crit = true;
     hit.damage *= w.player.stats.critMult;
     w.sfx('hit_crit', { vol: 0.5, pitch: 1.3 });
+    proc(w, 'hunter_eye');
   },
   draw(w, r) {
     if ((w.vars.__hunterEyeUntil ?? -1) < w.time) return;
@@ -141,6 +147,7 @@ defineArtifact({
   rarity: 'epic',
   tags: [],
   icon: 'icon_void_body',
+  look: { step: '#8a5ad8', aura: '#4a2a7a' },
   pools: [],
   hidden: true,
   unique: true,

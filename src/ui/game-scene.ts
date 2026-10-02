@@ -15,6 +15,8 @@ import { GameOverOverlay } from './gameover';
 import { audio } from '../audio/audio';
 import { save } from '../engine/save';
 import { applyGraphics } from './quality';
+import { BlessingOverlay } from './blessing';
+import { applyBlessing, autoBlessEnabled, blessingChoices, blessingDue, markBlessed } from '../game/blessings';
 
 export class GameScene implements Scene, WorldHost {
   world: World;
@@ -96,6 +98,17 @@ export class GameScene implements Scene, WorldHost {
     }
     w.update(dt);
     this.hud.update(w, dt);
+    if (!this.overlayOpen && blessingDue(w)) this.offerBlessing();
+  }
+
+  /** "등불의 축복": pick one of three blessings at the start of each floor. */
+  private offerBlessing(): void {
+    const w = this.world;
+    const choices = blessingChoices(w);
+    markBlessed(w);
+    if (!choices.length) return;
+    if (autoBlessEnabled()) applyBlessing(w, choices[0]);
+    else this.openOverlay(new BlessingOverlay(this, choices));
   }
 
   draw(r: Renderer): void {

@@ -10,6 +10,7 @@ import { fx } from '../../engine/rng';
 import type { World } from '../../game/world';
 import { O, addHitStatus, isAttack, isMelee, isPrimary, roll, rollHit, spawnShards, syncFamiliars } from './lib';
 import { LanternSun, MoonSatellite } from './familiars';
+import { proc } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 
@@ -42,15 +43,23 @@ defineDrawnSprite('icon_fallen_star', 16, 16, (p) => {
 defineArtifact({
   id: 'fallen_star',
   name: '떨어진 별 조각',
-  desc: '행운 +1, 치명타 확률 +4%',
+  desc: '행운 +1, 치명타 +6%. 치명타 시 등불 게이지 +3',
+  signature: '치명타가 터지면 별빛이 번쩍이며 등불 게이지가 찬다',
   quote: '소원은 이미 이루어졌다. 아마도.',
   rarity: 'common',
   tags: ['star'],
   icon: 'icon_fallen_star',
+  look: { shot: '#ffe890', shape: 'star', trail: 'stardust' },
   pools: ['treasure', 'shop', 'shrine'],
   stats(m, power) {
     m.addStat('luck', power);
-    m.addStat('critChance', 0.04 * power);
+    m.addStat('critChance', 0.06 * power);
+  },
+  onHit(w, t, hit, power) {
+    if (!hit.crit || !isAttack(hit)) return;
+    w.player.addEmber(3 * power);
+    w.particles.burst(t.x, t.y - t.z - 6, { count: 6, speed: [30, 90], life: [0.2, 0.4], colors: ['#ffffff', '#fff2b0', '#ffe890'], shape: 'spark', size: [1, 2], additive: true });
+    proc(w, 'fallen_star');
   },
 });
 
@@ -79,6 +88,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['star'],
   icon: 'icon_constellation_needle',
+  look: { orbit: '#d8c8ff', hit: '#ffe890' },
   pools: ['treasure', 'shop'],
   modifyHit(w, t, hit, power) {
     if (isAttack(hit) && !t.hasStatus('mark') && rollHit(w, hit, 0.15, power)) addHitStatus(w, t, hit, { kind: 'mark', duration: 6 });
@@ -110,6 +120,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['star'],
   icon: 'icon_star_chart',
+  look: { trail: 'stardust', orbit: '#b8a8ff' },
   pools: ['treasure', 'shop', 'boss'],
   stats(m, power) {
     m.addStat('homing', 2.6 * power);
@@ -142,6 +153,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['star'],
   icon: 'icon_moon_satellite',
+  look: { mote: '#e8e8ff' },
   pools: ['treasure', 'shop', 'shrine'],
   onUpdate(w, _dt, power) {
     syncFamiliars(w, 'moon_satellite', Math.min(3, power), (w2) => new MoonSatellite(w2), power);
@@ -183,6 +195,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['star'],
   icon: 'icon_fortune_moth',
+  look: { mote: '#ffe880', step: '#ffe880' },
   pools: ['treasure', 'shop', 'shrine'],
   stats(m, power) {
     m.addStat('luck', 2 * power);
@@ -191,6 +204,7 @@ defineArtifact({
     if (w.node.kind !== 'normal' || !roll(w, 0.25, power, 0)) return;
     const pos = w.room.nearestFree(w.room.centerX + 18, w.room.centerY, 6);
     w.dropRandom(pos.x, pos.y, 'room');
+    proc(w, 'fortune_moth');
     w.particles.burst(pos.x, pos.y - 4, { count: 14, speed: [20, 70], life: [0.4, 0.8], colors: ['#ffffff', '#ffe880', '#e8b840'], size: [1, 2], additive: true });
   },
 });
@@ -216,6 +230,7 @@ defineArtifact({
   rarity: 'epic',
   tags: ['star'],
   icon: 'icon_comet_tail',
+  look: { trail: 'comet', shot: '#d8c8ff', grow: 0.5 },
   pools: ['treasure', 'boss', 'shrine', 'challenge'],
   stats(m, power) {
     m.addStat('critMult', 0.5 * power);
@@ -284,6 +299,7 @@ defineArtifact({
   rarity: 'legendary',
   tags: ['star'],
   icon: 'icon_radiant_lance',
+  look: { shot: '#ffe890', aura: '#ffe890' },
   pools: ['treasure', 'boss', 'secret'],
   unique: true,
   stats(m) {
@@ -345,6 +361,7 @@ defineArtifact({
   rarity: 'legendary',
   tags: ['flame', 'star'],
   icon: 'icon_lantern_sun',
+  look: { aura: '#ffd060', mote: '#ffb040' },
   pools: ['treasure', 'boss', 'shrine'],
   unique: true,
   onUpdate(w, _dt, power) {

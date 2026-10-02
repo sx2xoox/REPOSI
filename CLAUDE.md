@@ -12,6 +12,13 @@ Signature mechanics of this game:
   max `EMBER_MAX`); `F` releases a character-specific special move (`CharacterDef.release`).
 - **등불 공명 (lantern resonance)**: artifacts carry tags; distinct artifacts sharing a tag
   unlock tiered bonuses (`SetDef`). Duplicate artifacts stack (`power` = copies held).
+- **유물의 흔적 (artifact presence)**: every artifact declares `look` (shot color layer / shape /
+  grow / trail / orbit, keeper mote / aura / step / hit sparks — composed in `game/look.ts`), and
+  calls `proc(w, id)` (items/lib) when its effect triggers (HUD row flash + icon pop; the shared
+  helpers auto-proc inside event hooks). Stat-only artifacts get a small `signature` side effect.
+  `tests/presence.test.ts` enforces this.
+- **등불의 축복 (floor blessings)**: pick 1 of 3 seeded blessings at every floor start
+  (`content/blessings`, hidden artifacts with `blessing: true`; `window.__lkAutoBless` auto-picks).
 - Isaac-like floors: start / normal / treasure / shop / boss / secret / challenge / shrine /
   curse rooms, keys, bombs, coins, hearts (red + soul), potions (unidentified, colors
   shuffled per run), active items with room charges.
@@ -58,7 +65,7 @@ Commands:
   17x9 tiles, walls 2 tiles. Room shapes 1x1 / 2x1 / 1x2 / 2x2.
 - Units: player damage base 10, fire rate 2.6/s, move 92 px/s. Player HP is in half hearts;
   enemy contact & bullets deal 1 half-heart (heavy attacks 2). Enemy HP is defined for floor 1
-  and multiplied by `FloorDef.hpMult` (1, 1.45, 2.0, 2.7, 3.5).
+  and multiplied by `FloorDef.hpMult` (1, 1.3, 1.65, 2.1, 2.6 — flat on purpose: items must outpace it).
   Typical floor-1 HP: fodder 10–20, regular 25–45, tough 60–120; bosses 450–700.
 - Enemy AI = generator `script(e, w)`: `yield 0.5` waits 0.5s, `yield` waits a frame.
   Use `Enemy` helpers: `chase`, `chaseFor`, `wanderFor`, `charge`, `jumpTo`, `moveAngle`,

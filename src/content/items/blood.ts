@@ -6,6 +6,7 @@ import { ramp } from '../../engine/painter';
 import { RingFx } from '../../game/effects';
 import { fx } from '../../engine/rng';
 import { O, addHitStatus, enemiesNear, isAttack, itemHit, roll, rollHit, spawnShards, stackMul } from './lib';
+import { proc } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 const RED = ['#4a0812', '#8a1020', '#c81c30', '#ff4a5a', '#ffb0b8'];
@@ -36,15 +37,29 @@ defineDrawnSprite('icon_leech_tooth', 16, 16, (p) => {
 defineArtifact({
   id: 'leech_tooth',
   name: '거머리 이빨',
-  desc: '공격력 +0.5. 적 처치 시 5% 확률로 체력 반 칸 회복',
+  desc: '공격력 +1. 처치 시 5% 확률로 체력 반 칸 회복',
   quote: '조금씩, 꾸준히.',
+  signature: '처치한 적의 핏방울이 날아와 스며든다',
   rarity: 'common',
   tags: ['blood'],
   icon: 'icon_leech_tooth',
+  look: { shot: '#ff4a5a', trail: 'drip' },
   pools: ['treasure', 'shop', 'curse'],
   stats(m, power) {
-    m.addStat('damage', 0.5 * power);
-    m.addStat('lifesteal', 0.05 * power);
+    m.addStat('damage', 1 * power);
+  },
+  onKill(w, e, power) {
+    // every kill: a few blood drops drift to the keeper
+    const p = w.player;
+    const dx = p.x - e.x;
+    const dy = p.y - 8 - e.y;
+    for (let i = 0; i < 3; i++) w.particles.spawn({ x: e.x + fx.range(-3, 3), y: e.y - 4, vx: dx * 1.6 + fx.range(-15, 15), vy: dy * 1.6 + fx.range(-15, 15), drag: 1.5, life: 0.55, colors: ['#ff6a7a', '#c01828'], size: 1, shape: 'pixel' });
+    if (!roll(w, 0.05, power, 0.005)) return;
+    if (p.maxRed > 0 && p.red < p.maxRed) {
+      p.heal(1);
+      w.sfx('heal', { vol: 0.5, pitch: 1.3 });
+    }
+    proc(w, 'leech_tooth');
   },
 });
 
@@ -79,6 +94,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['blood'],
   icon: 'icon_bramble_corset',
+  look: { aura: '#6aaa3a', hit: '#e8ffc0' },
   pools: ['treasure', 'shop', 'boss'],
   onHurt(w, _a, power) {
     const p = w.player;
@@ -115,6 +131,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['blood'],
   icon: 'icon_iron_quill',
+  look: { shape: 'needle', shot: '#d0d0e0', hit: '#ffffff' },
   pools: ['treasure', 'shop', 'challenge'],
   stats(m, power) {
     m.addStat('pierce', power);
@@ -124,8 +141,9 @@ defineArtifact({
     if (pr.generation > 0) return;
     pr.addBehavior({
       id: 'iron_quill',
-      onHit(p2) {
+      onHit(p2, w2) {
         p2.damage *= 1.2;
+        proc(w2, 'iron_quill', true);
       },
     });
   },
@@ -162,6 +180,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['blood'],
   icon: 'icon_crimson_edge',
+  look: { shot: '#c01828', hit: '#ff4a5a', trail: 'drip' },
   pools: ['treasure', 'challenge', 'curse'],
   modifyHit(w, t, hit, power) {
     if (isAttack(hit) && rollHit(w, hit, 0.15, power)) addHitStatus(w, t, hit, { kind: 'bleed', duration: 3, power: dmg(w) * 0.3 });
@@ -193,6 +212,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['blood'],
   icon: 'icon_heartstring',
+  look: { mote: '#ff6a7a', aura: '#ff8a9a' },
   pools: ['treasure', 'boss', 'shop'],
   onShoot(w, p) {
     const pl = w.player;
@@ -200,7 +220,10 @@ defineArtifact({
   },
   modifyHit(w, _t, hit, power) {
     const p = w.player;
-    if (p.maxRed > 0 && p.red >= p.maxRed && hit.kind !== 'status') hit.damage *= 1 + 0.3 * power;
+    if (p.maxRed > 0 && p.red >= p.maxRed && hit.kind !== 'status') {
+      hit.damage *= 1 + 0.3 * power;
+      proc(w, 'heartstring', true);
+    }
   },
 });
 
@@ -224,15 +247,28 @@ defineDrawnSprite('icon_blood_pact', 16, 16, (p) => {
 defineArtifact({
   id: 'blood_pact',
   name: '피의 서약',
-  desc: '공격력 ×1.4. 최대 체력 -1',
+  desc: '공격력 ×1.4, 최대 체력 -1. 피격 후 2회 치명타',
   quote: '서명은 피로 한다.',
+  signature: '피격당하면 다음 공격 2회가 반드시 치명타가 된다',
   rarity: 'epic',
   tags: ['blood'],
   icon: 'icon_blood_pact',
+  look: { aura: '#c01828', step: '#ff4a5a', grow: 0.5 },
   pools: ['curse', 'secret'],
   stats(m, power) {
     m.mulStat('damage', Math.pow(1.4, power));
     m.addStat('maxHearts', -power);
+  },
+  onHurt(w, _a, power) {
+    if (!w.player.alive) return;
+    w.vars.__pactN = 1 + power;
+    proc(w, 'blood_pact');
+  },
+  modifyHit(w, _t, hit) {
+    if ((w.vars.__pactN ?? 0) <= 0 || hit.crit || !isAttack(hit)) return;
+    w.vars.__pactN--;
+    hit.crit = true;
+    hit.damage *= w.player.stats.critMult;
   },
 });
 
@@ -266,6 +302,7 @@ defineArtifact({
   rarity: 'legendary',
   tags: ['blood', 'shadow'],
   icon: 'icon_blood_moon',
+  look: { shot: '#ff2040', shape: 'crescent', hit: '#ff6a7a' },
   pools: ['curse', 'boss', 'secret'],
   stats(m, power) {
     m.addStat('damage', power);

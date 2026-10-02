@@ -952,6 +952,15 @@ async function runSweep(browser) {
 
 // ------------------------------------------------------------------ main
 const browser = await chromium.launch({ args: args.audio ? ['--autoplay-policy=no-user-gesture-required'] : [] });
+// the floor-start blessing choice ("등불의 축복") auto-picks the first card for the bots
+{
+  const newContext = browser.newContext.bind(browser);
+  browser.newContext = async (o) => {
+    const c = await newContext(o);
+    await c.addInitScript(() => { window.__lkAutoBless = true; });
+    return c;
+  };
+}
 const all = [];
 const queue = specs();
 const t0 = Date.now();

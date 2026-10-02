@@ -121,9 +121,14 @@ defineWeapon({
     if (fresh) {
       for (let i = 0; i < max; i++) list.push(spawnOrb(w, p, st));
       st.mem.regen = 0;
+      st.mem.stash = 0;
+    } else if ((st.mem.stash ?? 0) > 0) {
+      // drawn again after a swap: the orbs that were put away come back
+      for (let i = 0; i < Math.min(max, st.mem.stash); i++) list.push(spawnOrb(w, p, st));
+      st.mem.stash = 0;
     } else if (list.length < max) {
       st.mem.regen = (st.mem.regen ?? 0) + dt;
-      if (st.mem.regen >= attackInterval(p, 2.6)) {
+      if (st.mem.regen >= attackInterval(p, 1.3)) {
         st.mem.regen = 0;
         list.push(spawnOrb(w, p, st));
         w.sfx('orb', { vol: 0.3, pitch: 1.4 });
@@ -148,7 +153,7 @@ defineWeapon({
     best.angle = aim;
     best.speed = s.shotSpeed * 1.45;
     best.syncVel();
-    best.damage = s.damage * 1.5;
+    best.damage = s.damage * 1.75;
     best.pierce = s.pierce + 1;
     best.homing = s.homing + 1.2;
     best.bounce = s.bounce;
@@ -165,6 +170,13 @@ defineWeapon({
     kick(w, aim, 0.8);
     w.sfx('orb', { vol: 0.55, pitch: 0.9 });
     w.sfx('whoosh', { vol: 0.25, pitch: 1.6 });
+  },
+  onHolster(_w, _p, st) {
+    const list = ORBS.get(st);
+    if (!list) return;
+    st.mem.stash = list.filter((o) => !o.dead).length;
+    for (const o of list) o.dead = true;
+    list.length = 0;
   },
   draw(w, p, r) {
     // no held object: a faint wisp in the casting hand

@@ -126,6 +126,8 @@ export class PauseOverlay implements Scene {
     const items: string[] = [];
     const wdef = Weapons.get(p.weaponId);
     if (wdef) items.push(wdef.icon);
+    const w2 = p.weapon2Id ? Weapons.get(p.weapon2Id) : undefined;
+    if (w2) items.push(w2.icon);
     const act = p.activeId ? Actives.get(p.activeId) : undefined;
     if (act) items.push(act.icon);
     for (const a of w.items.computed?.artifacts ?? []) items.push(a.def.icon);
@@ -135,7 +137,7 @@ export class PauseOverlay implements Scene {
     items.slice(0, perRow * 3).forEach((icon, i) => {
       const cx = rx + 26 + (i % perRow) * 24;
       const cy = iy + 24 + Math.floor(i / perRow) * 24;
-      frame(r, cx - 11, cy - 11, 22, 22, i < (act ? 2 : 1) ? 'slotHi' : 'slot', { alpha: k });
+      frame(r, cx - 11, cy - 11, 22, 22, i < (wdef ? 1 : 0) + (w2 ? 1 : 0) + (act ? 1 : 0) ? 'slotHi' : 'slot', { alpha: k });
       spriteCentered(r, icon, cx, cy, fitScale(icon, 18, 1), { alpha: k });
     });
     if (items.length > perRow * 3) r.uiText(`+${items.length - perRow * 3}`, rx + rw - 14, iy, { size: 10, font: 'small', align: 'right', color: C.textDim, alpha: k });

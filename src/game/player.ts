@@ -17,6 +17,7 @@ import { Bomb } from './pickups';
 import { Tile } from './tiles';
 import { fx } from '../engine/rng';
 import { DIR_VEC } from './constants';
+import { drawBackWeapon, equipWeapon, swapWeapons, tickHolstered, withSwapPop } from './weaponslots';
 
 export type Facing = 'down' | 'up' | 'side';
 
@@ -64,6 +65,13 @@ export class Player extends Actor {
   inv = new Inventory();
   weaponId: string;
   weapon: WeaponState = newWeaponState();
+  /** second weapon slot (null = empty); `swapWeapon` exchanges it with the current one */
+  weapon2Id: string | null = null;
+  weapon2: WeaponState = newWeaponState();
+  /** world time of the last swap / weapon pickup (draw animation) */
+  swapAt = -99;
+  /** weapon put away by the last swap (UI animation) */
+  lastSwapFrom: string | null = null;
   activeId: string | null = null;
   activeCharge = 0;
   potionId: string | null = null;
@@ -194,6 +202,7 @@ export class Player extends Actor {
       if (input.pressed('active')) this.useActive(w);
       if (input.pressed('consumable')) this.usePotion(w);
       if (input.pressed('special')) this.release(w);
+      if (input.pressed('swap')) this.swapWeapon(w);
     }
     this.firing = wantFire && this.holdT <= 0;
 
@@ -261,6 +270,7 @@ export class Player extends Actor {
     if (this.weapon.comboTimer > 0) this.weapon.comboTimer -= dt;
     else this.weapon.combo = 0;
     if (wdef && !this.dashing) wdef.update(w, this, this.weapon, dt, this.firing, this.aim);
+    tickHolstered(this, dt);
 
     // active item timed charge
     const act = this.activeId ? Actives.get(this.activeId) : undefined;
@@ -302,6 +312,20 @@ export class Player extends Actor {
     if (this.character.release) this.character.release(w, this);
     else defaultRelease(w, this);
     w.items.onRelease();
+  }
+
+  /** Switch to the weapon in the second slot (no-op when it is empty). */
+  swapWeapon(w: World): boolean {
+    return swapWeapons(w, this);
+  }
+
+  /**
+   * Take weapon `id` into the hands: fills the empty second slot first (the old
+   * weapon goes to the back); with both slots full the current weapon is
+   * replaced and its id returned so the caller can drop it.
+   */
+  equipWeapon(w: World, id: string): string | null {
+    return equipWeapon(w, this, id);
   }
 
   weaponSlowsMove(): boolean {
@@ -533,6 +557,7 @@ export class Player extends Actor {
     r.shadow(this.x, this.y + 4, this.flying ? 9 : 11, this.flying ? 3 : 4, this.flying ? 0.25 : 0.35);
     const wdef = Weapons.get(this.weaponId);
     const behind = this.facing === 'up';
+    if (!behind) drawBackWeapon(r, this, hover);
     if (behind) this.drawWeapon(r, w, wdef);
     const tint = this.statusTint();
     r.sprite(this.frameName(), this.x, this.y + 5 - this.z - hover, {
@@ -544,6 +569,7 @@ export class Player extends Actor {
       tint: tint?.color,
       tintAmount: tint?.amount,
     });
+    if (behind) drawBackWeapon(r, this, hover);
     if (!behind) this.drawWeapon(r, w, wdef);
     w.items.draw(r);
     if (this.holdT > 0 && this.holdIcon) {
@@ -571,16 +597,18 @@ export class Player extends Actor {
   private drawWeapon(r: Renderer, w: World, wdef = Weapons.get(this.weaponId)): void {
     // `weapon.mem.hideUntil` lets special moves hide the held weapon for a moment
     if (!wdef || this.holdT > 0 || (this.weapon.mem.hideUntil ?? -1) > w.time) return;
-    if (wdef.draw) {
-      wdef.draw(w, this, r, this.weapon);
-      return;
-    }
-    if (!wdef.heldSprite) return;
-    const a = this.aim;
-    const dist = 7 + this.recoil;
-    r.sprite(wdef.heldSprite, this.x + Math.cos(a) * dist, this.y - 5 + Math.sin(a) * dist * 0.8, {
-      rot: a,
-      flipY: Math.cos(a) < 0,
+    withSwapPop(r, w, this, () => {
+      if (wdef.draw) {
+        wdef.draw(w, this, r, this.weapon);
+        return;
+      }
+      if (!wdef.heldSprite) return;
+      const a = this.aim;
+      const dist = 7 + this.recoil;
+      r.sprite(wdef.heldSprite, this.x + Math.cos(a) * dist, this.y - 5 + Math.sin(a) * dist * 0.8, {
+        rot: a,
+        flipY: Math.cos(a) < 0,
+      });
     });
   }
 

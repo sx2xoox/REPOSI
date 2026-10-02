@@ -5,6 +5,7 @@ import { defineDrawnSprite } from '../../engine/sprites';
 import { RingFx } from '../../game/effects';
 import { O, addHitStatus, cooldown, enemiesNear, grantPerCopy, inflict, isAttack, roll, rollHit, sineBehavior, syncFamiliars } from './lib';
 import { WinterOrb } from './familiars';
+import { proc } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 const ICE = ['#2a6a9a', '#4aa0d8', '#8fd8f8', '#d8f6ff', '#ffffff'];
@@ -31,6 +32,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['frost'],
   icon: 'icon_rime_shard',
+  look: { shot: '#9fe8ff', shape: 'shard', trail: 'frost' },
   pools: ['treasure', 'shop'],
   modifyHit(w, t, hit, power) {
     if (isAttack(hit) && rollHit(w, hit, 0.15, power)) addHitStatus(w, t, hit, { kind: 'slow', duration: 2.5, power: 0.45 });
@@ -63,9 +65,13 @@ defineArtifact({
   rarity: 'common',
   tags: ['frost'],
   icon: 'icon_frostbite_ring',
+  look: { aura: '#bfeaff', hit: '#d8f6ff' },
   pools: ['treasure', 'shop', 'boss'],
   modifyHit(_w, t, hit, power) {
-    if (t.hasStatus('slow') || t.hasStatus('freeze')) hit.damage *= 1 + 0.3 * power;
+    if (t.hasStatus('slow') || t.hasStatus('freeze')) {
+      hit.damage *= 1 + 0.3 * power;
+      proc(_w, 'frostbite_ring', true);
+    }
   },
 });
 
@@ -93,6 +99,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['frost'],
   icon: 'icon_crystal_spiral',
+  look: { orbit: '#d8f6ff', trail: 'frost', shot: '#c8f4ff' },
   pools: ['treasure', 'shop'],
   stats(m, power) {
     m.mulStat('range', 1 + 0.2 * power);
@@ -127,6 +134,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['frost'],
   icon: 'icon_glacier_lens',
+  look: { shot: '#a8e8ff', grow: 1.5, hit: '#e8fbff' },
   pools: ['treasure', 'boss', 'challenge'],
   stats(m, power) {
     m.addStat('projSize', 1.2 * power);
@@ -170,6 +178,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['frost'],
   icon: 'icon_winter_orb',
+  look: { mote: '#bfeaff' },
   pools: ['treasure', 'shop'],
   onUpdate(w, _dt, power) {
     syncFamiliars(w, 'winter_orb', Math.min(3, power), (w2) => new WinterOrb(w2), power);
@@ -203,6 +212,7 @@ defineArtifact({
   rarity: 'epic',
   tags: ['frost'],
   icon: 'icon_hoarfrost_mantle',
+  look: { aura: '#d8f6ff', step: '#d8f6ff' },
   pools: ['treasure', 'boss', 'shrine'],
   onAcquire(w, power) {
     grantPerCopy(w, 'hoarfrost_mantle', power, () => w.player.addSoul(2));

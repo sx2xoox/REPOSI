@@ -6,6 +6,7 @@ import { ramp } from '../../engine/painter';
 import { fx } from '../../engine/rng';
 import { O, ZapFx, chainLightning, isPrimary, roll, rollHit, skyBolt, stackMul, syncFamiliars } from './lib';
 import { BallLightning } from './familiars';
+import { proc } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 const BOLT = '#ffe95a';
@@ -37,6 +38,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['storm'],
   icon: 'icon_copper_coil',
+  look: { shot: '#ffe95a', trail: 'static', orbit: '#fff6a0' },
   pools: ['treasure', 'shop', 'challenge'],
   onHit(w, t, hit, power) {
     if (!isPrimary(hit) || !rollHit(w, hit, 0.1, power)) return;
@@ -71,6 +73,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['storm', 'shadow'],
   icon: 'icon_static_cape',
+  look: { step: '#ffe95a', aura: '#fff6a0' },
   pools: ['treasure', 'shop', 'challenge'],
   stats(m, power) {
     m.mulStat('dashSpeed', 1 + 0.15 * power);
@@ -113,6 +116,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['storm'],
   icon: 'icon_paper_fan',
+  look: { trail: 'wind', shot: '#f0e8d0' },
   pools: ['treasure', 'shop', 'boss', 'challenge'],
   stats(m, power) {
     m.addStat('shots', 1 + power);
@@ -149,6 +153,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['storm'],
   icon: 'icon_thunder_drum',
+  look: { mote: '#ffe95a', aura: '#7ad8ff' },
   pools: ['treasure', 'boss', 'challenge'],
   onRoomEnter(w) {
     if (!w.node.cleared) w.vars.__drumT = w.time + 0.75;
@@ -163,6 +168,7 @@ defineArtifact({
     w.sfx('slam', { vol: 0.5 });
     w.shake(0.5);
     w.renderer.screenFlash('#fff8c0', 0.35);
+    proc(w, 'thunder_drum');
     for (const e of es) skyBolt(w, e, dmg(w) * 1.5 * stackMul(power), 0.8);
   },
 });
@@ -191,6 +197,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['storm'],
   icon: 'icon_ball_lightning',
+  look: { mote: '#7ad8ff', hit: '#c8f0ff' },
   pools: ['treasure', 'shop', 'secret'],
   onUpdate(w, _dt, power) {
     syncFamiliars(w, 'ball_lightning', Math.min(3, power), (w2) => new BallLightning(w2), power);
@@ -225,6 +232,7 @@ defineArtifact({
   rarity: 'epic',
   tags: ['storm', 'star'],
   icon: 'icon_stormcaller_rod',
+  look: { shot: '#7ad8ff', shape: 'spark', trail: 'static' },
   pools: ['treasure', 'boss', 'challenge'],
   stats(m, power) {
     m.addStat('critChance', 0.06 * power);
@@ -261,6 +269,7 @@ defineArtifact({
   rarity: 'legendary',
   tags: ['storm'],
   icon: 'icon_tempest_heart',
+  look: { shot: '#bfe8ff', orbit: '#ffe95a', aura: '#ffe95a', grow: 1 },
   pools: ['treasure', 'boss', 'secret'],
   stats(m) {
     m.mulStat('fireRate', 1.2);

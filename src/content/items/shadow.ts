@@ -6,6 +6,65 @@ import { ramp } from '../../engine/painter';
 import { fx } from '../../engine/rng';
 import { O, addHitStatus, cooldown, enemiesNear, familiarsOf, isAttack, isMelee, itemHit, roll, rollHit, stackMul, syncFamiliars } from './lib';
 import { TwinShadow } from './familiars';
+import { proc, miniBlast } from './lib';
+import { Entity } from '../../game/entity';
+import type { World } from '../../game/world';
+import type { Renderer } from '../../engine/renderer';
+
+/** 연기 장막 signature: a short-lived smoke puff that erases enemy bullets inside it. */
+class SmokeScreen extends Entity {
+  constructor(x: number, y: number, readonly radius: number) {
+    super();
+    this.x = x;
+    this.y = y;
+    this.layer = 2;
+    this.tileCollide = false;
+    this.flying = true;
+  }
+
+  override update(w: World, dt: number): void {
+    this.age += dt;
+    if (this.age > 1.1) {
+      this.dead = true;
+      return;
+    }
+    if (w.clearEnemyBullets(this.x, this.y, this.radius) > 0) proc(w, 'smoke_veil');
+    if (fx.chance(dt * 26)) {
+      const a = fx.angle();
+      const rr = fx.range(0, this.radius * 0.8);
+      w.particles.spawn({ x: this.x + Math.cos(a) * rr, y: this.y - 4 + Math.sin(a) * rr * 0.6, vy: -8, life: 0.6, colors: ['#8a7a9a90', '#5a4a6a80', '#3a2e4a70'], size: 3, sizeEnd: 6, shape: 'circle' });
+    }
+  }
+}
+
+/** 밤의 실내화 signature: violet afterimages left behind while dashing. */
+class AfterImage extends Entity {
+  private readonly frame: string;
+  private readonly flip: boolean;
+  constructor(w: World) {
+    super();
+    const p = w.player;
+    this.x = p.x;
+    this.y = p.y;
+    this.frame = p.frameName();
+    this.flip = p.flip;
+    this.tileCollide = false;
+    this.flying = true;
+  }
+
+  override get sortY(): number {
+    return this.y - 1;
+  }
+
+  override update(_w: World, dt: number): void {
+    this.age += dt;
+    if (this.age > 0.22) this.dead = true;
+  }
+
+  override draw(r: Renderer): void {
+    r.sprite(this.frame, this.x, this.y + 5, { flipX: this.flip, alpha: 0.42 * (1 - this.age / 0.22), tint: '#9a6aff', tintAmount: 0.7 });
+  }
+}
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 const VIO = ['#1a0c38', '#3a1a70', '#6a3ad0', '#9a6aff', '#d0b8ff'];
@@ -33,14 +92,20 @@ defineDrawnSprite('icon_smoke_veil', 16, 16, (p) => {
 defineArtifact({
   id: 'smoke_veil',
   name: '연기 베일',
-  desc: '8% 확률로 피해를 회피한다',
+  desc: '10% 확률로 피해 회피. 대시하면 연막이 탄환을 지움',
+  signature: '대시한 자리에 연막이 남아 적 탄환을 지운다',
   quote: '보이지 않으면 맞지도 않는다.',
   rarity: 'common',
   tags: ['shadow'],
   icon: 'icon_smoke_veil',
+  look: { step: '#8a7a9a', aura: '#6a5a7a', trail: 'smoke' },
   pools: ['treasure', 'shop'],
   stats(m, power) {
-    m.addStat('dodge', 0.08 * power);
+    m.addStat('dodge', 0.1 * power);
+  },
+  onDash(w, power) {
+    const p = w.player;
+    w.spawn(new SmokeScreen(p.x, p.y, 18 + 4 * (power - 1)));
   },
 });
 
@@ -67,15 +132,27 @@ defineDrawnSprite('icon_night_slippers', 16, 16, (p) => {
 defineArtifact({
   id: 'night_slippers',
   name: '밤의 덧신',
-  desc: '대시 쿨다운 -25%, 이동 속도 +5%',
+  desc: '대시 쿨다운 -25%, 이속 +8%. 대시 무적 연장',
+  signature: '대시하면 보랏빛 잔상이 남고 무적 시간이 조금 길어진다',
   quote: '발소리조차 잠들었다.',
   rarity: 'common',
   tags: ['shadow'],
   icon: 'icon_night_slippers',
+  look: { step: '#b08aff', mote: '#6a3ad0' },
   pools: ['treasure', 'shop', 'boss'],
   stats(m, power) {
     m.mulStat('dashCooldown', Math.pow(0.75, power));
-    m.mulStat('moveSpeed', 1 + 0.05 * power);
+    m.mulStat('moveSpeed', 1 + 0.08 * power);
+  },
+  onDash(w) {
+    const p = w.player;
+    p.invuln = Math.max(p.invuln, p.stats.dashTime + 0.22);
+    w.vars.__slipT = w.time + p.stats.dashTime + 0.03;
+  },
+  onUpdate(w) {
+    if ((w.vars.__slipT ?? 0) < w.time) return;
+    if (!cooldown(w, 'slip_ghost', 0.05)) return;
+    w.spawn(new AfterImage(w));
   },
 });
 
@@ -102,15 +179,21 @@ defineDrawnSprite('icon_black_candle', 16, 16, (p) => {
 defineArtifact({
   id: 'black_candle',
   name: '검은 초',
-  desc: '공격력 +1.5, 행운 -1',
+  desc: '공격력 +2.5, 행운 -1. 처치 시 가끔 검은 불꽃',
+  signature: '처치 시 10% 확률로 검은 불꽃이 터져 주변 적을 겁먹게 한다',
   quote: '어둠을 태우는 불도 있다.',
   rarity: 'common',
   tags: ['shadow', 'flame'],
   icon: 'icon_black_candle',
+  look: { shot: '#8a5ac8', trail: 'smoke', mote: '#3a2a4a' },
   pools: ['curse', 'shop', 'treasure'],
   stats(m, power) {
-    m.addStat('damage', 1.5 * power);
+    m.addStat('damage', 2.5 * power);
     m.addStat('luck', -power);
+  },
+  onKill(w, e, power) {
+    if (e.isMinion || !roll(w, 0.1, power, 0)) return;
+    miniBlast(w, e.x, e.y - 3, 30, w.player.stats.damage * 0.8, '#8a5ac8', [{ kind: 'fear', duration: 2 }]);
   },
 });
 
@@ -140,6 +223,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['shadow'],
   icon: 'icon_rear_eye',
+  look: { mote: '#c0a0ff', orbit: '#c0a0ff' },
   pools: ['treasure', 'shop'],
   onAttack(w, angle, power) {
     if (!cooldown(w, 'rear_eye', 0.12)) return;
@@ -175,6 +259,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['shadow', 'blood'],
   icon: 'icon_shade_dagger',
+  look: { step: '#c0a0ff', hit: '#c0a0ff' },
   pools: ['treasure', 'challenge'],
   onDash(w) {
     w.vars.__dagT = w.time + w.player.stats.dashTime + 0.06;
@@ -188,6 +273,7 @@ defineArtifact({
       if (e.mem[tag]) continue;
       e.mem[tag] = 1;
       itemHit(w, e, dmg(w) * 2.5 * stackMul(power), { knockback: 120, statuses: [{ kind: 'bleed', duration: 3, power: dmg(w) * 0.3 }] });
+      proc(w, 'shade_dagger');
       w.sfx('swing_heavy', { vol: 0.5, pitch: 1.3 });
       w.particles.burst(e.x, e.y - 5, { count: 14, speed: [60, 160], angle: Math.atan2(p.dashDY, p.dashDX), spread: 0.8, life: [0.15, 0.35], colors: ['#ffffff', VIO[4], VIO[3], VIO[1]], shape: 'spark', size: [1, 2] });
     }
@@ -219,6 +305,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['shadow'],
   icon: 'icon_hollow_mask',
+  look: { shot: '#9a7aff', aura: '#4a3a6a', hit: '#d0c0ff' },
   pools: ['treasure', 'curse', 'challenge'],
   modifyHit(w, t, hit, power) {
     if (t.hasStatus('fear')) hit.damage *= 1.25;
@@ -251,6 +338,7 @@ defineArtifact({
   rarity: 'epic',
   tags: ['shadow'],
   icon: 'icon_twin_shadow',
+  look: { aura: '#6a3ad0', step: '#6a3ad0' },
   pools: ['treasure', 'secret', 'curse'],
   onUpdate(w, _dt, power) {
     syncFamiliars(w, 'twin_shadow', Math.min(2, power), (w2) => new TwinShadow(w2), power);

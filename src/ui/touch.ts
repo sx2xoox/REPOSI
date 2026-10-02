@@ -46,6 +46,7 @@ const BUTTON_ACTION: Record<TouchButtonId, Action> = {
   active: 'active',
   consumable: 'consumable',
   special: 'special',
+  swap: 'swap',
   pause: 'pause',
   map: 'map',
   inventory: 'inventory',
@@ -84,6 +85,15 @@ definePixelSprite('tc_dash', { w: '#bfe8ff', b: '#5aa8e0', d: '#2a5a8a' }, [
   'd.bwwwww',
   '...bww..',
   '....bw..',
+], { outline: O });
+definePixelSprite('tc_swap', { w: '#ffe8b0', g: '#e0a848', d: '#8a5a20' }, [
+  '....gw...',
+  'wwwwwwg..',
+  '....gw...',
+  '.........',
+  '...wg....',
+  '..gwwwwww',
+  '...wg....',
 ], { outline: O });
 definePixelSprite('tc_attack', { w: '#f4ead8', d: '#b4a8c0', g: '#e0a848', h: '#7a4e1c' }, [
   '.......ww',
@@ -311,6 +321,7 @@ export class TouchControls {
     if (!p) return false;
     if (id === 'active') return !!p.activeId;
     if (id === 'consumable') return !!p.potionId;
+    if (id === 'swap') return !!p.weapon2Id;
     return true;
   }
 
@@ -895,6 +906,9 @@ export class TouchControls {
     }
     // potion
     if (p.potionId) this.drawBtn(r, 'consumable', A, held.has('consumable'), potionSpriteFor(w, p.potionId));
+    // weapon swap: shows the weapon in the other slot (only with two weapons)
+    const w2 = p.weapon2Id ? Weapons.get(p.weapon2Id) : undefined;
+    if (w2) this.drawBtn(r, 'swap', A, held.has('swap'), w2.icon, true, false, 1, '', '교체');
     // system
     this.drawBtn(r, 'pause', A, held.has('pause'), 'tc_pause');
     this.drawBtn(r, 'map', A, held.has('map'), 'tc_map');

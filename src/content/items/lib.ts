@@ -104,6 +104,7 @@ export function addHitStatus(w: World, target: Actor, hit: HitInfo, s: StatusApp
   hit.statuses = [...(hit.statuses ?? []), adj];
   statusPuff(w, target, adj.kind);
   ensureStatusMarks(w);
+  procHere(w);
 }
 
 /** Apply a status directly (auras, zones). */
@@ -114,6 +115,22 @@ export function inflict(w: World, target: Enemy, s: StatusApply, puff = true): v
   target.applyStatus(adj, () => w.rng.next());
   if (puff) statusPuff(w, target, adj.kind);
   ensureStatusMarks(w);
+  procHere(w);
+}
+
+// ====================================================================== proc feedback
+/**
+ * Proc feedback for the artifact / resonance tier whose event hook is running
+ * (HUD icon flash + icon pop above the keeper, rate-limited). The shared
+ * helpers here call it, so most item effects need no explicit call.
+ */
+export function procHere(w: World): void {
+  (w.items as { autoProc?: () => void } | undefined)?.autoProc?.();
+}
+
+/** Explicit proc feedback for artifact `id` (`quiet`: HUD flash only, for frequent passive bonuses). */
+export function proc(w: World, id: string, quiet = false): void {
+  (w.items as { proc?: (id: string, quiet?: boolean) => void } | undefined)?.proc?.(id, quiet);
 }
 
 export function statusPuff(w: World, t: Actor, kind: string): void {
@@ -128,6 +145,7 @@ export function zoneDamage(w: World, e: Enemy, dmg: number, color: 'burn' | 'poi
 
 /** Player hit from an item effect (crits allowed, no on-hit procs). */
 export function itemHit(w: World, e: Enemy, dmg: number, o: { from?: { x: number; y: number }; knockback?: number; statuses?: StatusApply[]; kind?: HitInfo['kind']; procs?: string[] } = {}): boolean {
+  procHere(w);
   const fx0 = o.from ?? w.player;
   const d = Math.hypot(e.x - fx0.x, e.y - fx0.y) || 1;
   const sts = o.statuses?.map((s) => bossSafe(e, s)).filter((s): s is StatusApply => !!s);
@@ -244,6 +262,7 @@ export interface ChainOpts {
  * The 번개 resonance (5) adds jumps and a short stun. Returns enemies hit.
  */
 export function chainLightning(w: World, x: number, y: number, o: ChainOpts): number {
+  procHere(w);
   const p = w.player;
   let jumps = o.jumps;
   let stun = o.stun ?? 0;
@@ -279,6 +298,7 @@ export function chainLightning(w: World, x: number, y: number, o: ChainOpts): nu
 
 /** A bolt from the sky onto a target (thunder drum, storms). */
 export function skyBolt(w: World, e: Enemy, dmg: number, stun = 0.6, color = '#ffe95a'): void {
+  procHere(w);
   const ty = e.y - e.z - 4;
   w.spawn(new ZapFx(e.x + fx.range(-10, 10), ty - 90, e.x, ty, { color, dur: 0.25, width: 3 }));
   w.particles.burst(e.x, e.y, { count: 10, speed: [40, 140], life: [0.15, 0.35], colors: ['#ffffff', color, '#a08020'], shape: 'spark', size: [1, 2], additive: true, light: 6 });
@@ -300,6 +320,7 @@ export interface ShardOpts extends Partial<ProjectileOpts> {
 
 /** Spawn secondary player projectiles (generation >= 1, never trigger onShoot). */
 export function spawnShards(w: World, x: number, y: number, o: ShardOpts): Projectile[] {
+  procHere(w);
   const out: Projectile[] = [];
   const base = o.angle ?? fx.angle();
   const arc = o.arc ?? TAU;
@@ -900,6 +921,7 @@ export class Starfall extends Entity {
 // ====================================================================== small blasts
 /** Small, quiet explosion that only hurts enemies (item procs; cheaper than World.explode). */
 export function miniBlast(w: World, x: number, y: number, radius: number, damage: number, color = '#ff9a30', statuses?: StatusApply[]): void {
+  procHere(w);
   w.particles.burst(x, y, { count: 12, speed: [40, 120], life: [0.15, 0.35], colors: ['#ffffff', '#fff0a0', color, '#802010'], size: [1, 2], additive: true, light: 4, lightColor: color.slice(0, 7) });
   w.particles.burst(x, y, { count: 4, speed: [10, 30], life: [0.4, 0.7], colors: ['#706060', '#403838'], size: [2, 3], sizeEnd: 4, drag: 3 });
   w.particles.spawn({ x, y, life: 0.2, size: 2, sizeEnd: radius, colors: ['#ffffff', color], shape: 'ring' });
@@ -911,6 +933,7 @@ export function miniBlast(w: World, x: number, y: number, radius: number, damage
 // ====================================================================== misc
 /** Floating label above the player (item procs, resonance). */
 export function shout(w: World, text: string, color: string): void {
+  procHere(w);
   w.floatText(w.player.x, w.player.y - 22, text, color);
 }
 

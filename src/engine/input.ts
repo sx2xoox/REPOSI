@@ -8,7 +8,7 @@
 export type Action =
   | 'up' | 'down' | 'left' | 'right'
   | 'shootUp' | 'shootDown' | 'shootLeft' | 'shootRight'
-  | 'fire' | 'dash' | 'bomb' | 'active' | 'consumable' | 'special'
+  | 'fire' | 'dash' | 'bomb' | 'active' | 'consumable' | 'special' | 'swap'
   | 'inventory' | 'map' | 'pause' | 'confirm' | 'cancel'
   | 'uiUp' | 'uiDown' | 'uiLeft' | 'uiRight' | 'restart';
 
@@ -33,6 +33,8 @@ export const DEFAULT_BINDINGS: Record<Action, string[]> = {
   active: ['KeyQ'],
   consumable: ['KeyR'],
   special: ['KeyF', 'Mouse1'],
+  /** switch between the two weapon slots ("Wheel" = any mouse-wheel step over the game) */
+  swap: ['KeyC', 'Wheel'],
   inventory: ['Tab', 'KeyI'],
   map: ['KeyM'],
   pause: ['Escape', 'KeyP'],
@@ -62,6 +64,7 @@ const PAD_BUTTONS: Partial<Record<Action, number[]>> = {
   uiRight: [15],
   fire: [7],             // RT (fires in last aim direction)
   special: [6],          // LT (lantern release)
+  swap: [11],            // R3 (right stick click: weapon swap)
 };
 
 export class Input {
@@ -171,6 +174,8 @@ export class Input {
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener('wheel', (e) => {
       this.wheelAcc += Math.sign(e.deltaY);
+      // a wheel step acts like a tap of the pseudo key "Wheel" (bound to weapon swap)
+      if (e.deltaY) this.latched.add('Wheel');
       e.preventDefault();
     }, { passive: false });
     window.addEventListener('gamepadconnected', () => { this.padConnected = true; });

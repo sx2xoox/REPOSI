@@ -7,9 +7,10 @@
 
 import type { World } from './world';
 import {
-  Actives, Artifacts, GlobalHooks, RARITY_WEIGHT, Weapons,
+  Actives, Artifacts, GlobalHooks, RARITY_WEIGHT, Sets, Weapons,
   type ItemHooks, type ItemPool, type Rarity,
 } from './defs';
+import { LookSystem } from './look';
 import { BASE_STATS, StatMods, computeStats, type Stats } from './stats';
 import { makeItem, type InvComputed, type InvItem } from './inventory';
 import type { PedestalItem } from './pickups';
@@ -36,8 +37,37 @@ export interface TempBuff {
   icon?: string;
 }
 
+/** One artifact effect trigger shown to the player (HUD flash, icon pop above the keeper). */
+export interface ProcEvent {
+  /** artifact id, or `set:<tag>` for a resonance tier */
+  id: string;
+  icon: string;
+  /** world time of the proc */
+  t: number;
+  /** also pop the icon above the keeper (else only the HUD row flashes) */
+  pop: boolean;
+}
+
+/** hooks whose helper effects count as visible procs (continuous hooks never auto-proc) */
+const EVENT_HOOKS = new Set<keyof ItemHooks>([
+  'modifyHit', 'onHit', 'onKill', 'onHurt', 'onDash', 'onRoomEnter', 'onRoomClear', 'onFloorStart', 'onBomb', 'onPickup', 'onRelease', 'onDeflect',
+]);
+/** min seconds between two HUD flashes / two icon pops of the same artifact */
+export const PROC_FLASH_CD = 0.6;
+export const PROC_POP_CD = 2.5;
+
 export class ItemSystem {
   effects: ActiveEffect[] = [];
+  /** composed visual traces of the held artifacts (shots, motes, aura ...) */
+  readonly look = new LookSystem();
+  /** recent procs, newest last (read by the HUD) */
+  procLog: ProcEvent[] = [];
+  private procFlashAt = new Map<string, number>();
+  private procPopAt = new Map<string, number>();
+  private lastPopAt = -9;
+  /** effect being dispatched + whether the hook is an event hook (auto procs) */
+  private cur: ActiveEffect | null = null;
+  private curEvent = false;
   computed: InvComputed | null = null;
   buffs: TempBuff[] = [];
   private activeKeys = new Set<string>();
@@ -73,6 +103,7 @@ export class ItemSystem {
     for (const e of oldEffects) if (!newKeys.has(e.key)) safe(() => e.hooks.onRemove?.(w));
     for (const e of effects) if (!this.activeKeys.has(e.key)) safe(() => e.hooks.onAcquire?.(w, e.power));
     this.activeKeys = newKeys;
+    this.look.compose(comp.artifacts);
 
     this.recomputeStats();
   }
@@ -109,8 +140,12 @@ export class ItemSystem {
     const list = this.with(hook);
     if (!list.length) return;
     this.depth++;
+    const prevCur = this.cur;
+    const prevEvent = this.curEvent;
+    this.curEvent = EVENT_HOOKS.has(hook);
     try {
       for (let i = 0; i < list.length; i++) {
+        this.cur = list[i];
         try {
           fn(list[i]);
         } catch (err) {
@@ -119,7 +154,55 @@ export class ItemSystem {
       }
     } finally {
       this.depth--;
+      this.cur = prevCur;
+      this.curEvent = prevEvent;
     }
+  }
+
+  // ---------------------------------------------------------- proc feedback
+  /**
+   * An artifact's effect just triggered: flash its icon in the HUD row and
+   * (if it hasn't popped recently) pop the icon above the keeper. `quiet`
+   * procs (frequent passive bonuses) only flash the HUD row. Rate-limited per
+   * artifact, so it is safe to call on every trigger.
+   */
+  proc(id: string, quiet = false): void {
+    const w = this.w;
+    const now = w.time;
+    if (now - (this.procFlashAt.get(id) ?? -9) < PROC_FLASH_CD) return;
+    let icon: string | undefined;
+    if (id.startsWith('set:')) icon = Sets.get(id.slice(4))?.icon;
+    else icon = Artifacts.get(id)?.icon;
+    if (!icon) return;
+    this.procFlashAt.set(id, now);
+    let pop = !quiet && now - (this.procPopAt.get(id) ?? -9) >= PROC_POP_CD && now - this.lastPopAt >= 0.22;
+    if (pop) {
+      let live = 0;
+      for (const e of this.procLog) if (e.pop && now - e.t < 0.9) live++;
+      if (live >= 3) pop = false;
+    }
+    if (pop) {
+      this.procPopAt.set(id, now);
+      this.lastPopAt = now;
+    }
+    this.procLog.push({ id, icon, t: now, pop });
+    if (this.procLog.length > 32) this.procLog.splice(0, this.procLog.length - 32);
+  }
+
+  /** Last flash time of an artifact's proc (-Infinity if never). */
+  lastProc(id: string): number {
+    return this.procFlashAt.get(id) ?? -Infinity;
+  }
+
+  /**
+   * Proc of the artifact / resonance tier whose EVENT hook is running right now
+   * (called by the shared item helpers: statuses, zaps, blasts, shards ...).
+   */
+  autoProc(): void {
+    const e = this.cur;
+    if (!e || !this.curEvent) return;
+    if (e.key.startsWith('a:')) this.proc(e.key.slice(2));
+    else if (e.key.startsWith('set:')) this.proc(`set:${e.key.split(':')[1]}`);
   }
 
   update(dt: number): void {
@@ -136,15 +219,20 @@ export class ItemSystem {
       this.recompute();
     }
     this.each('onUpdate', (e) => e.hooks.onUpdate!(w, dt, e.power));
+    this.look.update(w, dt);
   }
 
-  onShoot(p: Projectile): void { this.each('onShoot', (e) => e.hooks.onShoot?.(this.w, p, e.power)); }
+  onShoot(p: Projectile): void { this.look.applyShot(p); this.each('onShoot', (e) => e.hooks.onShoot?.(this.w, p, e.power)); }
   onAttack(angle: number): void { this.each('onAttack', (e) => e.hooks.onAttack?.(this.w, angle, e.power)); }
   modifyHit(target: Actor, hit: HitInfo): void { this.each('modifyHit', (e) => e.hooks.modifyHit?.(this.w, target, hit, e.power)); }
-  onHit(target: Actor, hit: HitInfo): void { if (!hit.noProc) this.each('onHit', (e) => e.hooks.onHit?.(this.w, target, hit, e.power)); }
+  onHit(target: Actor, hit: HitInfo): void {
+    if (hit.noProc) return;
+    this.each('onHit', (e) => e.hooks.onHit?.(this.w, target, hit, e.power));
+    this.look.onHit(this.w, target, hit);
+  }
   onKill(enemy: Enemy): void { this.each('onKill', (e) => e.hooks.onKill?.(this.w, enemy, e.power)); }
   onHurt(amount: number): void { this.each('onHurt', (e) => e.hooks.onHurt?.(this.w, amount, e.power)); }
-  onDash(): void { this.each('onDash', (e) => e.hooks.onDash?.(this.w, e.power)); }
+  onDash(): void { this.each('onDash', (e) => e.hooks.onDash?.(this.w, e.power)); this.look.onDash(this.w); }
   onRoomEnter(): void { this.each('onRoomEnter', (e) => e.hooks.onRoomEnter?.(this.w, e.power)); }
   onRoomClear(): void { this.each('onRoomClear', (e) => e.hooks.onRoomClear?.(this.w, e.power)); }
   onFloorStart(): void { this.each('onFloorStart', (e) => e.hooks.onFloorStart?.(this.w, e.power)); }
@@ -152,7 +240,7 @@ export class ItemSystem {
   onPickup(kind: string): void { this.each('onPickup', (e) => e.hooks.onPickup?.(this.w, kind, e.power)); }
   onRelease(): void { this.each('onRelease', (e) => e.hooks.onRelease?.(this.w, e.power)); }
   onDeflect(p: Projectile): void { this.each('onDeflect', (e) => e.hooks.onDeflect?.(this.w, p, e.power)); }
-  draw(r: Renderer): void { this.each('draw', (e) => e.hooks.draw?.(this.w, r, e.power)); }
+  draw(r: Renderer): void { this.each('draw', (e) => e.hooks.draw?.(this.w, r, e.power)); this.look.drawFront(r, this.w); }
 
   // ---------------------------------------------------------- buffs
   /** Add a temporary effect (potions, actives). Same key refreshes. */

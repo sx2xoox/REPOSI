@@ -68,7 +68,7 @@ defineWeapon({
   rarity: 'common',
   pools: ['treasure', 'shop'],
   stats(m) {
-    m.mulStat('damage', 0.62);
+    m.mulStat('damage', 0.49);
     m.mulStat('fireRate', 0.78);
     m.mulStat('shotSpeed', 1.5);
     m.mulStat('range', 1.15);

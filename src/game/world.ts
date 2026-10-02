@@ -16,7 +16,7 @@ import { generateFloor, matchingDoor, type FloorMap, type NodeDoor, type RoomNod
 import { Room, type Door, type DoorKind } from './room';
 import { Entity, Actor, type HitInfo, type StatusKind } from './entity';
 import { Enemy } from './enemy';
-import { Player, newWeaponState } from './player';
+import { Player } from './player';
 import { Projectile } from './projectile';
 import { FlowField } from './flow';
 import { ItemSystem, Loot } from './items';
@@ -1033,13 +1033,13 @@ export class World {
         break;
       }
       case 'weapon': {
-        const old = p.weaponId;
-        p.weaponId = it.id;
-        p.weapon = newWeaponState();
-        ped.item = { kind: 'weapon', id: old };
-        ped.waitForLeave = true;
-        ped.price = 0;
-        this.items.recompute();
+        // two slots: an empty second slot is filled first; else the held weapon is dropped here
+        const old = p.equipWeapon(this, it.id);
+        if (old) {
+          ped.item = { kind: 'weapon', id: old };
+          ped.waitForLeave = true;
+          ped.price = 0;
+        }
         break;
       }
     }

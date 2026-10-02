@@ -9,6 +9,7 @@ import { fx } from '../../engine/rng';
 import {
   O, addHitStatus, cooldown, enemiesNear, growBehavior, inflict, isAttack, isMelee, isPrimary, roll, rollHit, spawnShards,
 } from './lib';
+import { proc } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 
@@ -34,6 +35,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['venom'],
   icon: 'icon_viper_fang',
+  look: { shot: '#8aff5a', trail: 'drip', hit: '#b8ff70' },
   pools: ['treasure', 'shop'],
   modifyHit(w, t, hit, power) {
     if (isAttack(hit) && rollHit(w, hit, 0.2, power)) addHitStatus(w, t, hit, { kind: 'poison', duration: 4, power: dmg(w) * 0.22 });
@@ -68,6 +70,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['venom'],
   icon: 'icon_rot_mushroom',
+  look: { aura: '#a8e060', step: '#9a5aaa' },
   pools: ['treasure', 'boss'],
   stats(m, power) {
     m.addStat('maxHearts', power);
@@ -82,6 +85,7 @@ defineArtifact({
     const p = w.player;
     const R = 80 + 10 * (power - 1);
     w.sfx('poison', { vol: 0.6 });
+    proc(w, 'rot_mushroom');
     w.spawn(new RingFx(p.x, p.y - 4, R, 0.5, '#a8e060', 2));
     w.particles.burst(p.x, p.y - 4, { count: 40, speed: [30, 140], life: [0.6, 1.2], colors: ['#e0ffb0', '#a8e060', '#7a3a8a', '#4a8a2a'], size: [1, 3], shape: 'circle', drag: 2.5, fade: true });
     for (const e of enemiesNear(w, p.x, p.y, R)) inflict(w, e, { kind: 'poison', duration: 4, power: dmg(w) * 0.2 * power });
@@ -117,12 +121,16 @@ defineArtifact({
   rarity: 'common',
   tags: ['venom', 'star'],
   icon: 'icon_toad_idol',
+  look: { mote: '#8aff5a', hit: '#ffe060' },
   pools: ['treasure', 'shop'],
   stats(m, power) {
     m.addStat('luck', power);
   },
   onKill(w, e, power) {
-    if (e.hasStatus('poison') && roll(w, 0.15, power, 0)) w.spawn(new Pickup('coin', e.x, e.y).pop());
+    if (e.hasStatus('poison') && roll(w, 0.15, power, 0)) {
+      w.spawn(new Pickup('coin', e.x, e.y).pop());
+      proc(w, 'toad_idol');
+    }
   },
 });
 
@@ -150,6 +158,7 @@ defineArtifact({
   rarity: 'common',
   tags: ['venom'],
   icon: 'icon_swelling_seed',
+  look: { shot: '#b8ff70', shape: 'bubble', grow: 1 },
   pools: ['treasure', 'shop', 'challenge'],
   stats(m, power) {
     m.mulStat('range', 1 + 0.1 * power);
@@ -189,6 +198,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['venom'],
   icon: 'icon_plague_censer',
+  look: { aura: '#6ad83a', mote: '#b8ff70' },
   pools: ['treasure', 'curse'],
   onUpdate(w, dt, power) {
     const p = w.player;
@@ -232,6 +242,7 @@ defineArtifact({
   rarity: 'rare',
   tags: ['venom'],
   icon: 'icon_toxin_splitter',
+  look: { shot: '#6ae03a', trail: 'bubble', orbit: '#8aff5a' },
   pools: ['treasure', 'challenge'],
   onHit(w, t, hit, power) {
     if (!isPrimary(hit)) return;
@@ -271,6 +282,7 @@ defineArtifact({
   rarity: 'epic',
   tags: ['venom'],
   icon: 'icon_nightshade_wreath',
+  look: { mote: '#a070e0', aura: '#a070e0' },
   pools: ['treasure', 'curse', 'secret'],
   onKill(w, e, power) {
     const s = e.statuses.get('poison');
