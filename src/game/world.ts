@@ -158,6 +158,10 @@ export class World {
     this.roomCache.clear();
     this.mapVersion++;
     const start = this.map.nodes[this.map.startId];
+    // forget the previous floor's room so enterRoom() does not cache it under a
+    // node id that now belongs to a different room of the new floor
+    if (this.room) this.items.expire('room');
+    (this as { room?: Room }).room = undefined;
     this.enterRoom(start, null);
     this.floorCard = { name: floor.name, subtitle: floor.subtitle, t: 0 };
     this.items.expire('floor');

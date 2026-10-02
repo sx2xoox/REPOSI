@@ -1,33 +1,75 @@
-// Default behaviour per room kind (start, treasure, shop, boss, secret).
+// Default behaviour per room kind: start (control hints / light shaft), normal,
+// treasure, secret and boss. Shop, challenge, shrine and curse rooms live in their
+// own files in this folder.
 
 import { registerRoomHandler } from '../../game/roomkinds';
 import { Enemies } from '../../game/defs';
 import { Pedestal, Pickup, Trapdoor, type PickupKind } from '../../game/pickups';
 import { TILE } from '../../game/constants';
 import type { World } from '../../game/world';
+import type { Room } from '../../game/room';
 import type { RNG } from '../../engine/rng';
 import { audio } from '../../audio/audio';
+import { Candles } from '../props/lights';
+import { LightShaft } from '../props/ambient';
+import { coinHeap, darkRing, ritualCircle, roundRug, withDecals } from './decor';
+import { paintKeyHint, whenFontsReady } from './floortext';
+
+// ------------------------------------------------------------------ start
+const HINTS: { keys: string[]; label: string; dx: number; row: number }[] = [
+  { keys: ['W', 'A', 'S', 'D'], label: '이동', dx: -70, row: 0 },
+  { keys: ['Space'], label: '대시', dx: 74, row: 0 },
+  { keys: ['방향키'], label: '· 마우스  공격', dx: 0, row: 1 },
+  { keys: ['E'], label: '폭탄', dx: -84, row: 2 },
+  { keys: ['F'], label: '등불 해방', dx: 70, row: 2 },
+  { keys: ['Q'], label: '액티브', dx: -36, row: 3 },
+  { keys: ['R'], label: '물약', dx: 44, row: 3 },
+];
+
+function paintHints(room: Room): void {
+  const top = room.interiorY + 10;
+  const bottom = room.interiorY + room.interiorH;
+  const rows = [top, top + 20, bottom - 44, bottom - 24];
+  for (const h of HINTS) paintKeyHint(room, room.centerX + h.dx, rows[h.row], h.keys, h.label);
+}
 
 registerRoomHandler('start', {
   clearOnEnter: true,
+  populate(w, room) {
+    if (w.floor.index === 1 && w.run.floor === 1) {
+      // control hints painted on the floor of the very first room
+      if (typeof document !== 'undefined') void whenFontsReady().then(() => paintHints(room));
+    } else {
+      // a shaft of light where the lantern-keeper dropped in from above
+      w.spawn(new LightShaft(room.centerX, room.centerY + 20));
+    }
+  },
 });
 
 registerRoomHandler('normal', {
   clearOnEnter: true,
 });
 
+// ------------------------------------------------------------------ treasure
+function placeCandles(w: World, room: Room, spots: [number, number][], blue = false): void {
+  for (const [x, y] of spots) if (room.isFree(x, y, 5)) w.spawn(new Candles(x, y, 3, blue));
+}
+
 registerRoomHandler('treasure', {
   populate(w, room, rng) {
+    const cx = room.centerX;
+    const cy = room.centerY;
+    withDecals(room, (p) => roundRug(p, cx, cy + 4, 34, 20, ['#3a0e14', '#6a1a22', '#962a30', '#c04a40'], '#e0b040'));
+    placeCandles(w, room, [[cx - 52, cy - 22], [cx + 52, cy - 22], [cx - 52, cy + 30], [cx + 52, cy + 30]]);
     const item = w.loot.rollItem('treasure', w.run.lootRng);
-    if (item) w.spawn(new Pedestal(room.centerX, room.centerY, item));
+    const ped = item ? w.spawn(new Pedestal(cx, cy, item)) : null;
     // luck: a second choice (take one, the other vanishes)
-    if (rng.chance(0.08 + w.player.stats.luck * 0.03)) {
-      const ped = w.entities.find((e) => e instanceof Pedestal) as Pedestal | undefined;
+    if (ped && rng.chance(0.08 + w.player.stats.luck * 0.03)) {
       const item2 = w.loot.rollItem('treasure', w.run.lootRng);
-      if (ped && item2) {
+      if (item2) {
         ped.x -= 24;
         ped.group = 1;
-        const p2 = new Pedestal(room.centerX + 24, room.centerY, item2);
+        const p2 = new Pedestal(cx + 24, cy, item2);
         p2.group = 1;
         w.spawn(p2);
       }
@@ -35,37 +77,13 @@ registerRoomHandler('treasure', {
   },
 });
 
-registerRoomHandler('shop', {
-  populate(w, room, rng) {
-    const cx = room.centerX;
-    const cy = room.centerY;
-    const slots = [-60, -30, 0, 30, 60];
-    const itemSlots = rng.chance(0.5) ? 2 : 3;
-    slots.forEach((dx, i) => {
-      if (i < itemSlots) {
-        const item = w.loot.rollItem('shop', w.run.lootRng);
-        if (!item) return;
-        const ped = new Pedestal(cx + dx * 1.2 - (itemSlots - 1) * 6, cy + 4, item);
-        ped.price = shopPrice(item.kind, item.id);
-        w.spawn(ped);
-      } else {
-        const pool: [PickupKind, number][] = [['heart', 3], ['bomb', 5], ['key', 5], ['soul_heart', 5], ['potion', 4]];
-        const [kind, price] = rng.pick(pool);
-        const pk = new Pickup(kind, cx + dx * 1.2 + 10, cy + 4);
-        pk.price = price;
-        if (kind === 'potion') pk.potionId = rng.pick(Object.keys(w.run.potionColors));
-        w.spawn(pk);
-      }
-    });
-  },
-});
-
-function shopPrice(kind: string, _id: string): number {
-  return kind === 'active' ? 20 : 15;
-}
-
+// ------------------------------------------------------------------ secret
 registerRoomHandler('secret', {
   populate(w, room, rng) {
+    withDecals(room, (p) => {
+      for (let i = 0; i < 5; i++) coinHeap(p, room.centerX + rng.range(-90, 90), room.centerY + rng.range(-46, 46), rng, rng.int(4, 9));
+    });
+    placeCandles(w, room, [[room.centerX - 40, room.centerY - 30], [room.centerX + 40, room.centerY - 30]], true);
     if (rng.chance(0.55)) {
       const item = w.loot.rollItem('secret', w.run.lootRng) ?? w.loot.rollItem('treasure', w.run.lootRng);
       if (item) w.spawn(new Pedestal(room.centerX, room.centerY, item));
@@ -79,7 +97,15 @@ registerRoomHandler('secret', {
   },
 });
 
+// ------------------------------------------------------------------ boss
 registerRoomHandler('boss', {
+  populate(w, room) {
+    // a scorched summoning circle marks the arena
+    withDecals(room, (p) => {
+      darkRing(p, room.centerX, room.centerY, 46, 0.35);
+      ritualCircle(p, room.centerX, room.centerY, 58, '#a02020', 0.35);
+    });
+  },
   spawnEnemies(w, room, rng) {
     const id = pickBoss(w, rng);
     if (!id) return false;

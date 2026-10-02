@@ -1,7 +1,7 @@
-// A few starter artifacts, the flame resonance, an active item and a potion.
+// A few starter artifacts, an active item and a potion.
 
-import { defineActive, defineArtifact, definePotion, defineSet } from '../../game/defs';
-import { defineDrawnSprite, definePixelSprite } from '../../engine/sprites';
+import { defineActive, defineArtifact, definePotion } from '../../game/defs';
+import { defineDrawnSprite } from '../../engine/sprites';
 import { ramp } from '../../engine/painter';
 import { RingFx } from '../../game/effects';
 
@@ -42,6 +42,7 @@ defineArtifact({
   id: 'ember_heart',
   name: '불씨 심장',
   desc: '최대 체력 +1',
+  quote: '작은 불씨가 심장을 데운다.',
   rarity: 'common',
   tags: ['flame'],
   icon: 'icon_ember_heart',
@@ -51,24 +52,26 @@ defineArtifact({
   },
 });
 
-definePixelSprite('icon_quick_feather', { w: '#e8f0ff', b: '#80a0d0', s: '#5a4a3a' }, [
-  '..........ww',
-  '........wwwb',
-  '......wwwbb.',
-  '.....wwbbb..',
-  '....wwbb....',
-  '...wbbb.....',
-  '..wbb.......',
-  '.sb.........',
-  's...........',
-], { outline: O });
+defineDrawnSprite('icon_quick_feather', 16, 16, (p) => {
+  p.poly([2, 14, 5, 8, 9, 4, 14, 1, 13, 5, 10, 9, 6, 12], '#d8e4f8');
+  p.poly([2, 14, 5, 8, 9, 4, 14, 1, 9, 7, 5, 11], '#f4f8ff');
+  p.poly([8, 9, 10, 9, 13, 5, 11.5, 8.5], '#8aa8d8');
+  p.line(1, 15, 13, 2, '#5a78b0');
+  p.line(0, 16, 2, 14, '#5a4a3a');
+  p.px(6, 11, null);
+  p.px(10, 8, null);
+  p.px(13, 9, '#ffe95a');
+  p.px(14, 10, '#ffffff');
+  p.px(15, 12, '#ffe95a');
+}, { outline: O });
 
 defineArtifact({
   id: 'quick_feather',
   name: '재빠른 깃털',
-  desc: '이동 속도 증가, 공격 속도 +0.4',
+  desc: '이동 속도 +12%, 공격 속도 +0.4',
+  quote: '바람보다 먼저 닿는다.',
   rarity: 'common',
-  tags: ['wind'],
+  tags: ['storm'],
   icon: 'icon_quick_feather',
   pools: ['treasure', 'shop'],
   stats(m, power) {
@@ -77,40 +80,7 @@ defineArtifact({
   },
 });
 
-defineDrawnSprite('res_flame', 8, 8, (p) => {
-  p.poly([1, 7, 7, 7, 6, 3, 4, 0, 2, 3], '#ff8a30');
-  p.poly([2.5, 7, 5.5, 7, 5, 4, 4, 2, 3, 4], '#ffe080');
-}, { outline: O });
-
-defineSet({
-  tag: 'flame',
-  name: '불꽃',
-  color: '#ff9a40',
-  icon: 'res_flame',
-  tiers: [
-    {
-      count: 2,
-      desc: '공격이 20% 확률로 적을 불태운다',
-      hooks: {
-        onShoot(w, p) {
-          if (w.rng.chance(0.2)) {
-            p.statuses = [...p.statuses, { kind: 'burn', duration: 3, power: w.player.stats.damage * 0.4 }];
-            p.color = '#ff8a30';
-          }
-        },
-      },
-    },
-    {
-      count: 4,
-      desc: '불타는 적이 죽으면 폭발한다',
-      hooks: {
-        onKill(w, e) {
-          if (e.hasStatus('burn')) w.explode(e.x, e.y, 26, w.player.stats.damage * 1.5, { hurtsPlayer: false, noTiles: true, color: '#ff7020' });
-        },
-      },
-    },
-  ],
-});
+// The 불꽃 (flame) resonance and the other seven tags live in resonance.ts.
 
 // ---- active
 defineDrawnSprite('icon_bell', 16, 16, (p) => {

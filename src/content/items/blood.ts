@@ -1,0 +1,286 @@
+// 피 (blood) artifacts: bleeding, life steal, risky power and thorns.
+
+import { defineArtifact } from '../../game/defs';
+import { defineDrawnSprite } from '../../engine/sprites';
+import { ramp } from '../../engine/painter';
+import { RingFx } from '../../game/effects';
+import { fx } from '../../engine/rng';
+import { O, addHitStatus, enemiesNear, isAttack, itemHit, roll, spawnShards, stackMul } from './lib';
+
+const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
+const RED = ['#4a0812', '#8a1020', '#c81c30', '#ff4a5a', '#ffb0b8'];
+
+// ------------------------------------------------------------------ 거머리 이빨
+defineDrawnSprite('icon_leech_tooth', 16, 16, (p) => {
+  const path: [number, number, number][] = [[3, 13, 2.2], [4.5, 10.5, 2.5], [6.5, 8.5, 2.6], [9, 7, 2.7], [11.5, 5.5, 2.8]];
+  for (const [x, y, r] of path) p.circle(x, y, r, '#6a1a2a');
+  for (const [x, y, r] of path) p.circle(x - 0.6, y - 0.6, r * 0.55, '#9a3040');
+  p.line(3, 12, 4, 11, '#c05060');
+  p.circle(12, 4.5, 2.6, '#8a2030');
+  p.circle(12, 4.5, 1.5, '#2a0408');
+  p.px(11, 3, '#fff0f0');
+  p.px(13, 3, '#fff0f0');
+  p.px(11, 5, '#fff0f0');
+  p.px(13, 5, '#fff0f0');
+  p.px(12, 2, '#ffe0e0');
+  p.ellipse(13, 10, 1.3, 1.6, '#e02838');
+  p.px(13, 9, '#ff9aa8');
+}, { outline: O });
+
+defineArtifact({
+  id: 'leech_tooth',
+  name: '거머리 이빨',
+  desc: '공격력 +0.5. 적 처치 시 5% 확률로 체력 반 칸 회복',
+  quote: '조금씩, 꾸준히.',
+  rarity: 'common',
+  tags: ['blood'],
+  icon: 'icon_leech_tooth',
+  pools: ['treasure', 'shop', 'curse'],
+  stats(m, power) {
+    m.addStat('damage', 0.5 * power);
+    m.addStat('lifesteal', 0.05 * power);
+  },
+});
+
+// ------------------------------------------------------------------ 가시덩굴 코르셋
+defineDrawnSprite('icon_bramble_corset', 16, 16, (p) => {
+  p.poly([3, 1, 13, 1, 11, 8, 13, 15, 3, 15, 5, 8], '#7a2030');
+  p.shadeSphere(7, 6, 8, 10, [RED[0], '#5a1420', '#7a2030', '#a03848']);
+  for (let y = 3; y <= 13; y += 2) {
+    p.px(7, y, '#e8c0a0');
+    p.px(9, y, '#e8c0a0');
+    p.px(8, y + 1, '#c09070');
+  }
+  for (let x = 2; x <= 14; x++) {
+    const y = 6 + Math.round(Math.sin(x * 0.9) * 1.5);
+    p.px(x, y, '#3a7a2a');
+    if (x % 3 === 0) p.px(x, y - 1, '#a8d070');
+  }
+  for (let x = 2; x <= 14; x++) {
+    const y = 11 + Math.round(Math.sin(x * 0.9 + 2) * 1.5);
+    p.px(x, y, '#3a7a2a');
+    if (x % 3 === 1) p.px(x, y + 1, '#a8d070');
+  }
+  p.px(1, 6, '#3a7a2a');
+  p.px(15, 11, '#3a7a2a');
+}, { outline: O });
+
+defineArtifact({
+  id: 'bramble_corset',
+  name: '가시덩굴 코르셋',
+  desc: '피격 시 가시가 터져 주변 적에게 피해를 주고 출혈시킨다',
+  quote: '안아주려는 자에게도 가시가 돋는다.',
+  rarity: 'common',
+  tags: ['blood'],
+  icon: 'icon_bramble_corset',
+  pools: ['treasure', 'shop', 'boss'],
+  onHurt(w, _a, power) {
+    const p = w.player;
+    const R = 58;
+    w.sfx('spike', { vol: 0.7 });
+    w.spawn(new RingFx(p.x, p.y - 4, R, 0.3, '#a8d070', 2));
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      w.particles.spawn({ x: p.x + Math.cos(a) * 6, y: p.y - 4 + Math.sin(a) * 6, vx: Math.cos(a) * 220, vy: Math.sin(a) * 220, drag: 6, life: 0.3, colors: ['#e8ffc0', '#6aaa3a', '#3a6a2a'], size: 2, sizeEnd: 1, shape: 'spark', rot: a });
+    }
+    for (const e of enemiesNear(w, p.x, p.y, R)) itemHit(w, e, dmg(w) * 2.5 * stackMul(power), { knockback: 200, statuses: [{ kind: 'bleed', duration: 3, power: dmg(w) * 0.3 }] });
+  },
+});
+
+// ------------------------------------------------------------------ 무쇠 깃촉
+defineDrawnSprite('icon_iron_quill', 16, 16, (p) => {
+  p.poly([8, 15.5, 3, 6.5, 5, 2, 11, 2, 13, 6.5], '#8a90a0');
+  p.poly([8, 15.5, 3, 6.5, 5, 2, 8, 2], '#c8d0e0');
+  p.line(8, 8, 8, 15, '#22222e');
+  p.circle(8, 7, 1.2, '#22222e');
+  p.line(4, 6, 7, 3, '#f0f4ff');
+  p.rect(5, 0, 6, 2.5, '#5a4a6a');
+  p.line(5, 0, 10, 0, '#8a7a9a');
+  p.ellipse(13, 13, 1.4, 1.8, '#e02838');
+  p.px(13, 12, '#ff9aa8');
+  p.px(12, 10, '#e02838');
+}, { outline: O });
+
+defineArtifact({
+  id: 'iron_quill',
+  name: '무쇠 깃촉',
+  desc: '탄환이 적 하나를 더 관통하고, 관통할 때마다 피해 +20% (탄환 한정)',
+  quote: '펜은 칼보다 깊이 박힌다.',
+  rarity: 'common',
+  tags: ['blood'],
+  icon: 'icon_iron_quill',
+  pools: ['treasure', 'shop'],
+  stats(m, power) {
+    m.addStat('pierce', power);
+    m.mulStat('shotSpeed', 1.1);
+  },
+  onShoot(_w, pr) {
+    if (pr.generation > 0) return;
+    pr.addBehavior({
+      id: 'iron_quill',
+      onHit(p2) {
+        p2.damage *= 1.2;
+      },
+    });
+  },
+});
+
+// ------------------------------------------------------------------ 진홍 칼날
+defineDrawnSprite('icon_crimson_edge', 16, 16, (p) => {
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const d1 = Math.hypot(x + 0.5 - 3, y + 0.5 - 13);
+      const d2 = Math.hypot(x + 0.5 - 1, y + 0.5 - 15.5);
+      if (d1 < 12.5 && d2 > 12 && x > 2 && y < 12) {
+        const edge = 12.5 - d1;
+        p.px(x, y, edge < 1.3 ? '#ffd0d8' : edge < 2.6 ? RED[3] : RED[2]);
+      }
+    }
+  }
+  p.line(2, 12, 4, 10, '#d8b050');
+  p.line(1, 11, 5, 13, '#d8b050');
+  p.line(0, 15, 2, 13, '#3a1a1a');
+  p.line(1, 15, 3, 13, '#5a2a2a');
+  p.px(13, 4, '#ffffff');
+  p.px(9, 12, RED[3]);
+  p.px(10, 14, RED[2]);
+}, { outline: O });
+
+defineArtifact({
+  id: 'crimson_edge',
+  name: '진홍 칼날',
+  desc: '공격이 15% 확률로 출혈을 일으킨다. 출혈은 중첩된다',
+  quote: '베인 자리가 오래 아프다.',
+  rarity: 'rare',
+  tags: ['blood'],
+  icon: 'icon_crimson_edge',
+  pools: ['treasure', 'challenge', 'curse'],
+  modifyHit(w, t, hit, power) {
+    if (isAttack(hit) && roll(w, 0.15, power)) addHitStatus(w, t, hit, { kind: 'bleed', duration: 3, power: dmg(w) * 0.3 });
+  },
+});
+
+// ------------------------------------------------------------------ 심장 실
+defineDrawnSprite('icon_heartstring', 16, 16, (p) => {
+  p.circle(5, 6, 3.6, RED[2]);
+  p.circle(11, 6, 3.6, RED[2]);
+  p.poly([1.5, 7, 14.5, 7, 8, 14.5], RED[2]);
+  p.shadeSphere(8, 8, 7, 7, ramp('#d82838', 4));
+  p.line(2, 9, 13, 5, '#f8e8e0');
+  p.line(3, 11, 12, 8, '#f8e8e0');
+  p.px(7, 3, '#f8e8e0');
+  p.px(6, 2, '#f8e8e0');
+  p.px(8, 2, '#f8e8e0');
+  p.px(4, 4, '#ffd0d8');
+  p.line(11, 15, 15, 9, '#c0c8d8');
+  p.px(15, 9, '#ffffff');
+  p.px(14, 11, '#f8e8e0');
+}, { outline: O });
+
+defineArtifact({
+  id: 'heartstring',
+  name: '심장 실',
+  desc: '붉은 체력이 가득 차 있으면 공격력 +30%',
+  quote: '온전할 때, 가장 강하다.',
+  rarity: 'rare',
+  tags: ['blood'],
+  icon: 'icon_heartstring',
+  pools: ['treasure', 'boss', 'shop'],
+  onShoot(w, p) {
+    const pl = w.player;
+    if (p.generation === 0 && pl.maxRed > 0 && pl.red >= pl.maxRed) p.color = '#ff6a7a';
+  },
+  modifyHit(w, _t, hit, power) {
+    const p = w.player;
+    if (p.maxRed > 0 && p.red >= p.maxRed && hit.kind !== 'status') hit.damage *= 1 + 0.3 * power;
+  },
+});
+
+// ------------------------------------------------------------------ 피의 서약
+defineDrawnSprite('icon_blood_pact', 16, 16, (p) => {
+  p.rect(2, 2, 10, 12, '#e8d8b0');
+  p.shadeVertical(2, 2, 10, 12, ['#b8a070', '#d8c498', '#f0e4c4']);
+  p.rect(1, 1, 12, 2, '#c8b080');
+  p.rect(1, 13, 12, 2, '#c8b080');
+  p.line(1, 1, 12, 1, '#f4ecd0');
+  for (let y = 4; y <= 8; y += 2) p.line(4, y, 10, y, '#8a7a5a');
+  p.circle(7, 10.5, 2.4, '#c02030');
+  p.px(6, 10, '#ff6a78');
+  p.px(7, 13, '#c02030');
+  p.px(7, 14, '#8a1020');
+  p.line(11, 6, 15, 0, '#f0f0f0');
+  p.line(12, 6, 15, 2, '#c8c8d0');
+  p.px(11, 7, '#3a1a1a');
+}, { outline: O });
+
+defineArtifact({
+  id: 'blood_pact',
+  name: '피의 서약',
+  desc: '공격력 ×1.4. 최대 체력 -1',
+  quote: '서명은 피로 한다.',
+  rarity: 'epic',
+  tags: ['blood'],
+  icon: 'icon_blood_pact',
+  pools: ['curse', 'secret'],
+  stats(m, power) {
+    m.mulStat('damage', Math.pow(1.4, power));
+    m.addStat('maxHearts', -power);
+  },
+});
+
+// ------------------------------------------------------------------ 핏빛 달 (legendary)
+defineDrawnSprite('icon_blood_moon', 16, 16, (p) => {
+  p.circle(8, 8, 7.2, '#3a0a14');
+  p.circle(8, 8, 6.2, RED[2]);
+  p.shadeSphere(8, 8, 6.2, 6.2, [RED[1], RED[2], RED[3], RED[4]]);
+  p.circle(11, 6, 5.2, '#3a0a14');
+  p.circle(11.5, 5.5, 4.4, null);
+  p.px(4, 5, '#ffd0d8');
+  p.px(3, 8, '#ff9aa8');
+  p.px(5, 14, RED[2]);
+  p.px(5, 15, RED[1]);
+  p.px(8, 15, RED[2]);
+  p.px(14, 12, '#ffd0d8');
+  p.px(13, 1, '#ffffff');
+}, { outline: '#14040a' });
+
+defineDrawnSprite('fx_blood_moon_small', 7, 7, (p) => {
+  p.circle(3.5, 3.5, 3.5, RED[2]);
+  p.shadeSphere(3.5, 3.5, 3.5, 3.5, [RED[1], RED[2], RED[3]], { dither: false });
+  p.circle(5.2, 2.3, 2.8, null);
+}, { outline: '#14040a' });
+
+defineArtifact({
+  id: 'blood_moon',
+  name: '핏빛 달',
+  desc: '공격력 +1. 적을 처치하면 핏빛 화살 4발이 다른 적을 쫓아간다',
+  quote: '달이 붉게 물드는 밤엔, 사냥꾼도 사냥감이 된다.',
+  rarity: 'legendary',
+  tags: ['blood', 'shadow'],
+  icon: 'icon_blood_moon',
+  pools: ['curse', 'boss', 'secret'],
+  stats(m, power) {
+    m.addStat('damage', power);
+  },
+  onKill(w, e, power) {
+    if ((w.vars.__bloodMoonT ?? -1) > w.time) return;
+    w.vars.__bloodMoonT = w.time + 0.04;
+    w.sfx('whoosh', { vol: 0.35, pitch: 1.4 });
+    spawnShards(w, e.x, e.y - 4, {
+      count: 3 + power, damage: dmg(w) * 0.6, sprite: 'proj_blood_dart', color: '#ff4a5a', speed: 190, range: 220, homing: 7, spectral: true,
+      statuses: [{ kind: 'bleed', duration: 3, power: dmg(w) * 0.25 }],
+    });
+  },
+  onUpdate(w, dt) {
+    if (fx.chance(dt * 3)) {
+      const p = w.player;
+      w.particles.spawn({ x: p.x + 9 + fx.range(-1, 1), y: p.y - 22, vy: 18, life: 0.6, colors: ['#ff4a5a', '#8a1020'], size: 1, gravity: 0 });
+    }
+  },
+  draw(w, r) {
+    const p = w.player;
+    const bob = Math.sin(w.time * 2) * 1.5;
+    r.circle(p.x + 9, p.y - 24 + bob, 6, '#ff2040', 0.12);
+    r.sprite('fx_blood_moon_small', p.x + 9, p.y - 24 + bob);
+  },
+});

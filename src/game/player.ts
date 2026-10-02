@@ -54,6 +54,8 @@ export class Player extends Actor {
   red = 6;
   /** soul (shield) health in half hearts */
   soul = 0;
+  /** one-hit barriers granted by items (each blocks one hit completely) */
+  shields = 0;
   private peakMaxRed = 0;
   coins = 0;
   bombs = 1;
@@ -80,6 +82,8 @@ export class Player extends Actor {
   dashDX = 0;
   dashDY = 1;
   private afterT = 0;
+  /** dash pressed slightly before the cooldown ended: performed as soon as possible */
+  private dashBuffer = 0;
   /** Isaac-style "hold the new item over your head" */
   holdIcon: string | null = null;
   holdT = 0;
@@ -178,7 +182,11 @@ export class Player extends Actor {
       } else {
         wantFire = input.held('fire');
       }
-      if (input.pressed('dash')) this.tryDash(w, mv);
+      if (input.pressed('dash')) this.dashBuffer = 0.14;
+      if (this.dashBuffer > 0) {
+        if (this.tryDash(w, mv)) this.dashBuffer = 0;
+        else this.dashBuffer -= dt;
+      }
       if (input.pressed('bomb')) this.placeBomb(w);
       if (input.pressed('active')) this.useActive(w);
       if (input.pressed('consumable')) this.usePotion(w);
@@ -227,13 +235,13 @@ export class Player extends Actor {
     this.vx = vx;
     this.vy = vy;
 
-    // footstep dust
-    if (this.moving && !this.dashing && Math.floor(this.animT * 7) !== Math.floor((this.animT - dt) * 7)) {
+    // footstep dust (floating characters leave none)
+    if (this.moving && !this.dashing && !this.flying && Math.floor(this.animT * 7) !== Math.floor((this.animT - dt) * 7)) {
       w.particles.burst(this.x, this.y + 4, { count: 1, speed: [5, 15], life: [0.2, 0.35], colors: ['#a09080', '#706050'], size: [1, 2], ground: true });
     }
 
     // facing
-    const lookA = this.firing || input.aimMode === 'mouse' ? this.aim : this.moving ? Math.atan2(this.vy, this.vx) : null;
+    const lookA = this.dashing ? Math.atan2(this.dashDY, this.dashDX) : this.firing || input.aimMode === 'mouse' ? this.aim : this.moving ? Math.atan2(this.vy, this.vx) : null;
     if (lookA !== null) {
       const cx = Math.cos(lookA);
       const cy = Math.sin(lookA);
@@ -296,8 +304,9 @@ export class Player extends Actor {
     return Weapons.get(this.weaponId)?.kind === 'charge';
   }
 
-  tryDash(w: World, mv: { x: number; y: number }): void {
-    if (this.dashCD > 0 || this.dashing) return;
+  /** Start a dash toward the move input (or the aim). Returns false while on cooldown. */
+  tryDash(w: World, mv: { x: number; y: number }): boolean {
+    if (this.dashCD > 0 || this.dashing) return false;
     let d = norm(mv.x, mv.y);
     if (d.x === 0 && d.y === 0) d = fromAngle(this.aim);
     this.dashDX = d.x;
@@ -309,6 +318,7 @@ export class Player extends Actor {
     w.sfx('dash');
     w.particles.burst(this.x, this.y + 3, { count: 8, speed: [20, 60], angle: Math.atan2(-d.y, -d.x), spread: 1.2, life: [0.2, 0.4], colors: ['#d0c8c0', '#908070'], size: [1, 2] });
     w.items.onDash();
+    return true;
   }
 
   placeBomb(w: World): void {
@@ -424,6 +434,15 @@ export class Player extends Actor {
   /** Player takes `halfHearts` damage. Returns true if damage was applied. */
   hurt(w: World, halfHearts: number, source = '???'): boolean {
     if (!this.alive || this.invuln > 0 || this.god || w.transitioning) return false;
+    if (this.shields > 0) {
+      this.shields--;
+      this.invuln = Math.max(this.invuln, 0.6);
+      w.sfx('shield_block');
+      w.shake(0.2);
+      w.spawn(new RingFx(this.x, this.y - 6, 26, 0.35, '#c8f0ff', 2));
+      w.particles.burst(this.x, this.y - 6, { count: 16, speed: [40, 120], life: [0.2, 0.5], colors: ['#ffffff', '#c8f0ff', '#70b0ff'], size: [1, 2], shape: 'spark' });
+      return false;
+    }
     if (this.stats.dodge > 0 && w.rng.chance(this.stats.dodge)) {
       this.invuln = 0.4;
       w.floatText(this.x, this.y - 16, 'MISS', '#c0e0ff');
@@ -458,6 +477,7 @@ export class Player extends Actor {
   // -------------------------------------------------------------- drawing
   private animName(): string {
     const pre = this.character.spritePrefix;
+    if (this.dashing && hasAnim(`${pre}_dash_${this.facing}`)) return `${pre}_dash_${this.facing}`;
     if (this.dashing && hasAnim(`${pre}_dash`)) return `${pre}_dash`;
     if (this.flash > 0 && hasAnim(`${pre}_hurt`)) return `${pre}_hurt`;
     const kind = this.moving ? 'walk' : 'idle';
@@ -474,12 +494,14 @@ export class Player extends Actor {
   override draw(r: Renderer, w: World): void {
     if (this.dead) return;
     const blink = this.invuln > 0 && !this.dashing && Math.floor(this.invuln * 14) % 2 === 0;
-    r.shadow(this.x, this.y + 4, 11, 4, 0.35);
+    // flying characters hover a little above their (smaller) shadow
+    const hover = this.flying ? 2 + Math.sin(this.age * 3.2) : 0;
+    r.shadow(this.x, this.y + 4, this.flying ? 9 : 11, this.flying ? 3 : 4, this.flying ? 0.25 : 0.35);
     const wdef = Weapons.get(this.weaponId);
     const behind = this.facing === 'up';
     if (behind) this.drawWeapon(r, w, wdef);
     const tint = this.statusTint();
-    r.sprite(this.frameName(), this.x, this.y + 5 - this.z, {
+    r.sprite(this.frameName(), this.x, this.y + 5 - this.z - hover, {
       flipX: this.flip,
       sx: this.squashX,
       sy: this.squashY,
