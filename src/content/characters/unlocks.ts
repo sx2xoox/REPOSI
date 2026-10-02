@@ -37,13 +37,39 @@ export function bossUnlocksNiel(floor: number, isBoss: boolean, isMinion: boolea
   return isBoss && !isMinion && floor >= 3 && bossesLeft === 0;
 }
 
+/** Total defeats that bring 보리 to the keeper's side. */
+export const BORI_UNLOCK_DEATHS = 3;
+/** Total kills that call 모리 down from the hills. */
+export const MORI_UNLOCK_KILLS = 300;
+
+export function boriUnlockDue(deaths: number): boolean {
+  return deaths >= BORI_UNLOCK_DEATHS;
+}
+
+/** Should this boss kill unlock 백구? `roomDamage` = damage taken since entering the boss room (pure; exported for tests). */
+export function bossUnlocksBaekgu(isBoss: boolean, isMinion: boolean, bossesLeft: number, roomDamage: number): boolean {
+  return isBoss && !isMinion && bossesLeft === 0 && roomDamage <= 0;
+}
+
+export function moriUnlockDue(totalKills: number): boolean {
+  return totalKills >= MORI_UNLOCK_KILLS;
+}
+
 defineGlobalHooks({
   id: 'character_unlocks',
+  onRoomEnter(w) {
+    // remember the damage taken so far when a boss room is entered (백구's clean kill)
+    if (w.node.kind === 'boss') w.vars.__bossRoomDmg = w.run.stats.damageTaken;
+  },
   onKill(w, e) {
     if (bossUnlocksNiel(w.run.floor, e.isBoss, e.isMinion, w.bosses.length)) unlockCharacter(w, 'niel');
+    const since = w.run.stats.damageTaken - (w.vars.__bossRoomDmg ?? w.run.stats.damageTaken);
+    if (bossUnlocksBaekgu(e.isBoss, e.isMinion, w.bosses.length, since)) unlockCharacter(w, 'baekgu');
+    if (moriUnlockDue(save.progress.totalKills)) unlockCharacter(w, 'mori');
   },
   onFloorStart(w) {
     if (w.run.floor >= 4) unlockCharacter(w, 'niel');
+    if (boriUnlockDue(save.progress.deaths)) unlockCharacter(w, 'bori');
   },
 });
 

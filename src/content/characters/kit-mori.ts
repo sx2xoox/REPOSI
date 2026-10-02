@@ -22,7 +22,7 @@ import { fx } from '../../engine/rng';
 import { TAU, angleTo, dist, dist2 } from '../../engine/math';
 import { glowSprite } from '../weapons/common';
 import { Familiar, familiarsOf, isAttack, itemHit, proc, syncFamiliars } from '../items/lib';
-import { HitFalloff, ReleaseShot, clearBullets, releaseHit } from './releases';
+import { HitFalloff, ReleaseShot, releaseHit } from './releases';
 import { KitTimeline, releaseOpen } from './kit-common';
 import { EnemyOverlay, O, ensureOverlay } from './kit';
 
@@ -336,7 +336,7 @@ class StampedePen extends Entity {
       const k = (0.4 + 0.6 * (1 - d / pull)) * (e.isBoss ? 110 : 460) * dt;
       e.knock((this.x - e.x) / d, (this.y - e.y) / d, k * Math.max(0.2, e.mass));
     }
-    clearBullets(w, this.x, this.y, this.r + 16, false);
+    w.clearEnemyBullets(this.x, this.y, this.r + 16, false);
     if (fx.chance(dt * 30)) {
       const a = fx.angle();
       w.particles.spawn({ x: this.x + Math.cos(a) * this.r, y: this.y + Math.sin(a) * this.r * 0.7, vx: -Math.cos(a) * 50, vy: -Math.sin(a) * 35, life: 0.4, colors: SPIRIT, size: 1, additive: true });

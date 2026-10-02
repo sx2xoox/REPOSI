@@ -1,0 +1,4432 @@
+diff --git a/scripts/coop-e2e.mjs b/scripts/coop-e2e.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a93c9702e6cce80ce62a12c1099f46e8d048e3d
+--- /dev/null
++++ b/scripts/coop-e2e.mjs
+@@ -0,0 +1,298 @@
++// Online co-op browser end-to-end test: 2–4 game pages over BroadcastChannel
++// (`?net=bc`). The first page creates a room through the title menu, the
++// others join with the share link, pick characters and ready up, the host
++// starts. Then every page's bot plays its own keeper (moves, shoots, dashes,
++// walks through doors) for ~60 s while the script takes screenshots of each
++// page (HUD + teammate panels + name tags, a downed ghost being revived, the
++// "연결 대기 중…" overlay while the host stalls, the co-op pause menu, a phone
++// layout) and finally checks: no desync on any page, identical state hashes
++// at every tick all pages reported, every page still running, no console errors.
++//
++// Usage: node scripts/coop-e2e.mjs [--players 3] [--seconds 60] [--out dir] [--url http://localhost:5173/]
++// Exit code 1 on any failed check. Ports: 5550–5599 (dev server).
++import { chromium } from 'playwright';
++import { mkdirSync, writeFileSync } from 'node:fs';
++import { join } from 'node:path';
++
++const args = Object.fromEntries(
++  process.argv.slice(2).reduce((acc, a, i, arr) => (a.startsWith('--') ? [...acc, [a.slice(2), arr[i + 1] ?? true]] : acc), []),
++);
++const players = Math.min(4, Math.max(2, Number(args.players ?? 3)));
++const seconds = Math.max(20, Number(args.seconds ?? 60));
++const out = String(args.out ?? 'screenshots/coop-e2e');
++mkdirSync(out, { recursive: true });
++
++const report = { ok: true, checks: [], errors: [], pages: [] };
++const check = (name, ok, info = '') => {
++  report.checks.push({ name, ok: !!ok, info });
++  if (!ok) report.ok = false;
++  console.log(`[check] ${ok ? 'OK  ' : 'FAIL'} ${name}${info ? ` — ${info}` : ''}`);
++};
++const wait = (ms) => new Promise((r) => setTimeout(r, ms));
++
++// ---------------------------------------------------------------- dev server
++let vite = null;
++let url = args.url;
++if (!url) {
++  const { createServer } = await import('vite');
++  const port = 5550 + Math.floor(Math.random() * 40);
++  vite = await createServer({ server: { port, strictPort: true, hmr: false }, logLevel: 'warn' });
++  await vite.listen();
++  url = `http://localhost:${port}/`;
++}
++
++const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? undefined, args: ['--autoplay-policy=no-user-gesture-required'] });
++// BroadcastChannel only reaches pages of one storage partition: one context for everyone
++const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
++
++async function newPlayer(label, nick, query, o = {}) {
++  const page = await ctx.newPage();
++  if (o.viewport) await page.setViewportSize(o.viewport);
++  page.on('console', (m) => {
++    if (m.type() === 'error') report.errors.push(`[${label}] ${m.text()}`);
++  });
++  page.on('pageerror', (e) => report.errors.push(`[${label}] ${e.message}`));
++  // per-page settings (the context shares localStorage: written right before this page boots)
++  await page.addInitScript(([n, touch]) => {
++    window.__lkAutoBless = true;
++    try {
++      const s = JSON.parse(localStorage.getItem('lanternkeeper.settings.v1') ?? '{}');
++      localStorage.setItem('lanternkeeper.settings.v1', JSON.stringify({ ...s, nickname: n, touchControls: touch ? 'on' : 'off' }));
++    } catch {
++      // ignore
++    }
++  }, [nick, !!o.touch]);
++  await page.goto(url + query);
++  await page.waitForFunction(() => !!window.__lknet && !!window.__lk, null, { timeout: 30000 });
++  await page.waitForTimeout(600);
++  return { page, label, nick, phone: !!o.touch };
++}
++
++const lobbyState = (p) => p.page.evaluate(() => window.__lknet.state());
++const coopState = (p) => p.page.evaluate(() => window.__lk.coop.state());
++async function until(p, fn, what, timeout = 20000, get = lobbyState) {
++  const end = Date.now() + timeout;
++  let s = null;
++  while (Date.now() < end) {
++    s = await get(p);
++    if (fn(s)) return s;
++    await wait(100);
++  }
++  throw new Error(`${p.label}: timed out waiting for ${what} (state ${JSON.stringify(s).slice(0, 300)})`);
++}
++async function key(p, k, times = 1) {
++  for (let i = 0; i < times; i++) {
++    await p.page.keyboard.press(k);
++    await wait(120);
++  }
++}
++const shot = async (p, name) => {
++  const path = join(out, `${p.label}-${name}.png`);
++  await p.page.screenshot({ path });
++  return path;
++};
++
++/** In-page bot: aim + shoot at the nearest enemy, strafe, dash now and then; when the room is clear, walk to a door. */
++async function startBot(p, seed) {
++  await p.page.evaluate((seed) => {
++    let r = seed >>> 0;
++    const rand = () => ((r = (r * 1664525 + 1013904223) >>> 0) / 4294967296);
++    let strafe = 1;
++    let strafeT = 0;
++    let door = null;
++    let doorRoom = -1;
++    window.__coopBot = setInterval(() => {
++      const w = window.__lk.world();
++      const inp = window.__lk.input;
++      if (!w || !w.local || window.__coopBotOff) return;
++      const p = w.local;
++      strafeT -= 0.05;
++      if (strafeT <= 0) {
++        strafe = rand() < 0.5 ? -1 : 1;
++        strafeT = 0.5 + rand();
++      }
++      let best = null;
++      let bd = Infinity;
++      for (const e of w.enemies) {
++        if (!e.alive || e.hidden) continue;
++        const d = Math.hypot(e.x - p.x, e.y - p.y);
++        if (d < bd) {
++          bd = d;
++          best = e;
++        }
++      }
++      if (best) {
++        const ux = (best.x - p.x) / (bd || 1);
++        const uy = (best.y - p.y) / (bd || 1);
++        const want = bd < 50 ? -1 : bd > 110 ? 1 : 0;
++        let mx = ux * want - uy * strafe;
++        let my = uy * want + ux * strafe;
++        const l = Math.hypot(mx, my) || 1;
++        inp.touchMove = { x: mx / l, y: my / l };
++        inp.touchAim = { x: ux, y: uy };
++        if (rand() < 0.02) inp.touchTap('dash');
++        return;
++      }
++      inp.touchAim = null;
++      if (!w.node.cleared) {
++        inp.touchMove = { x: Math.cos(w.time), y: Math.sin(w.time * 0.7) };
++        return;
++      }
++      if (doorRoom !== w.node.id || !door || door.state !== 'open') {
++        const open = w.room.doors.filter((d) => d.state === 'open');
++        const fresh = open.filter((d) => !w.map.nodes[d.to].visited);
++        const pool = fresh.length ? fresh : open;
++        door = pool.length ? pool[Math.floor(rand() * pool.length)] : null;
++        doorRoom = w.node.id;
++      }
++      if (!door) return;
++      const dx = door.x - p.x;
++      const dy = door.y - p.y;
++      const d = Math.hypot(dx, dy) || 1;
++      inp.touchMove = { x: dx / d, y: dy / d };
++    }, 50);
++  }, seed);
++}
++
++// ---------------------------------------------------------------- scenario
++const names = ['방장', '둘째', '셋째', '넷째'];
++let pages = [];
++try {
++  const host = await newPlayer('p0', names[0], '?net=bc');
++  await key(host, 'ArrowDown');
++  await key(host, 'Enter');
++  await until(host, (s) => s.scene === 'lobby' && s.screen === 'main', 'lobby main');
++  await wait(300);
++  await key(host, 'Enter');
++  const hs = await until(host, (s) => s.screen === 'room' && !!s.code, 'room created');
++  const code = hs.code;
++  check(`host created room ${code}`, /^[A-HJKMNP-Z2-9]{4}$/.test(code));
++  const guests = [];
++  for (let i = 1; i < players; i++) {
++    // the last guest plays on a phone-sized touch layout
++    const phone = i === players - 1;
++    const g = await newPlayer(`p${i}`, names[i], `?net=bc&room=${code}`, phone ? { viewport: { width: 844, height: 390 }, touch: true } : {});
++    await until(g, (s) => s.scene === 'lobby' && s.modal === 'code', 'prefilled code box');
++    await key(g, 'Enter');
++    await until(g, (s) => s.screen === 'room' && s.localSlot === i, `joined as slot ${i}`, 25000);
++    guests.push(g);
++  }
++  pages = [host, ...guests];
++  await until(host, (s) => s.roster.length === players, `${players} players in the roster`);
++  for (const [i, g] of guests.entries()) {
++    await key(g, 'ArrowRight', i + 1);
++    await key(g, 'Enter');
++  }
++  await until(host, (s) => s.canStart, 'everyone ready');
++  await shot(host, 'lobby');
++  await key(host, 'Enter');
++  for (const p of pages) await until(p, (s) => !!s && s.state === 'running', 'co-op run started', 25000, coopState);
++  const s0 = await Promise.all(pages.map(coopState));
++  check('every page runs the same party', s0.every((s) => JSON.stringify(s.players.map((q) => [q.slot, q.ch])) === JSON.stringify(s0[0].players.map((q) => [q.slot, q.ch]))), JSON.stringify(s0[0].players.map((q) => q.ch)));
++  check('each page controls its own keeper', s0.every((s, i) => s.local === i), s0.map((s) => s.local).join(','));
++  // bots are invulnerable (a lockstep debug command, so it is the same on every peer) and start playing
++  for (const p of pages) await p.page.evaluate(() => window.__lk.coop.cmd({ type: 'debug', op: 'god' }));
++  for (const [i, p] of pages.entries()) await startBot(p, 1234 + i * 77);
++
++  const t0 = Date.now();
++  const at = async (sec) => {
++    const ms = t0 + sec * 1000 - Date.now();
++    if (ms > 0) await wait(ms);
++  };
++  // ---- HUD, teammate panels, name tags
++  await at(6);
++  for (const p of pages) await shot(p, 'hud');
++  // ---- a downed ghost: slot 1 goes down (debug command), its teammates see the ghost + toast
++  await pages[1].page.evaluate(() => window.__lk.coop.cmd({ type: 'debug', op: 'down' }));
++  await at(7.5);
++  for (const p of pages) await shot(p, 'downed');
++  const ds = await coopState(pages[0]);
++  check('slot 1 is downed on the host', ds.players.find((q) => q.slot === 1)?.downed === true, JSON.stringify(ds.players.map((q) => q.downed)));
++  // the host walks over to revive (its bot pauses; the teammates keep fighting)
++  await pages[0].page.evaluate(() => { window.__coopBotOff = true; });
++  const reviveEnd = Date.now() + 9000;
++  let revived = false;
++  while (Date.now() < reviveEnd && !revived) {
++    revived = await pages[0].page.evaluate(() => {
++      const w = window.__lk.world();
++      const me = w.local;
++      const v = w.players.find((q) => q.slot === 1);
++      const inp = window.__lk.input;
++      inp.touchAim = null;
++      if (!v || !v.downed) {
++        inp.touchMove = { x: 0, y: 0 };
++        return true;
++      }
++      const dx = v.x - me.x;
++      const dy = v.y - me.y;
++      const d = Math.hypot(dx, dy);
++      inp.touchMove = d > 8 ? { x: dx / d, y: dy / d } : { x: 0, y: 0 };
++      return false;
++    });
++    if (!revived && Date.now() > reviveEnd - 7000 && !report.reviveShot) {
++      report.reviveShot = await shot(pages[0], 'reviving');
++    }
++    await wait(100);
++  }
++  check('downed keeper revived by a teammate standing close', revived);
++  await pages[0].page.evaluate(() => { window.__coopBotOff = false; });
++  for (const p of pages) await shot(p, 'revived');
++  // ---- the co-op pause menu (the world keeps running behind it)
++  const g1 = pages[1];
++  const tickBefore = (await coopState(g1)).tick;
++  await g1.page.keyboard.press('Escape');
++  await wait(1200);
++  await shot(g1, 'pause');
++  const tickAfter = (await coopState(g1)).tick;
++  check('the world keeps running under the pause menu', tickAfter > tickBefore + 30, `${tickBefore} -> ${tickAfter}`);
++  await g1.page.keyboard.press('Escape');
++  await wait(400);
++  // ---- the host stalls: clients show "연결 대기 중…"
++  await pages[0].page.evaluate(() => { window.__lkLoop.manual = true; });
++  await wait(1500);
++  const waiting = await coopState(pages[1]);
++  await shot(pages[1], 'waiting');
++  if (players > 2) await shot(pages[players - 1], 'waiting');
++  check('clients wait for a stalled host', waiting.waiting === true);
++  await pages[0].page.evaluate(() => { window.__lkLoop.manual = false; });
++  await wait(1500);
++  // ---- a treasure room: one pedestal per keeper
++  await pages[0].page.evaluate(() => window.__lk.coop.cmd({ type: 'debug', op: 'room', kind: 'treasure' }));
++  await wait(1500);
++  const peds = await pages[0].page.evaluate(() => window.__lk.world().entities.filter((e) => e.constructor.name === 'Pedestal' && e.item).length);
++  for (const p of pages) await shot(p, 'treasure');
++  check('a treasure room offers a pedestal per keeper', peds >= players, `${peds} pedestals`);
++  await pages[0].page.evaluate(() => window.__lk.coop.cmd({ type: 'debug', op: 'room', kind: 'normal' }));
++  // ---- play on
++  await at(seconds);
++  for (const p of pages) await shot(p, 'end');
++  for (const p of pages) await p.page.evaluate(() => clearInterval(window.__coopBot));
++  await wait(1500);
++
++  // ---- verdict: no desync, identical hashes on every tick all pages reported
++  const states = await Promise.all(pages.map(coopState));
++  const hashes = await Promise.all(pages.map((p) => p.page.evaluate(() => window.__lk.coop.hashes())));
++  report.pages = states;
++  check('no desync on any page', states.every((s) => s.state === 'running' && !s.desync), states.map((s) => `${s.state}${s.desync ? ` @${s.desync.tick}` : ''}`).join(' '));
++  const maps = hashes.map((h) => new Map(h));
++  const ticks = [...maps[0].keys()].filter((t) => maps.every((m) => m.has(t)));
++  const same = ticks.filter((t) => maps.every((m) => m.get(t) === maps[0].get(t)));
++  check('state hashes identical on every page', ticks.length >= Math.floor((seconds - 5) * 60 / 60 * 0.8) && same.length === ticks.length, `${same.length}/${ticks.length} common hashed ticks equal (last tick ${Math.max(...ticks)})`);
++  check('every page simulated about the same number of frames', states.every((s) => s.tick > states[0].tick * 0.95), states.map((s) => s.tick).join(' '));
++  report.hashTicks = ticks.length;
++  report.lastTick = Math.max(...ticks);
++} catch (e) {
++  report.ok = false;
++  report.errors.push(String(e?.stack ?? e));
++  console.error(e);
++  for (const p of pages) await shot(p, 'failure').catch(() => undefined);
++}
++
++const ignorable = (s) => /WebSocket|ERR_CONNECTION_REFUSED|favicon/i.test(s);
++const errs = report.errors.filter((e) => !ignorable(e));
++check('no console errors', errs.length === 0, errs.slice(0, 5).join(' | ').slice(0, 600));
++writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 2));
++await browser.close();
++if (vite) await vite.close();
++console.log(report.ok ? 'coop e2e: ok' : 'coop e2e: FAILED');
++process.exit(report.ok ? 0 : 1);
+diff --git a/src/content/items/actives.ts b/src/content/items/actives.ts
+index bc1c262b8f7facdfabbb3c3cdf8cd90e33aa0be8..1ac18104e702dacc83f8487baec1019cc643ae0e 100644
+--- a/src/content/items/actives.ts
++++ b/src/content/items/actives.ts
+@@ -851,6 +851,8 @@ defineActive({
+ // ====================================================================== runtime ticker
+ defineGlobalHooks({
+   id: 'actives_runtime',
++  // co-op: time stops and hounds live in each keeper's w.vars
++  perPlayer: true,
+   onUpdate(w) {
+     tickTimeStop(w);
+     if (w.vars.__houndEnd !== undefined) syncHounds(w);
+diff --git a/src/content/items/lib.ts b/src/content/items/lib.ts
+index b809ba485553c0b361efd3dc823b15dc3c75411c..cccc291212ae958f4fe68014dbd18e7b9ab768e4 100644
+--- a/src/content/items/lib.ts
++++ b/src/content/items/lib.ts
+@@ -635,8 +635,17 @@ export abstract class Familiar extends Entity {
+ /** last requested familiar counts per world (so they can follow the player at once on room enter) */
+ const familiarWant = new WeakMap<World, Map<string, { want: number; make: (w: World) => Familiar; power: number }>>();
+ 
+-/** Keep exactly `want` familiars of `key` alive in the current room. */
++/** Registry key of a familiar kind for the context keeper (co-op: every keeper has its own). */
++function famKey(w: World, key: string): string {
++  return w.coop ? `${key}#${w.player.slot}` : key;
++}
++
++/** Keep exactly `want` familiars of `key` alive in the current room (co-op: the context keeper's). */
+ export function syncFamiliars<T extends Familiar>(w: World, key: string, want: number, make: (w: World) => T, power = 1): T[] {
++  return syncFamiliarKey(w, famKey(w, key), want, make, power);
++}
++
++function syncFamiliarKey<T extends Familiar>(w: World, key: string, want: number, make: (w: World) => T, power = 1): T[] {
+   let reg = familiarReg.get(w);
+   if (!reg) familiarReg.set(w, (reg = new Map()));
+   let wants = familiarWant.get(w);
+@@ -671,26 +680,29 @@ export function syncFamiliars<T extends Familiar>(w: World, key: string, want: n
+   return list;
+ }
+ 
+-/** Re-sync every familiar kind (room enter: they arrive with the player, visible during the room slide). */
++/** Re-sync every familiar kind (room enter: they arrive with the player, visible during the room slide). Co-op: the context keeper's. */
+ export function resyncFamiliars(w: World): void {
+   const wants = familiarWant.get(w);
+   if (!wants) return;
+-  for (const [key, s] of [...wants]) syncFamiliars(w, key, s.want, s.make, s.power);
++  const mine = w.coop ? `#${w.player.slot}` : '';
++  for (const [key, s] of [...wants]) if (!mine || key.endsWith(mine)) syncFamiliarKey(w, key, s.want, s.make, s.power);
+ }
+ 
+ defineGlobalHooks({
+   id: 'familiars_follow',
++  // co-op: each keeper's familiars follow it into the room
++  perPlayer: true,
+   onRoomEnter(w) {
+     resyncFamiliars(w);
+   },
+ });
+ 
+ export function familiarCount(w: World, key: string): number {
+-  return familiarReg.get(w)?.get(key)?.filter((f) => !f.dead).length ?? 0;
++  return familiarReg.get(w)?.get(famKey(w, key))?.filter((f) => !f.dead).length ?? 0;
+ }
+ 
+ export function familiarsOf<T extends Familiar>(w: World, key: string): T[] {
+-  return ((familiarReg.get(w)?.get(key) ?? []) as T[]).filter((f) => !f.dead && f.room === w.room);
++  return ((familiarReg.get(w)?.get(famKey(w, key)) ?? []) as T[]).filter((f) => !f.dead && f.room === w.room);
+ }
+ 
+ // ====================================================================== time stop
+diff --git a/src/debug.ts b/src/debug.ts
+index fdbc17fe38cd957127e292ea30492289ce09979b..11405216d7ccc1a1983359584161fd5b77629725 100644
+--- a/src/debug.ts
++++ b/src/debug.ts
+@@ -7,6 +7,9 @@ import type { World } from './game/world';
+ import { input } from './engine/input';
+ import { Pedestal, Pickup } from './game/pickups';
+ import { FIXED_DT } from './game/constants';
++import { stateHash } from './game/statehash';
++import type { GameScene } from './ui/game-scene';
++import type { CoopCommand } from './game/coop';
+ 
+ function world(): World | undefined {
+   return (window as unknown as { __world?: World }).__world;
+@@ -36,6 +39,24 @@ export interface DebugApi {
+   errors: string[];
+   /** the live input state (bots drive `touchMove` / `touchAim` / `touchTap`) */
+   input: typeof input;
++  /** online co-op run (null outside one) */
++  coop: {
++    /** lockstep state, tick, party, this peer's hash */
++    state(): Record<string, unknown> | null;
++    /** [tick, stateHash] reported to the lockstep (every 60 ticks) */
++    hashes(): [number, number][];
++    /** send a lockstep command (applied on every peer at the same tick), e.g. {type:'debug', op:'god'} */
++    cmd(c: CoopCommand): boolean;
++  };
++}
++
++function coopScene(): GameScene | null {
++  const stack = app.scenes?.stack ?? [];
++  for (const s of stack) {
++    const g = s as unknown as Partial<GameScene>;
++    if (g.net && g.world) return s as unknown as GameScene;
++  }
++  return null;
+ }
+ 
+ export function installDebug(): void {
+@@ -50,6 +71,29 @@ export function installDebug(): void {
+   const api: DebugApi = {
+     errors,
+     input,
++    coop: {
++      state() {
++        const g = coopScene();
++        const net = g?.net;
++        if (!g || !net) return null;
++        const w = g.world;
++        return {
++          state: net.state, tick: net.ticks, host: net.isHost, waiting: net.waiting, desync: net.desync, endReason: net.endReason,
++          local: w.local.slot, hash: stateHash(w), floor: w.run.floor, room: w.node.kind, gameOver: w.gameOver,
++          players: w.players.map((p) => ({ slot: p.slot, name: p.name, ch: p.character.id, hp: p.red + p.soul, downed: p.downed, x: p.x, y: p.y })),
++        };
++      },
++      hashes() {
++        const net = coopScene()?.net;
++        return net ? [...net.hashes.entries()] : [];
++      },
++      cmd(c) {
++        const g = coopScene();
++        if (!g?.net) return false;
++        g.command(c);
++        return true;
++      },
++    },
+     start(seed = 'TEST-SEED', character) {
+       const ch = character ?? Characters.all()[0]?.id;
+       app.startRun(seed, ch, true);
+diff --git a/src/game/app.ts b/src/game/app.ts
+index 2e1c907f121e7ed85071715ad1f573f890f16448..e9f963da455abbf5892f8fd98c41ade454cec874 100644
+--- a/src/game/app.ts
++++ b/src/game/app.ts
+@@ -15,6 +15,8 @@ export class App {
+     title?: () => import('../ui/scene').Scene;
+     game?: (seed: string, character: string, seeded: boolean) => import('../ui/scene').Scene;
+     characterSelect?: () => import('../ui/scene').Scene;
++    /** online co-op run (net/session.ts startNetRun) */
++    coop?: (session: import('../net/session').NetSession, start: import('../net/lobby').StartInfo) => import('../ui/scene').Scene;
+   } = {};
+ 
+   init(canvas: HTMLCanvasElement): void {
+diff --git a/src/game/blessings.ts b/src/game/blessings.ts
+index 05a2be561f99f45454f1864d0c1d856e5da6de17..c67a6084c57209e0284a2731ab746325f34be11a 100644
+--- a/src/game/blessings.ts
++++ b/src/game/blessings.ts
+@@ -24,9 +24,10 @@ export function rollBlessings(seed: string, floor: number, owned: (id: string) =
+   return rng.shuffle(pool).slice(0, n);
+ }
+ 
+-/** Choices for the world's current floor. */
++/** Choices for the world's current floor (co-op: the context keeper's own three; P1 gets the solo roll). */
+ export function blessingChoices(w: World): string[] {
+-  return rollBlessings(w.run.seed, w.run.floor, (id) => w.items.hasArtifact(id));
++  const seed = w.coop && w.player.slot > 0 ? `${w.run.seed}#p${w.player.slot}` : w.run.seed;
++  return rollBlessings(seed, w.run.floor, (id) => w.items.hasArtifact(id));
+ }
+ 
+ /** The floor's blessing has not been chosen yet and the moment has come. */
+diff --git a/src/game/coop.ts b/src/game/coop.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..8a5f6d3286cea2a876139c80f2668b2696cae275
+--- /dev/null
++++ b/src/game/coop.ts
+@@ -0,0 +1,112 @@
++// Online co-op rules shared by the simulation and the UI: revive timing and
++// the lockstep commands (player decisions that change the world, applied at the
++// same tick on every peer: blessing picks, artifact discards, the host ending
++// the run or taking the party back to the lobby).
++//
++// No local UI mutates the world directly in a co-op run: overlays send one of
++// these commands (net/netrun.ts) and the world applies it from the frame.
++
++import type { World } from './world';
++import type { Player } from './player';
++import { applyBlessing, blessingChoices, markBlessed } from './blessings';
++import { discardArtifact } from './interact';
++
++/** Seconds a teammate must stand next to a downed keeper to revive them. */
++export const REVIVE_TIME = 2;
++/** Revive reach (px between the keepers' centers). */
++export const REVIVE_RANGE = 22;
++
++/** A lockstep command (JSON, see net/wire NetCommand). */
++export type CoopCommand =
++  /** the keeper picked this floor's blessing (`id: null` = skipped) */
++  | { type: 'bless'; floor: number; id: string | null }
++  /** the keeper discards one copy of an artifact (Tab screen) */
++  | { type: 'discard'; id: string }
++  /** host: end the descent for everyone (pause menu "하강 종료") */
++  | { type: 'end' }
++  /** host: back to the lobby together (after the party summary) */
++  | { type: 'lobby' }
++  /** e2e probe marker (no effect on the world) */
++  | { type: 'probe' }
++  /** debugging / e2e (window.__lk.coop.cmd): applied in lockstep like any command */
++  | { type: 'debug'; op: 'down' | 'god' | 'killAll' | 'room'; kind?: string };
++
++/** Is `cmd` one of ours (shape-checked: commands come from the network)? */
++export function isCoopCommand(cmd: { type: string; [k: string]: unknown }): cmd is CoopCommand {
++  switch (cmd.type) {
++    case 'bless':
++      return typeof cmd.floor === 'number' && (cmd.id === null || typeof cmd.id === 'string');
++    case 'discard':
++      return typeof cmd.id === 'string';
++    case 'end':
++    case 'lobby':
++    case 'probe':
++      return true;
++    case 'debug':
++      return cmd.op === 'down' || cmd.op === 'god' || cmd.op === 'killAll' || cmd.op === 'room';
++    default:
++      return false;
++  }
++}
++
++/**
++ * Apply a keeper's command to the world (every peer, same tick, between steps).
++ * Host-only commands from other slots are ignored. Returns true when the world changed.
++ */
++export function applyCoopCommand(w: World, slot: number, cmd: CoopCommand): boolean {
++  const p = w.players.find((q) => q.slot === slot);
++  switch (cmd.type) {
++    case 'bless':
++      if (!p) return false;
++      return w.asPlayer(p, () => bless(w, p, cmd.floor, cmd.id));
++    case 'discard':
++      if (!p || !p.alive) return false;
++      return w.asPlayer(p, () => !!discardArtifact(w, cmd.id));
++    case 'end':
++      if (slot !== 0 || w.gameOver) return false;
++      w.endRun('하강 종료');
++      return true;
++    case 'debug':
++      if (!p) return false;
++      return w.asPlayer(p, () => debugCommand(w, p, cmd.op, cmd.kind));
++    default:
++      return false;
++  }
++}
++
++function debugCommand(w: World, p: Player, op: string, kind?: string): boolean {
++  switch (op) {
++    case 'down':
++      if (!p.alive) return false;
++      p.god = false;
++      p.invuln = 0;
++      p.shields = 0;
++      return p.hurt(w, 99, '시험', true);
++    case 'god':
++      p.god = !p.god;
++      return true;
++    case 'killAll':
++      for (const e of [...w.enemies]) w.killEnemy(e);
++      return true;
++    case 'room': {
++      const n = w.map.nodes.find((x) => x.kind === kind && x !== w.node);
++      if (!n || w.transitioning) return false;
++      w.teleportTo(n);
++      return true;
++    }
++    default:
++      return false;
++  }
++}
++
++function bless(w: World, p: Player, floor: number, id: string | null): boolean {
++  // stale (another floor) or already chosen: ignore
++  if (floor !== w.run.floor || (p.vars.__blessedFloor ?? 0) >= floor) return false;
++  if (id === null) {
++    markBlessed(w);
++    return true;
++  }
++  if (!blessingChoices(w).includes(id)) return false;
++  applyBlessing(w, id);
++  return true;
++}
+diff --git a/src/game/coopfx.ts b/src/game/coopfx.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..8680468e7a92fce2e99c870176b72597ac76d356
+--- /dev/null
++++ b/src/game/coopfx.ts
+@@ -0,0 +1,102 @@
++// Co-op presentation in the world: each keeper's colour ring and name tag, the
++// downed ghost's revive ring, and a keeper who left fading out. Draw-only (no
++// simulation state is read back from here).
++
++import { Entity } from './entity';
++import type { World } from './world';
++import type { Player } from './player';
++import { VIEW_H, VIEW_W, type Renderer } from '../engine/renderer';
++import { REVIVE_TIME } from './coop';
++
++/** Slot colours: P1 gold, P2 cyan, P3 pink, P4 green. */
++export const SLOT_COLORS = ['#ffd04a', '#56e0ff', '#ff7ad0', '#7aff86'] as const;
++/** Darker partners of SLOT_COLORS (outlines, panel edges). */
++export const SLOT_DARK = ['#7a5410', '#16607a', '#7a1e5c', '#1e7a2e'] as const;
++
++export function slotColor(slot: number): string {
++  return SLOT_COLORS[slot % SLOT_COLORS.length];
++}
++
++export function slotDark(slot: number): string {
++  return SLOT_DARK[slot % SLOT_DARK.length];
++}
++
++/** "P1".."P4" (shown when a keeper has no nickname). */
++export function slotLabel(slot: number): string {
++  return `P${slot + 1}`;
++}
++
++/** A keeper's display name in co-op (nickname, else P1..P4). */
++export function keeperName(p: Player): string {
++  return p.name || slotLabel(p.slot);
++}
++
++/** A keeper who left the session: its sprite rises and fades away. */
++export class FadeOut extends Entity {
++  static override readonly cosmetic = true;
++  private frame: string;
++  private flip: boolean;
++  constructor(p: Player) {
++    super();
++    this.x = p.x;
++    this.y = p.y;
++    this.frame = p.frameName();
++    this.flip = p.flip;
++    this.layer = 2;
++    this.tileCollide = false;
++  }
++
++  override update(_w: World, dt: number): void {
++    this.age += dt;
++    if (this.age > 1) this.dead = true;
++  }
++
++  override draw(r: Renderer): void {
++    const k = Math.min(1, this.age);
++    r.sprite(this.frame, this.x, this.y + 5 - k * 10, { flipX: this.flip, alpha: (1 - k) * 0.8, tint: '#c8d8ff', tintAmount: 0.4 + 0.5 * k });
++  }
++}
++
++/** Floor layer, under the keepers: a colour ring at each keeper's feet (who is who at a glance). */
++export function drawCoopRings(r: Renderer, w: World): void {
++  for (const p of w.players) {
++    if (p.fall > 0) continue;
++    const col = slotColor(p.slot);
++    const a = p.downed ? 0.35 : p === w.local ? 0.85 : 0.65;
++    r.ring(p.x, p.y + 4, p === w.local ? 8.5 : 8, col, 1, a);
++    if (p.downed && p.reviveT > 0) {
++      // revive progress: a filling arc of dots around the ghost
++      const f = Math.min(1, p.reviveT / REVIVE_TIME);
++      const n = 20;
++      for (let i = 0; i < n; i++) {
++        const lit = i / n < f;
++        const ang = -Math.PI / 2 + (i / n) * Math.PI * 2;
++        const x = p.x + Math.cos(ang) * 13;
++        const y = p.y - 6 + Math.sin(ang) * 13;
++        r.rect(x - 1, y - 1, 2, 2, lit ? '#fff0a0' : '#40384a', lit ? 1 : 0.6);
++      }
++    }
++  }
++}
++
++/** Where a keeper is on screen this frame (UI units), recorded while the world is drawn (interpolated). */
++export interface CoopTag {
++  slot: number;
++  /** UI position of the keeper's head */
++  x: number;
++  y: number;
++  /** the keeper is inside the world view */
++  onScreen: boolean;
++}
++
++/** Record every keeper's on-screen spot for the HUD (name tags, off-screen arrows). Draw-only. */
++export function recordCoopTags(r: Renderer, w: World, out: CoopTag[]): void {
++  out.length = 0;
++  for (const p of w.players) {
++    const d = r.worldToDisplay(p.x, p.y - 22 - (p.downed ? 2 : 0));
++    const u = r.displayToUI(d.x, d.y);
++    const sx = p.x - r.viewX;
++    const sy = p.y - r.viewY;
++    out.push({ slot: p.slot, x: u.x, y: u.y, onScreen: sx > -4 && sx < VIEW_W + 4 && sy > 0 && sy < VIEW_H + 16 });
++  }
++}
+diff --git a/src/game/defs.ts b/src/game/defs.ts
+index 6844ad48f3376f84df268993fd03da082d2e37ca..e83b03983dde23bb10e2a56e13c216d4ed8e44e6 100644
+--- a/src/game/defs.ts
++++ b/src/game/defs.ts
+@@ -525,6 +525,12 @@ export const RoomTemplates = makeRegistry<RoomTemplate>('room template');
+  */
+ export interface GlobalHookDef extends ItemHooks {
+   id: string;
++  /**
++   * Co-op: run the world-event hooks (onUpdate / onRoomEnter / onRoomClear /
++   * onFloorStart) once per keeper, with that keeper as `w.player` (state kept in
++   * `w.vars`, which is per keeper). Default: once per event, for the party leader.
++   */
++  perPlayer?: boolean;
+ }
+ export const GlobalHooks = makeRegistry<GlobalHookDef>('global hook');
+ 
+diff --git a/src/game/enemy.ts b/src/game/enemy.ts
+index b6371d0b302a1a3744b0be5f3da42ccc35514c40..7a32e57168b26631bc3fff4c1b880d3e4c743946 100644
+--- a/src/game/enemy.ts
++++ b/src/game/enemy.ts
+@@ -18,6 +18,7 @@ import { animFrame, hasAnim } from '../engine/sprites';
+ import { angleTo, clamp, dist, norm, TAU } from '../engine/math';
+ import { Projectile, fanAngles, orbSprite, type ProjectileOpts } from './projectile';
+ import { fx } from '../engine/rng';
++import type { Player } from './player';
+ 
+ export interface ShootOpts extends Partial<ProjectileOpts> {
+   speed?: number;
+@@ -68,6 +69,10 @@ export class Enemy extends Actor {
+   /** ids of extra parts etc. */
+   parent: Enemy | null = null;
+   lastDamageSource = '';
++  /** co-op: the keeper this enemy goes after (nearest standing one, sticky; World picks it every step) */
++  tgt: Player | null = null;
++  /** co-op: the keeper who hit it last (kill credit, damage over time) */
++  lastHitBy: Player | null = null;
+ 
+   constructor(def: EnemyDef, x: number, y: number, hpMult = 1) {
+     super();
+@@ -178,13 +183,13 @@ export class Enemy extends Actor {
+   }
+ 
+   // -------------------------------------------------------------- AI helpers
+-  /** Position the enemy should target (player, or nearest enemy when charmed). */
++  /** Position the enemy should target (its keeper — co-op: the one it goes after —, or nearest enemy when charmed). */
+   target(w: World): { x: number; y: number } {
+     if (this.hasStatus('charm')) {
+       const other = w.nearestEnemy(this.x, this.y, 400, undefined, this);
+       if (other) return other;
+     }
+-    return w.player;
++    return this.tgt ?? w.player;
+   }
+ 
+   angleToTarget(w: World): number {
+diff --git a/src/game/entity.ts b/src/game/entity.ts
+index 0b140bb692de108261c9333096ccecfff2487ad9..4596405bc48b83528d560d9d35faa8b0344a3de6 100644
+--- a/src/game/entity.ts
++++ b/src/game/entity.ts
+@@ -59,7 +59,12 @@ export interface HitInfo {
+ // id 1 (`resetEntityIds`), and purely visual entities (`static cosmetic`) count
+ // down from -1 on their own, so spawning them conditionally (settings, `fx`
+ // chances, unlock banners) never shifts the ids of gameplay entities.
+-let nextEntityId = 1;
++/** Entity id counters of one World (several Worlds in one process — headless co-op tests — each keep their own). */
++export interface EntityIds {
++  next: number;
++  nextCosmetic: number;
++}
++let ids: EntityIds = { next: 1, nextCosmetic: -1 };
+ 
+ // shared status tints (Actor.statusTint)
+ const TINT_FREEZE = { color: '#9fe8ff', amount: 0.55 } as const;
+@@ -69,16 +74,22 @@ const TINT_BURN = { color: '#ff7a2a', amount: 0.25 };
+ const TINT_POISON = { color: '#7dff5a', amount: 0.3 } as const;
+ const TINT_SLOW = { color: '#8fa8d8', amount: 0.3 } as const;
+ const TINT_WEAK = { color: '#d0d0d0', amount: 0.25 } as const;
+-let nextCosmeticId = -1;
+ 
+-/** Restart entity ids (called when a run's World is created). */
+-export function resetEntityIds(): void {
+-  nextEntityId = 1;
+-  nextCosmeticId = -1;
++/** Restart entity ids (called when a run's World is created); returns the new counters (current from now on). */
++export function resetEntityIds(): EntityIds {
++  ids = { next: 1, nextCosmetic: -1 };
++  return ids;
++}
++
++/** Make `s` the current id counters; returns the previous ones (restore them after). */
++export function useEntityIds(s: EntityIds): EntityIds {
++  const prev = ids;
++  ids = s;
++  return prev;
+ }
+ 
+ function allocId(e: Entity): number {
+-  return (e.constructor as typeof Entity).cosmetic ? nextCosmeticId-- : nextEntityId++;
++  return (e.constructor as typeof Entity).cosmetic ? ids.nextCosmetic-- : ids.next++;
+ }
+ 
+ export abstract class Entity {
+@@ -128,6 +139,12 @@ export abstract class Entity {
+    * Bullet-clearing effects (`World.clearEnemyBullets`) remove these too.
+    */
+   enemyHazard = false;
++  /**
++   * Co-op: the keeper this entity runs on behalf of (`w.player` during its
++   * update), set at spawn from the keeper whose code spawned it; null = unowned
++   * (enemy-made things: the nearest keeper). Single-player: unused.
++   */
++  ctxP: Actor | null = null;
+ 
+   update(_w: World, _dt: number): void {}
+ 
+diff --git a/src/game/interact.ts b/src/game/interact.ts
+index 58df636f9c9635f524042219de544c55a62c2f83..19a990e2d0c387d3e076915e8c77b5f9236ae475 100644
+--- a/src/game/interact.ts
++++ b/src/game/interact.ts
+@@ -40,7 +40,7 @@ export function closestWithin<T extends Point>(px: number, py: number, list: Ite
+ /** The entity the keeper is focusing (preview card + interact target), or null. */
+ export function findFocus(w: World): Entity | null {
+   const p = w.player;
+-  if (!p || p.dead || w.transitioning || w.descending) return null;
++  if (!p || p.dead || p.downed || w.transitioning || w.descending) return null;
+   return closestWithin(p.x, p.y, w.entities, PREVIEW_RANGE, (e) => !e.dead && e !== p && e.previewable(w));
+ }
+ 
+diff --git a/src/game/items.ts b/src/game/items.ts
+index bc5d247a78fb19cf9c3bc7616827d8faccdd8765..53da1381aed2c9fccb031589a8905e1f5a6e9c2a 100644
+--- a/src/game/items.ts
++++ b/src/game/items.ts
+@@ -19,6 +19,7 @@ import type { Enemy } from './enemy';
+ import type { Actor, HitInfo } from './entity';
+ import type { Projectile } from './projectile';
+ import type { Renderer } from '../engine/renderer';
++import type { Player } from './player';
+ 
+ export interface ActiveEffect {
+   key: string;
+@@ -52,6 +53,13 @@ export interface ProcEvent {
+ const EVENT_HOOKS = new Set<keyof ItemHooks>([
+   'modifyHit', 'onHit', 'onKill', 'onHurt', 'onDash', 'onRoomEnter', 'onRoomClear', 'onFloorStart', 'onBomb', 'onPickup', 'onRelease', 'onDeflect',
+ ]);
++/**
++ * Co-op: hooks that are world events (dispatched to every keeper's item system).
++ * A global hook (`defineGlobalHooks`) runs once for them — in the party leader's
++ * dispatch — unless it is `perPlayer`; every other hook is one keeper's own
++ * event, so its globals run in that keeper's dispatch.
++ */
++const WORLD_EVENT_HOOKS = new Set<keyof ItemHooks>(['onUpdate', 'onRoomEnter', 'onRoomClear', 'onFloorStart']);
+ /** min seconds between two HUD flashes / two icon pops of the same artifact */
+ export const PROC_FLASH_CD = 0.6;
+ export const PROC_POP_CD = 2.5;
+@@ -90,17 +98,38 @@ export class ItemSystem {
+   /** effects that implement a given hook (rebuilt lazily after recompute) */
+   private byHook = new Map<keyof ItemHooks, ActiveEffect[]>();
+   private w: World;
++  /** the keeper these items belong to (the context player while its hooks run) */
++  readonly p: Player;
+   /** guard against re-entrant dispatch loops */
+   private depth = 0;
+ 
+-  constructor(w: World) {
++  constructor(w: World, p: Player) {
+     this.w = w;
++    this.p = p;
++    this.look.owner = p;
++  }
++
++  /** Run `fn` with this system's keeper as the world's context player (co-op; a no-op in single-player). */
++  private own<T>(fn: () => T): T {
++    const w = this.w;
++    if (w.player === this.p) return fn();
++    const prev = w.player;
++    w.player = this.p;
++    try {
++      return fn();
++    } finally {
++      w.player = prev;
++    }
+   }
+ 
+   /** Rebuild the effect list & stats. Call after any inventory / weapon change. */
+   recompute(): void {
++    this.own(() => this.recomputeOwn());
++  }
++
++  private recomputeOwn(): void {
+     const w = this.w;
+-    const p = w.player;
++    const p = this.p;
+     const comp = p.inv.compute();
+     this.computed = comp;
+     const effects: ActiveEffect[] = [];
+@@ -128,8 +157,12 @@ export class ItemSystem {
+   }
+ 
+   recomputeStats(): void {
++    this.own(() => this.recomputeStatsOwn());
++  }
++
++  private recomputeStatsOwn(): void {
+     const w = this.w;
+-    const p = w.player;
++    const p = this.p;
+     const base: Stats = { ...BASE_STATS, ...(p.character.baseStats ?? {}) };
+     base.maxHearts = p.baseHearts;
+     const m = new StatMods();
+@@ -154,12 +187,20 @@ export class ItemSystem {
+   private with(hook: keyof ItemHooks): ActiveEffect[] {
+     let l = this.byHook.get(hook);
+     if (!l) {
+-      l = this.effects.filter((e) => typeof e.hooks[hook] === 'function');
++      const w = this.w;
++      // co-op: a world-event global runs in the leader's dispatch only (unless perPlayer)
++      const solo = !w.coop || !WORLD_EVENT_HOOKS.has(hook) || w.players[0] === this.p;
++      l = this.effects.filter((e) => typeof e.hooks[hook] === 'function' && (solo || !e.key.startsWith('global:') || !!(e.hooks as { perPlayer?: boolean }).perPlayer));
+       this.byHook.set(hook, l);
+     }
+     return l;
+   }
+ 
++  /** Forget the per-hook dispatch lists (the party leader changed). */
++  invalidate(): void {
++    this.byHook = new Map();
++  }
++
+   private each(hook: keyof ItemHooks, fn: (e: ActiveEffect) => void): void {
+     if (this.depth > 4) return;
+     const list = this.with(hook);
+@@ -168,6 +209,10 @@ export class ItemSystem {
+     const prevCur = this.cur;
+     const prevEvent = this.curEvent;
+     this.curEvent = EVENT_HOOKS.has(hook);
++    // hooks run with their keeper as the context player (`w.player`, `w.items`, `w.vars`)
++    const w = this.w;
++    const prevP = w.player;
++    w.player = this.p;
+     try {
+       for (let i = 0; i < list.length; i++) {
+         this.cur = list[i];
+@@ -181,6 +226,7 @@ export class ItemSystem {
+       this.depth--;
+       this.cur = prevCur;
+       this.curEvent = prevEvent;
++      w.player = prevP;
+     }
+   }
+ 
+@@ -234,10 +280,14 @@ export class ItemSystem {
+ 
+   /** Is the held weapon one of the character's favoured class (CharacterDef.affinity)? */
+   get affinityActive(): boolean {
+-    return this.w.player.flags.has('affinity');
++    return this.p.flags.has('affinity');
+   }
+ 
+   update(dt: number): void {
++    this.own(() => this.updateOwn(dt));
++  }
++
++  private updateOwn(dt: number): void {
+     const w = this.w;
+     let changed = false;
+     for (const b of this.buffs) {
+@@ -302,25 +352,25 @@ export class ItemSystem {
+     const w = this.w;
+     const item = makeItem(id);
+     w.run.obtained.add(id);
+-    w.player.inv.add(item);
++    this.p.inv.add(item);
+     this.recompute();
+     return item;
+   }
+ 
+   /** Remove one copy of an artifact (curses, trades). */
+   take(id: string): boolean {
+-    const ok = this.w.player.inv.removeOne(id);
++    const ok = this.p.inv.removeOne(id);
+     if (ok) this.recompute();
+     return ok;
+   }
+ 
+   hasArtifact(id: string): boolean {
+-    return this.w.player.inv.has(id);
++    return this.p.inv.has(id);
+   }
+ 
+   /** Number of copies of an artifact held (0 if none). */
+   powerOf(id: string): number {
+-    return this.w.player.inv.countOf(id);
++    return this.p.inv.countOf(id);
+   }
+ }
+ 
+diff --git a/src/game/look.ts b/src/game/look.ts
+index 691fd6f97acbe8a5326b307a0dc836eb8ba07474..ba338a3f206acd5ce491ea3e781eb4cfdf7a0269 100644
+--- a/src/game/look.ts
++++ b/src/game/look.ts
+@@ -11,6 +11,7 @@
+ import { Entity } from './entity';
+ import type { World } from './world';
+ import type { Projectile } from './projectile';
++import type { Player } from './player';
+ import type { ArtifactDef, Rarity } from './defs';
+ import type { DrawOpts, Renderer } from '../engine/renderer';
+ import type { HitInfo, Actor } from './entity';
+@@ -435,13 +436,13 @@ class LookFx extends Entity {
+   }
+ 
+   override update(w: World): void {
+-    const p = w.player;
++    const p = this.sys.keeper(w);
+     this.x = p.x;
+     this.y = p.y;
+   }
+ 
+   override draw(r: Renderer, w: World): void {
+-    const p = w.player;
++    const p = this.sys.keeper(w);
+     if (!p || !p.alive || p.fall > 0) return;
+     const L = this.sys.player;
+     if (L.aura.length) {
+@@ -454,7 +455,7 @@ class LookFx extends Entity {
+ 
+   override light(w: World): void {
+     const L = this.sys.player;
+-    const p = w.player;
++    const p = this.sys.keeper(w);
+     if (!L.glow || !p.alive) return;
+     w.lights.add(p.x, p.y - 6, L.glowR, L.glow, { intensity: 0.32 });
+   }
+@@ -464,11 +465,18 @@ class LookFx extends Entity {
+ export class LookSystem {
+   shot: ShotLook | null = null;
+   player: PlayerLook = EMPTY_PLAYER;
++  /** the keeper wearing this look (co-op: each keeper has its own; null = the world's player) */
++  owner: Player | null = null;
+   private ent: LookFx | null = null;
+   private stepT = 0;
+   private hitT = -1;
+   private stepN = 0;
+ 
++  /** The keeper this look follows. */
++  keeper(w: World): Player {
++    return this.owner ?? w.player;
++  }
++
+   /** Fold the held artifacts (in pickup order) into the shot & player looks. */
+   compose(sources: LookSource[]): void {
+     const looks = sources.filter((s) => s.def.look);
+@@ -538,7 +546,7 @@ export class LookSystem {
+ 
+   /** Keep the companion entity in the current room; footstep / dash sparkles. */
+   update(w: World, dt: number): void {
+-    const p = w.player;
++    const p = this.keeper(w);
+     if (!p) return;
+     const L = this.player;
+     const want = L.aura.length > 0 || L.motes.length > 0 || L.glow !== null;
+@@ -567,7 +575,7 @@ export class LookSystem {
+   onDash(w: World): void {
+     const L = this.player;
+     if (!L.step.length) return;
+-    const p = w.player;
++    const p = this.keeper(w);
+     w.particles.burst(p.x, p.y + 2, {
+       count: 6 + L.step.length * 2, speed: [20, 70], angle: Math.atan2(-p.dashDY, -p.dashDX), spread: 1.3, life: [0.2, 0.4],
+       colors: ['#ffffff', ...L.step], size: [1, 2], additive: true,
+@@ -588,7 +596,7 @@ export class LookSystem {
+   drawMotes(r: Renderer, w: World, front: boolean): void {
+     const motes = this.player.motes;
+     if (!motes.length) return;
+-    const p = w.player;
++    const p = this.keeper(w);
+     if (!p.alive || p.fall > 0) return;
+     const t = w.time;
+     for (let i = 0; i < motes.length; i++) {
+diff --git a/src/game/melee.ts b/src/game/melee.ts
+index d57a7070c5dcf41d03028106dfb2627a39f5b74b..2d25ed619e1cb8d1706db471637e4f4400763972 100644
+--- a/src/game/melee.ts
++++ b/src/game/melee.ts
+@@ -134,9 +134,13 @@ export class MeleeSwing extends Entity {
+             w.room.damageTile(w, tx, ty, this.o.damage);
+           }
+         }
+-      } else if (!this.hitIds.has(w.player.id) && this.contains(w.player.x, w.player.y, w.player.r)) {
+-        this.hitIds.add(w.player.id);
+-        w.player.hurt(w, Math.max(1, Math.round(this.o.damage)), (this.owner as { def?: { name: string } }).def?.name ?? '공격');
++      } else {
++        // enemy swing: every keeper it reaches (single-player: the keeper)
++        for (const pl of w.coop ? w.players : [w.player]) {
++          if (this.hitIds.has(pl.id) || !this.contains(pl.x, pl.y, pl.r)) continue;
++          this.hitIds.add(pl.id);
++          pl.hurt(w, Math.max(1, Math.round(this.o.damage)), (this.owner as { def?: { name: string } }).def?.name ?? '공격');
++        }
+       }
+       // deflect bullets
+       if (this.o.deflect) {
+@@ -161,7 +165,7 @@ export class MeleeSwing extends Entity {
+       colors: ['#ffffff', this.o.color, '#ffe8a0'], shape: 'spark', size: [1, 2],
+     });
+     w.spawn(new ImpactFx(x, y, this.o.angle, crit ? 1.4 : 1, this.o.color));
+-    if (this.o.hitKick > 0) w.renderer.kick(Math.cos(this.o.angle) * this.o.hitKick, Math.sin(this.o.angle) * this.o.hitKick);
++    if (this.o.hitKick > 0 && (!w.coop || this.owner === w.local)) w.renderer.kick(Math.cos(this.o.angle) * this.o.hitKick, Math.sin(this.o.angle) * this.o.hitKick);
+   }
+ 
+   override draw(r: Renderer): void {
+diff --git a/src/game/pickups.ts b/src/game/pickups.ts
+index 9613ace8a59918e6b7331fc3a6f602775002d8ab..8e3c046921b5bbbfe149ccdfceee8e7c76bb0487 100644
+--- a/src/game/pickups.ts
++++ b/src/game/pickups.ts
+@@ -389,8 +389,7 @@ export class FirePlace extends Actor {
+     this.age += dt;
+     if (this.flash > 0) this.flash -= dt;
+     if (!this.lit) return;
+-    const p = w.player;
+-    if (dist(this.x, this.y, p.x, p.y) < this.r + p.r - 1) p.hurt(w, 1, '모닥불');
++    for (const p of w.coop ? w.players : [w.player]) if (dist(this.x, this.y, p.x, p.y) < this.r + p.r - 1) p.hurt(w, 1, '모닥불');
+     if (fx.chance(dt * 14)) {
+       w.particles.spawn({
+         x: this.x + fx.range(-3, 3), y: this.y - 8, vy: -fx.range(15, 35), vx: fx.range(-6, 6), life: fx.range(0.3, 0.7),
+diff --git a/src/game/player.ts b/src/game/player.ts
+index 867b398763304786a92585e537a2f4ecfec22746..d9407528012f891a809bde4eee9224b760fe0ea9 100644
+--- a/src/game/player.ts
++++ b/src/game/player.ts
+@@ -18,11 +18,24 @@ import { fx } from '../engine/rng';
+ import { DIR_VEC } from './constants';
+ import { drawBackWeapon, equipWeapon, swapWeapons, tickHolstered, withSwapPop } from './weaponslots';
+ import { emptyInput, HELD, PRESS, readLocalInput, type PlayerInput } from './seam';
++import { FlowField } from './flow';
++import type { ItemSystem } from './items';
++import type { Entity } from './entity';
+ 
+ export type Facing = 'down' | 'up' | 'side';
+ 
+ export const EMBER_MAX = 100;
+ 
++/**
++ * Coins, bombs and keys. Every keeper has their own in single-player; a co-op
++ * party shares one purse (`World.startParty` hands the same object to everyone).
++ */
++export class Purse {
++  coins = 0;
++  bombs = 1;
++  keys = 0;
++}
++
+ /** Default lantern release: a ring of flame that burns enemies and erases bullets. */
+ export function defaultRelease(w: World, p: Player): void {
+   const radius = 90;
+@@ -59,9 +72,8 @@ export class Player extends Actor {
+   /** one-hit barriers granted by items (each blocks one hit completely) */
+   shields = 0;
+   private peakMaxRed = 0;
+-  coins = 0;
+-  bombs = 1;
+-  keys = 0;
++  /** coins / bombs / keys (shared by the whole party in co-op) */
++  purse = new Purse();
+   inv = new Inventory();
+   weaponId: string;
+   weapon: WeaponState = newWeaponState();
+@@ -116,6 +128,26 @@ export class Player extends Actor {
+    */
+   readonly input: PlayerInput = emptyInput();
+ 
++  // ---- co-op (see World.startParty; single-player: slot 0, never downed)
++  /** lockstep slot 0..3 (P1..P4) */
++  slot = 0;
++  /** nickname shown on the name tag / teammate panel */
++  name = '';
++  /** this keeper's artifacts, buffs, hook dispatch and looks (`w.items` while it is the context player) */
++  items!: ItemSystem;
++  /** per-keeper scratch state of item / kit hooks (`w.vars` while it is the context player) */
++  vars: Record<string, number> = {};
++  /** ground enemies' path field toward this keeper (`w.flow` while it is the context player) */
++  readonly flow = new FlowField();
++  /** the item this keeper stands next to (`w.focus` while it is the context player) */
++  focus: Entity | null = null;
++  /** co-op: at 0 HP the keeper is a ghost (moves, can't attack / interact / be hurt) until revived */
++  downed = false;
++  /** co-op: revive progress in seconds while a teammate stands close */
++  reviveT = 0;
++  /** co-op: left the session (removed from the world) */
++  left = false;
++
+   constructor(character: CharacterDef) {
+     super();
+     this.character = character;
+@@ -126,6 +158,30 @@ export class Player extends Actor {
+     this.solid = false;
+   }
+ 
++  get coins(): number {
++    return this.purse.coins;
++  }
++
++  set coins(v: number) {
++    this.purse.coins = v;
++  }
++
++  get bombs(): number {
++    return this.purse.bombs;
++  }
++
++  set bombs(v: number) {
++    this.purse.bombs = v;
++  }
++
++  get keys(): number {
++    return this.purse.keys;
++  }
++
++  set keys(v: number) {
++    this.purse.keys = v;
++  }
++
+   get maxRed(): number {
+     return this.stats.maxHearts * 2;
+   }
+@@ -135,7 +191,7 @@ export class Player extends Actor {
+   }
+ 
+   override get alive(): boolean {
+-    return !this.dead && this.red + this.soul > 0;
++    return !this.dead && !this.downed && this.red + this.soul > 0;
+   }
+ 
+   get dashing(): boolean {
+@@ -155,12 +211,14 @@ export class Player extends Actor {
+   }
+ 
+   heal(halfHearts: number): number {
++    if (this.downed) return 0;
+     const before = this.red;
+     this.red = Math.min(this.maxRed, this.red + halfHearts);
+     return this.red - before;
+   }
+ 
+   addSoul(halfHearts: number): void {
++    if (this.downed) return;
+     this.soul = Math.min(24 - this.red, this.soul + halfHearts);
+   }
+ 
+@@ -179,7 +237,10 @@ export class Player extends Actor {
+     this.updateStatuses(w, dt);
+     this.updateKnockback(dt);
+     this.updateSquash(dt);
+-    if (!this.alive) return;
++    if (!this.alive) {
++      if (this.downed) this.updateGhost(w, dt);
++      return;
++    }
+ 
+     const s = this.stats;
+     const inp = this.input;
+@@ -306,6 +367,34 @@ export class Player extends Actor {
+     }
+   }
+ 
++  /**
++   * Co-op: a downed keeper drifts around as a translucent ghost (movement only,
++   * over pits; no attacks, dash, items or interact) until a teammate revives them.
++   */
++  private updateGhost(w: World, dt: number): void {
++    const inp = this.input;
++    (w.inputSource ?? readLocalInput)(w, this, inp);
++    this.firing = false;
++    this.dashT = 0;
++    const speed = this.stats.moveSpeed * 0.8;
++    const k = 1 - Math.exp(-dt * 10);
++    this.vx += (inp.mx * speed - this.vx) * k;
++    this.vy += (inp.my * speed - this.vy) * k;
++    this.moving = Math.hypot(this.vx, this.vy) > 12;
++    if (this.moving) {
++      this.facing = Math.abs(this.vy) > Math.abs(this.vx) * 1.1 ? (this.vy < 0 ? 'up' : 'down') : 'side';
++      this.flip = this.vx < 0;
++    }
++    const fly = this.flying;
++    this.flying = true;
++    this.vx += this.kbx;
++    this.vy += this.kby;
++    this.move(w, dt);
++    this.vx -= this.kbx;
++    this.vy -= this.kby;
++    this.flying = fly;
++  }
++
+   /** Gain embers (called when dealing damage). */
+   addEmber(amount: number): void {
+     const before = this.ember;
+@@ -534,11 +623,15 @@ export class Player extends Actor {
+    */
+   hurt(w: World, halfHearts: number, source = '???', raw = false): boolean {
+     if (!this.alive || this.invuln > 0 || this.god || w.transitioning) return false;
++    // co-op: the hurt keeper's items react (onHurt) and its death downs it
++    if (w.coop && w.player !== this) return w.asPlayer(this, () => this.hurt(w, halfHearts, source, raw));
++    // co-op: screen shake / flash only for this peer's own keeper
++    const own = !w.coop || this === w.local;
+     if (this.shields > 0) {
+       this.shields--;
+       this.invuln = Math.max(this.invuln, 0.6);
+       w.sfx('shield_block');
+-      w.shake(0.2);
++      if (own) w.shake(0.2);
+       w.spawn(new RingFx(this.x, this.y - 6, 26, 0.35, '#c8f0ff', 2));
+       w.particles.burst(this.x, this.y - 6, { count: 16, speed: [40, 120], life: [0.2, 0.5], colors: ['#ffffff', '#c8f0ff', '#70b0ff'], size: [1, 2], shape: 'spark' });
+       return false;
+@@ -562,10 +655,12 @@ export class Player extends Actor {
+     w.run.lastDamageSource = source;
+     // feedback scales with the hit (1 = normal, 2+ = heavy attack)
+     const heavy = Math.max(0, Math.round(halfHearts) - 1);
+-    w.shake(0.42 + 0.15 * heavy);
++    if (own) w.shake(0.42 + 0.15 * heavy);
+     w.hitstop(0.08 + 0.025 * heavy);
+-    w.renderer.screenFlash('#ff2030', 0.24 + 0.08 * heavy);
+-    w.playerHurtFx?.(halfHearts);
++    if (own) {
++      w.renderer.screenFlash('#ff2030', 0.24 + 0.08 * heavy);
++      w.playerHurtFx?.(halfHearts);
++    }
+     this.squash(0.72, 1.3);
+     w.sfx('player_hurt', { pitch: heavy ? 0.9 : 1 });
+     w.spawn(new RingFx(this.x, this.y - 6, 16 + 6 * heavy, 0.25, '#ff5060', 2));
+@@ -603,6 +698,10 @@ export class Player extends Actor {
+       this.drawFalling(r);
+       return;
+     }
++    if (this.downed) {
++      this.drawGhost(r);
++      return;
++    }
+     const blink = this.invuln > 0 && !this.dashing && Math.floor(this.invuln * 14) % 2 === 0;
+     // flying characters hover a little above their (smaller) shadow
+     const hover = this.flying ? 2 + Math.sin(this.age * 3.2) : 0;
+@@ -630,6 +729,18 @@ export class Player extends Actor {
+     }
+   }
+ 
++  /** Co-op downed keeper: a pale, floating, see-through lantern ghost. */
++  private drawGhost(r: Renderer): void {
++    const bob = Math.sin(this.age * 2.6) * 1.5;
++    r.shadow(this.x, this.y + 4, 8, 3, 0.15);
++    r.sprite(this.frameName(), this.x, this.y + 1 + bob, {
++      flipX: this.flip,
++      alpha: 0.42 + 0.08 * Math.sin(this.age * 5),
++      tint: '#a8d8ff',
++      tintAmount: 0.6,
++    });
++  }
++
+   /** Trapdoor fall: shrink, spin a little and sink into the hole. */
+   private drawFalling(r: Renderer): void {
+     const f = this.fall;
+@@ -665,6 +776,10 @@ export class Player extends Actor {
+   }
+ 
+   override light(w: World): void {
++    if (this.downed) {
++      w.lights.add(this.x, this.y - 4, 34, '#a8d8ff', { intensity: 0.5 });
++      return;
++    }
+     const fl = (1 + Math.sin(this.age * 9) * 0.03 + Math.sin(this.age * 23) * 0.02) * (1 - this.fall * 0.6);
+     w.lights.add(this.x, this.y - 6, (this.character.lightRadius ?? 95) * fl, this.character.lightColor ?? '#ffd8a0', { intensity: 0.95 });
+     w.lights.add(this.x, this.y - 6, 30, '#ffffff', { intensity: 0.35 });
+diff --git a/src/game/statehash.ts b/src/game/statehash.ts
+index b223b472d63b3cec251436f9a8eb1d52ecc3f438..3d9f79108796dffbc9b2709f2de289611bc8fc23 100644
+--- a/src/game/statehash.ts
++++ b/src/game/statehash.ts
+@@ -8,6 +8,9 @@
+ // Floats are hashed by their exact IEEE-754 bits, so even a one-ulp drift
+ // changes the hash. Purely visual state (particles, lights, camera, cosmetic
+ // entities, UI banners) is left out on purpose: it may legitimately differ.
++// Co-op: every keeper is covered in slot order (never "the local one": the hash
++// must not depend on which peer computes it), plus the co-op state (downed,
++// revive progress, enemy targets); a single-player world hashes exactly as before.
+ 
+ import type { World } from './world';
+ import type { Room } from './room';
+@@ -116,7 +119,9 @@ export function stateHashParts(w: World): Record<string, number> {
+   part('run', (h) => hashRun(h, w));
+   part('world', (h) => hashWorldScalars(h, w));
+   part('room', (h) => hashRoom(h, w));
+-  part('player', (h) => hashPlayer(h, w.player));
++  part('player', (h) => {
++    for (const p of keepers(w)) hashPlayer(h, p, w.coop);
++  });
+   part('entities', (h) => hashEntities(h, w));
+   return out;
+ }
+@@ -125,13 +130,20 @@ function hashWorld(h: StateHasher, w: World): void {
+   hashRun(h, w);
+   hashWorldScalars(h, w);
+   hashRoom(h, w);
+-  if (w.player) hashPlayer(h, w.player);
++  for (const p of keepers(w)) hashPlayer(h, p, w.coop);
+   hashEntities(h, w);
+ }
+ 
++/** The keepers to hash: everyone (slot order) in co-op, else the world's keeper. */
++function keepers(w: World): Player[] {
++  if (w.coop) return w.players;
++  return w.player ? [w.player] : [];
++}
++
+ function hashRun(h: StateHasher, w: World): void {
+   const r = w.run;
+-  h.str(r.seed).str(r.characterId).int(r.floor).rng(r.rng).rng(r.lootRng);
++  // co-op: run.characterId is each peer's own pick; the party roster is what they share
++  h.str(r.seed).str(w.coop ? w.players.map((p) => `${p.slot}:${p.character.id}`).join(',') : r.characterId).int(r.floor).rng(r.rng).rng(r.lootRng);
+   const s = r.stats;
+   h.int(s.kills).num(s.timeSec).num(s.damageTaken).num(s.damageDealt).int(s.roomsCleared).int(s.itemsTaken);
+   h.int(s.coinsCollected).int(s.coinsSpent).int(s.activesUsed).int(s.bossesKilled).int(s.secretsFound).int(s.releases);
+@@ -153,11 +165,13 @@ function hashWorldScalars(h: StateHasher, w: World): void {
+   else h.word(0);
+   for (const f of w.flags) h.str(f);
+   h.word(-4);
+-  for (const k in w.vars) h.str(k).num(w.vars[k]);
+-  h.word(-5);
+-  // buffs (temporary item effects)
+-  for (const b of w.items.buffs) h.str(b.key).num(b.time).str(b.until ?? '');
+-  h.word(-6);
++  // per keeper: hook scratch state and buffs (temporary item effects)
++  for (const p of keepers(w)) {
++    for (const k in p.vars) h.str(k).num(p.vars[k]);
++    h.word(-5);
++    for (const b of p.items.buffs) h.str(b.key).num(b.time).str(b.until ?? '');
++    h.word(-6);
++  }
+ }
+ 
+ function hashRoom(h: StateHasher, w: World): void {
+@@ -175,7 +189,7 @@ function hashRoom(h: StateHasher, w: World): void {
+       if (c.room === w.room) continue;
+       h.int(id);
+       hashTiles(h, c.room);
+-      for (const e of c.entities) if (!(e.constructor as typeof Entity).cosmetic) hashEntity(h, e);
++      for (const e of c.entities) if (!(e.constructor as typeof Entity).cosmetic) hashEntity(h, e, w.coop);
+       h.word(-12);
+     }
+   }
+@@ -194,8 +208,9 @@ function hashWeapon(h: StateHasher, id: string | null, st: WeaponState): void {
+   h.str(id).num(st.cooldown).num(st.charge).num(st.combo).num(st.comboTimer).num(st.sinceAttack).mem(st.mem as Record<string, unknown>);
+ }
+ 
+-function hashPlayer(h: StateHasher, p: Player): void {
++function hashPlayer(h: StateHasher, p: Player, coop = false): void {
+   hashActor(h, p);
++  if (coop) h.int(p.slot).bool(p.downed).num(p.reviveT);
+   h.num(p.red).num(p.soul).num(p.shields).num(p.baseHearts).num(p.ember).num(p.releaseT);
+   h.int(p.coins).int(p.bombs).int(p.keys);
+   h.num(p.aim).bool(p.firing).str(p.facing).bool(p.moving).num(p.dashT).num(p.dashCD).num(p.dashDX).num(p.dashDY).num(p.dashX0).num(p.dashY0);
+@@ -219,11 +234,12 @@ function hashActor(h: StateHasher, a: Actor): void {
+   h.word(-9);
+ }
+ 
+-function hashEntity(h: StateHasher, e: Entity): void {
++function hashEntity(h: StateHasher, e: Entity, coop = false): void {
+   if (e instanceof Player) return; // hashed by hashPlayer (it is also in the list: mark its slot)
+   if (e instanceof Enemy) {
+     h.str(e.def.id);
+     hashActor(h, e);
++    if (coop) h.int(e.tgt ? e.tgt.slot : -1).int(e.lastHitBy ? e.lastHitBy.slot : -1);
+     h.num(e.script.steps).num(e.script.waiting).bool(e.script.done).num(e.dormant).num(e.telegraphT).int(e.phase);
+     h.bool(e.hidden).bool(e.vulnerable).bool(e.harmful).bool(e.champion).bool(e.isMinion).num(e.speed);
+     h.num(e.wantVX).num(e.wantVY).num(e.accel).int(e.facing).str(e.anim).num(e.contactDamage).num(e.mass);
+@@ -258,8 +274,8 @@ function hashEntities(h: StateHasher, w: World): void {
+   for (const list of [w.entities, pending]) {
+     for (const e of list) {
+       if ((e.constructor as typeof Entity).cosmetic) continue;
+-      if (e === w.player) h.word(0x91a7e5);
+-      else hashEntity(h, e);
++      if (w.coop ? e instanceof Player : e === w.player) h.word(0x91a7e5 + (w.coop ? (e as Player).slot : 0));
++      else hashEntity(h, e, w.coop);
+       n++;
+     }
+     h.word(-10);
+diff --git a/src/game/world.ts b/src/game/world.ts
+index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba120a597e73 100644
+--- a/src/game/world.ts
++++ b/src/game/world.ts
+@@ -13,9 +13,9 @@ import { TILE, WALL, CELL_W, CELL_H, DIR_VEC, type Dir } from './constants';
+ import { Characters, Enemies, Floors, RoomTemplates, Themes, Actives, Weapons, Potions, type FloorDef } from './defs';
+ import { generateFloor, matchingDoor, type FloorMap, type NodeDoor, type RoomNode } from './dungeon';
+ import { Room, type Door, type DoorKind } from './room';
+-import { Entity, Actor, resetEntityIds, type HitInfo, type StatusKind } from './entity';
++import { Entity, Actor, resetEntityIds, useEntityIds, type EntityIds, type HitInfo, type StatusKind } from './entity';
+ import { Enemy } from './enemy';
+-import { Player } from './player';
++import { Player, Purse } from './player';
+ import { Projectile } from './projectile';
+ import { FlowField } from './flow';
+ import { ItemSystem, Loot } from './items';
+@@ -28,6 +28,8 @@ import { findFocus } from './interact';
+ import { roomBaseJob } from './roomart';
+ import { localRules, readLocalInput, type InputSource, type SimRules } from './seam';
+ import { Interpolator } from './interp';
++import { REVIVE_RANGE, REVIVE_TIME } from './coop';
++import { FadeOut, drawCoopRings, recordCoopTags, type CoopTag } from './coopfx';
+ 
+ /** Max wall-clock ms per 1/60 s spent pre-rendering neighbour rooms (split over the frames drawn in it). */
+ const IDLE_BUDGET_MS = 2.5;
+@@ -55,6 +57,26 @@ export interface GameOverInfo {
+   source: string;
+ }
+ 
++/** One keeper of a co-op party (`World.startParty`). */
++export interface PartyMember {
++  /** lockstep slot 0..3 */
++  slot: number;
++  characterId: string;
++  name: string;
++}
++
++/** Co-op happenings for the HUD (toasts); UI only, never read by the simulation. */
++export interface CoopEvent {
++  kind: 'down' | 'revive' | 'left';
++  slot: number;
++  name: string;
++  /** world time */
++  t: number;
++}
++
++/** Co-op: an enemy switches to a closer keeper only when it is this much (px) closer. */
++const TARGET_STICK = 32;
++
+ export interface WorldHost {
+   /** open the collection / status overlay */
+   openInventory(): void;
+@@ -81,8 +103,21 @@ export class World {
+   readonly particles = new Particles();
+   readonly run: RunState;
+   readonly host: WorldHost;
++  /**
++   * The CONTEXT keeper: whose turn it is. The simulation sets it before running
++   * code on behalf of a keeper (its own update, item hooks, hits it deals,
++   * pickups it collects, enemies targeting it ...) and restores it; outside the
++   * simulation (drawing, UI) it is `local`. Single-player: always the one keeper.
++   */
+   player!: Player;
+-  items: ItemSystem;
++  /** every keeper in the run, in slot order (co-op: those still in the session) */
++  players: Player[] = [];
++  /** this peer's keeper (camera, HUD, input) */
++  local!: Player;
++  /** online co-op run (lockstep party; downed / revive rules, party scaling) */
++  coop = false;
++  /** co-op toasts for the HUD (UI only) */
++  coopEvents: CoopEvent[] = [];
+   loot: Loot;
+   map!: FloorMap;
+   floor!: FloorDef;
+@@ -94,7 +129,6 @@ export class World {
+   enemies: Enemy[] = [];
+   projectiles: Projectile[] = [];
+   hittables: Actor[] = [];
+-  flow = new FlowField();
+   /** gameplay rng (shared with run) */
+   get rng(): RNG {
+     return this.run.rng;
+@@ -130,7 +164,7 @@ export class World {
+   mapVersion = 0;
+   /** free-form per-run flags for content (e.g. "devilDealTaken") */
+   flags = new Set<string>();
+-  vars: Record<string, number> = {};
++  private noVars: Record<string, number> = {};
+   /**
+    * Fills the keeper's per-step input (`Player.input`): the local devices by
+    * default; scripted in tests, the network frame in lockstep multiplayer.
+@@ -138,8 +172,7 @@ export class World {
+   inputSource: InputSource = readLocalInput;
+   /** simulation-changing options: live settings in single-player, fixed per run in multiplayer */
+   rules: SimRules = localRules;
+-  /** the item the keeper is next to (preview card / interact target; see game/interact.ts) */
+-  focus: Entity | null = null;
++  private noFocus: Entity | null = null;
+   /** entity whose update() is running: default position of sounds played via `sfx()` */
+   private sfxSource: Entity | null = null;
+   /** accumulating damage numbers per (enemy, color) */
+@@ -162,13 +195,15 @@ export class World {
+   private drawAll: Entity[] = [];
+   private drawMid: Entity[] = [];
+ 
++  /** this run's entity id counters (made current while the world simulates; see withIds) */
++  private readonly ids: EntityIds;
++
+   constructor(renderer: Renderer, run: RunState, host: WorldHost) {
+     // entity ids are part of the simulation state: every run starts from 1
+-    resetEntityIds();
++    this.ids = resetEntityIds();
+     this.renderer = renderer;
+     this.run = run;
+     this.host = host;
+-    this.items = new ItemSystem(this);
+     this.loot = new Loot(this);
+     this.snapCanvas = document.createElement('canvas');
+     this.snapCanvas.width = VIEW_W;
+@@ -176,6 +211,100 @@ export class World {
+     this.particles.density = save.settings.particles;
+   }
+ 
++  // ------------------------------------------------------------------ context keeper
++  /** The context keeper's items (artifacts, buffs, hook dispatch). */
++  get items(): ItemSystem {
++    return this.player.items;
++  }
++
++  /** The context keeper's scratch state for item / kit hooks (numbers). */
++  get vars(): Record<string, number> {
++    return this.player ? this.player.vars : this.noVars;
++  }
++
++  /** Path field toward the context keeper (ground enemies chase their target with it). */
++  get flow(): FlowField {
++    return this.player.flow;
++  }
++
++  /** The item the context keeper is next to (preview card / interact target; see game/interact.ts). */
++  get focus(): Entity | null {
++    return this.player ? this.player.focus : this.noFocus;
++  }
++
++  set focus(e: Entity | null) {
++    if (this.player) this.player.focus = e;
++    else this.noFocus = e;
++  }
++
++  /**
++   * Run `fn` with this world's entity id counters current. Only matters when
++   * several Worlds live in one process (headless co-op tests): the game has one.
++   */
++  withIds<T>(fn: () => T): T {
++    const prev = useEntityIds(this.ids);
++    if (prev === this.ids) return fn();
++    try {
++      return fn();
++    } finally {
++      useEntityIds(prev);
++    }
++  }
++
++  /** Run `fn` with `p` as the context keeper, restoring the previous one after. */
++  asPlayer<T>(p: Player, fn: () => T): T {
++    const prev = this.player;
++    if (prev === p) return fn();
++    this.player = p;
++    try {
++      return fn();
++    } finally {
++      this.player = prev;
++    }
++  }
++
++  /** The party leader for room / world events: the first keeper standing, else the first one. */
++  lead(): Player {
++    const ps = this.players;
++    for (let i = 0; i < ps.length; i++) if (ps[i].alive) return ps[i];
++    return ps[0] ?? this.player;
++  }
++
++  /** Nearest keeper to (x, y): standing ones first (ties: lower slot). */
++  nearestPlayer(x: number, y: number): Player {
++    const ps = this.players;
++    let best: Player | null = null;
++    let bd = Infinity;
++    for (let pass = 0; pass < 2 && !best; pass++) {
++      for (let i = 0; i < ps.length; i++) {
++        const p = ps[i];
++        if (pass === 0 && !p.alive) continue;
++        const d = dist2(x, y, p.x, p.y);
++        if (d < bd) {
++          bd = d;
++          best = p;
++        }
++      }
++    }
++    return best ?? this.player;
++  }
++
++  /** Keepers that can be hurt / targeted right now (co-op: everyone standing; single-player: the keeper). */
++  targets(): Player[] {
++    return this.coop ? this.players.filter((p) => p.alive) : [this.player];
++  }
++
++  /** Party size (enemy HP scaling). */
++  get partySize(): number {
++    return this.coop ? this.players.length : 1;
++  }
++
++  /** Co-op enemy HP scaling: x(1 + 0.5(n-1)), bosses x(1 + 0.6(n-1)). */
++  partyHpMult(boss: boolean): number {
++    const n = this.partySize;
++    return n <= 1 ? 1 : 1 + (boss ? 0.6 : 0.5) * (n - 1);
++  }
++
+   /** World simulation paused (overlays). Pausing ducks the music. */
+   get paused(): boolean {
+     return this.pausedFlag;
+@@ -198,29 +327,80 @@ export class World {
+   }
+ 
+   // ================================================================== setup
+-  /** Create the player and enter floor 1. */
++  /** Create the keeper (single-player: the run's character) and enter floor 1. */
+   start(): void {
+-    const ch = Characters.must(this.run.characterId);
+-    const p = new Player(ch);
+-    this.player = p;
+-    p.red = ch.hearts * 2;
+-    p.soul = (ch.soulHearts ?? 0) * 2;
+-    p.coins = ch.coins ?? 0;
+-    p.bombs = ch.bombs ?? 1;
+-    p.keys = ch.keys ?? 0;
+-    this.items.recompute();
+-    for (const a of ch.artifacts ?? []) this.items.give(a);
+-    if (ch.active) {
+-      p.activeId = ch.active;
+-      p.activeCharge = Actives.get(ch.active)?.charge ?? 0;
+-    }
+-    for (const id of ch.artifacts ?? []) this.run.seenOnPedestal.add(id);
+-    this.items.recompute();
+-    p.red = p.maxRed;
++    this.startParty([{ slot: 0, characterId: this.run.characterId, name: '' }], 0, false);
++  }
++
++  /**
++   * Create the keepers and enter floor 1. `coop`: an online party (same seed and
++   * roster on every peer, `localSlot` = this peer's keeper): coins / bombs / keys
++   * become one shared purse (the characters' starting amounts added up).
++   */
++  startParty(members: PartyMember[], localSlot: number, coop = true): void {
++    const prevIds = useEntityIds(this.ids);
++    try {
++      this.startParty1(members, localSlot, coop);
++    } finally {
++      useEntityIds(prevIds);
++    }
++  }
++
++  private startParty1(members: PartyMember[], localSlot: number, coop: boolean): void {
++    const sorted = [...members].sort((a, b) => a.slot - b.slot);
++    const purse = new Purse();
++    purse.bombs = 0;
++    this.coop = coop;
++    this.players = sorted.map((m) => {
++      const p = new Player(Characters.must(m.characterId));
++      p.slot = m.slot;
++      p.name = m.name;
++      p.items = new ItemSystem(this, p);
++      if (coop) p.purse = purse;
++      return p;
++    });
++    this.local = this.players.find((p) => p.slot === localSlot) ?? this.players[0];
++    for (const p of this.players) {
++      const ch = p.character;
++      this.player = p;
++      p.red = ch.hearts * 2;
++      p.soul = (ch.soulHearts ?? 0) * 2;
++      if (coop) {
++        purse.coins += ch.coins ?? 0;
++        purse.bombs += ch.bombs ?? 1;
++        purse.keys += ch.keys ?? 0;
++      } else {
++        p.coins = ch.coins ?? 0;
++        p.bombs = ch.bombs ?? 1;
++        p.keys = ch.keys ?? 0;
++      }
++      this.items.recompute();
++      for (const a of ch.artifacts ?? []) this.items.give(a);
++      if (ch.active) {
++        p.activeId = ch.active;
++        p.activeCharge = Actives.get(ch.active)?.charge ?? 0;
++      }
++      for (const id of ch.artifacts ?? []) this.run.seenOnPedestal.add(id);
++      this.items.recompute();
++      p.red = p.maxRed;
++    }
++    this.player = this.lead();
+     this.startFloor(1);
++    this.player = this.local;
++  }
++
++  /** Every keeper's item system, in slot order (co-op world events); single-player: the keeper's. */
++  private eachItems(fn: (items: ItemSystem) => void): void {
++    if (!this.coop) {
++      fn(this.items);
++      return;
++    }
++    for (const p of [...this.players]) fn(p.items);
+   }
+ 
+   startFloor(index: number): void {
++    // co-op: world events run with the party leader as the context keeper
++    if (this.coop && this.player !== this.lead()) return this.asPlayer(this.lead(), () => this.startFloor(index));
+     this.run.floor = index;
+     const floor = Floors.all().find((f) => f.index === index);
+     if (!floor) throw new Error(`no floor ${index}`);
+@@ -236,12 +416,12 @@ export class World {
+     const start = this.map.nodes[this.map.startId];
+     // forget the previous floor's room so enterRoom() does not cache it under a
+     // node id that now belongs to a different room of the new floor
+-    if (this.room) this.items.expire('room');
++    if (this.room) this.eachItems((it) => it.expire('room'));
+     (this as { room?: Room }).room = undefined;
+     this.enterRoom(start, null);
+     this.floorCard = { name: floor.name, subtitle: floor.subtitle, t: 0 };
+-    this.items.expire('floor');
+-    this.items.onFloorStart();
++    this.eachItems((it) => it.expire('floor'));
++    this.eachItems((it) => it.onFloorStart());
+     audio.playMusic(floor.music);
+     this.sfx('floor_start');
+     save.progress.bestFloor = Math.max(save.progress.bestFloor, index);
+@@ -265,15 +445,17 @@ export class World {
+ 
+   /** Enter `node`. `via` = the door (in the previous room) we walked through. */
+   enterRoom(node: RoomNode, via: NodeDoor | null): void {
++    if (this.coop && this.player !== this.lead()) return this.asPlayer(this.lead(), () => this.enterRoom(node, via));
+     // save the room we are leaving
+     if (this.room) {
+       const keep = this.entities.filter((e) => e.persistent && !e.dead);
+       this.roomCache.set(this.node.id, { room: this.room, entities: keep });
+-      this.items.expire('room');
++      this.eachItems((it) => it.expire('room'));
+     }
+     const prevNode = this.node;
+     this.node = node;
+     this.focus = null;
++    if (this.coop) for (const q of this.players) q.focus = null;
+     const cached = this.roomCache.get(node.id);
+     let room: Room;
+     const firstVisit = !cached;
+@@ -333,7 +515,8 @@ export class World {
+     p.y = free.y;
+     p.vx = p.vy = p.kbx = p.kby = 0;
+     p.dashT = 0;
+-    this.entities.push(p);
++    if (this.coop) this.placeParty(p, room, via && prevNode ? via : null);
++    else this.entities.push(p);
+ 
+     const rng = new RNG(node.seed ^ 0xa5a5);
+     const handler = roomHandler(node.kind);
+@@ -355,7 +538,9 @@ export class World {
+     handler?.onEnter?.(this, room);
+     this.flushPending();
+     this.camInit = false;
+-    this.items.onRoomEnter();
++    this.eachItems((it) => it.onRoomEnter());
++    // co-op: one more treasure pedestal per extra keeper (rolled with w.rng on the first visit)
++    if (this.coop && firstVisit && node.kind === 'treasure') this.coopExtraPedestals(room, room.centerX, room.centerY, 'treasure');
+     // things spawned by room-enter hooks (familiars, hounds ...) must be visible
+     // during the room slide, not pop in when it ends
+     this.flushPending();
+@@ -367,6 +552,56 @@ export class World {
+     if (hostile) this.sfx('door_close', { vol: 0.6 });
+   }
+ 
++  /**
++   * Co-op: everyone enters together. `p` (the leader, already placed at the
++   * doorway or the room's spawn spot) goes first; the others line up beside and
++   * behind it, each on the nearest free spot. All keepers join the entity list.
++   */
++  private placeParty(p: Player, room: Room, via: NodeDoor | null): void {
++    const others = this.players.filter((q) => q !== p);
++    // spread across the doorway's width, a step further into the room each
++    let ax = 1;
++    let ay = 0;
++    let bx = 0;
++    let by = 0;
++    if (via) {
++      const v = DIR_VEC[via.dir];
++      ax = v.y !== 0 ? 1 : 0;
++      ay = v.x !== 0 ? 1 : 0;
++      bx = -v.x;
++      by = -v.y;
++    }
++    const OFFS: [number, number][] = [[-14, 6], [14, 6], [0, 14]];
++    others.forEach((q, i) => {
++      const [side, back] = OFFS[i % OFFS.length];
++      const tx = p.x + ax * side + bx * back;
++      const ty = p.y + ay * side + by * back + (via ? 0 : back * 0.5);
++      const f = room.nearestFree(tx, ty, q.r);
++      q.x = f.x;
++      q.y = f.y;
++      q.vx = q.vy = q.kbx = q.kby = 0;
++      q.dashT = 0;
++    });
++    for (const q of this.players) this.entities.push(q);
++  }
++
++  /**
++   * Co-op: extra item pedestals for the extra keepers (treasure rooms, boss
++   * rewards), rolled with the gameplay rng so every peer gets the same items
++   * while the loot stream stays as in a solo run of the same seed.
++   */
++  private coopExtraPedestals(room: Room, cx: number, cy: number, pool: 'treasure' | 'boss'): void {
++    const extra = this.players.length - 1;
++    const SPOTS: [number, number][] = pool === 'treasure' ? [[0, 36], [-42, 20], [42, 20]] : [[-32, 0], [-64, 0], [0, -30]];
++    for (let i = 0; i < extra; i++) {
++      const item = this.loot.rollItem(pool, this.rng) ?? this.loot.rollItem('treasure', this.rng);
++      if (!item) continue;
++      const [ox, oy] = SPOTS[i % SPOTS.length];
++      const pos = room.nearestFree(cx + ox, cy + oy, 8);
++      this.spawn(new Pedestal(pos.x, pos.y, item));
++    }
++  }
++
+   /** Spawn pickups / fireplaces etc. from template markers (enemies handled separately). */
+   private spawnTemplateMarkers(room: Room, rng: RNG): void {
+     for (const m of room.markers) {
+@@ -431,7 +666,9 @@ export class World {
+       console.warn(`[world] unknown enemy ${id}`);
+       return null;
+     }
+-    const e = new Enemy(def, x, y, def.boss ? this.floor.bossHpMult ?? this.floor.hpMult : this.floor.hpMult);
++    const mult = def.boss ? this.floor.bossHpMult ?? this.floor.hpMult : this.floor.hpMult;
++    // co-op: more keepers, tougher enemies (x1 in single-player)
++    const e = new Enemy(def, x, y, this.coop ? mult * this.partyHpMult(!!def.boss) : mult);
+     if (!def.flying && !def.phasing) {
+       const f = this.room.nearestFree(x, y, Math.min(def.radius, 7));
+       e.x = f.x;
+@@ -443,10 +680,16 @@ export class World {
+   }
+ 
+   spawn<T extends Entity>(e: T): T {
++    // co-op: things a keeper's code spawns keep running on its behalf (see ctxFor);
++    // whatever enemies make stays unowned (it goes after the nearest keeper)
++    if (this.coop && e.ctxP === null && !this.hostileTurn) e.ctxP = this.player;
+     this.pending.push(e);
+     return e;
+   }
+ 
++  /** co-op: an enemy-side entity is updating (its spawns stay unowned) */
++  private hostileTurn = false;
++
+   private flushPending(): void {
+     if (this.pending.length) {
+       for (const e of this.pending) this.entities.push(e);
+@@ -456,9 +699,35 @@ export class World {
+ 
+   // ================================================================== update
+   update(dt: number): void {
++    const prevIds = useEntityIds(this.ids);
++    try {
++      this.update1(dt);
++    } finally {
++      useEntityIds(prevIds);
++    }
++  }
++
++  private update1(dt: number): void {
++    if (!this.coop) {
++      this.step(dt);
++      return;
++    }
++    // co-op: world-level work runs as the party leader; afterwards (drawing, UI)
++    // the context keeper is this peer's own again
++    this.player = this.lead();
++    try {
++      this.step(dt);
++    } finally {
++      this.player = this.local;
++    }
++  }
++
++  private step(dt: number): void {
+     this.savePrev();
+     this.dt = dt;
+     if (this.renderer) this.renderer.updateEffects(dt);
++    // co-op: a finished run stands still behind the party summary
++    if (this.coop && this.gameOver) return;
+     this.updateUiTimers(dt);
+     if (this.hurtT > 0) this.hurtT = Math.max(0, this.hurtT - dt);
+     if (this.transition) {
+@@ -492,17 +761,26 @@ export class World {
+ 
+     this.flushPending();
+     this.rebuildCaches();
+-    this.flow.update(this.room, this.player.x, this.player.y);
++    const coop = this.coop;
++    if (coop) for (const p of this.players) p.flow.update(this.room, p.x, p.y);
++    else this.flow.update(this.room, this.player.x, this.player.y);
+ 
+     for (const e of this.entities) {
+       if (e.dead) continue;
+       this.sfxSource = e;
++      // co-op: each entity runs on behalf of its keeper (see ctxFor)
++      if (coop) {
++        this.player = this.ctxFor(e);
++        this.hostileTurn = e instanceof Enemy || e.team === 'enemy' || e.enemyHazard || (e.ctxP === null && !(e instanceof Player));
++      }
+       if (e instanceof Projectile && e.team === 'enemy') e.update(this, sdt * this.enemyTimeScale);
+       else e.update(this, sdt);
+     }
+     this.sfxSource = null;
++    this.hostileTurn = false;
++    if (coop) this.player = this.lead();
+     if (this.descending) this.updateDescend(sdt);
+-    this.items.update(sdt);
++    this.eachItems((it) => it.update(sdt));
+     this.flushPending();
+     this.rebuildCaches();
+     this.collisions();
+@@ -515,12 +793,18 @@ export class World {
+       const e = es[i];
+       if (e.dead) {
+         e.onRemove(this);
+-        if (e !== this.player) continue;
++        if (!(e instanceof Player)) continue;
+       }
+       es[n++] = e;
+     }
+     es.length = n;
+-    this.focus = findFocus(this);
++    if (coop) {
++      for (const p of this.players) {
++        this.player = p;
++        p.focus = findFocus(this);
++      }
++      this.player = this.lead();
++    } else this.focus = findFocus(this);
+     if (this.clearMomentT >= 0) {
+       this.clearMomentT -= sdt;
+       if (this.clearMomentT < 0) this.roomClearMoment();
+@@ -531,6 +815,7 @@ export class World {
+     this.room.theme.ambientFx?.(this, sdt);
+     this.checkDoors();
+     this.checkClear();
++    if (coop) this.updateRevive(sdt);
+     this.updateCamera(sdt);
+     audio.setMusicIntensity(this.enemies.length > 0 ? 1 : 0);
+ 
+@@ -543,6 +828,147 @@ export class World {
+     }
+   }
+ 
++  // ------------------------------------------------------------------ co-op context
++  /**
++   * Co-op: the keeper an entity runs on behalf of. Keepers: themselves. Enemies:
++   * their target (nearest standing keeper, sticky). Shots / swings: their owner
++   * (an enemy's: its target). Pickups: the nearest keeper that may collect them.
++   * Pedestals, chests, fires, trapdoors: the nearest keeper. Anything else: the
++   * keeper whose code spawned it (familiars, turrets, item zones ...), else the
++   * nearest keeper (enemy hazards).
++   */
++  private ctxFor(e: Entity): Player {
++    if (e instanceof Player) return e;
++    if (e instanceof Enemy) return this.retarget(e);
++    const o = (e as { owner?: unknown }).owner;
++    if (o instanceof Player) return o.left ? this.nearestPlayer(e.x, e.y) : o;
++    if (o instanceof Enemy) return o.tgt && !o.tgt.left ? o.tgt : this.nearestPlayer(e.x, e.y);
++    if (e instanceof Pickup) return this.pickupCtx(e);
++    const c = e.ctxP;
++    if (c instanceof Player && !c.left && !(e instanceof Pedestal || e instanceof Chest || e instanceof Trapdoor || e instanceof FirePlace)) return c;
++    return this.nearestPlayer(e.x, e.y);
++  }
++
++  /** The keeper a pickup works for: the nearest standing one that could collect it, else the nearest. */
++  private pickupCtx(pk: Pickup): Player {
++    const ps = this.players;
++    let best: Player | null = null;
++    let bd = Infinity;
++    for (let i = 0; i < ps.length; i++) {
++      const p = ps[i];
++      if (!p.alive) continue;
++      this.player = p;
++      if (!pk.canCollect(this)) continue;
++      const d = dist2(pk.x, pk.y, p.x, p.y);
++      if (d < bd) {
++        bd = d;
++        best = p;
++      }
++    }
++    return best ?? this.nearestPlayer(pk.x, pk.y);
++  }
++
++  /** Pick (and remember) the keeper an enemy goes after: the nearest standing one, switching only for a clearly closer one. */
++  private retarget(e: Enemy): Player {
++    let cur = e.tgt;
++    if (cur && !cur.alive) cur = null;
++    let best: Player | null = null;
++    let bd = Infinity;
++    for (const p of this.players) {
++      if (!p.alive) continue;
++      const d = dist2(e.x, e.y, p.x, p.y);
++      if (d < bd) {
++        bd = d;
++        best = p;
++      }
++    }
++    if (!best) return e.tgt && !e.tgt.left ? e.tgt : this.players[0];
++    if (!cur || (best !== cur && Math.sqrt(bd) < dist(e.x, e.y, cur.x, cur.y) - TARGET_STICK)) cur = best;
++    e.tgt = cur;
++    return cur;
++  }
++
++  /** Co-op: downed keepers come back after ~2 s with a teammate standing next to them. */
++  private updateRevive(dt: number): void {
++    for (const p of this.players) {
++      if (!p.downed) continue;
++      let near = false;
++      for (const q of this.players) {
++        if (q !== p && q.alive && dist2(p.x, p.y, q.x, q.y) < REVIVE_RANGE * REVIVE_RANGE) near = true;
++      }
++      if (near && this.deathT < 0) {
++        p.reviveT += dt;
++        if (p.reviveT >= REVIVE_TIME) this.revive(p);
++      } else if (p.reviveT > 0) p.reviveT = Math.max(0, p.reviveT - dt * 0.5);
++    }
++  }
++
++  /** Co-op: a downed keeper stands up again with one heart. */
++  revive(p: Player): void {
++    if (!p.downed) return;
++    p.downed = false;
++    p.reviveT = 0;
++    if (p.maxRed >= 2) p.red = Math.max(p.red, 2);
++    else p.soul = Math.max(p.soul, 2);
++    p.invuln = Math.max(p.invuln, 1.5);
++    p.flash = 0.2;
++    p.squash(0.7, 1.35);
++    this.sfx('power_up', { vol: 0.7, x: p.x });
++    this.spawn(new RingFx(p.x, p.y - 6, 30, 0.45, '#fff0b0', 3));
++    this.particles.burst(p.x, p.y - 8, { count: 24, speed: [40, 130], life: [0.3, 0.7], colors: ['#ffffff', '#fff0a0', '#ffd060'], size: [1, 2], additive: true });
++    this.coopEvent('revive', p);
++  }
++
++  /** Co-op: the keeper dropped to 0 HP and becomes a ghost; everyone down = the run is over. */
++  private downPlayer(p: Player, source: string): void {
++    if (p.downed) return;
++    p.downed = true;
++    p.reviveT = 0;
++    p.red = 0;
++    p.soul = 0;
++    p.dashT = 0;
++    p.firing = false;
++    p.statuses.clear();
++    p.vx = p.vy = 0;
++    this.run.lastDamageSource = source;
++    this.sfx('player_die', { vol: 0.7, x: p.x });
++    this.particles.burst(p.x, p.y - 6, { count: 30, speed: [40, 160], life: [0.4, 0.9], colors: ['#ff5060', '#c01828', '#ffffff'], size: [1, 3], gravity: 300, vz: [60, 150] });
++    this.spawn(new RingFx(p.x, p.y - 6, 26, 0.4, '#a8d8ff', 2));
++    this.coopEvent('down', p);
++    if (this.players.every((q) => q.downed) && this.deathT < 0) {
++      this.deathT = 0;
++      audio.stopMusic(1.2);
++      this.slowmo = 0.35;
++      this.slowmoT = 1.2;
++    }
++  }
++
++  /**
++   * Co-op: a keeper left the session. Removed at the same tick on every peer
++   * (its character fades out); the party carries on without it.
++   */
++  removePlayer(slot: number): void {
++    const p = this.players.find((q) => q.slot === slot);
++    if (!p || this.players.length <= 1) return;
++    const wasLeader = this.players[0] === p;
++    p.left = true;
++    p.dead = true;
++    this.players = this.players.filter((q) => q !== p);
++    this.entities = this.entities.filter((e) => e !== p);
++    this.spawn(new FadeOut(p));
++    if (this.local === p) this.local = this.players[0];
++    if (this.player === p) this.player = this.lead();
++    // the new leader's item system now dispatches the world-event global hooks
++    if (wasLeader) for (const q of this.players) q.items.invalidate();
++    this.coopEvent('left', p);
++    if (this.players.every((q) => q.downed) && this.deathT < 0) this.deathT = 0;
++  }
++
++  private coopEvent(kind: CoopEvent['kind'], p: Player): void {
++    this.coopEvents.push({ kind, slot: p.slot, name: p.name, t: this.time });
++    if (this.coopEvents.length > 8) this.coopEvents.shift();
++  }
++
+   private updateUiTimers(dt: number): void {
+     for (const b of this.banners) b.t += dt;
+     this.banners = this.banners.filter((b) => b.t < 3.2);
+@@ -569,11 +995,15 @@ export class World {
+   }
+ 
+   private collisions(): void {
+-    const p = this.player;
++    let p = this.player;
++    const coop = this.coop;
++    const lead = p;
+     // projectiles
+     for (const pr of this.projectiles) {
+       if (pr.dead || pr.delay > 0) continue;
+       if (pr.team === 'player') {
++        // co-op: the shot's owner gets the credit (crits, item hooks, embers)
++        if (coop) this.player = p = pr.owner instanceof Player && !pr.owner.left ? pr.owner : lead;
+         for (const e of this.enemies) {
+           if (pr.dead) break;
+           if (!e.alive || e.hidden || !e.vulnerable || pr.hitIds.has(e.id)) continue;
+@@ -595,31 +1025,23 @@ export class World {
+           }
+         }
+       } else if (pr.team === 'enemy') {
+-        if (!p.alive || p.z > 12) continue;
+-        const rr = pr.r + p.r - 1;
+-        if (dist2(pr.x, pr.y, p.x, p.y - 4) < rr * rr) {
+-          if (p.invuln > 0 && !p.dashing) continue;
+-          if (p.dashing) continue; // dodge through
+-          if (p.hurt(this, pr.damage, pr.owner instanceof Enemy ? pr.owner.def.name : '탄환')) {
+-            p.knock(Math.cos(pr.angle), Math.sin(pr.angle), 120);
+-          }
+-          pr.expire(this, true);
++        if (!coop) {
++          this.enemyShotHits(pr, p);
++          continue;
+         }
++        // co-op: enemy bullets hit every keeper (the first one touched takes it)
++        for (const pl of this.players) if (this.enemyShotHits(pr, pl) || pr.dead) break;
+       }
+     }
++    if (coop) this.player = p = lead;
+     // enemy contact & separation
+     const es = this.enemies;
+     for (let i = 0; i < es.length; i++) {
+       const e = es[i];
+       if (!e.alive || e.hidden) continue;
+-      if (e.harmful && e.dormant <= 0 && e.contactDamage > 0 && e.z < 10 && p.alive && !e.hasStatus('charm')) {
+-        const rr = e.r + p.r - 2;
+-        if (dist2(e.x, e.y, p.x, p.y) < rr * rr) {
+-          if (p.hurt(this, e.contactDamage, e.def.name)) {
+-            const d = Math.hypot(p.x - e.x, p.y - e.y) || 1;
+-            p.knock((p.x - e.x) / d, (p.y - e.y) / d, 160);
+-          }
+-        }
++      if (e.harmful && e.dormant <= 0 && e.contactDamage > 0 && e.z < 10 && !e.hasStatus('charm')) {
++        if (!coop) this.contactHit(e, p);
++        else for (const pl of this.players) this.contactHit(e, pl);
+       }
+       if (e.hasStatus('charm') && e.contactDamage > 0) {
+         for (const o of es) {
+@@ -659,13 +1081,52 @@ export class World {
+     }
+   }
+ 
++  /** An enemy bullet against one keeper; true when it hit (and was used up). */
++  private enemyShotHits(pr: Projectile, p: Player): boolean {
++    if (!p.alive || p.z > 12) return false;
++    const rr = pr.r + p.r - 1;
++    if (dist2(pr.x, pr.y, p.x, p.y - 4) < rr * rr) {
++      if (p.invuln > 0 && !p.dashing) return false;
++      if (p.dashing) return false; // dodge through
++      if (p.hurt(this, pr.damage, pr.owner instanceof Enemy ? pr.owner.def.name : '탄환')) {
++        p.knock(Math.cos(pr.angle), Math.sin(pr.angle), 120);
++      }
++      pr.expire(this, true);
++      return true;
++    }
++    return false;
++  }
++
++  /** Contact damage of a harmful enemy against one keeper. */
++  private contactHit(e: Enemy, p: Player): void {
++    if (!p.alive) return;
++    const rr = e.r + p.r - 2;
++    if (dist2(e.x, e.y, p.x, p.y) < rr * rr) {
++      if (p.hurt(this, e.contactDamage, e.def.name)) {
++        const d = Math.hypot(p.x - e.x, p.y - e.y) || 1;
++        p.knock((p.x - e.x) / d, (p.y - e.y) / d, 160);
++      }
++    }
++  }
++
+   // ================================================================== combat
+   /**
+    * Apply a hit to any actor. Player-caused hits on enemies go through crits,
+    * item hooks, damage numbers and kill handling. Returns true if applied.
+    */
+   applyHit(target: Actor, hit: HitInfo): boolean {
+-    const p = this.player;
++    let p = this.player;
++    if (this.coop) {
++      // co-op: the keeper who dealt it (its crits, items, embers); no friendly fire
++      const a = hit.attacker instanceof Player ? hit.attacker : hit.source instanceof Projectile && hit.source.owner instanceof Player ? hit.source.owner : null;
++      if (target instanceof Player) return a ? false : target.takeHit(this, hit);
++      if (a && !a.left) p = a;
++      if (target instanceof Enemy && (a || (hit.source instanceof Projectile && hit.source.team === 'player'))) {
++        if (!target.alive || !target.vulnerable || target.hidden) return false;
++        target.lastHitBy = p;
++        if (this.player !== p) return this.asPlayer(p, () => this.applyHit(target, hit));
++      }
++    }
+     const byPlayer = hit.attacker === p || (hit.source instanceof Projectile && hit.source.team === 'player');
+     if (target instanceof Enemy && byPlayer) {
+       if (!target.alive || !target.vulnerable || target.hidden) return false;
+@@ -727,7 +1188,8 @@ export class World {
+     if (hit.light) return;
+     // shake: only hits clearly above a normal shot move the camera; a swing that
+     // hits a crowd shakes like its biggest hit, not like the sum of all of them
+-    const shake = Math.min(0.4, (heavy ? 0.04 : 0) + Math.max(0, rel - 1.2) * 0.035 + (hit.crit ? 0.07 : 0));
++    // (co-op: only this peer's own hits)
++    const shake = !this.coop || p === this.local ? Math.min(0.4, (heavy ? 0.04 : 0) + Math.max(0, rel - 1.2) * 0.035 + (hit.crit ? 0.07 : 0)) : 0;
+     if (shake > 0.01 && shake > this.hitShake) {
+       this.shake(shake - this.hitShake);
+       this.hitShake = shake;
+@@ -764,17 +1226,25 @@ export class World {
+ 
+   /** Damage-over-time tick (burn/poison/bleed). */
+   statusDamage(target: Actor, dmg: number, kind: StatusKind): void {
+-    if (target === this.player) {
+-      if (kind === 'burn' || kind === 'poison') this.player.hurt(this, 1, kind === 'burn' ? '화상' : '독', true);
++    if (target === this.player || (this.coop && target instanceof Player)) {
++      if (kind === 'burn' || kind === 'poison') (target as Player).hurt(this, 1, kind === 'burn' ? '화상' : '독', true);
+       return;
+     }
+-    this.applyHit(target, { damage: dmg, kind: 'status', attacker: this.player, light: true, noProc: true, procs: [kind] });
++    // co-op: damage over time is credited to the keeper who last hit the enemy
++    const by = this.coop && target instanceof Enemy && target.lastHitBy && !target.lastHitBy.left ? target.lastHitBy : this.player;
++    this.applyHit(target, { damage: dmg, kind: 'status', attacker: by, light: true, noProc: true, procs: [kind] });
+     const col = kind === 'burn' ? ['#ffe060', '#ff7020'] : kind === 'poison' ? ['#c0ff60', '#40a020'] : ['#ff4050', '#801020'];
+     this.particles.burst(target.x, target.y - 4, { count: 3, speed: [10, 30], life: [0.3, 0.6], colors: col, size: [1, 2], vz: [10, 30], gravity: -20 });
+   }
+ 
+   killEnemy(e: Enemy): void {
+     if (e.dead) return;
++    // co-op: the kill (item hooks, lifesteal, luck) belongs to the keeper who last hit it
++    const by = e.lastHitBy;
++    if (this.coop && by && !by.left && this.player !== by) {
++      this.asPlayer(by, () => this.killEnemy(e));
++      return;
++    }
+     e.hp = Math.min(0, e.hp);
+     e.dead = true;
+     const prevSrc = this.sfxSource;
+@@ -868,12 +1338,17 @@ export class World {
+       }
+     }
+     for (const h of [...this.hittables]) if (dist(x, y, h.x, h.y) < radius + h.r) h.takeHit(this, { damage, kind: 'explosion', attacker: p });
+-    if ((o.hurtsPlayer ?? true) && !p.flags.has('bombImmune') && dist(x, y, p.x, p.y) < radius + p.r - 4) {
+-      // enemy blasts (e.g. bursting bloaters) name their owner on the death screen
+-      // enemy blasts scale with the floor's enemy damage; the keeper's own bombs do not
+-      if (p.hurt(this, 2, o.source instanceof Enemy ? o.source.def.name : '폭발', !(o.source instanceof Enemy))) {
+-        const d = dist(x, y, p.x, p.y) || 1;
+-        p.knock((p.x - x) / d, (p.y - y) / d, 240);
++    // co-op: every keeper in range, except that a keeper's own blasts spare its teammates
++    const friendly = o.byPlayer !== false && !(o.source instanceof Enemy);
++    for (const pl of this.coop ? this.players : [p]) {
++      if (this.coop && friendly && pl !== p) continue;
++      if ((o.hurtsPlayer ?? true) && !pl.flags.has('bombImmune') && dist(x, y, pl.x, pl.y) < radius + pl.r - 4) {
++        // enemy blasts (e.g. bursting bloaters) name their owner on the death screen
++        // enemy blasts scale with the floor's enemy damage; the keeper's own bombs do not
++        if (pl.hurt(this, 2, o.source instanceof Enemy ? o.source.def.name : '폭발', !(o.source instanceof Enemy))) {
++          const d = dist(x, y, pl.x, pl.y) || 1;
++          pl.knock((pl.x - x) / d, (pl.y - y) / d, 240);
++        }
+       }
+     }
+     for (const e of this.entities) {
+@@ -1145,8 +1620,18 @@ export class World {
+ 
+   // ================================================================== room flow
+   private checkDoors(): void {
+-    const p = this.player;
+-    if (!p.alive || this.transitioning) return;
++    if (!this.coop) {
++      this.checkDoorsFor(this.player);
++      return;
++    }
++    // co-op: any standing keeper opens locked doors (shared keys) and walking
++    // into an open doorway takes the whole party through
++    for (const p of [...this.players]) if (this.checkDoorsFor(p)) return;
++  }
++
++  /** Door checks for one keeper; true when it went through a door. */
++  private checkDoorsFor(p: Player): boolean {
++    if (!p.alive || this.transitioning) return false;
+     for (const d of this.room.doors) {
+       // unlock with key
+       if (d.state === 'locked') {
+@@ -1166,9 +1651,10 @@ export class World {
+       const across = v.x !== 0 ? Math.abs(p.y - d.y) : Math.abs(p.x - d.x);
+       if (along > 3 && across < 10) {
+         this.goThroughDoor(d);
+-        return;
++        return true;
+       }
+     }
++    return false;
+   }
+ 
+   private goThroughDoor(d: Door): void {
+@@ -1205,6 +1691,7 @@ export class World {
+   roomCleared(): void {
+     const node = this.node;
+     if (node.cleared) return;
++    if (this.coop && this.player !== this.lead()) return this.asPlayer(this.lead(), () => this.roomCleared());
+     node.cleared = true;
+     this.mapVersion++;
+     this.run.stats.roomsCleared++;
+@@ -1212,12 +1699,13 @@ export class World {
+     this.sfx('door_open');
+     // the chime + door glow land a beat after the last death sound
+     this.clearMomentT = 0.16;
+-    // active item charge
+-    const p = this.player;
+-    const act = p.activeId ? Actives.get(p.activeId) : undefined;
+-    if (act && !act.timed && p.activeCharge < act.charge) {
+-      p.activeCharge = Math.min(act.charge, p.activeCharge + (node.cw * node.ch > 1 ? 2 : 1));
+-      if (p.activeCharge >= act.charge) playSfx('active_ready');
++    // active item charge (co-op: everyone's)
++    for (const p of this.coop ? this.players : [this.player]) {
++      const act = p.activeId ? Actives.get(p.activeId) : undefined;
++      if (act && !act.timed && p.activeCharge < act.charge) {
++        p.activeCharge = Math.min(act.charge, p.activeCharge + (node.cw * node.ch > 1 ? 2 : 1));
++        if (p.activeCharge >= act.charge && (!this.coop || p === this.local)) playSfx('active_ready');
++      }
+     }
+     const handler = roomHandler(node.kind);
+     const rng = new RNG(node.seed ^ 0xc1ea);
+@@ -1226,7 +1714,13 @@ export class World {
+       const pos = this.room.nearestFree(this.room.centerX, this.room.centerY, 6);
+       this.dropRandom(pos.x, pos.y, 'room');
+     }
+-    this.items.onRoomClear();
++    // co-op: a boss leaves one more reward pedestal per extra keeper
++    if (this.coop && node.kind === 'boss' && !this.gameOver && this.entities.concat(this.pending).some((e) => e instanceof Trapdoor)) {
++      this.coopExtraPedestals(this.room, this.room.centerX, this.room.centerY - 20, 'boss');
++    }
++    this.eachItems((it) => it.onRoomClear());
++    // co-op: a cleared room brings every downed keeper back
++    if (this.coop && this.deathT < 0) for (const p of this.players) if (p.downed) this.revive(p);
+   }
+ 
+   /** The room-clear "moment": a soft chime and the opened doors glowing. */
+@@ -1245,12 +1739,14 @@ export class World {
+    */
+   beginDescend(x: number, y: number): void {
+     if (this.transitioning || this.descending || this.gameOver) return;
+-    const p = this.player;
+     this.descending = { x, y, t: 0 };
+-    p.frozen = true;
+-    p.invuln = Math.max(p.invuln, 5);
+-    p.vx = p.vy = p.kbx = p.kby = 0;
+-    p.dashT = 0;
++    // co-op: the whole party goes down together
++    for (const p of this.coop ? this.players : [this.player]) {
++      p.frozen = true;
++      p.invuln = Math.max(p.invuln, 5);
++      p.vx = p.vy = p.kbx = p.kby = 0;
++      p.dashT = 0;
++    }
+     this.sfx('trapdoor', { x });
+     this.sfx('whoosh', { vol: 0.5, pitch: 0.7, x });
+     this.particles.burst(x, y, { count: 16, speed: [20, 70], life: [0.3, 0.7], colors: ['#c0b0d0', '#7a6a8a', '#40304a'], size: [1, 3], drag: 3, sizeEnd: 3, fade: true });
+@@ -1267,21 +1763,25 @@ export class World {
+ 
+   private updateDescend(dt: number): void {
+     const d = this.descending!;
+-    const p = this.player;
++    const ps = this.coop ? [...this.players] : [this.player];
+     d.t += dt;
+     const k = clamp(d.t / DESCEND_FALL, 0, 1);
+     // pulled to the hole's center, then sinks into it
+     const pull = 1 - Math.exp(-dt * 14);
+-    p.x += (d.x - p.x) * pull;
+-    p.y += (d.y - p.y) * pull;
+-    p.vx = p.vy = 0;
+-    p.fall = k * k * (3 - 2 * k);
++    for (const p of ps) {
++      p.x += (d.x - p.x) * pull;
++      p.y += (d.y - p.y) * pull;
++      p.vx = p.vy = 0;
++      p.fall = k * k * (3 - 2 * k);
++    }
+     if (d.t >= DESCEND_FALL) {
+       this.descending = null;
+       this.descend(true);
+-      p.fall = 0;
+-      p.frozen = false;
+-      p.invuln = Math.min(p.invuln, 1);
++      for (const p of ps) {
++        p.fall = 0;
++        p.frozen = false;
++        p.invuln = Math.min(p.invuln, 1);
++      }
+     }
+   }
+ 
+@@ -1300,6 +1800,14 @@ export class World {
+     if (animated && this.floorCard) this.floorCard.t = -0.3;
+   }
+ 
++  /** End the run now (co-op: the host's "하강 종료"); the summary screen follows. */
++  endRun(source: string): void {
++    if (this.gameOver) return;
++    this.run.lastDamageSource = source;
++    this.gameOver = { won: false, source };
++    this.host.onGameOver(this.gameOver);
++  }
++
+   victory(): void {
+     if (this.gameOver) return;
+     this.run.won = true;
+@@ -1309,6 +1817,11 @@ export class World {
+   }
+ 
+   playerDied(source: string): void {
++    // co-op: the context keeper (Player.hurt switches to it) goes down instead
++    if (this.coop) {
++      this.downPlayer(this.player, source);
++      return;
++    }
+     if (this.deathT >= 0) return;
+     this.deathT = 0;
+     this.run.lastDamageSource = source;
+@@ -1466,7 +1979,8 @@ export class World {
+   // ================================================================== camera & draw
+   private updateCamera(dt: number): void {
+     const r = this.renderer;
+-    const p = this.player;
++    // co-op: every peer's camera follows its own keeper
++    const p = this.coop ? this.local : this.player;
+     const room = this.room;
+     let tx: number;
+     let ty: number;
+@@ -1530,7 +2044,38 @@ export class World {
+     }
+   }
+ 
++  /** co-op: every keeper's on-screen spot this frame (name tags / arrows in the HUD); draw-only */
++  readonly coopTags: CoopTag[] = [];
++
++  /** Draw-time context keeper of an entity (pure: same rule as ctxFor, without retargeting). */
++  private drawCtx(e: Entity): Player {
++    if (e instanceof Player) return e;
++    if (e instanceof Enemy) return e.tgt && !e.tgt.left ? e.tgt : this.local;
++    const o = (e as { owner?: unknown }).owner;
++    if (o instanceof Player && !o.left) return o;
++    const c = e.ctxP;
++    if (c instanceof Player && !c.left) return c;
++    return this.local;
++  }
++
++  private drawEntity(e: Entity, r: Renderer): void {
++    if (this.coop) this.player = this.drawCtx(e);
++    e.draw(r, this);
++  }
++
+   private drawFrame(alpha: number): void {
++    if (!this.coop) {
++      this.drawFrameCtx(alpha);
++      return;
++    }
++    try {
++      this.drawFrameCtx(alpha);
++    } finally {
++      this.player = this.local;
++    }
++  }
++
++  private drawFrameCtx(alpha: number): void {
+     const r = this.renderer;
+     r.beginWorld('#06040a');
+     this.room.drawBackground(r);
+@@ -1543,24 +2088,33 @@ export class World {
+     const es = this.entities;
+     for (let i = 0; i < es.length; i++) {
+       const e = es[i];
+-      if (e.dead && e !== this.player) continue;
++      if (e.dead && !(e instanceof Player)) continue;
+       all.push(e);
+       if (e.layer === 1) mid.push(e);
+     }
+-    for (let i = 0; i < all.length; i++) if (all[i].layer === 0) all[i].draw(r, this);
++    for (let i = 0; i < all.length; i++) if (all[i].layer === 0) this.drawEntity(all[i], r);
+     this.room.drawDoors(r, this.time);
++    if (this.coop) drawCoopRings(r, this);
+     this.sortMid(mid);
+-    for (let i = 0; i < mid.length; i++) mid[i].draw(r, this);
++    for (let i = 0; i < mid.length; i++) this.drawEntity(mid[i], r);
+     this.particles.draw(r, false);
+-    for (let i = 0; i < all.length; i++) if (all[i].layer === 2) all[i].draw(r, this);
++    for (let i = 0; i < all.length; i++) if (all[i].layer === 2) this.drawEntity(all[i], r);
+ 
+     // lighting
+     this.lights.begin(r, this.room.theme.ambient);
+-    for (let i = 0; i < all.length; i++) all[i].light(this);
++    for (let i = 0; i < all.length; i++) {
++      if (this.coop) this.player = this.drawCtx(all[i]);
++      all[i].light(this);
++    }
++    if (this.coop) this.player = this.local;
+     if (this.lights.enabled) this.drawParticleLights();
+     this.lights.apply();
+ 
+-    for (let i = 0; i < all.length; i++) if (all[i].layer === 3) all[i].draw(r, this);
++    for (let i = 0; i < all.length; i++) if (all[i].layer === 3) this.drawEntity(all[i], r);
++    if (this.coop) {
++      this.player = this.local;
++      recordCoopTags(r, this, this.coopTags);
++    }
+     this.drawVignette();
+ 
+     if (this.transition) this.drawTransition(alpha);
+diff --git a/src/main.ts b/src/main.ts
+index d595206aacb6637ca5f6b8a8aef4c28d4bade0fa..3faae097397d12fa5f59b26782ea0cc59728c676 100644
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -29,6 +29,7 @@ async function boot(): Promise<void> {
+   app.factories.title = () => new TitleScene();
+   app.factories.characterSelect = () => new CharacterSelectScene();
+   app.factories.game = (seed, ch, seeded) => new GameScene(seed, ch, seeded);
++  app.factories.coop = (session, start) => new GameScene(start.seed, '', false, { session, start });
+ 
+   try {
+     await Promise.race([
+diff --git a/src/net/lobby.ts b/src/net/lobby.ts
+index 0847f6bd3d54cf9ea6362e9c72573c8e980b9b42..f5b9c0b757a1b091a3485ef417a019be4229a66f 100644
+--- a/src/net/lobby.ts
++++ b/src/net/lobby.ts
+@@ -36,6 +36,8 @@ export interface StartInfo {
+   buildId: string;
+   /** suggested initial client jitter buffer in frames (1..4), from lobby RTT jitter */
+   inputDelayHint: number;
++  /** the host's simulation options for this run (game/seam SimRules; absent = defaults) */
++  rules?: { hitStop?: boolean };
+ }
+ 
+ export type LobbyState = 'joining' | 'open' | 'started' | 'closed';
+@@ -232,8 +234,8 @@ export class Lobby {
+     return this.role === 'host' && this.state === 'open' && this.roster.every((p) => p.host || p.ready);
+   }
+ 
+-  /** Host: start the run with `seed`; every peer receives the same StartInfo. */
+-  start(seed: string): StartInfo {
++  /** Host: start the run with `seed` (and the host's sim `rules`); every peer receives the same StartInfo. */
++  start(seed: string, rules?: StartInfo['rules']): StartInfo {
+     if (!this.canStart()) throw new Error('lobby: cannot start yet');
+     this.rebuildRoster();
+     const info: StartInfo = {
+@@ -242,6 +244,7 @@ export class Lobby {
+       buildId: this.o.buildId,
+       inputDelayHint: this.inputDelayHint(),
+     };
++    if (rules) info.rules = { ...rules };
+     this.state = 'started';
+     this.startInfo = info;
+     for (const peer of this.peers.keys()) this.send(peer, { t: 'start', ...info });
+@@ -484,6 +487,10 @@ export class Lobby {
+           buildId: str(m.buildId, 64),
+           inputDelayHint: Number(m.inputDelayHint) || 2,
+         };
++        if (m.rules && typeof m.rules === 'object') {
++          const r = m.rules as Record<string, unknown>;
++          info.rules = typeof r.hitStop === 'boolean' ? { hitStop: r.hitStop } : {};
++        }
+         if (info.buildId !== this.o.buildId) {
+           this.close('version');
+           return;
+diff --git a/src/net/lockstep.ts b/src/net/lockstep.ts
+index 3b044b21655d9f47284697d5541394fce73f57eb..c1187ea5d737d43d514dfb0aa09958d467e732dc 100644
+--- a/src/net/lockstep.ts
++++ b/src/net/lockstep.ts
+@@ -379,6 +379,16 @@ export class LockstepHost {
+     this.closed = true;
+     this.unlisten();
+   }
++
++  /**
++   * Stop quietly, keeping the clients' connections (no END): the transport is
++   * handed to something else, e.g. the lobby after a co-op run ended together.
++   */
++  detach(): void {
++    if (this.closed) return;
++    this.closed = true;
++    this.unlisten();
++  }
+ }
+ 
+ // ================================================================ client
+@@ -570,6 +580,11 @@ export class LockstepClient {
+     }
+   }
+ 
++  /** Stop quietly without leaving (the transport is handed on, e.g. back to the lobby with the host). */
++  detach(): void {
++    this.end('closed', false);
++  }
++
+   /** Leave the session (the host seals a `left` marker for this slot). */
+   leave(): void {
+     if (this.ended) return;
+diff --git a/src/net/netrun.ts b/src/net/netrun.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d7a01928be40d3dde7b36874269f5e24b422bb07
+--- /dev/null
++++ b/src/net/netrun.ts
+@@ -0,0 +1,199 @@
++// NetRun: one co-op run on top of a NetSession — the lockstep loop around the
++// shared World.
++//
++// Every local fixed step (the game scene's update):
++//   1. sample this peer's input (keyboard / mouse / pad / touch, incl. touch
++//      auto-aim, all resolved locally into a PlayerInput) and quantize it into
++//      the 17-byte payload (game/seam encodeInput);
++//   2. host: seal the next frame with it (+ queued commands) and simulate it;
++//      client: send it, then simulate every frame the jitter buffer releases
++//      (0, 1 or 2 — the World interpolates whatever ran in this step);
++//   3. per frame: drop `left` keepers, decode every slot's payload into that
++//      keeper's input (World.inputSource), apply the frame's commands
++//      (game/coop.ts), step the world, and every HASH_INTERVAL ticks report
++//      stateHash(world) (desyncs come back through onDesync).
++// No local UI touches the world: overlays call `sendCommand`.
++
++import type { NetSession } from './session';
++import type { StartInfo } from './lobby';
++import type { DesyncEvent, ClientEndReason } from './lockstep';
++import { shouldHash } from './lockstep';
++import type { Frame, NetCommand } from './wire';
++import type { World } from '../game/world';
++import { FIXED_DT } from '../game/constants';
++import { clearInput, decodeInput, emptyInput, encodeInput, INPUT_BYTES, type PlayerInput } from '../game/seam';
++import { stateHash, stateHashParts } from '../game/statehash';
++import { applyCoopCommand, isCoopCommand, type CoopCommand } from '../game/coop';
++
++export type NetRunState =
++  /** playing */
++  | 'running'
++  /** a peer's state hash differed from the host's: the run cannot continue */
++  | 'desync'
++  /** the session ended under us (host gone, room closed, dropped) */
++  | 'ended'
++  /** the host took the party back to the lobby (the scene hands the transport over) */
++  | 'lobby';
++
++const EMPTY_PAYLOAD = new Uint8Array(INPUT_BYTES);
++/** recent hashed ticks kept for desync diagnostics */
++const PARTS_KEEP = 8;
++
++export class NetRun {
++  readonly session: NetSession;
++  readonly start: StartInfo;
++  readonly world: World;
++  state: NetRunState = 'running';
++  /** why the session ended (state 'ended') */
++  endReason: ClientEndReason | null = null;
++  desync: DesyncEvent | null = null;
++  /** frames simulated so far (= next tick) */
++  ticks = 0;
++  /** per slot: this tick's decoded input (World.inputSource reads it) */
++  private readonly inputs: PlayerInput[] = [emptyInput(), emptyInput(), emptyInput(), emptyInput()];
++  private readonly payload = new Uint8Array(INPUT_BYTES);
++  /** host: commands for the next sealed frame */
++  private hostCmds: NetCommand[] = [];
++  private observers = new Set<(f: Frame) => void>();
++  private parts = new Map<number, Record<string, number>>();
++  /** hash per hashed tick (diagnostics / tests) */
++  readonly hashes = new Map<number, number>();
++  /**
++   * Tests / tools: deterministic world changes right before a frame's step
++   * (must depend only on the tick and the world, so every peer does the same).
++   */
++  beforeStep: ((w: World, tick: number) => void) | null = null;
++
++  constructor(session: NetSession, start: StartInfo, world: World) {
++    this.session = session;
++    this.start = start;
++    this.world = world;
++    world.inputSource = (_w, p, out) => {
++      const src = this.inputs[p.slot];
++      out.mx = src.mx;
++      out.my = src.my;
++      out.ax = src.ax;
++      out.ay = src.ay;
++      out.cx = src.cx;
++      out.cy = src.cy;
++      out.held = src.held;
++      out.pressed = src.pressed;
++    };
++    const onDesync = (e: DesyncEvent) => this.onDesync(e);
++    if (session.host) session.host.onDesync = onDesync;
++    if (session.client) {
++      session.client.onDesync = onDesync;
++      session.client.onEnd = (reason) => {
++        if (this.state === 'running') {
++          this.state = 'ended';
++          this.endReason = reason;
++        }
++      };
++    }
++    session.game = {
++      observe: (fn) => {
++        this.observers.add(fn);
++        return () => this.observers.delete(fn);
++      },
++      sendCommand: (cmd) => this.sendCommand(cmd as NetCommand),
++    };
++  }
++
++  get isHost(): boolean {
++    return this.session.role === 'host';
++  }
++
++  /** Client: no frame from the host for a while (show "연결 대기 중…"). */
++  get waiting(): boolean {
++    return this.state === 'running' && !!this.session.client?.waitingForHost;
++  }
++
++  /** Queue a lockstep command (applied on every peer at the same tick). */
++  sendCommand(cmd: CoopCommand | NetCommand): void {
++    if (this.state !== 'running' && cmd.type !== 'lobby') return;
++    if (this.session.host) this.hostCmds.push(cmd as NetCommand);
++    else this.session.client?.sendCommand(cmd as NetCommand);
++  }
++
++  /**
++   * One local fixed step: send `sample` (this peer's input, null = none: an
++   * overlay is open) and simulate the frames that are due. Returns how many
++   * world steps ran (0..2).
++   */
++  step(sample: PlayerInput | null): number {
++    if (this.state !== 'running' || this.session.closed) return 0;
++    const payload = sample ? encodeInput(sample, this.payload) : EMPTY_PAYLOAD;
++    const host = this.session.host;
++    if (host) {
++      const cmds = this.hostCmds;
++      this.hostCmds = [];
++      this.apply(host.sealFrame(host.tick + 1, payload, cmds));
++      return 1;
++    }
++    const client = this.session.client;
++    if (!client) return 0;
++    client.sendInput(payload);
++    let n = 0;
++    for (let k = client.stepsDue(); k > 0 && this.state === 'running'; k--) {
++      this.apply(client.nextFrame());
++      n++;
++    }
++    return n;
++  }
++
++  /** Simulate one sealed frame (identical on every peer). */
++  private apply(f: Frame): void {
++    this.world.withIds(() => this.apply1(f));
++  }
++
++  private apply1(f: Frame): void {
++    const w = this.world;
++    for (const slot of f.left) w.removePlayer(slot);
++    for (let slot = 0; slot < this.inputs.length; slot++) {
++      const b = f.inputs[slot];
++      if (b) decodeInput(b, this.inputs[slot]);
++      else clearInput(this.inputs[slot]);
++    }
++    let lobby = false;
++    for (const { slot, cmd } of f.commands) {
++      if (!isCoopCommand(cmd)) continue;
++      if (cmd.type === 'lobby') {
++        if (slot === 0) lobby = true;
++        continue;
++      }
++      applyCoopCommand(w, slot, cmd);
++    }
++    // (outside the step the context keeper is this peer's own: scripted changes run as the party leader)
++    if (this.beforeStep) w.asPlayer(w.lead(), () => this.beforeStep!(w, f.tick));
++    w.update(FIXED_DT);
++    this.ticks = f.tick + 1;
++    if (shouldHash(f.tick)) {
++      const h = stateHash(w);
++      this.hashes.set(f.tick, h);
++      if (this.hashes.size > 4096) this.hashes.delete(this.hashes.keys().next().value as number);
++      this.parts.set(f.tick, stateHashParts(w));
++      if (this.parts.size > PARTS_KEEP) this.parts.delete(this.parts.keys().next().value as number);
++      (this.session.host ?? this.session.client)?.submitHash(f.tick, h);
++    }
++    for (const fn of this.observers) fn(f);
++    if (lobby && this.state === 'running') this.state = 'lobby';
++  }
++
++  private onDesync(e: DesyncEvent): void {
++    if (this.state !== 'running') return;
++    this.state = 'desync';
++    this.desync = e;
++    // diagnostics: which part of our state the hash at that tick was made of
++    console.warn(`[coop] desync at tick ${e.tick} (slot ${e.slot}: host ${e.hostHash.toString(16)} vs peer ${e.peerHash.toString(16)})`, {
++      ourParts: this.parts.get(e.tick) ?? null,
++      currentParts: stateHashParts(this.world),
++      tick: this.ticks,
++    });
++  }
++
++  /** Stop observing / sending (the scene is going away). */
++  dispose(): void {
++    this.observers.clear();
++    if (this.session.game) this.session.game = null;
++  }
++}
+diff --git a/src/net/session.ts b/src/net/session.ts
+index 2da3863119e5def576925727b1536dffee811a1c..d5a844c6671f4843be72e8b2217240703e545cb3 100644
+--- a/src/net/session.ts
++++ b/src/net/session.ts
+@@ -1,10 +1,8 @@
+ // NetSession: what the lobby hands to the game when the host starts a co-op run
+ // (transport + lockstep role + roster + local slot + RTT), and the integration
+-// hook `startNetRun(session, start)` every peer calls with the same StartInfo.
+-//
+-// The default `startNetRun` below just starts a normal single-player run with
+-// the shared seed and the local player's character, so the lobby flow is
+-// testable end to end; the multiplayer world integration replaces it.
++// hook `startNetRun(session, start)` every peer calls with the same StartInfo:
++// it starts the co-op game scene (ui/game-scene.ts), whose NetRun
++// (net/netrun.ts) drives the lockstep and the shared World.
+ 
+ import { app } from '../game/app';
+ import { LockstepClient, LockstepHost, shouldHash, type LockstepOptions } from './lockstep';
+@@ -32,6 +30,20 @@ export interface NetSession {
+   readonly closed: boolean;
+   /** leave / end the session and close the transport */
+   close(): void;
++  /**
++   * End the session but keep the connections: stops the lockstep quietly and
++   * returns the transport (the whole party goes back to the lobby together).
++   */
++  detach(): Transport;
++  /** the co-op run driving this session (set by NetRun; the e2e probe observes it) */
++  game: NetGameHook | null;
++}
++
++/** What a running co-op game exposes to the session tools (e2e probe). */
++export interface NetGameHook {
++  /** observe every frame the game simulates; returns an unsubscribe */
++  observe(fn: (f: Frame) => void): () => void;
++  sendCommand(cmd: { type: string; [k: string]: unknown }): void;
+ }
+ 
+ let active: NetSession | null = null;
+@@ -68,6 +80,7 @@ export function createNetSession(lobby: Lobby, start: StartInfo, opts: LockstepO
+     get closed() {
+       return closed;
+     },
++    game: null,
+     close() {
+       if (closed) return;
+       closed = true;
+@@ -78,6 +91,17 @@ export function createNetSession(lobby: Lobby, start: StartInfo, opts: LockstepO
+       setTimeout(() => transport.close('closed'), 250);
+       if (active === session) active = null;
+     },
++    detach() {
++      if (!closed) {
++        closed = true;
++        if (timer) clearInterval(timer);
++        host?.detach();
++        client?.detach();
++        lobby.dispose();
++        if (active === session) active = null;
++      }
++      return transport;
++    },
+   };
+   active = session;
+   return session;
+@@ -85,10 +109,15 @@ export function createNetSession(lobby: Lobby, start: StartInfo, opts: LockstepO
+ 
+ /**
+  * Integration hook: called on every peer when the host starts, with the same
+- * StartInfo. DEFAULT: a normal single-player run with the shared seed and the
+- * local player's character (the co-op world integration replaces this body).
++ * StartInfo. Starts the co-op game scene: a World with every roster keeper,
++ * built from the shared seed, driven by the lockstep (net/netrun.ts).
+  */
+ export function startNetRun(session: NetSession, start: StartInfo): void {
++  if (app.factories.coop) {
++    app.scenes.set(app.factories.coop(session, start));
++    return;
++  }
++  // no co-op scene registered (tools): a solo run with the shared seed
+   const me = start.roster.find((p) => p.slot === session.localSlot);
+   app.startRun(start.seed, me?.characterId ?? start.roster[0]?.characterId ?? '', true);
+ }
+@@ -113,6 +142,7 @@ export interface ProbeResult {
+  * real transports end to end. Each peer also sends one command at tick 30.
+  */
+ export function probeLockstep(session: NetSession, ticks = 180): Promise<ProbeResult> {
++  if (session.game) return probeGame(session, session.game, ticks);
+   return new Promise((resolve, reject) => {
+     let digest = 0x811c9dc5;
+     let done = 0;
+@@ -154,3 +184,57 @@ export function probeLockstep(session: NetSession, ticks = 180): Promise<ProbeRe
+     }, 8);
+   });
+ }
++
++/**
++ * The probe while a co-op run drives the session: observe the frames the game
++ * simulates. The window starts at the frame carrying the host's 'probe' command
++ * (clients send theirs once they saw it, so every probe command lands inside
++ * the window) and spans `ticks` frames: every peer digests the same frames.
++ */
++function probeGame(session: NetSession, game: NetGameHook, ticks: number): Promise<ProbeResult> {
++  return new Promise((resolve, reject) => {
++    let digest = 0x811c9dc5;
++    let done = 0;
++    let startTick = -1;
++    let sent = false;
++    const commands: string[] = [];
++    const started = performance.now();
++    // the host marks the window half a second in, so every client is observing by then
++    let wait = session.role === 'host' ? 30 : -1;
++    const stop = game.observe((f) => {
++      if (wait > 0 && --wait === 0) {
++        game.sendCommand({ type: 'probe' });
++        sent = true;
++      }
++      if (startTick < 0) {
++        if (!f.commands.some((c) => c.slot === 0 && c.cmd.type === 'probe')) return;
++        startTick = f.tick;
++        if (!sent) {
++          sent = true;
++          game.sendCommand({ type: 'probe' });
++        }
++      }
++      if (done >= ticks) return;
++      digest = Math.imul(digest ^ frameDigest(f), 0x01000193) >>> 0;
++      for (const c of f.commands) if (c.cmd.type === 'probe') commands.push(`${f.tick}:${c.slot}:${c.cmd.type}`);
++      done++;
++      if (done >= ticks) finish();
++    });
++    const timer = setInterval(() => {
++      if (performance.now() - started > ticks * 50 + 15000) {
++        clearInterval(timer);
++        stop();
++        reject(new Error(`probe timed out after ${done}/${ticks} frames`));
++      }
++    }, 250);
++    function finish(): void {
++      clearInterval(timer);
++      stop();
++      const st = session.client?.stats;
++      resolve({
++        role: session.role, frames: done, digest, commands,
++        underruns: st?.underruns ?? 0, catchUps: st?.catchUps ?? 0, target: st?.target ?? 0, rtt: Math.round(session.rtt(1)),
++      });
++    }
++  });
++}
+diff --git a/src/ui/blessing.ts b/src/ui/blessing.ts
+index 9f5931208082f387d32196f3b3ace975ff9a02d6..38b014f3fc82561bcdd15a857817a1604ddcd6e8 100644
+--- a/src/ui/blessing.ts
++++ b/src/ui/blessing.ts
+@@ -17,7 +17,6 @@ import { divider, frame, glow, keyHintRow, spriteCentered } from './frame';
+ import { Repeater, appear } from './anim';
+ import { actionLabel } from './keys';
+ import { touchUiActive } from './touch-mode';
+-import { applyBlessing } from '../game/blessings';
+ 
+ const CARD_W = 156;
+ const CARD_H = 196;
+@@ -62,7 +61,8 @@ export class BlessingOverlay implements Scene {
+       this.chosenT += dt;
+       if (this.chosenT > 0.42) {
+         this.game.closeOverlay(this);
+-        applyBlessing(this.game.world, this.choices[this.chosen]);
++        // single-player: applied now; co-op: a lockstep command
++        this.game.chooseBlessing(this.choices[this.chosen]);
+       }
+       return;
+     }
+diff --git a/src/ui/coop.ts b/src/ui/coop.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..df94ef8a956e58ac52a25eff994c1897e7176285
+--- /dev/null
++++ b/src/ui/coop.ts
+@@ -0,0 +1,387 @@
++// Online co-op UI: teammate panels, name tags over the keepers, arrows to
++// teammates off screen, "OO님이 쓰러졌어요" toasts and the downed banner (CoopHud,
++// drawn by the HUD); the "연결 대기 중…" overlay; the connection notices
++// (desync, host lost, room closed); and the party summary after the run.
++// Everything here only reads the world.
++
++import type { Scene } from './scene';
++import type { Renderer } from '../engine/renderer';
++import { UI_H, UI_W } from '../engine/renderer';
++import type { GameScene } from './game-scene';
++import type { GameOverInfo, World } from '../game/world';
++import type { Player } from '../game/player';
++import { EMBER_MAX } from '../game/player';
++import { Actives, Weapons } from '../game/defs';
++import { Menu } from './widgets';
++import { app } from '../game/app';
++import { clamp, ease } from '../engine/math';
++import { animFrame, hasAnim } from '../engine/sprites';
++import { sfx } from '../audio/audio';
++import { C, formatTime, splitFloorName } from './theme';
++import { divider, fitScale, frame, glow, spriteCentered } from './frame';
++import { appear, envelope } from './anim';
++import { keeperName, slotColor, slotDark, slotLabel } from '../game/coopfx';
++import { REVIVE_TIME } from '../game/coop';
++import { netErrorText, type NetErrorCode } from '../net/transport';
++import { touchUiActive } from './touch-mode';
++
++/** A keeper's face for panels (idle animation, else the portrait). */
++function face(p: Player, t: number): string {
++  const ch = p.character;
++  const idle = `${ch.spritePrefix}_idle_down`;
++  return hasAnim(idle) ? animFrame(idle, t) : ch.portrait;
++}
++
++// ---------------------------------------------------------------- HUD
++const PANEL_W = 128;
++const PANEL_H = 36;
++const TOAST_TIME = 3.2;
++
++/** Co-op parts of the HUD (drawn on top of the regular one, in the safe area). */
++export class CoopHud {
++  private t = 0;
++  /** last coop event drawn as a toast */
++  private seen = 0;
++  private toasts: { text: string; color: string; t: number }[] = [];
++  private hearts = new Map<number, number>();
++  private hurtT = new Map<number, number>();
++
++  update(w: World, dt: number): void {
++    this.t += dt;
++    // new events → toasts
++    const ev = w.coopEvents;
++    const fresh = ev.filter((e) => e.t > this.seen || (e.t === this.seen && false));
++    for (const e of fresh) {
++      this.seen = Math.max(this.seen, e.t + 1e-9);
++      const name = e.name || slotLabel(e.slot);
++      const mine = e.slot === w.local.slot;
++      const text = e.kind === 'down' ? (mine ? '쓰러졌어요 — 동료 곁에 머물면 일어나요' : `${name}님이 쓰러졌어요`)
++        : e.kind === 'revive' ? (mine ? '다시 일어났어요!' : `${name}님이 일어났어요`)
++          : `${name}님이 나갔어요`;
++      this.toasts.push({ text, color: e.kind === 'down' ? '#ff9aa0' : e.kind === 'revive' ? '#fff0a0' : C.textDim, t: this.t });
++      if (e.kind === 'down') sfx('warn', { vol: 0.35 });
++    }
++    this.toasts = this.toasts.filter((x) => this.t - x.t < TOAST_TIME);
++    if (this.toasts.length > 3) this.toasts.splice(0, this.toasts.length - 3);
++    for (const p of w.players) {
++      const hp = p.red + p.soul;
++      const before = this.hearts.get(p.slot);
++      if (before !== undefined && hp < before) this.hurtT.set(p.slot, this.t);
++      this.hearts.set(p.slot, hp);
++    }
++  }
++
++  /** Teammate panels (right edge, under the minimap), tags, arrows, toasts. `ox/oy`: safe-area origin, `W/H`: HUD area. */
++  draw(r: Renderer, w: World, A: number, ox: number, oy: number, W: number, H: number, panelTop: number): void {
++    this.drawTags(r, w, A);
++    const mates = w.players.filter((p) => p !== w.local);
++    const touch = touchUiActive();
++    // phones: the panels shrink to a narrow column so the touch buttons stay clear
++    const pw = touch ? 104 : PANEL_W;
++    mates.forEach((p, i) => this.drawPanel(r, w, p, ox + W - pw - 8, oy + panelTop + i * (PANEL_H + 4), pw, A));
++    this.drawToasts(r, w, A, ox + W / 2, oy + (touch ? 58 : 46));
++    if (w.local.downed) this.drawDowned(r, w, A, ox + W / 2, oy + H * 0.68);
++  }
++
++  private drawPanel(r: Renderer, w: World, p: Player, x: number, y: number, pw: number, A: number): void {
++    const col = slotColor(p.slot);
++    const down = p.downed;
++    const a = A * (down ? 0.85 : 1);
++    frame(r, x, y, pw, PANEL_H, 'panel', { alpha: a * 0.92 });
++    r.uiRect(x + 2, y + 2, 3, PANEL_H - 4, col, a);
++    // face
++    const hurt = this.t - (this.hurtT.get(p.slot) ?? -9) < 0.3;
++    spriteCentered(r, face(p, this.t + p.slot * 0.37), x + 18, y + PANEL_H / 2 + 1, 1.5, {
++      alpha: a * (down ? 0.5 : 1), tint: down ? '#a8d8ff' : undefined, tintAmount: down ? 0.6 : undefined, flash: hurt ? 0.7 : 0,
++    });
++    // name
++    const name = keeperName(p);
++    r.uiText(name, x + 32, y + 4, { size: 10, font: 'small', color: col, alpha: a, outline: C.ink });
++    if (down) {
++      // revive progress bar
++      const f = clamp(p.reviveT / REVIVE_TIME, 0, 1);
++      r.uiText(f > 0 ? '부활 중' : '쓰러짐', x + pw - 6, y + 4, { size: 10, font: 'small', align: 'right', color: f > 0 ? C.emberHi : '#a8d8ff', alpha: a, outline: C.ink });
++      r.uiRect(x + 32, y + 22, pw - 40, 5, C.ink, a);
++      r.uiRect(x + 33, y + 23, (pw - 42) * f, 3, '#fff0a0', a);
++      return;
++    }
++    // hearts: one small pip per half heart (red, then soul)
++    const pip = 5;
++    const maxPips = Math.floor((pw - 40) / (pip + 1));
++    const total = Math.min(maxPips, Math.max(p.maxRed, p.red) + p.soul);
++    for (let i = 0; i < total; i++) {
++      const hx = x + 32 + i * (pip + 1);
++      const hy = y + 18;
++      const isRed = i < p.maxRed;
++      const filled = isRed ? i < p.red : i - p.maxRed < p.soul;
++      const c = !filled ? '#3a2430' : isRed ? C.heart : C.soul;
++      r.uiRect(hx, hy, pip, 6, C.ink, a);
++      r.uiRect(hx + 1, hy + 1, pip - 2, 4, c, a);
++      if (filled && i % 2 === 0) r.uiRect(hx + 1, hy + 1, 1, 1, '#ffffff', a * 0.6);
++    }
++    // ember
++    const ef = clamp(p.ember / EMBER_MAX, 0, 1);
++    r.uiRect(x + 32, y + 27, pw - 40, 4, C.ink, a);
++    r.uiRect(x + 33, y + 28, (pw - 42) * ef, 2, ef >= 1 ? C.emberHi : C.ember, a);
++    if (ef >= 1) glow(r, x + 32 + (pw - 40), y + 29, 8, C.ember, 0.35 * a * (0.6 + 0.4 * Math.sin(this.t * 7)));
++  }
++
++  /** Name tags over teammates on screen, arrows at the edge for those off screen. */
++  private drawTags(r: Renderer, w: World, A: number): void {
++    const sa = r.uiSafe;
++    for (const tag of w.coopTags) {
++      const p = w.players.find((q) => q.slot === tag.slot);
++      if (!p) continue;
++      const col = slotColor(p.slot);
++      const mine = p === w.local;
++      if (tag.onScreen) {
++        if (!mine) r.uiText(keeperName(p), tag.x, tag.y - 12, { size: 10, font: 'small', align: 'center', color: col, outline: C.ink, alpha: A });
++        if (p.downed) {
++          const f = clamp(p.reviveT / REVIVE_TIME, 0, 1);
++          const label = f > 0 ? `부활 ${Math.round(f * 100)}%` : '쓰러짐';
++          r.uiText(label, tag.x, tag.y - (mine ? 12 : 24), { size: 10, font: 'small', align: 'center', color: f > 0 ? C.emberHi : '#a8d8ff', outline: C.ink, alpha: A * (0.75 + 0.25 * Math.sin(this.t * 4)) });
++        }
++        continue;
++      }
++      if (mine) continue;
++      // off screen: a colored arrow on the screen edge pointing at the teammate
++      const cx = UI_W / 2;
++      const cy = UI_H / 2;
++      const dx = tag.x - cx;
++      const dy = tag.y + 12 - cy;
++      const ang = Math.atan2(dy, dx);
++      const mx = UI_W / 2 - 22 - Math.max(sa.l, sa.r);
++      const my = UI_H / 2 - 30 - Math.max(sa.t, sa.b);
++      const k = Math.min(mx / Math.max(1e-6, Math.abs(Math.cos(ang))), my / Math.max(1e-6, Math.abs(Math.sin(ang))));
++      const ax = cx + Math.cos(ang) * k;
++      const ay = cy + Math.sin(ang) * k;
++      this.drawArrow(r, ax, ay, ang, col, slotDark(p.slot), A);
++      r.uiText(keeperName(p), ax - Math.cos(ang) * 16, ay - Math.sin(ang) * 16 - 5, { size: 10, font: 'small', align: 'center', color: col, outline: C.ink, alpha: A });
++    }
++  }
++
++  private drawArrow(r: Renderer, x: number, y: number, ang: number, col: string, dark: string, A: number): void {
++    const d = r.dctx;
++    d.save();
++    d.globalAlpha = A * (0.8 + 0.2 * Math.sin(this.t * 5));
++    d.translate(Math.round(x), Math.round(y));
++    d.rotate(ang);
++    d.beginPath();
++    d.moveTo(9, 0);
++    d.lineTo(-5, -7);
++    d.lineTo(-2, 0);
++    d.lineTo(-5, 7);
++    d.closePath();
++    d.fillStyle = col;
++    d.strokeStyle = dark;
++    d.lineWidth = 2;
++    d.stroke();
++    d.fill();
++    d.restore();
++  }
++
++  private drawToasts(r: Renderer, _w: World, A: number, cx: number, y: number): void {
++    this.toasts.forEach((x, i) => {
++      const age = this.t - x.t;
++      const a = envelope(age, TOAST_TIME, 0.15, 0.6) * A;
++      const ty = y + i * 18 - (1 - ease.outCubic(clamp(age / 0.25, 0, 1))) * 6;
++      const tw = r.measureText(x.text, 12, true) + 24;
++      r.uiRect(cx - tw / 2, ty - 3, tw, 17, C.ink, 0.7 * a);
++      r.uiText(x.text, cx, ty, { size: 12, bold: true, align: 'center', color: x.color, alpha: a, outline: C.ink });
++    });
++  }
++
++  private drawDowned(r: Renderer, w: World, A: number, cx: number, y: number): void {
++    const p = w.local;
++    const f = clamp(p.reviveT / REVIVE_TIME, 0, 1);
++    const a = A * (0.85 + 0.15 * Math.sin(this.t * 3));
++    const msg = f > 0 ? '동료가 일으켜 세우는 중…' : '쓰러졌어요 — 동료 곁에 머무르거나 방을 정리하면 일어나요';
++    const tw = r.measureText(msg, 12, true) + 30;
++    r.uiRect(cx - tw / 2, y - 4, tw, 30, C.ink, 0.65 * a);
++    r.uiText(msg, cx, y, { size: 12, bold: true, align: 'center', color: '#a8d8ff', alpha: a, outline: C.ink });
++    r.uiRect(cx - 80, y + 17, 160, 4, '#2a2238', a);
++    r.uiRect(cx - 80, y + 17, 160 * f, 4, '#fff0a0', a);
++  }
++}
++
++// ---------------------------------------------------------------- waiting
++/** "연결 대기 중…": the client has had no frame from the host for a while (`t` s, already past 0.5 s). */
++export function drawWaiting(r: Renderer, t: number, W: number, H: number): void {
++  r.beginUI();
++  const a = clamp(t / 0.25, 0, 1);
++  r.uiRect(0, 0, W, H, C.void, 0.45 * a);
++  const pw = 230;
++  const ph = 54;
++  const x = W / 2 - pw / 2;
++  const y = H / 2 - ph / 2 - 20;
++  frame(r, x, y, pw, ph, 'panel', { alpha: a });
++  const dots = '.'.repeat(1 + (Math.floor(t * 3) % 3));
++  r.uiText(`연결 대기 중${dots}`, W / 2, y + 12, { size: 16, bold: true, align: 'center', color: C.text, alpha: a, outline: C.ink });
++  r.uiText('방장의 신호를 기다리고 있어요', W / 2, y + 34, { size: 10, font: 'small', align: 'center', color: C.textFaint, alpha: a });
++  for (let i = 0; i < 3; i++) {
++    const k = 0.5 + 0.5 * Math.sin(t * 6 - i * 0.9);
++    r.uiRect(x + 20 + i * 8, y + 22, 4, 4, C.goldHi, a * (0.3 + 0.7 * k));
++  }
++}
++
++// ---------------------------------------------------------------- notices
++type NoticeKind = 'desync' | NetErrorCode;
++
++/** The run cannot go on (out of sync, host gone, room closed): a clear message and the way out. */
++export class NetNoticeOverlay implements Scene {
++  transparent = true;
++  touchBack = false as const;
++  private t = 0;
++  private menu: Menu;
++  private title: string;
++  private hint: string;
++
++  constructor(private readonly game: GameScene, readonly kind: NoticeKind) {
++    if (kind === 'desync') {
++      this.title = '게임 상태가 어긋났어요';
++      this.hint = '모두의 하강이 서로 달라져 더 이어갈 수 없어요.\n로비로 돌아가 다시 시작해 주세요.';
++    } else {
++      const txt = netErrorText(kind);
++      this.title = txt.title;
++      this.hint = txt.hint;
++    }
++    const toLobby = kind === 'desync';
++    this.menu = new Menu([
++      toLobby
++        ? { label: '로비로', action: () => this.game.leaveOnline('lobby'), hint: '함께하기 화면으로 돌아갑니다.' }
++        : { label: '타이틀로', action: () => this.game.leaveOnline('title'), hint: '타이틀 화면으로 돌아갑니다.' },
++    ], UI_W / 2, UI_H / 2 + 46, { width: 200, lineH: 28, size: 14, showHint: false });
++  }
++
++  enter(): void {
++    sfx('ui_error');
++  }
++
++  update(dt: number): void {
++    this.t += dt;
++    if (this.t > 0.4) this.menu.update(app.renderer, dt);
++  }
++
++  draw(r: Renderer): void {
++    r.beginUI();
++    const a = appear(this.t, 0.3);
++    r.uiRect(0, 0, UI_W, UI_H, C.void, 0.8 * a);
++    const pw = 440;
++    const ph = 170;
++    const x = UI_W / 2 - pw / 2;
++    const y = UI_H / 2 - ph / 2 - 16 + (1 - a) * 10;
++    frame(r, x, y, pw, ph, 'ornate', { alpha: a });
++    r.uiSprite(this.kind === 'desync' ? 'ui_hourglass' : 'ui_skull', x + 34, y + 30, 2, { alpha: a });
++    r.uiText(this.title, UI_W / 2 + 10, y + 20, { size: 16, bold: true, align: 'center', color: C.bad, alpha: a, outline: C.ink });
++    this.hint.split('\n').forEach((line, i) => r.uiText(line, UI_W / 2, y + 54 + i * 18, { size: 12, align: 'center', color: C.textDim, alpha: a }));
++    this.menu.y = y + ph - 32;
++    this.menu.draw(r, a);
++  }
++}
++
++// ---------------------------------------------------------------- party summary
++/** After the run: the party (every keeper and what they carried), the shared record, and what's next. */
++export class CoopSummaryOverlay implements Scene {
++  transparent = true;
++  touchBack = false as const;
++  private t = 0;
++  private menu: Menu;
++  private menuShown = false;
++  private items = new Map<number, string[]>();
++
++  constructor(private readonly game: GameScene, private readonly info: GameOverInfo) {
++    const host = !!game.net?.isHost;
++    this.menu = new Menu(host
++      ? [
++        { label: '다시 함께 (로비로)', action: () => this.lobby(), hint: '모두 함께 같은 방의 로비로 돌아갑니다.' },
++        { label: '타이틀로', action: () => this.game.leaveOnline('title'), hint: '방을 닫고 타이틀로 돌아갑니다.' },
++      ]
++      : [{ label: '타이틀로', action: () => this.game.leaveOnline('title'), hint: '방에서 나가 타이틀로 돌아갑니다.' }],
++    UI_W / 2, 352, { width: 240, lineH: 26, size: 13, hintY: UI_H - 16 });
++    for (const p of game.world.players) {
++      const list: string[] = [];
++      const wd = Weapons.get(p.weaponId);
++      if (wd) list.push(wd.icon);
++      const act = p.activeId ? Actives.get(p.activeId) : undefined;
++      if (act) list.push(act.icon);
++      for (const a of p.items.computed?.artifacts ?? []) if (!a.def.hidden || a.def.blessing) list.push(a.def.icon);
++      this.items.set(p.slot, list);
++    }
++  }
++
++  private lobby(): void {
++    sfx('ui_select');
++    this.game.command({ type: 'lobby' });
++  }
++
++  enter(): void {
++    sfx(this.info.won ? 'item_get_rare' : 'ui_open', { vol: 0.5 });
++  }
++
++  update(dt: number): void {
++    this.t += dt;
++    if (this.t > 1.2) {
++      if (!this.menuShown) {
++        this.menuShown = true;
++        this.menu.t = 0;
++      }
++      this.menu.update(app.renderer, dt);
++    }
++  }
++
++  draw(r: Renderer): void {
++    r.beginUI();
++    const w = this.game.world;
++    const run = this.game.run;
++    const won = this.info.won;
++    const ended = !won && this.info.source === '하강 종료';
++    const a = clamp(this.t / 0.7, 0, 1);
++    r.uiRect(0, 0, UI_W, UI_H, won ? '#0a0604' : '#0e0306', 0.93 * a);
++    const ta = appear(this.t, 0.6, 0.15);
++    const title = won ? '함께 심연을 밝혔다' : ended ? '하강을 마쳤다' : '모두의 등불이 꺼졌다';
++    const ty = 22 + (1 - ta) * 10;
++    if (won) glow(r, UI_W / 2, ty + 16, 120, '#ffb040', 0.25 * ta);
++    r.uiText(title, UI_W / 2, ty, { size: 28, bold: true, align: 'center', color: won ? C.goldHi : ended ? C.text : '#ff7a7a', outline: C.ink, alpha: ta });
++    const [no, fname] = splitFloorName(w.floor.name);
++    const s = run.stats;
++    const line = `${no} ${fname} · ${formatTime(s.timeSec)} · 처치 ${s.kills} · 방 ${s.roomsCleared} · 보스 ${s.bossesKilled}`;
++    r.uiText(line, UI_W / 2, ty + 38, { size: 12, align: 'center', color: C.textDim, alpha: ta });
++    divider(r, UI_W / 2, ty + 58, 360, won ? C.gold : '#7a2a30', ta);
++
++    // party cards
++    const ps = w.players;
++    const cw = Math.min(170, (UI_W - 60) / Math.max(1, ps.length) - 10);
++    const gap = 10;
++    const total = ps.length * cw + (ps.length - 1) * gap;
++    const x0 = UI_W / 2 - total / 2;
++    ps.forEach((p, i) => {
++      const ca = appear(this.t, 0.45, 0.35 + i * 0.12);
++      const x = x0 + i * (cw + gap);
++      const y = 104 + (1 - ca) * 14;
++      const col = slotColor(p.slot);
++      frame(r, x, y, cw, 214, p === w.local ? 'panelHi' : 'panel', { alpha: ca });
++      r.uiRect(x + 3, y + 3, cw - 6, 3, col, ca);
++      glow(r, x + cw / 2, y + 44, 34, p.character.color, 0.15 * ca);
++      spriteCentered(r, face(p, this.t + i * 0.3), x + cw / 2, y + 44, 2.5, { alpha: ca, tint: p.downed ? '#a8d8ff' : undefined, tintAmount: p.downed ? 0.5 : undefined });
++      r.uiText(keeperName(p), x + cw / 2, y + 74, { size: 12, bold: true, align: 'center', color: col, alpha: ca, outline: C.ink });
++      r.uiText(`${slotLabel(p.slot)} · ${p.character.name}${p === w.local ? ' (나)' : ''}`, x + cw / 2, y + 92, { size: 10, font: 'small', align: 'center', color: C.textFaint, alpha: ca });
++      r.uiText(p.downed ? '쓰러진 채 끝났다' : '끝까지 버텼다', x + cw / 2, y + 106, { size: 10, font: 'small', align: 'center', color: p.downed ? '#a8d8ff' : C.good, alpha: ca });
++      const icons = this.items.get(p.slot) ?? [];
++      const cols = Math.max(1, Math.floor((cw - 16) / 24));
++      icons.slice(0, cols * 3).forEach((icon, k) => {
++        const kk = clamp((this.t - 0.8 - i * 0.1 - k * 0.03) / 0.25, 0, 1);
++        if (kk <= 0) return;
++        const cx = x + 8 + 12 + (k % cols) * 24 + ((cw - 16) - cols * 24) / 2;
++        const cy = y + 136 + Math.floor(k / cols) * 24;
++        frame(r, cx - 11, cy - 11, 22, 22, 'slot', { alpha: ca * kk });
++        spriteCentered(r, icon, cx, cy, fitScale(icon, 18, 1) * ease.outBack(kk), { alpha: ca * kk });
++      });
++      if (icons.length > cols * 3) r.uiText(`+${icons.length - cols * 3}`, x + cw - 8, y + 198, { size: 10, font: 'small', align: 'right', color: C.textDim, alpha: ca });
++    });
++    r.uiText(`시드 ${run.seed}`, UI_W / 2, 326, { size: 10, font: 'small', align: 'center', color: C.textMute, alpha: a });
++    if (!this.game.net?.isHost && this.menuShown) {
++      r.uiText('방장이 다음을 정하면 함께 이동해요', UI_W / 2, 336 + 44, { size: 10, font: 'small', align: 'center', color: C.textFaint, alpha: appear(this.menu.t, 0.3) * (0.7 + 0.3 * Math.sin(this.t * 3)) });
++    }
++    if (this.menuShown) this.menu.draw(r, appear(this.menu.t, 0.3));
++  }
++}
+diff --git a/src/ui/game-scene.ts b/src/ui/game-scene.ts
+index 7d5555f3f25b63df0b36ab8ae84a26223cf262e5..3db5e7f48b67efcf72931a7b80ddeaf2a0722236 100644
+--- a/src/ui/game-scene.ts
++++ b/src/ui/game-scene.ts
+@@ -1,8 +1,16 @@
+ // Gameplay scene: owns the World and the HUD, and opens overlays
+ // (pause, status (Tab), full map (M), game over / victory).
++//
++// Online co-op (`coop` given): the World holds every roster keeper and a
++// NetRun (net/netrun.ts) steps it in lockstep. Then nothing local stops or
++// changes the simulation: overlays (pause, Tab, map, blessing) open on top of
++// a world that keeps running (`alwaysUpdate`), this peer's keeper idles while
++// one is open, and decisions (blessing, discard, the host ending the run or
++// taking the party back to the lobby) go out as lockstep commands.
+ 
+ import type { Scene } from './scene';
+ import type { Renderer } from '../engine/renderer';
++import { UI_H, UI_W } from '../engine/renderer';
+ import { World, type GameOverInfo, type WorldHost } from '../game/world';
+ import { RunState } from '../game/run';
+ import { app } from '../game/app';
+@@ -17,14 +25,45 @@ import { save } from '../engine/save';
+ import { applyGraphics } from './quality';
+ import { BlessingOverlay } from './blessing';
+ import { applyBlessing, autoBlessEnabled, blessingChoices, blessingDue, markBlessed } from '../game/blessings';
++import type { NetSession } from '../net/session';
++import type { StartInfo } from '../net/lobby';
++import { NetRun } from '../net/netrun';
++import { emptyInput, fixedRules, readLocalInput } from '../game/seam';
++import { CoopSummaryOverlay, NetNoticeOverlay, drawWaiting } from './coop';
++import { LobbyScene } from './lobby';
++import type { CoopCommand } from '../game/coop';
++
++/** What the lobby hands to a co-op game scene. */
++export interface CoopStart {
++  session: NetSession;
++  start: StartInfo;
++}
+ 
+ export class GameScene implements Scene, WorldHost {
+   world: World;
+   run: RunState;
+   hud = new Hud();
++  /** online co-op: the lockstep driver (null in single-player) */
++  net: NetRun | null = null;
++  /** co-op: keep stepping the world under overlays */
++  alwaysUpdate = false;
+   private overlayOpen: Scene | null = null;
++  private readonly coop: CoopStart | null;
++  private readonly sample = emptyInput();
++  /** co-op: floor whose blessing this peer already offered */
++  private blessFloor = 0;
++  private notice: Scene | null = null;
++  /** co-op: time the client has been waiting for the host (s) */
++  private waitT = 0;
+ 
+-  constructor(seed: string, character: string, seeded: boolean) {
++  constructor(seed: string, character: string, seeded: boolean, coop: CoopStart | null = null) {
++    this.coop = coop;
++    if (coop) {
++      const me = coop.start.roster.find((p) => p.slot === coop.session.localSlot);
++      character = me?.characterId ?? coop.start.roster[0]?.characterId ?? character;
++      seed = coop.start.seed;
++      seeded = false;
++    }
+     this.run = new RunState(seed, character);
+     this.run.seeded = seeded;
+     this.world = new World(app.renderer, this.run, this);
+@@ -33,18 +72,36 @@ export class GameScene implements Scene, WorldHost {
+   enter(): void {
+     save.progress.runs++;
+     save.saveProgress();
+-    this.world.start();
++    const c = this.coop;
++    if (c) {
++      const w = this.world;
++      // the host's simulation options, fixed for the whole run on every peer
++      w.rules = fixedRules(c.start.rules ?? {});
++      w.startParty(c.start.roster.map((p) => ({ slot: p.slot, characterId: p.characterId, name: p.name })), c.session.localSlot);
++      this.net = new NetRun(c.session, c.start, w);
++      this.alwaysUpdate = true;
++    } else this.world.start();
+     (window as unknown as { __world?: World }).__world = this.world;
+     applyGraphics(this.world);
+   }
+ 
+   exit(): void {
+     audio.stopMusic(0.5);
++    if (this.net) {
++      this.net.dispose();
++      if (!this.net.session.closed) this.net.session.close();
++    }
++  }
++
++  /** Online co-op run? */
++  get online(): boolean {
++    return !!this.net;
+   }
+ 
+   openOverlay(s: Scene): void {
+     this.overlayOpen = s;
+-    this.world.paused = true;
++    // co-op: the world keeps running under menus
++    if (!this.net) this.world.paused = true;
+     input.releaseAll();
+     app.scenes.push(s);
+   }
+@@ -53,10 +110,25 @@ export class GameScene implements Scene, WorldHost {
+   closeOverlay(s: Scene): void {
+     app.scenes.remove(s);
+     if (this.overlayOpen === s) this.overlayOpen = null;
+-    if (!this.world.gameOver) this.world.paused = false;
++    if (!this.net && !this.world.gameOver) this.world.paused = false;
+     input.releaseAll();
+   }
+ 
++  /** Co-op: queue a lockstep command (no-op in single-player). */
++  command(cmd: CoopCommand): void {
++    this.net?.sendCommand(cmd);
++  }
++
++  /** The keeper chose a blessing (`id: null` = none). Single-player: applied now; co-op: a command. */
++  chooseBlessing(id: string | null, floor = this.world.run.floor): void {
++    if (this.net) {
++      this.net.sendCommand({ type: 'bless', floor, id });
++      return;
++    }
++    if (id) applyBlessing(this.world, id);
++    else markBlessed(this.world);
++  }
++
+   // WorldHost
+   openInventory(): void {
+     if (!this.overlayOpen) this.openOverlay(new StatusOverlay(this));
+@@ -76,11 +148,21 @@ export class GameScene implements Scene, WorldHost {
+     if (!info.won) audio.playMusic('gameover');
+     if (this.overlayOpen) app.scenes.remove(this.overlayOpen);
+     this.overlayOpen = null;
++    if (this.net) {
++      // co-op: the party summary (the lockstep keeps running for the host's choice)
++      this.overlayOpen = new CoopSummaryOverlay(this, info);
++      app.scenes.push(this.overlayOpen);
++      return;
++    }
+     this.world.paused = true;
+     app.scenes.push(new GameOverOverlay(this, info));
+   }
+ 
+   update(dt: number): void {
++    if (this.net) {
++      this.updateNet(dt);
++      return;
++    }
+     const w = this.world;
+     if (!w.gameOver && !w.transitioning) {
+       if (input.pressed('pause')) {
+@@ -101,19 +183,78 @@ export class GameScene implements Scene, WorldHost {
+     if (!this.overlayOpen && blessingDue(w)) this.offerBlessing();
+   }
+ 
++  /** Co-op step: local input → lockstep → 0..2 world steps; menus never stop it. */
++  private updateNet(dt: number): void {
++    const net = this.net!;
++    const w = this.world;
++    if (net.state === 'lobby') {
++      this.backToLobby();
++      return;
++    }
++    if ((net.state === 'desync' || net.state === 'ended') && !this.notice) {
++      this.notice = new NetNoticeOverlay(this, net.state === 'desync' ? 'desync' : net.endReason ?? 'host-lost');
++      if (this.overlayOpen) app.scenes.remove(this.overlayOpen);
++      this.overlayOpen = this.notice;
++      app.scenes.push(this.notice);
++      return;
++    }
++    const free = !this.overlayOpen && net.state === 'running';
++    if (free && !w.gameOver && !w.transitioning) {
++      if (input.pressed('pause')) this.openOverlay(new PauseOverlay(this));
++      else if (input.pressed('inventory')) this.openOverlay(new StatusOverlay(this));
++      else if (input.pressed('map')) this.openOverlay(new MapOverlay(this));
++    }
++    // this peer's keeper: local devices (incl. touch auto-aim), idle while a menu is up
++    let sample = null;
++    if (!this.overlayOpen && !w.gameOver) {
++      readLocalInput(w, w.local, this.sample);
++      sample = this.sample;
++    }
++    net.step(sample);
++    this.waitT = net.waiting ? this.waitT + dt : 0;
++    this.hud.update(w, dt);
++    if (!this.overlayOpen && !w.gameOver && net.state === 'running' && blessingDue(w) && this.blessFloor !== w.run.floor) this.offerBlessing();
++  }
++
+   /** "등불의 축복": pick one of three blessings at the start of each floor. */
+   private offerBlessing(): void {
+     const w = this.world;
+     const choices = blessingChoices(w);
++    const floor = w.run.floor;
++    if (this.net) {
++      // co-op: the choice goes out as a command; nothing changes locally until it comes back
++      this.blessFloor = floor;
++      if (!choices.length) this.chooseBlessing(null, floor);
++      else if (autoBlessEnabled()) this.chooseBlessing(choices[0], floor);
++      else this.openOverlay(new BlessingOverlay(this, choices));
++      return;
++    }
+     markBlessed(w);
+     if (!choices.length) return;
+     if (autoBlessEnabled()) applyBlessing(w, choices[0]);
+     else this.openOverlay(new BlessingOverlay(this, choices));
+   }
+ 
++  /** Co-op: the host took everyone back to the lobby — same room, same connections. */
++  private backToLobby(): void {
++    const net = this.net!;
++    net.dispose();
++    const transport = net.session.detach();
++    app.scenes.set(new LobbyScene({ resume: transport }));
++  }
++
++  /** Co-op: leave the session and go to the title (pause menu "방 나가기", notices). */
++  leaveOnline(to: 'title' | 'lobby' = 'title'): void {
++    const net = this.net;
++    if (net && !net.session.closed) net.session.close();
++    if (to === 'lobby') app.scenes.set(new LobbyScene());
++    else app.goTitle();
++  }
++
+   draw(r: Renderer): void {
+     this.world.draw();
+     r.presentWorld();
+     this.hud.draw(r, this.world, app.fps);
++    if (this.net && this.waitT > 0) drawWaiting(r, this.waitT, UI_W, UI_H);
+   }
+ }
+diff --git a/src/ui/hud.ts b/src/ui/hud.ts
+index ce52fda6011f9653b8822370b54fe87e60067ed9..c7551f5e195bf5f8d18fcd2ec22079cb6ccf4183 100644
+--- a/src/ui/hud.ts
++++ b/src/ui/hud.ts
+@@ -35,6 +35,7 @@ import { ItemTooltip } from './item-tooltip';
+ import { UiLayer } from './layer-cache';
+ import { ArtifactBar } from './artifact-bar';
+ import type { HudStat } from './logic';
++import { CoopHud } from './coop';
+ 
+ /** HUD minimap size and margin (UI units). */
+ export const MINIMAP_W = 124;
+@@ -120,6 +121,8 @@ export class Hud {
+   readonly artifacts = new ArtifactBar();
+   /** preview card of the item the keeper stands next to */
+   readonly tooltip = new ItemTooltip();
++  /** online co-op: teammate panels, name tags, off-screen arrows, toasts */
++  readonly coop = new CoopHud();
+   /** HUD area inside the safe insets (UI units); corner elements are drawn translated to its top-left */
+   private W = UI_W;
+   private H = UI_H;
+@@ -306,6 +309,7 @@ export class Hud {
+     this.hints.update(w, dt);
+     this.artifacts.update(w, dt);
+     this.tooltip.update(w, dt);
++    if (w.coop) this.coop.update(w, dt);
+   }
+ 
+   private spawnShards(slot: number, color: string): void {
+@@ -344,6 +348,7 @@ export class Hud {
+     d.restore();
+     this.cr = null;
+     this.cw = null;
++    if (w.coop) this.coop.draw(r, w, A, sa.l, sa.t, this.W, this.H, MINIMAP_MARGIN + MINIMAP_H + 34);
+     this.artifacts.draw(r, w, A, sa.l, sa.t, 196, this.W - MINIMAP_W - MINIMAP_MARGIN - 10);
+     this.tooltip.draw(r, w, A);
+     drawBanners(r, w);
+diff --git a/src/ui/lobby.ts b/src/ui/lobby.ts
+index bceb15478cdab6cf07b964a90a08d0b9edecffee..7eef08080d299518a9739aaddc1207c16d38df25 100644
+--- a/src/ui/lobby.ts
++++ b/src/ui/lobby.ts
+@@ -29,7 +29,7 @@ import {
+   applyTypedCode, defaultNickname, finalNickname, isValidRoomCode, normalizeRoomCode, roomFromSearch, sanitizeNickname,
+   randomRoomCode, searchWithoutRoom, shareLink, ROOM_ALPHABET, ROOM_CODE_LENGTH,
+ } from '../net/code';
+-import { NetError, hostRoom, netErrorText, transportFactory, type NetErrorCode } from '../net/transport';
++import { NetError, hostRoom, netErrorText, transportFactory, type NetErrorCode, type Transport } from '../net/transport';
+ import { Lobby, MAX_PLAYERS, type LobbyPlayer, type StartInfo } from '../net/lobby';
+ import { BUILD_ID, checkForUpdate } from '../net/build';
+ import { activeSession, createNetSession, probeLockstep, startNetRun, type NetSession, type ProbeResult } from '../net/session';
+@@ -175,6 +175,8 @@ function pingColor(ms: number): string {
+ export interface LobbySceneOptions {
+   /** open the join box with this code (share link) */
+   join?: string;
++  /** back from a co-op run together: reopen the same room on this (still connected) transport */
++  resume?: Transport;
+ }
+ 
+ export class LobbyScene implements Scene {
+@@ -230,9 +232,27 @@ export class LobbyScene implements Scene {
+       { label: '돌아가기', action: () => this.back(), hint: '타이틀 화면으로 돌아갑니다.' },
+     ], UI_W_BASE / 2, 214, { width: 220, size: 14, lineH: 30, hintY: 344 });
+     if (o.join) this.openCode(o.join);
++    if (o.resume) this.resume(o.resume);
+     activeLobbyScene = this;
+   }
+ 
++  /** Reopen the room on a transport that is still connected (the party came back from a run). */
++  private resume(t: Transport): void {
++    if (t.closed) {
++      this.fail(t.role === 'host' ? 'closed' : 'host-lost');
++      return;
++    }
++    if (t.role === 'host') {
++      this.attach(Lobby.host(t, this.lobbyOpts()));
++      this.setScreen('room');
++    } else {
++      this.connectMsg = '로비로 돌아가는 중…';
++      this.connectCode = t.code;
++      this.setScreen('connecting');
++      this.attach(Lobby.join(t, this.lobbyOpts()));
++    }
++  }
++
+   // ------------------------------------------------------------ lifecycle
+   enter(): void {
+     audio.playMusic('title');
+@@ -465,7 +485,8 @@ export class LobbyScene implements Scene {
+       return false;
+     }
+     sfx('ui_select');
+-    l.start(randomSeedString());
++    // the host's simulation options are fixed for everyone for this run
++    l.start(randomSeedString(), { hitStop: save.settings.hitStop });
+     return true;
+   }
+ 
+diff --git a/src/ui/pause.ts b/src/ui/pause.ts
+index 5858a3035af8a90c3361d66519de14986bed4199..f830b0cef272d7a840dc06f6afc80563e16f99cc 100644
+--- a/src/ui/pause.ts
++++ b/src/ui/pause.ts
+@@ -1,5 +1,7 @@
+ // Pause menu (Esc): resume / settings / quit (with confirm), plus a run card
+ // (keeper, floor, time, kills, seed, collected items) and a controls reference.
++// Online co-op: the world keeps running behind it; 계속 / 설정 / 방 나가기, and
++// for the host 하강 종료 (ends the run for everyone, a lockstep command).
+ 
+ import type { Scene } from './scene';
+ import type { Renderer } from '../engine/renderer';
+@@ -26,10 +28,34 @@ export class PauseOverlay implements Scene {
+   private game: GameScene;
+   private t = 0;
+   private confirmQuit = false;
++  private confirmEnd = false;
+   private closing = -1;
+ 
+   constructor(game: GameScene) {
+     this.game = game;
++    if (game.online) {
++      const host = !!game.net?.isHost;
++      const items: ConstructorParameters<typeof Menu>[0] = [
++        { label: '계속', action: () => this.close(), hint: '하강을 이어갑니다. (함께하는 동안 게임은 멈추지 않아요)' },
++        { label: '설정', action: () => app.scenes.push(new SettingsOverlay()), hint: '소리, 화면, 조작 설정.' },
++        {
++          label: () => (this.confirmQuit ? '정말 나갈까요?' : '방 나가기'),
++          danger: true,
++          action: () => this.quit(),
++          hint: () => (this.confirmQuit ? '한 번 더 누르면 방에서 나갑니다.' : host ? '방을 닫고 타이틀로 돌아갑니다. (모두의 하강이 끝나요)' : '방에서 나가 타이틀로 돌아갑니다. 동료들은 계속해요.'),
++        },
++      ];
++      if (host) {
++        items.splice(2, 0, {
++          label: () => (this.confirmEnd ? '정말 끝낼까요?' : '하강 종료'),
++          danger: true,
++          action: () => this.endForAll(),
++          hint: () => (this.confirmEnd ? '한 번 더 누르면 모두의 하강이 끝나고 결과 화면으로 갑니다.' : '모두의 하강을 여기서 끝냅니다.'),
++        });
++      }
++      this.menu = new Menu(items, 150, 150, { width: 220, lineH: 30, size: 14, hintY: 262 });
++      return;
++    }
+     this.menu = new Menu([
+       { label: '계속하기', action: () => this.close(), hint: '하강을 이어갑니다.' },
+       { label: '설정', action: () => app.scenes.push(new SettingsOverlay()), hint: '소리, 화면, 조작 설정.' },
+@@ -58,7 +84,19 @@ export class PauseOverlay implements Scene {
+       sfx('warn', { vol: 0.4 });
+       return;
+     }
+-    app.goTitle();
++    if (this.game.online) this.game.leaveOnline('title');
++    else app.goTitle();
++  }
++
++  /** Co-op host: end the run for everyone (a lockstep command; the summary follows). */
++  private endForAll(): void {
++    if (!this.confirmEnd) {
++      this.confirmEnd = true;
++      sfx('warn', { vol: 0.4 });
++      return;
++    }
++    this.game.command({ type: 'end' });
++    this.close();
+   }
+ 
+   update(dt: number): void {
+@@ -72,7 +110,9 @@ export class PauseOverlay implements Scene {
+       this.close();
+       return;
+     }
+-    if (this.confirmQuit && this.menu.index !== 2) this.confirmQuit = false;
++    const quitIndex = this.menu.items.length - 1;
++    if (this.confirmQuit && this.menu.index !== quitIndex) this.confirmQuit = false;
++    if (this.confirmEnd && this.menu.index !== 2) this.confirmEnd = false;
+     this.menu.update(app.renderer, dt);
+   }
+ 
+@@ -87,12 +127,13 @@ export class PauseOverlay implements Scene {
+     const ox = uiCenterX(); // 768-wide layout centered on wide screens
+     const lx = ox + 30;
+     const ly = 60 + (1 - k) * 10;
+-    frame(r, lx, ly, 240, 236, 'ornate', { alpha: k });
+-    r.uiText('일시정지', lx + 120, ly + 16, { size: 24, bold: true, align: 'center', color: C.text, outline: C.ink, alpha: k });
++    const extra = Math.max(0, this.menu.items.length - 3) * 30;
++    frame(r, lx, ly, 240, 236 + extra, 'ornate', { alpha: k });
++    r.uiText(this.game.online ? '메뉴' : '일시정지', lx + 120, ly + 16, { size: 24, bold: true, align: 'center', color: C.text, outline: C.ink, alpha: k });
+     divider(r, lx + 120, ly + 52, 180, C.goldDark, k);
+     this.menu.x = lx + 120;
+     this.menu.y = ly + 78;
+-    this.menu.hintY = ly + 186;
++    this.menu.hintY = ly + 186 + extra;
+     this.menu.draw(r, k);
+ 
+     // ---- right: run card
+diff --git a/src/ui/scene.ts b/src/ui/scene.ts
+index 8fa1d2e51f5dba0c02abe2a68d059c6a452c0e6a..e31ea570fa4c70183e0d15363dbd84dd7cf5c96b 100644
+--- a/src/ui/scene.ts
++++ b/src/ui/scene.ts
+@@ -28,6 +28,8 @@ export interface Scene {
+   transparent?: boolean;
+   /** keep updating the scene below (rare) */
+   passUpdate?: boolean;
++  /** keep updating even under other scenes (online co-op: the lockstep never stops for a menu) */
++  alwaysUpdate?: boolean;
+   /** touch mode: show a corner button that taps 'cancel' ('close' = ✕, 'back' = ◀) */
+   touchBack?: 'close' | 'back' | false;
+   /** which top corner the back button sits in (default right) */
+@@ -111,10 +113,16 @@ export class SceneManager {
+     this.fadeT = Math.min(FADE_TIME, this.fadeT + dt);
+     const top = this.top;
+     if (!top) return;
++    // scenes that never stop (co-op game) run first, under whatever is on top
++    for (let i = 0; i < this.stack.length - 1; i++) {
++      const s = this.stack[i];
++      if (s.alwaysUpdate) s.update(dt);
++    }
++    if (this.top !== top) return; // the update changed the stack
+     top.update(dt);
+     if (top.passUpdate) {
+       const below = this.stack[this.stack.length - 2];
+-      below?.update(dt);
++      if (below && !below.alwaysUpdate) below.update(dt);
+     }
+   }
+ 
+diff --git a/src/ui/status.ts b/src/ui/status.ts
+index 16af596863877a9001fdc5f2f33c0609be00684e..73b44f5b5e9b9fe5c269772870ee05e27c02e7aa 100644
+--- a/src/ui/status.ts
++++ b/src/ui/status.ts
+@@ -142,6 +142,13 @@ export class StatusOverlay implements Scene {
+       return;
+     }
+     this.armedId = '';
++    if (this.game.online) {
++      // co-op: the discard is a lockstep command (applied on every peer at the same tick)
++      this.game.command({ type: 'discard', id: cur.def.id });
++      sfx('ui_place');
++      this.say(`${cur.def.name}을(를) 곁에 내려놓았다`, C.textDim);
++      return;
++    }
+     const ped = discardArtifact(w, cur.def.id);
+     if (!ped) {
+       sfx('ui_error');
+diff --git a/tests/coop.test.ts b/tests/coop.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..37e51d498a107c33192839dd6e6743a45ff3e3ce
+--- /dev/null
++++ b/tests/coop.test.ts
+@@ -0,0 +1,164 @@
++// Online co-op, headless: 2, 3 and 4 real Worlds driven through the lockstep
++// (LockstepHost / LockstepClient over MemoryTransport with latency + jitter)
++// by NetRun, each peer's bot playing its own keeper. Thousands of steps across
++// rooms and doors, a boss, a downed keeper revived by a teammate, blessing and
++// discard commands and a player leaving: every peer must produce the identical
++// stateHash after every frame, and the lockstep's own hash exchange must never
++// report a desync. Harness: tests/coopsim.ts.
++//
++//   npx vitest run tests/coop
++
++import './headless';
++import { describe, expect, it } from 'vitest';
++import { runCoop, type CoopResult, type CoopScenario } from './coopsim';
++import { World } from '../src/game/world';
++import { RunState } from '../src/game/run';
++import { Renderer } from '../src/engine/renderer';
++import { fakeDisplay } from './headless';
++import { fixedRules } from '../src/game/seam';
++import { stateHash } from '../src/game/statehash';
++import { FIXED_DT } from '../src/game/constants';
++import { BASE_VARIANT, runScenario } from './detsim';
++
++/** Every peer's per-frame hashes equal the host's on the frames both simulated. */
++function expectSameHashes(res: CoopResult): { frames: number[]; checked: number } {
++  const ref = res.peers[0].hashes;
++  let checked = 0;
++  const frames: number[] = [];
++  for (const p of res.peers) {
++    const n = Math.min(ref.length, p.hashes.length);
++    frames.push(p.hashes.length);
++    for (let t = 0; t < n; t++) {
++      if (p.hashes[t] === undefined || ref[t] === undefined) continue;
++      if (p.hashes[t] !== ref[t]) {
++        throw new Error(`${p.slot}: first hash mismatch at tick ${t} (host ${ref[t].toString(16)} vs ${p.hashes[t].toString(16)})`);
++      }
++      checked++;
++    }
++  }
++  return { frames, checked };
++}
++
++function summary(res: CoopResult): string {
++  const w = res.peers[0].world;
++  const s = w.run.stats;
++  return `floor ${w.run.floor} rooms ${s.roomsCleared} kills ${s.kills} bosses ${s.bossesKilled} keepers ${w.players.length} log ${res.peers[0].log.filter((x) => !x.includes('stuck') && !x.includes(':tp')).join(' ')}`;
++}
++
++const LINK = { latencyMs: 35, jitterMs: 25 };
++
++const SCENARIOS: (CoopScenario & { expectLeave: boolean })[] = [
++  {
++    name: '2 keepers', seed: 'COOP-2', chars: ['ria', 'serin'], ms: 110_000, link: LINK, bossAt: 2400, downAt: 900, leaveAt: 0, discardAt: 400,
++    expectLeave: false,
++  },
++  {
++    name: '3 keepers, one leaves', seed: 'COOP-3', chars: ['bern', 'ria', 'niel'], ms: 100_000, link: { latencyMs: 25, jitterMs: 40, drop: 0.02 }, bossAt: 2000,
++    downAt: 700, leaveAt: 3200, discardAt: 300, drift: [0.004, -0.003], expectLeave: true,
++  },
++  {
++    name: '4 keepers, one leaves', seed: 'COOP-4', chars: ['serin', 'bern', 'ria', 'serin'], ms: 110_000, link: LINK, bossAt: 3000, downAt: 600,
++    leaveAt: 3400, discardAt: 350, drift: [0.002, -0.002, 0.003], expectLeave: true,
++  },
++];
++
++describe('online co-op: lockstep worlds stay identical', () => {
++  for (const sc of SCENARIOS) {
++    it(`${sc.name}: identical stateHash on every peer after every frame`, () => {
++      const res = runCoop(sc);
++      const host = res.peers[0];
++      const { frames, checked } = expectSameHashes(res);
++      const info = `${summary(res)} frames ${frames.join('/')} checked ${checked}`;
++      console.log(`[coop] ${sc.name}: ${info}`);
++      // thousands of frames, every client caught up with almost all of them
++      expect(host.hashes.length, info).toBeGreaterThan(4000);
++      for (const p of res.peers) {
++        if (p.gone) continue;
++        expect(p.hashes.length, `slot ${p.slot}`).toBeGreaterThan(host.hashes.length * 0.97);
++        expect(p.desyncs, `slot ${p.slot} desync`).toEqual([]);
++        expect(p.net.state).toBe('running');
++      }
++      // the lockstep's own periodic hash exchange agreed too (the host compares every report)
++      expect(host.desyncs).toEqual([]);
++      const w = host.world;
++      // it really played: rooms, a boss, the scripted downing + revive, commands, a leave
++      expect(w.run.stats.roomsCleared, info).toBeGreaterThan(4);
++      expect(w.run.stats.bossesKilled, info).toBeGreaterThanOrEqual(1);
++      expect(host.log.some((s) => s.endsWith(':downed')), info).toBe(true);
++      expect(host.log.some((s) => s.endsWith(':revived')), info).toBe(true);
++      expect(w.coopEvents.some((e) => e.kind === 'revive') || host.log.some((s) => s.endsWith(':revived'))).toBe(true);
++      // every keeper picked a blessing on the first floor (a command each)
++      for (const p of w.players) expect(Object.keys(p.vars).some((k) => k.startsWith('blessedAt:')), `slot ${p.slot} blessed`).toBe(true);
++      // slot 1's discard left a pedestal-able copy behind: one fewer artifact than gifts + innate + blessings
++      expect(w.players.find((p) => p.slot === 1)?.inv.items.length).toBeGreaterThan(0);
++      if (sc.expectLeave) {
++        expect(w.players.length).toBe(sc.chars.length - 1);
++        for (const p of res.peers) if (!p.gone) expect(p.world.players.map((q) => q.slot)).toEqual(w.players.map((q) => q.slot));
++      } else expect(w.players.length).toBe(sc.chars.length);
++    }, 240_000);
++  }
++
++  it('the discard command removes the artifact on every peer at the same tick', () => {
++    const sc: CoopScenario = { name: 'discard', seed: 'COOP-D', chars: ['ria', 'bern'], ms: 9000, link: LINK, bossAt: 0, downAt: 0, leaveAt: 0, discardAt: 120 };
++    const res = runCoop(sc);
++    expectSameHashes(res);
++    for (const p of res.peers) {
++      const k = p.world.players.find((q) => q.slot === 1)!;
++      // gifts gave 3 artifacts; one went back onto a pedestal
++      const innate = k.character.artifacts?.length ?? 0;
++      const blessings = Object.keys(k.vars).filter((x) => x.startsWith('blessedAt:')).length;
++      expect(k.inv.items.length).toBe(innate + 3 - 1 + blessings);
++    }
++  }, 60_000);
++});
++
++describe('co-op desync detection', () => {
++  it('a 1e-9 px nudge on one peer shows up in the per-frame hashes and in the lockstep hash exchange', () => {
++    const sc: CoopScenario = {
++      name: 'inject', seed: 'COOP-X', chars: ['ria', 'niel', 'bern'], ms: 8000, link: LINK, bossAt: 0, downAt: 0, leaveAt: 0, discardAt: 0,
++      inject: { slot: 2, tick: 200 },
++    };
++    const res = runCoop(sc);
++    const [host, , bad] = res.peers;
++    let first = -1;
++    for (let t = 0; t < Math.min(host.hashes.length, bad.hashes.length); t++) if (host.hashes[t] !== bad.hashes[t]) { first = t; break; }
++    expect(first).toBe(200);
++    for (let t = 0; t < Math.min(host.hashes.length, res.peers[1].hashes.length); t++) expect(res.peers[1].hashes[t]).toBe(host.hashes[t]);
++    // the host compares the tick-240 reports and tells everyone
++    expect(host.desyncs.length).toBeGreaterThan(0);
++    expect(host.desyncs[0]).toMatchObject({ tick: 240, slot: 2 });
++    expect(bad.net.state).toBe('desync');
++    expect(host.net.state).toBe('desync');
++  });
++});
++
++describe('co-op does not change single-player', () => {
++  it('a solo world never turns on co-op state', () => {
++    const r = runScenario({ name: 'solo', seed: 'COOP-SOLO', character: 'ria', floors: [1], exploreSteps: 600, bossSteps: 600, giftsPerFloor: 3, maxSteps: 1500, cycle: true, extraEnemies: 1 }, BASE_VARIANT);
++    const w = r.world;
++    expect(w.coop).toBe(false);
++    expect(w.players.length).toBe(1);
++    expect(w.local).toBe(w.player);
++    expect(w.partyHpMult(true)).toBe(1);
++    expect(w.coopEvents).toEqual([]);
++  });
++
++  it('start() equals a one-keeper non-co-op party (same hash sequence)', () => {
++    const r = new Renderer(fakeDisplay(1280, 720));
++    const host = { openInventory() {}, onGameOver() {} };
++    const mk = (party: boolean) => {
++      const run = new RunState('COOP-SP', 'serin');
++      const w = new World(r, run, host);
++      w.rules = fixedRules({ hitStop: true });
++      if (party) w.startParty([{ slot: 0, characterId: 'serin', name: '' }], 0, false);
++      else w.start();
++      const hs: number[] = [];
++      for (let i = 0; i < 300; i++) {
++        w.update(FIXED_DT);
++        hs.push(stateHash(w));
++      }
++      return hs;
++    };
++    expect(mk(true)).toEqual(mk(false));
++  });
++});
+diff --git a/tests/coopsim.ts b/tests/coopsim.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..5ba435aa0599be82edd567fde64bebbfabaa7cab
+--- /dev/null
++++ b/tests/coopsim.ts
+@@ -0,0 +1,240 @@
++// Headless co-op lockstep harness: 2–4 real Worlds in one process, each driven
++// by its own NetRun over the in-memory network (latency, jitter, loss) — the
++// same code path as the browser, minus the scene / renderer. Each peer's bot
++// (tests/detsim.ts botInput) reads only its own world, from its own keeper's
++// point of view, and talks to the simulation through the lockstep input; the
++// few scripted world changes (gifts, heals, a forced downing, moving on to the
++// boss) happen in NetRun.beforeStep, keyed by tick and world state only, so
++// every peer applies them identically. Every simulated frame records
++// stateHash(world).
++
++import './headless';
++import { fakeDisplay } from './headless';
++import { loadContent } from '../src/content';
++import { Renderer } from '../src/engine/renderer';
++import { RNG } from '../src/engine/rng';
++import { MemoryNetwork, type LinkOptions, type MemoryTransport } from '../src/net/transport-memory';
++import { LockstepClient, LockstepHost, STEP_MS, type DesyncEvent } from '../src/net/lockstep';
++import type { NetSession } from '../src/net/session';
++import { NetRun } from '../src/net/netrun';
++import { World, type WorldHost, type PartyMember } from '../src/game/world';
++import { RunState } from '../src/game/run';
++import { Artifacts, Actives } from '../src/game/defs';
++import { emptyInput, fixedRules } from '../src/game/seam';
++import { stateHash } from '../src/game/statehash';
++import { blessingChoices, blessingDue } from '../src/game/blessings';
++import { discardBlockFor } from '../src/game/interact';
++import { botInput, newBot, type BotState } from './detsim';
++import type { Frame } from '../src/net/wire';
++
++loadContent();
++
++export interface CoopScenario {
++  name: string;
++  seed: string;
++  /** characters by slot (2..4 keepers) */
++  chars: string[];
++  /** virtual milliseconds to run */
++  ms: number;
++  link: LinkOptions;
++  /** host tick at which the party is sent to the boss room */
++  bossAt: number;
++  /** tick at which slot 1 is forced down (0 = never) */
++  downAt: number;
++  /** client local step at which the last slot leaves the session (0 = never) */
++  leaveAt: number;
++  /** client local step at which slot 1 discards an artifact (0 = never) */
++  discardAt: number;
++  /** clock drift per client (fraction) */
++  drift?: number[];
++  /** test only: nudge the last keeper by 1e-9 px on one peer at this tick (desync detection) */
++  inject?: { slot: number; tick: number };
++}
++
++export interface CoopPeer {
++  slot: number;
++  world: World;
++  net: NetRun;
++  bot: BotState;
++  /** stateHash after every simulated frame, by tick */
++  hashes: number[];
++  nextAt: number;
++  period: number;
++  steps: number;
++  gone: boolean;
++  blessed: number;
++  desyncs: DesyncEvent[];
++  /** scripted happenings seen (identical on every peer) */
++  log: string[];
++}
++
++export interface CoopResult {
++  peers: CoopPeer[];
++  net: MemoryNetwork;
++  host: LockstepHost;
++}
++
++const stubHost: WorldHost = { openInventory() {}, onGameOver() {} };
++let renderer: Renderer | null = null;
++
++/** Run a scenario; returns every peer (hash sequences, worlds, logs). */
++export function runCoop(sc: CoopScenario): CoopResult {
++  if (!renderer) renderer = new Renderer(fakeDisplay(1280, 720));
++  const n = sc.chars.length;
++  const net = new MemoryNetwork({ seed: sc.seed.length * 7919 + n, ...sc.link });
++  const ht = net.hostSync('COOP');
++  const cts: MemoryTransport[] = [];
++  for (let i = 1; i < n; i++) cts.push(net.joinSync('COOP'));
++  net.advance(400);
++  const members: PartyMember[] = sc.chars.map((c, slot) => ({ slot, characterId: c, name: ['방장', '둘째', '셋째', '넷째'][slot] }));
++  const players = [{ slot: 0, peer: ht.localId }, ...cts.map((t, i) => ({ slot: i + 1, peer: t.localId }))];
++  const host = new LockstepHost(ht, players, 0, { now: net.now });
++  const clients = cts.map((t, i) => new LockstepClient(t, i + 1, { now: net.now, initialBuffer: 2 }));
++  const phase = new RNG(`${sc.seed}:phase`);
++
++  const peers: CoopPeer[] = [];
++  for (let slot = 0; slot < n; slot++) {
++    const client = slot === 0 ? null : clients[slot - 1];
++    const session = {
++      role: slot === 0 ? 'host' : 'client', host: slot === 0 ? host : null, client, localSlot: slot, closed: false, game: null,
++      transport: slot === 0 ? ht : cts[slot - 1], code: 'COOP', roster: [], start: null, rtt: () => 0,
++      close() {}, detach() { return slot === 0 ? ht : cts[slot - 1]; },
++    } as unknown as NetSession;
++    const run = new RunState(sc.seed, sc.chars[slot]);
++    run.seeded = true;
++    const world = new World(renderer, run, stubHost);
++    world.rules = fixedRules({ hitStop: true });
++    world.startParty(members, slot);
++    const nr = new NetRun(session, { seed: sc.seed, roster: [], buildId: 'test', inputDelayHint: 2 }, world);
++    const peer: CoopPeer = {
++      slot, world, net: nr, bot: newBot(`${sc.seed}:${slot}`), hashes: [], nextAt: net.time + (slot === 0 ? 0 : 1 + phase.next() * STEP_MS),
++      period: STEP_MS * (1 + (slot === 0 ? 0 : sc.drift?.[slot - 1] ?? 0)), steps: 0, gone: false, blessed: 0, desyncs: [], log: [],
++    };
++    session.game?.observe((f: Frame) => {
++      peer.hashes[f.tick] = stateHash(world);
++    });
++    nr.beforeStep = (w, tick) => script(sc, peer, w, tick);
++    const ls = slot === 0 ? host : client!;
++    const netHandler = ls.onDesync;
++    ls.onDesync = (e) => {
++      peer.desyncs.push(e);
++      netHandler?.(e);
++    };
++    peers.push(peer);
++  }
++
++  const sample = emptyInput();
++  const stepPeer = (p: CoopPeer) => {
++    if (p.gone) return;
++    p.steps++;
++    if (p.slot === 0) host.poll();
++    else clients[p.slot - 1].poll();
++    const w = p.world;
++    // the keeper's own decisions: blessing picks and a discard go out as commands
++    if (blessingDue(w) && p.blessed !== w.run.floor) {
++      p.blessed = w.run.floor;
++      const choices = blessingChoices(w);
++      p.net.sendCommand({ type: 'bless', floor: w.run.floor, id: choices.length ? choices[p.slot % choices.length] : null });
++    }
++    if (p.slot === 1 && p.steps === sc.discardAt) {
++      const it = w.local.inv.items.find((x) => !discardBlockFor(w, x.id));
++      if (it) p.net.sendCommand({ type: 'discard', id: it.id });
++    }
++    if (p.slot === n - 1 && p.slot > 0 && p.steps === sc.leaveAt) {
++      clients[p.slot - 1].leave();
++      p.gone = true;
++      return;
++    }
++    if (w.local.alive) botInput(w, p.bot, sample);
++    else {
++      // downed: drift toward the nearest teammate
++      const mate = w.players.find((q) => q !== w.local && q.alive);
++      sample.mx = sample.my = sample.ax = sample.ay = 0;
++      sample.held = sample.pressed = 0;
++      if (mate) {
++        const d = Math.hypot(mate.x - w.local.x, mate.y - w.local.y) || 1;
++        sample.mx = (mate.x - w.local.x) / d;
++        sample.my = (mate.y - w.local.y) / d;
++      }
++    }
++    p.net.step(sample);
++  };
++
++  const end = net.time + sc.ms;
++  while (net.time < end) {
++    net.advance(1);
++    for (const p of peers) {
++      while (p.nextAt <= net.time) {
++        stepPeer(p);
++        p.nextAt += p.period;
++      }
++    }
++  }
++  return { peers, net, host };
++}
++
++/** Scripted world changes before each frame (tick + world state only: identical on every peer). */
++function script(sc: CoopScenario, peer: CoopPeer, w: World, tick: number): void {
++  const log = (s: string) => peer.log.push(`${tick}:${s}`);
++  if (sc.inject && sc.inject.slot === peer.slot && sc.inject.tick === tick) w.players[w.players.length - 1].x += 1e-9;
++  if (tick === 3) {
++    // every keeper starts with a couple of artifacts and an active (something to discard / use)
++    const arts = Artifacts.all().filter((a) => !a.hidden && !a.blessing).map((a) => a.id);
++    const acts = Actives.all().map((a) => a.id);
++    const r = new RNG(`${sc.seed}:gifts`);
++    for (const p of w.players) {
++      for (let i = 0; i < 3; i++) p.items.give(r.pick(arts));
++      w.asPlayer(p, () => p.setActive(r.pick(acts), w));
++    }
++    w.players[0].coins = Math.max(w.players[0].coins, 20);
++    log('gifts');
++  }
++  if (w.gameOver || w.transitioning || w.descending) return;
++  // keep the party alive (the scripted downing below excepted)
++  for (const p of w.players) {
++    if (!p.alive || p.downed) continue;
++    if (p.red + p.soul <= 2) {
++      p.heal(6);
++      p.addSoul(2);
++    }
++  }
++  // a downing and a revive by standing next to the ghost
++  if (sc.downAt > 0 && tick >= sc.downAt) {
++    const v = w.players.find((p) => p.slot === 1);
++    const helper = w.players.find((p) => p.slot === 0);
++    if (v && helper && !peer.log.some((s) => s.endsWith(':downed'))) {
++      v.invuln = 0;
++      v.shields = 0;
++      v.god = false;
++      v.stats.dodge = 0;
++      if (v.hurt(w, 40, '시험', true) && v.downed) log('downed');
++    } else if (v?.downed && helper?.alive && tick > sc.downAt + 30) {
++      const f = w.room.nearestFree(v.x + 8, v.y, helper.r);
++      helper.x = f.x;
++      helper.y = f.y;
++    }
++    if (v && !v.downed && peer.log.some((s) => s.endsWith(':downed')) && !peer.log.some((s) => s.endsWith(':revived'))) log('revived');
++  }
++  // move on: to the boss, out of stuck fights, on from long-cleared rooms
++  if (sc.bossAt > 0 && tick >= sc.bossAt && w.run.floor === 1 && !peer.log.some((s) => s.endsWith(':boss'))) {
++    const boss = w.map.nodes.find((x) => x.kind === 'boss');
++    if (boss && boss !== w.node) w.teleportTo(boss);
++    log('boss');
++    return;
++  }
++  if (!w.node.cleared && w.roomTime > (w.node.kind === 'boss' ? 30 : 25)) {
++    for (const e of [...w.enemies]) w.killEnemy(e);
++    log(`kill-stuck r${w.node.id}`);
++  }
++  if (w.node.cleared && w.roomTime > 14 && w.node.kind !== 'boss') {
++    const next = w.map.nodes.find((x) => !x.visited && x.kind !== 'boss');
++    if (next) {
++      w.teleportTo(next);
++      log(`tp r${next.id}`);
++    }
++  }
++  if (w.node.kind === 'boss' && w.node.cleared && w.roomTime > 16) {
++    w.descend();
++    log('descend');
++  }
++}
+diff --git a/tests/detsim.ts b/tests/detsim.ts
+index e4e8505e93c4e97a0b4beefd8132597f086fcfe1..a17fd3c92e5fb34f22cb06e2390a47257710d94b 100644
+--- a/tests/detsim.ts
++++ b/tests/detsim.ts
+@@ -157,7 +157,7 @@ function nextWaypoint(w: World, gx: number, gy: number): { x: number; y: number
+   return { x: (tx + 0.5) * TILE, y: (((c - tx) / W) + 0.5) * TILE };
+ }
+ 
+-interface BotState {
++export interface BotState {
+   rng: RNG;
+   strafe: number;
+   strafeT: number;
+@@ -176,8 +176,16 @@ function unit(x: number, y: number): [number, number] {
+   return l > 1e-9 ? [x / l, y / l] : [0, 0];
+ }
+ 
+-/** One step of bot input (reads the world like a player looking at the screen). */
+-function botInput(w: World, b: BotState, out: PlayerInput): void {
++/** A fresh bot (seeded); drive it with `botInput` once per step. */
++export function newBot(seed: string): BotState {
++  return {
++    rng: new RNG(`${seed}:bot`), strafe: 1, strafeT: 0, cursorMode: false, modeT: 0, dashT: 1, bombT: 3, swapT: 2,
++    door: null, roomSteps: 0, clearSteps: 0,
++  };
++}
++
++/** One step of bot input (reads the world like a player looking at the screen: `w.player`). */
++export function botInput(w: World, b: BotState, out: PlayerInput): void {
+   const p = w.player;
+   out.mx = out.my = out.ax = out.ay = 0;
+   out.held = 0;
+@@ -314,10 +322,7 @@ export function runScenario(sc: Scenario, v: Variant, partsAt = -1): RunResult {
+   const w = new World(r, run, host);
+   w.setQuality({ lighting: v.quality !== 'low', particles: v.particles * (v.quality === 'low' ? 0.5 : 1) });
+   w.rules = fixedRules({ hitStop: true });
+-  const bot: BotState = {
+-    rng: new RNG(`${sc.seed}:bot`), strafe: 1, strafeT: 0, cursorMode: false, modeT: 0, dashT: 1, bombT: 3, swapT: 2,
+-    door: null, roomSteps: 0, clearSteps: 0,
+-  };
++  const bot = newBot(sc.seed);
+   // the bot is the input source: called by the keeper's update, once per step
+   w.inputSource = (ww, _p, out) => botInput(ww, bot, out);
+   w.start();
+diff --git a/tests/zz-sp-baseline.test.ts b/tests/zz-sp-baseline.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..7124fcaaac172bf196a09a72c38d5c512b976d5c
+--- /dev/null
++++ b/tests/zz-sp-baseline.test.ts
+@@ -0,0 +1,29 @@
++// TEMPORARY (not committed): records / compares single-player hash sequences.
++import './headless';
++import { it, expect } from 'vitest';
++import { BASE_VARIANT, runScenario, firstMismatch, type Scenario } from './detsim';
++import { existsSync, readFileSync, writeFileSync } from 'node:fs';
++
++const FILE = process.env.SP_BASELINE ?? '/tmp/claude-0/-home-user-REPOSI/5b6d1b7f-a03d-5f09-9d18-90f35456395e/scratchpad/coop/sp-baseline.json';
++const SCEN: Scenario[] = [
++  { name: 'ria', seed: 'DET-RIA-1', character: 'ria', floors: [1, 2, 3, 4, 5], exploreSteps: 700, bossSteps: 1500, giftsPerFloor: 6, maxSteps: 14000, cycle: true, extraEnemies: 2 },
++  { name: 'niel', seed: 'DET-NIEL-4', character: 'niel', floors: [1], exploreSteps: 1500, bossSteps: 1500, giftsPerFloor: 4, maxSteps: 3600, cycle: true, extraEnemies: 2 },
++  { name: 'serin', seed: 'DET-SERIN-2', character: 'serin', floors: [2, 3], exploreSteps: 1300, bossSteps: 1500, giftsPerFloor: 5, maxSteps: 7000, cycle: true, extraEnemies: 2 },
++  { name: 'bern', seed: 'DET-BERN-3', character: 'bern', floors: [4, 5], exploreSteps: 1200, bossSteps: 1500, giftsPerFloor: 6, maxSteps: 7000, cycle: true, extraEnemies: 3 },
++];
++
++it('sp baseline', () => {
++  const out: Record<string, number[]> = {};
++  for (const sc of SCEN) out[sc.name] = runScenario(sc, BASE_VARIANT).hashes;
++  if (process.env.SP_RECORD || !existsSync(FILE)) {
++    writeFileSync(FILE, JSON.stringify(out));
++    console.log('recorded', Object.fromEntries(Object.entries(out).map(([k, v]) => [k, v.length])));
++    return;
++  }
++  const base = JSON.parse(readFileSync(FILE, 'utf8')) as Record<string, number[]>;
++  for (const sc of SCEN) {
++    const k = firstMismatch(base[sc.name], out[sc.name]);
++    console.log(sc.name, 'len', base[sc.name].length, out[sc.name].length, 'first mismatch', k);
++    expect(k, sc.name).toBe(-1);
++  }
++}, 600_000);
