@@ -245,9 +245,13 @@ bless({
 });
 
 bless({
-  id: 'bless_release_heal', name: '해방의 온기', desc: '등불 해방 시 체력 반 칸 회복', quote: '불꽃을 놓아줄 때 따뜻해진다.',
+  id: 'bless_release_heal', name: '해방의 온기', desc: '등불 해방 시 체력 반 칸 회복 (방마다 한 번)', quote: '불꽃을 놓아줄 때 따뜻해진다.',
   disk: '#6a4a2a', glyph: (p) => { p.rect(6, 5, 4, 7, '#ffd890'); p.rect(5, 4, 6, 1, '#a07040'); p.rect(5, 12, 6, 1, '#a07040'); p.px(8, 8, '#ff8a30'); p.px(8, 7, '#fff0a0'); }, look: { aura: '#ffe0a0' },
   onRelease(w, power) {
+    // once per room: several releases a floor would otherwise out-heal every other source
+    const room = w.run.floor * 1000 + w.node.id;
+    if (w.vars.__releaseHealRoom === room) return;
+    w.vars.__releaseHealRoom = room;
     const p = w.player;
     if (p.maxRed > 0 && p.red < p.maxRed) p.heal(power);
     else p.addSoul(1);

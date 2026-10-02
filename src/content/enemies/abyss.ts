@@ -87,7 +87,8 @@ export class VoidPool extends Entity {
     if (this.armed && p.alive && p.z < 4) {
       const dx = p.x - this.x;
       const dy = (p.y - this.y) / 0.7;
-      if (dx * dx + dy * dy < (this.radius * 0.85) ** 2) p.hurt(w, 1, this.source);
+      const rr = this.radius * 0.85;
+      if (dx * dx + dy * dy < rr * rr) p.hurt(w, 1, this.source);
     }
   }
 

@@ -87,7 +87,8 @@ export class FrostPatch extends Entity {
     if (this.armed && p.alive && p.z < 4) {
       const dx = p.x - this.x;
       const dy = (p.y - this.y) / 0.7;
-      if (dx * dx + dy * dy < (this.radius * 0.9) ** 2) {
+      const rr = this.radius * 0.9;
+      if (dx * dx + dy * dy < rr * rr) {
         p.applyStatus({ kind: 'slow', duration: 0.35, power: 0.45 }, () => 0);
         if (fx.chance(dt * 12)) {
           w.particles.spawn({ x: p.x + fx.range(-4, 4), y: p.y + 3, vy: -fx.range(6, 16), life: fx.range(0.3, 0.5), colors: SNOWDUST, size: 1 });

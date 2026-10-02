@@ -38,10 +38,10 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let vite = null;
 let url = args.url;
 if (!url) {
-  // dev server without HMR / file watching (edits elsewhere must not reload the pages)
+  // dev server without HMR (edits elsewhere must not reload the pages mid-test)
   const { createServer } = await import('vite');
   const port = 5150 + Math.floor(Math.random() * 40);
-  vite = await createServer({ server: { port, strictPort: true, hmr: false, watch: null }, logLevel: 'warn' });
+  vite = await createServer({ server: { port, strictPort: true, hmr: false }, logLevel: 'warn' });
   await vite.listen();
   url = `http://localhost:${port}/`;
 }
@@ -202,6 +202,12 @@ async function scenario(kind) {
   const ls = await until(late, (s) => s.screen === 'error', 'late rejection', 25000);
   check(`${kind}: join after start rejected`, ls.error?.code === 'started', ls.error?.title);
   await late.page.close();
+
+  // hosting with a code that is already registered falls back to a fresh code
+  const second = await newPlayer(await ctxFor(), `${kind}-second-host`, '두번째방', q);
+  const code2 = await second.page.evaluate((c) => { window.__lknet.open(); return window.__lknet.host(c); }, code);
+  check(`${kind}: a taken room code is replaced by a fresh one`, /^[A-HJKMNP-Z2-9]{4}$/.test(code2) && code2 !== code, `${code} → ${code2}`);
+  await second.page.close();
 
   // lockstep over the real transport: identical frame streams on every peer
   const probes = await Promise.all(everyone.map((p) => p.page.evaluate(() => window.__lknet.probe(240))));

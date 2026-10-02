@@ -8,7 +8,7 @@ import { Pedestal, Pickup, Trapdoor, type PickupKind } from '../../game/pickups'
 import { TILE } from '../../game/constants';
 import type { World } from '../../game/world';
 import type { Room } from '../../game/room';
-import type { RNG } from '../../engine/rng';
+import { RNG } from '../../engine/rng';
 import { audio } from '../../audio/audio';
 import { finalVictory } from '../bosses/final';
 import { Candles } from '../props/lights';
@@ -96,8 +96,10 @@ registerRoomHandler('treasure', {
 // ------------------------------------------------------------------ secret
 registerRoomHandler('secret', {
   populate(w, room, rng) {
+    // decal art has its own stream: painting it (or not, headless) never shifts the room's loot rolls
+    const deco = new RNG((room.node.seed ^ 0x5ec4e7) >>> 0);
     withDecals(room, (p) => {
-      for (let i = 0; i < 5; i++) coinHeap(p, room.centerX + rng.range(-90, 90), room.centerY + rng.range(-46, 46), rng, rng.int(4, 9));
+      for (let i = 0; i < 5; i++) coinHeap(p, room.centerX + deco.range(-90, 90), room.centerY + deco.range(-46, 46), deco, deco.int(4, 9));
     });
     placeCandles(w, room, [[room.centerX - 40, room.centerY - 30], [room.centerX + 40, room.centerY - 30]], true);
     if (rng.chance(0.55)) {

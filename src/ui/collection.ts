@@ -8,7 +8,7 @@ import { UI_H, UI_W, UI_W_BASE, uiCenterX } from '../engine/renderer';
 import { app } from '../game/app';
 import { input } from '../engine/input';
 import { sfx } from '../audio/audio';
-import { Actives, Artifacts, Characters, Enemies, Floors, RARITY_COLOR, RARITY_NAME, Sets, Weapons, type Rarity } from '../game/defs';
+import { Actives, Artifacts, Characters, Enemies, Floors, RARITY_COLOR, RARITY_NAME, Sets, Weapons, floorAt, type Rarity } from '../game/defs';
 import { save } from '../engine/save';
 import { animFrame } from '../engine/sprites';
 import { clamp } from '../engine/math';
@@ -96,7 +96,7 @@ function buildEntries(tab: TabId): Entry[] {
             title: d.name, sub: d.boss ? d.bossTitle ?? '보스' : '적',
             body: d.boss ? '층의 끝에서 등불지기를 기다리는 존재.' : '',
             facts: [
-              ['체력', `${d.hp}${d.boss ? '' : ''} (1층 기준)`],
+              ['체력', bestiaryHp(d.hp, !!d.boss, floors[0] ?? 1)],
               ['출현', floors.length ? floors.map((f) => Floors.all().find((x) => x.index === f)?.name.split('·')[1]?.trim() ?? `${f}층`).join(' · ') : '특수'],
               ...(d.flying ? [['특성', '비행'] as [string, string]] : []),
             ],
@@ -369,4 +369,11 @@ export class CollectionScene implements Scene {
       r.uiText(h.seed, hx + hw - 18, ry + 13, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: k });
     });
   }
+}
+
+/** Bestiary HP line: the HP on the first floor the enemy appears on (floor HP scaling applied). */
+export function bestiaryHp(hp: number, boss: boolean, floor: number): string {
+  const f = floorAt(floor);
+  const mult = f ? (boss ? f.bossHpMult ?? f.hpMult : f.hpMult) : 1;
+  return `${Math.round(hp * mult)} (${f ? floor : 1}층 기준)`;
 }

@@ -159,16 +159,35 @@ const GLYPHS: Record<string, string[]> = {
 };
 
 // ---------------------------------------------------------------- measure cache
-const widthCache = new Map<string, number>();
+/**
+ * Measured text widths: text -> flat [styleKey, width, styleKey, width ...]
+ * (a lookup builds no key string; UI layout measures every frame).
+ */
+const widthCache = new Map<string, number[]>();
+let widthCount = 0;
 const WIDTH_CACHE_MAX = 3000;
+/** wrapText results: text -> [styleKey, maxWidth, lines, ...] (dropped together with the widths) */
+const wrapCache = new Map<string, (number | string[])[]>();
+const WRAP_CACHE_MAX = 600;
 let fontsWatched = false;
+
+function clearTextMetrics(): void {
+  widthCache.clear();
+  widthCount = 0;
+  wrapCache.clear();
+}
 
 /** Widths measured before the web fonts loaded are wrong: drop the cache when fonts finish loading. */
 function watchFonts(): void {
   if (fontsWatched || typeof document === 'undefined' || !document.fonts) return;
   fontsWatched = true;
-  document.fonts.addEventListener?.('loadingdone', () => widthCache.clear());
-  void document.fonts.ready?.then(() => widthCache.clear());
+  document.fonts.addEventListener?.('loadingdone', clearTextMetrics);
+  void document.fonts.ready?.then(clearTextMetrics);
+}
+
+/** Number identifying a (size, bold, font) text style (sizes are < 1e6 UI units, fractions allowed). */
+function styleKey(size: number, bold: boolean, font: 'main' | 'small'): number {
+  return size + (bold ? 1e6 : 0) + (font === 'small' ? 2e6 : 0);
 }
 
 // ---------------------------------------------------------------- bitmap caches
@@ -649,19 +668,46 @@ export class Renderer {
 
   /** Text width in UI units (cached; the cache is dropped when web fonts finish loading). */
   measureText(str: string, size = 12, bold = false, font: 'main' | 'small' = 'main'): number {
-    const key = `${size}|${bold ? 1 : 0}|${font}|${str}`;
-    const hit = widthCache.get(key);
-    if (hit !== undefined) return hit;
+    const k = styleKey(size, bold, font);
+    let row = widthCache.get(str);
+    if (row) {
+      for (let i = 0; i < row.length; i += 2) if (row[i] === k) return row[i + 1];
+    }
     watchFonts();
     this.dctx.font = this.fontString(size, bold, font);
     const wdt = this.dctx.measureText(str).width;
-    if (widthCache.size >= WIDTH_CACHE_MAX) widthCache.clear();
-    widthCache.set(key, wdt);
+    if (widthCount >= WIDTH_CACHE_MAX) {
+      clearTextMetrics();
+      row = undefined;
+    }
+    if (!row) widthCache.set(str, (row = []));
+    row.push(k, wdt);
+    widthCount++;
     return wdt;
   }
 
-  /** Word-wrap text (Korean-aware: breaks on spaces, falls back to characters). */
+  /**
+   * Word-wrap text (Korean-aware: breaks on spaces, falls back to characters).
+   * Results are cached: the returned array is shared, do not modify it.
+   */
   wrapText(str: string, maxWidth: number, size = 12, bold = false, font: 'main' | 'small' = 'main'): string[] {
+    const k = styleKey(size, bold, font);
+    let row = wrapCache.get(str);
+    if (row) {
+      for (let i = 0; i < row.length; i += 3) if (row[i] === k && row[i + 1] === maxWidth) return row[i + 2] as string[];
+    }
+    const lines = this.wrapLines(str, maxWidth, size, bold, font);
+    // measuring may have dropped the caches (fonts loaded / size cap): look the row up again
+    row = wrapCache.get(str);
+    if (!row) {
+      if (wrapCache.size >= WRAP_CACHE_MAX) wrapCache.clear();
+      wrapCache.set(str, (row = []));
+    } else if (row.length >= 24) row.length = 0; // an animated width: keep the row short
+    row.push(k, maxWidth, lines);
+    return lines;
+  }
+
+  private wrapLines(str: string, maxWidth: number, size: number, bold: boolean, font: 'main' | 'small'): string[] {
     const lines: string[] = [];
     for (const para of str.split('\n')) {
       const words = para.split(' ');

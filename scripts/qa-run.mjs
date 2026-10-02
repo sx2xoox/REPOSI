@@ -115,7 +115,7 @@ function botMain(opts) {
   // keeper takes real hits (invuln frames, shields, dodge) but is topped up
   // instead of dying, so later floors still get measured ("wouldDie" counts it).
   const BAL = (B.bal = { floors: [], rooms: [], bosses: [], wouldDie: 0 });
-  const bal = { room: null, boss: null, lastRel: 0, relT: -99, hooked: null };
+  const bal = { room: null, boss: null, lastRel: 0, relT: -99, hooked: null, debt: 0 };
   const estDps = (s) => Math.max(0, s.damage) * Math.max(0, s.fireRate) * (1 + Math.max(0, s.critChance) * Math.max(0, s.critMult - 1))
     * (1 + Math.max(0, s.shots - 1) * 0.7) * (1 + Math.min(3, Math.max(0, s.pierce)) * 0.12);
   function balFloor(w) {
@@ -151,17 +151,18 @@ function botMain(opts) {
     };
     const origHurt = p.hurt.bind(p);
     p.hurt = (ww, hh, src) => {
-      const pre = p.red + p.soul;
-      // immortal: refill only when this hit could be lethal (no floor hits for more than 4 half-hearts)
-      if (opts.immortal && pre <= 4) { if (p.maxRed > 0) p.red = p.maxRed; else p.soul += 6; }
+      // immortal: before a possibly lethal hit (no hit deals more than 4 half-hearts) lend
+      // soul hearts; HP minus what was lent is the "real" HP: at 0 the keeper would have died
+      if (opts.immortal && p.red + p.soul <= 4) { p.soul += 6; bal.debt += 6; }
       const mid = p.red + p.soul;
       const ok = origHurt(ww, hh, src);
       const taken = mid - (p.red + p.soul);
       if (ok && taken > 0) {
         const f = balFloor(w);
         f.taken += taken; f.hits++;
-        if (taken >= pre) { f.wouldDie++; BAL.wouldDie++; }
-        f.minHp = Math.min(f.minHp ?? 99, Math.max(0, pre - taken));
+        const real = p.red + p.soul - bal.debt;
+        f.minHp = Math.min(f.minHp ?? 99, Math.max(0, real));
+        if (real <= 0) { f.wouldDie++; BAL.wouldDie++; bal.debt = 0; }
         if (bal.room && !bal.room.done) bal.room.taken += taken;
         if (bal.boss) bal.boss.taken += taken;
       }
@@ -205,6 +206,26 @@ function botMain(opts) {
       bal.boss = null;
     }
     f.allDmg = +f.allDmg.toFixed(1);
+  }
+
+  /**
+   * Like a player reading the stat card: after a new weapon lands in the hands,
+   * keep whichever of the two slots has the higher stat DPS estimate in hand.
+   */
+  function weaponCheck(w, p) {
+    const key = `${p.weaponId}|${p.weapon2Id}`;
+    const c = B.wcheck;
+    if (!c) {
+      if (key === B.wkey) return;
+      B.wkey = key;
+      if (p.weapon2Id) B.wcheck = { a: estDps(p.stats), stage: 1 };
+      return;
+    }
+    if (c.stage === 1) {
+      if (!lk.swap()) return;
+      c.stage = estDps(p.stats) < c.a ? 2 : 0;
+    } else if (c.stage === 2 && lk.swap()) c.stage = 0;
+    if (c.stage === 0) { B.wcheck = null; B.wkey = `${p.weaponId}|${p.weapon2Id}`; }
   }
 
   function hostiles(w) {
@@ -617,6 +638,7 @@ function botMain(opts) {
     progress(w);
     if (w.transitioning || w.descending || p.frozen || w.paused) { setInput({ x: 0, y: 0 }, null, p); B.progressT = Math.max(B.progressT, w.time - 15); return; }
     if (opts.god && !p.god) p.god = true;
+    weaponCheck(w, p);
 
     const hs = hostiles(w);
     let move = { x: 0, y: 0 }, aim = null;

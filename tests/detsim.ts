@@ -6,6 +6,7 @@
 // apply. Every step records `stateHash(w)`.
 
 import { fakeDisplay, setDisplaySize } from './headless';
+import { expect } from 'vitest';
 import { loadContent } from '../src/content';
 import { Renderer } from '../src/engine/renderer';
 import { RNG, fx } from '../src/engine/rng';
@@ -484,3 +485,52 @@ export function firstMismatch(a: number[], b: number[]): number {
 }
 
 export type { Player };
+
+// ------------------------------------------------------------------ shared test helpers
+/** narrow view (304), low quality, effect settings off, drawn every 2nd step mid-interpolation, caches pre-warmed */
+export const NARROW: Variant = {
+  ...BASE_VARIANT, name: 'narrow', fxSeed: 0x9e3779b9, display: [960, 720], quality: 'low', particles: 0.25, damageNumbers: false,
+  hitStopSetting: false, screenShake: 0, drawEvery: 2, drawAlpha: 0.37, warmSprites: true,
+};
+/** wide view (512), medium quality, drawn every 3rd step */
+export const WIDE: Variant = {
+  ...BASE_VARIANT, name: 'wide', fxSeed: 7, display: [1720, 720], quality: 'medium', particles: 0.6, drawEvery: 3, drawAlpha: 0.8,
+};
+
+/** Human-readable report of the first desync between a base run and a variant run (re-runs both to that step). */
+export function describeMismatch(sc: Scenario, base: RunResult, v: Variant, other: RunResult, k: number): string {
+  if (k < 0) return '';
+  const a = runScenario(sc, BASE_VARIANT, k);
+  const b = runScenario(sc, v, k);
+  const lines = [`${sc.name} / ${v.name}: first desync at step ${k} (${base.where[k] ?? '?'} vs ${other.where[k] ?? '?'})`];
+  lines.push(`parts base ${JSON.stringify(a.parts)}`, `parts ${v.name} ${JSON.stringify(b.parts)}`);
+  const da = a.dump ?? [];
+  const db = b.dump ?? [];
+  let n = 0;
+  for (let i = 0; i < Math.max(da.length, db.length) && n < 4; i++) {
+    if (da[i] === db[i]) continue;
+    lines.push(`base:   ${da[i]?.slice(0, 500)}`, `${v.name}: ${db[i]?.slice(0, 500)}`);
+    n++;
+  }
+  return lines.join('\n');
+}
+
+/** Base run + every variant: identical state hash after every step. */
+export function checkScenario(sc: Scenario, variants: Variant[], repeat = false): void {
+  const base = runScenario(sc, BASE_VARIANT);
+  // the scenario really plays: rooms, kills, a boss on every planned floor
+  expect(base.hashes.length).toBeGreaterThan(2500);
+  expect(base.stats.floors).toBe(sc.floors.length);
+  expect(base.stats.bosses).toBeGreaterThanOrEqual(1);
+  expect(base.stats.kills).toBeGreaterThan(2);
+  expect(base.stats.rooms).toBeGreaterThan(sc.floors.length);
+  // the run does not get stuck (the state keeps changing)
+  expect(new Set(base.hashes).size).toBeGreaterThan(base.hashes.length * 0.9);
+  if (repeat) expect(firstMismatch(base.hashes, runScenario(sc, BASE_VARIANT).hashes)).toBe(-1);
+  for (const v of variants) {
+    const other = runScenario(sc, v);
+    const k = firstMismatch(base.hashes, other.hashes);
+    expect(k, describeMismatch(sc, base, v, other, k)).toBe(-1);
+  }
+}
+

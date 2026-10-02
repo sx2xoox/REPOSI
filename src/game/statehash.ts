@@ -10,6 +10,7 @@
 // entities, UI banners) is left out on purpose: it may legitimately differ.
 
 import type { World } from './world';
+import type { Room } from './room';
 import { Entity, Actor } from './entity';
 import { Enemy } from './enemy';
 import { Player } from './player';
@@ -94,6 +95,7 @@ interface WorldPrivates {
   deathT: number;
   clearMomentT: number;
   pending: Entity[];
+  roomCache: Map<number, { room: Room; entities: Entity[] }>;
 }
 
 /** Hash the gameplay state of `w` (see the file comment for what is covered). */
@@ -136,7 +138,9 @@ function hashRun(h: StateHasher, w: World): void {
   for (const id of r.identified) h.str(id);
   h.word(-2);
   for (const id of r.seenOnPedestal) h.str(id);
-  h.word(-3).bool(r.won).str(r.lastDamageSource);
+  h.word(-3);
+  for (const id of r.obtained) h.str(id);
+  h.word(-11).bool(r.won).str(r.lastDamageSource);
 }
 
 function hashWorldScalars(h: StateHasher, w: World): void {
@@ -163,7 +167,21 @@ function hashRoom(h: StateHasher, w: World): void {
     h.int(n.id).bool(n.visited).bool(n.discovered).bool(n.cleared).bool(n.locked);
     for (const d of n.doors) h.bool((d as { revealed?: boolean }).revealed);
   }
-  const room = w.room;
+  hashTiles(h, w.room);
+  // rooms visited earlier on this floor: their tiles and the entities left there
+  const cache = (w as unknown as WorldPrivates).roomCache;
+  if (cache) {
+    for (const [id, c] of cache) {
+      if (c.room === w.room) continue;
+      h.int(id);
+      hashTiles(h, c.room);
+      for (const e of c.entities) if (!(e.constructor as typeof Entity).cosmetic) hashEntity(h, e);
+      h.word(-12);
+    }
+  }
+}
+
+function hashTiles(h: StateHasher, room: Room): void {
   h.int(room.w).int(room.h).int(room.version);
   const t = room.tiles;
   for (let i = 0; i < t.length; i += 4) h.word(t[i] | (t[i + 1] << 8) | (t[i + 2] << 16) | (t[i + 3] << 24));

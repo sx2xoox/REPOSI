@@ -27,7 +27,7 @@ import { softKeyboard, touchUiActive } from './touch-mode';
 import { currentNetConfig, type NetConfig } from '../net/config';
 import {
   applyTypedCode, defaultNickname, finalNickname, isValidRoomCode, normalizeRoomCode, roomFromSearch, sanitizeNickname,
-  searchWithoutRoom, shareLink, ROOM_CODE_LENGTH,
+  randomRoomCode, searchWithoutRoom, shareLink, ROOM_ALPHABET, ROOM_CODE_LENGTH,
 } from '../net/code';
 import { NetError, hostRoom, netErrorText, transportFactory, type NetErrorCode } from '../net/transport';
 import { Lobby, MAX_PLAYERS, type LobbyPlayer, type StartInfo } from '../net/lobby';
@@ -199,6 +199,10 @@ export class LobbyScene implements Scene {
   private pickT = new Map<number, number>();
   private lastChars = new Map<number, string>();
   private rl = new Repeater(0.35, 0.16);
+  private padUp = new Repeater(0.3, 0.08);
+  private padDown = new Repeater(0.3, 0.08);
+  /** gamepad code entry: alphabet index shown in the cursor slot (-1 = none) */
+  private padSel = -1;
   private rr = new Repeater(0.35, 0.16);
   private hover = '';
   private startInfo: StartInfo | null = null;
@@ -275,6 +279,7 @@ export class LobbyScene implements Scene {
     this.modal = 'code';
     this.modalT = 0;
     this.codeEdit = normalizeRoomCode(initial);
+    this.padSel = -1;
     input.textCapture = true;
     input.releaseAll();
     sfx('ui_open');
@@ -350,14 +355,20 @@ export class LobbyScene implements Scene {
     return { name: this.name, buildId: BUILD_ID, unlocked: chars.map((c) => c.id), characterId: pick?.id ?? '' };
   }
 
-  async createRoom(): Promise<string> {
+  /** Host a room (`firstCode`: try this code first — tests of the taken-code retry). */
+  async createRoom(firstCode?: string): Promise<string> {
     const token = ++this.op;
     this.connectMsg = '방을 만드는 중…';
     this.connectCode = '';
     this.setScreen('connecting');
     try {
       const factory = await transportFactory(this.cfg);
-      const t = await hostRoom(factory);
+      let forced = firstCode;
+      const t = await hostRoom(factory, () => {
+        const c = forced ?? randomRoomCode();
+        forced = undefined;
+        return c;
+      });
       if (token !== this.op) {
         t.close();
         return '';
@@ -603,8 +614,8 @@ export class LobbyScene implements Scene {
     const host = l.role === 'host';
     const me = l.me;
     const out: Btn[] = [
-      { id: 'copy', x: 500, y: 24, w: 86, h: 26, label: '복사', icon: 'net_copy', gesture: true },
-      { id: 'share', x: 500, y: 54, w: 86, h: 26, label: '공유', icon: 'net_share', gesture: true },
+      { id: 'copy', x: 498, y: 20, w: 96, h: 29, label: '복사', icon: 'net_copy', gesture: true },
+      { id: 'share', x: 498, y: 53, w: 96, h: 29, label: '공유', icon: 'net_share', gesture: true },
       { id: 'leave', x: 26, y: 352, w: 132, h: 44, label: host ? '방 닫기' : '나가기' },
     ];
     if (host) out.push({ id: 'start', x: UI_W_BASE / 2 - 110, y: 352, w: 220, h: 44, label: '하강 시작', primary: true, disabled: !l.canStart() });
@@ -761,6 +772,12 @@ export class LobbyScene implements Scene {
       }
       return;
     }
+    if (this.modal === 'code') {
+      // a gamepad has no keyboard: pick letters with the d-pad (text capture off so it reaches us)
+      const pad = input.lastDevice === 'pad' && !softKeyboard.active;
+      input.textCapture = !pad;
+      if (pad && this.updatePadCode()) return;
+    }
     const typed = input.typed;
     if (this.modal === 'code' && !softKeyboard.active) {
       // desktop: typed keys (paste arrives through the paste event)
@@ -781,6 +798,36 @@ export class LobbyScene implements Scene {
       if (this.modal === 'code') this.confirmCode();
       else this.confirmName();
     }
+  }
+
+  /** Gamepad code entry: ↑↓ letter, → / Ⓐ next slot, ← erase. True when it consumed the input. */
+  private updatePadCode(): boolean {
+    const n = ROOM_ALPHABET.length;
+    const full = this.codeEdit.length >= ROOM_CODE_LENGTH;
+    const dt = 1 / 60;
+    if (!full && this.padUp.update(input.held('uiUp'), dt)) {
+      this.padSel = this.padSel < 0 ? 0 : (this.padSel + 1) % n;
+      sfx('ui_move', { vol: 0.5, pitch: 1.2 });
+    }
+    if (!full && this.padDown.update(input.held('uiDown'), dt)) {
+      this.padSel = this.padSel < 0 ? n - 1 : (this.padSel - 1 + n) % n;
+      sfx('ui_move', { vol: 0.5, pitch: 1.1 });
+    }
+    if (input.pressed('uiRight') || (input.pressed('confirm') && !full)) {
+      if (!full && this.padSel >= 0) {
+        this.codeEdit += ROOM_ALPHABET[this.padSel];
+        this.padSel = -1;
+        sfx('ui_select', { vol: 0.6 });
+      } else if (!full) sfx('ui_error');
+      return true;
+    }
+    if (input.pressed('uiLeft')) {
+      if (this.padSel >= 0) this.padSel = -1;
+      else this.codeEdit = this.codeEdit.slice(0, -1);
+      sfx('ui_back', { vol: 0.6 });
+      return true;
+    }
+    return false;
   }
 
   private updateRoom(dt: number): void {
@@ -883,7 +930,8 @@ export class LobbyScene implements Scene {
       ? '개발 모드 · 같은 브라우저의 탭끼리 연결 (BroadcastChannel)'
       : '서버 없이 기기끼리 직접 연결돼요 · 인터넷 연결이 필요해요';
     r.uiText(note, UI_W_BASE / 2, 370, { size: 10, font: 'small', align: 'center', color: C.textFaint, alpha: A });
-    if (!touchUiActive()) keyHintRow(r, [['↑↓', '선택'], ['Enter', '결정'], ['Esc', '뒤로']], UI_W_BASE / 2, UI_H - 12 - sa.b, { alpha: A * 0.8, pad: input.aimMode === 'pad' });
+    const pad = input.lastDevice === 'pad';
+    if (!touchUiActive()) keyHintRow(r, [['↑↓', '선택'], [pad ? 'A' : 'Enter', '결정'], [pad ? 'B' : 'Esc', '뒤로']], UI_W_BASE / 2, UI_H - 12 - sa.b, { alpha: A * 0.8, pad });
   }
 
   private drawPanel(r: Renderer, w: number, h: number, k: number): { x: number; y: number } {
@@ -936,6 +984,7 @@ export class LobbyScene implements Scene {
       r.uiText(host ? '방을 닫을까요?' : '방에서 나갈까요?', UI_W_BASE / 2, y + 22, { size: 16, bold: true, align: 'center', color: C.goldHi });
       r.uiText(host ? '친구들도 모두 방에서 나가게 돼요.' : '다시 들어오려면 코드를 입력해야 해요.', UI_W_BASE / 2, y + 50, { size: 12, align: 'center', color: C.textDim });
     } else if (this.modal === 'code') {
+      const padMode = input.lastDevice === 'pad' && !softKeyboard.active;
       r.uiText('방 코드 입력', UI_W_BASE / 2, y + 14, { size: 16, bold: true, align: 'center', color: C.goldHi });
       const sx = this.shake > 0 ? Math.sin(this.shake * 60) * 4 * (this.shake / 0.35) : 0;
       const tw = 46;
@@ -947,10 +996,19 @@ export class LobbyScene implements Scene {
         frame(r, tx, y + 42, tw, 52, cur ? 'slotHi' : 'inset');
         const ch = this.codeEdit[i];
         if (ch) r.uiText(ch, tx + tw / 2, y + 52, { size: 24, bold: true, align: 'center', color: C.text });
-        else if (cur && Math.floor(this.modalT * 2.2) % 2 === 0) r.uiRect(tx + tw / 2 - 8, y + 80, 16, 3, C.goldHi);
+        else if (cur && padMode && this.padSel >= 0) {
+          r.uiText(ROOM_ALPHABET[this.padSel], tx + tw / 2, y + 52, { size: 24, bold: true, align: 'center', color: C.goldHi });
+        } else if (cur && Math.floor(this.modalT * 2.2) % 2 === 0) r.uiRect(tx + tw / 2 - 8, y + 80, 16, 3, C.goldHi);
+        if (cur && padMode) {
+          const bob = Math.sin(this.modalT * 6) * 1.5;
+          r.uiSprite('ui_arrow_r', tx + tw / 2, y + 36 - bob, 2, { rot: -Math.PI / 2 });
+          r.uiSprite('ui_arrow_r', tx + tw / 2, y + 98 + bob, 2, { rot: Math.PI / 2 });
+        }
       }
-      const hint = touchUi ? '칸을 눌러 입력 · 초대 링크도 붙여넣을 수 있어요' : '친구에게 받은 4자리 코드 · Ctrl+V로 붙여넣기';
-      r.uiText(hint, UI_W_BASE / 2, y + 102, { size: 10, font: 'small', align: 'center', color: C.textFaint });
+      const hint = padMode
+        ? '↑↓ 글자 고르기 · → 다음 칸 · ← 지우기 · A 버튼 참가'
+        : touchUi ? '칸을 눌러 입력 · 초대 링크도 붙여넣을 수 있어요' : '친구에게 받은 4자리 코드 · Ctrl+V로 붙여넣기';
+      r.uiText(hint, UI_W_BASE / 2, y + 106, { size: 10, font: 'small', align: 'center', color: C.textFaint });
     } else if (this.modal === 'name') {
       r.uiText('이름 바꾸기', UI_W_BASE / 2, y + 14, { size: 16, bold: true, align: 'center', color: C.goldHi });
       const bx = b.x + 34;
@@ -1024,7 +1082,8 @@ export class LobbyScene implements Scene {
     }
     const sa = r.uiSafe;
     if (!touchUiActive() && this.screen === 'room') {
-      keyHintRow(r, [['←→', '캐릭터'], ['Enter', host ? '시작' : '준비'], ['C', '코드 복사'], ['Esc', host ? '방 닫기' : '나가기']], UI_W_BASE / 2, UI_H - 12 - sa.b, { alpha: A * 0.8, pad: input.aimMode === 'pad' });
+      const pad = input.lastDevice === 'pad';
+      keyHintRow(r, [['←→', '캐릭터'], [pad ? 'A' : 'Enter', host ? '시작' : '준비'], [pad ? 'X' : 'C', '코드 복사'], [pad ? 'B' : 'Esc', host ? '방 닫기' : '나가기']], UI_W_BASE / 2, UI_H - 12 - sa.b, { alpha: A * 0.8, pad });
     }
   }
 
@@ -1118,7 +1177,8 @@ let lastStart: StartInfo | null = null;
 
 export interface NetDebugApi {
   open(join?: string): void;
-  host(): Promise<string>;
+  /** host a room; `firstCode` is tried first (a taken code must fall back to a fresh one) */
+  host(firstCode?: string): Promise<string>;
   join(code: string): Promise<void>;
   pick(dir: number): void;
   ready(): void;
@@ -1133,7 +1193,7 @@ function installNetDebug(): void {
   const scene = () => activeLobbyScene;
   const api: NetDebugApi = {
     open: (join) => app.scenes.set(new LobbyScene({ join })),
-    host: async () => (await scene()?.createRoom()) ?? '',
+    host: async (firstCode) => (await scene()?.createRoom(firstCode)) ?? '',
     join: async (code) => scene()?.joinRoom(normalizeRoomCode(code)),
     pick: (dir) => scene()?.pickCharacter(dir),
     ready: () => scene()?.toggleReady(),

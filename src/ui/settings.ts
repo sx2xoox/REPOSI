@@ -89,7 +89,7 @@ export class SettingsOverlay implements Scene {
       choice('그래픽 품질', QUALITY_ORDER, () => s.graphicsQuality, (v) => { s.graphicsQuality = v; applyGraphics(); }, (v) => QUALITY_LABEL[v],
         '해상도와 파티클 양. 휴대폰에서 끊기거나 뜨거워지면 낮추세요.'),
       choice('최대 프레임', FRAME_CAPS, () => effectiveMaxFps(s), (v) => { s.maxFps = v; }, (v) => (v === 0 ? '디스플레이 최대' : `${v}`),
-        '화면을 그리는 최대 횟수(초당). 120 Hz 화면에서 더 부드럽게 움직입니다. 배터리를 아끼려면 60.'),
+        '초당 화면을 그리는 최대 횟수. 낮추면 배터리를 아낍니다.'),
       sw('정수배 픽셀', 'pixelPerfect', '픽셀을 정수배로만 확대해 가장 선명하게 보여줍니다.'),
       sw('FPS 표시', 'showFps', '오른쪽 아래에 프레임 수를 표시합니다.'),
       { label: '게임플레이', header: true },

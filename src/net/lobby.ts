@@ -244,7 +244,6 @@ export class Lobby {
     };
     this.state = 'started';
     this.startInfo = info;
-    this.pending.clear();
     for (const peer of this.peers.keys()) this.send(peer, { t: 'start', ...info });
     this.onStart?.(info);
     this.changed();
@@ -307,13 +306,13 @@ export class Lobby {
           this.transport.kick(peer);
         }
       }
-      if (this.state !== 'open') return;
       for (const [peer, at] of this.pending) {
         if (now - at > this.o.helloTimeoutMs) {
           this.pending.delete(peer);
           this.transport.kick(peer);
         }
       }
+      if (this.state !== 'open') return;
       for (const [peer, p] of this.peers) {
         if (now - p.lastRecv > this.o.silenceTimeoutMs) {
           this.removePeer(peer);

@@ -83,3 +83,35 @@ Commands:
 - Do not touch files owned by other workstreams unless strictly needed; if you must extend a
   core API, keep it backward compatible and small, and mention it in your final report.
 - Never run git commands that change state (commit/checkout/reset/stash) — the orchestrator commits.
+
+### Determinism (multiplayer lockstep)
+Every co-op peer runs the full simulation from the same seed and only exchanges inputs, so
+`World.update` and everything under it (enemy scripts, items, projectiles, pickups, room
+handlers, dungeon generation) must be **bit-identical on every browser** (V8 / JavaScriptCore / SpiderMonkey).
+- **`w.rng` (or a stream seeded from the run / room seed) for anything that touches gameplay**:
+  positions, velocities, spawns, damage, drops, AI choices, timers, which entities exist. If the
+  code has no `w`, take it as a parameter or derive the value from deterministic state (see
+  `Pickup.pop`). Never `Math.random`.
+- **`fx` only for cosmetics** (particles, sound pitch, shake, decals, purely visual entities). A
+  value drawn from `fx` must never flow into gameplay state. Purely visual entity classes declare
+  `static override readonly cosmetic = true` (separate negative ids, left out of the state hash);
+  everything else counts as gameplay.
+- **No real time, viewport, camera or settings in the simulation**: no `performance.now` /
+  `Date`, no `VIEW_W` / `renderer.camX` / on-screen checks, no `save.settings` / `save.progress` /
+  quality / touch mode / audio state. Player input reaches the sim only through `Player.input`
+  (`PlayerInput`, filled by `World.inputSource`; game/seam.ts) — never read the `input` singleton
+  or the mouse from gameplay code (use `p.input.cx/cy` / `w.mouseWorld()`). Options that change the
+  simulation live in `w.rules` (`SimRules`, fixed per run in multiplayer).
+- **Fixed step only**: state changes happen in `update(dt)` with the fixed `FIXED_DT`; `draw()` /
+  `light()` must not change simulation state (restore anything you temporarily change).
+- Transcendental math is deterministic because `engine/dmath.ts` replaces `Math.sin/cos/tan/atan2/
+  exp/log/pow/hypot/...` at boot (`installDeterministicMath`, also in tests via `tests/setup.ts`).
+  Do not use the `**` operator in simulation code (it bypasses `Math.pow`); write `x * x` or `Math.pow`.
+- Prefer `Map` / `Set` / arrays (insertion order) for iteration that affects gameplay; sorts need
+  total, NaN-free comparators.
+- Entity ids are simulation state (restart at 1 per run): spawn order must not depend on anything above.
+- Check: `npx vitest run tests/determinism` drives the real World headless with a scripted bot
+  through floors 1–5 and asserts identical per-step `stateHash(w)` (game/statehash.ts) across fx
+  seeds, view widths, quality / settings, drawing and cache warm-up. On failure it prints the first
+  diverging step, the per-part hashes and the differing entities. Add new content to its coverage
+  by playing it there (the harness cycles every weapon / artifact / active / enemy over its scenarios).
