@@ -10,6 +10,7 @@ import type { World } from '../../game/world';
 import type { Room } from '../../game/room';
 import type { RNG } from '../../engine/rng';
 import { audio } from '../../audio/audio';
+import { finalVictory } from '../bosses/final';
 import { Candles } from '../props/lights';
 import { LightShaft } from '../props/ambient';
 import { coinHeap, darkRing, ritualCircle, roundRug, withDecals } from './decor';
@@ -124,7 +125,9 @@ registerRoomHandler('boss', {
       if (item) w.spawn(new Pedestal(room.centerX, room.centerY - 20, item));
       w.spawn(new Trapdoor(room.centerX, room.centerY + 24));
     } else {
-      w.victory();
+      // last floor: a short light-flood cinematic, then the victory screen
+      if (w.floor.index === 5) finalVictory(w, room.centerX, room.centerY - 24);
+      else w.victory();
       return;
     }
     w.spawn(new Pickup('heart', room.centerX - 30, room.centerY).pop());
