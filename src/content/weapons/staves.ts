@@ -63,8 +63,10 @@ defineWeapon({
   kind: 'ranged',
   archetype: '연사',
   rarity: 'epic',
+  tags: ['arcane'],
   pools: ['treasure', 'boss'],
   stats(m) {
+    m.mulStat('damage', 0.72);
     m.mulStat('shotSpeed', 1.3);
   },
   update(w, p, st, dt, firing, aim) {
@@ -219,9 +221,10 @@ defineWeapon({
   kind: 'beam',
   archetype: '광선',
   rarity: 'rare',
+  tags: ['arcane'],
   pools: ['treasure', 'shop', 'secret'],
   stats(m) {
-    m.mulStat('damage', 1.2);
+    m.mulStat('damage', 1.0);
     m.mulStat('fireRate', 0.95);
   },
   update(w, p, st, _dt, firing, aim) {
@@ -330,7 +333,11 @@ defineWeapon({
   kind: 'ranged',
   archetype: '화염 방사',
   rarity: 'epic',
+  tags: ['arcane'],
   pools: ['treasure', 'boss'],
+  stats(m) {
+    m.mulStat('damage', 0.6);
+  },
   update(w, p, st, dt, firing, aim) {
     if (!firing) {
       st.mem.atk = 0;
@@ -413,10 +420,11 @@ defineWeapon({
   kind: 'beam',
   archetype: '연쇄 번개',
   rarity: 'epic',
+  tags: ['arcane'],
   pools: ['treasure', 'boss', 'secret'],
   stats(m) {
-    m.mulStat('damage', 1.6);
-    m.mulStat('fireRate', 0.95);
+    m.mulStat('damage', 1.18);
+    m.mulStat('fireRate', 0.9);
   },
   update(w, p, st, _dt, firing, aim) {
     if (!firing || st.cooldown > 0) return;

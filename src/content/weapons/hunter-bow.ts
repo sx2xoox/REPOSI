@@ -102,7 +102,11 @@ defineWeapon({
   heldSprite: 'w_hunter_bow',
   kind: 'charge',
   rarity: 'rare',
+  tags: ['bow'],
   pools: ['treasure', 'shop'],
+  stats(m) {
+    m.mulStat('damage', 1.13);
+  },
   update(w, p, st, dt, firing, aim) {
     if (firing && st.cooldown <= 0) {
       if (!st.mem.drawing) {

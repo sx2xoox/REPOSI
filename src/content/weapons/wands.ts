@@ -62,8 +62,10 @@ defineWeapon({
   kind: 'ranged',
   archetype: '권총',
   rarity: 'common',
+  tags: ['arcane'],
   pools: ['treasure', 'shop'],
   stats(m) {
+    m.mulStat('damage', 0.93);
     m.mulStat('fireRate', 0.9);
     m.mulStat('shotSpeed', 1.25);
   },
@@ -149,9 +151,10 @@ defineWeapon({
   kind: 'ranged',
   archetype: '냉기',
   rarity: 'common',
+  tags: ['arcane'],
   pools: ['treasure', 'shop'],
   stats(m) {
-    m.mulStat('damage', 0.95);
+    m.mulStat('damage', 0.88);
     m.mulStat('shotSpeed', 1.15);
   },
   update(w, p, st, _dt, firing, aim) {
@@ -236,6 +239,7 @@ defineWeapon({
   kind: 'ranged',
   archetype: '방울',
   rarity: 'common',
+  tags: ['arcane'],
   pools: ['treasure', 'shop'],
   stats(m) {
     m.mulStat('damage', 1.25);
@@ -347,9 +351,10 @@ defineWeapon({
   kind: 'ranged',
   archetype: '분열',
   rarity: 'rare',
+  tags: ['arcane'],
   pools: ['treasure', 'shop', 'boss'],
   stats(m) {
-    m.mulStat('damage', 1.6);
+    m.mulStat('damage', 1.4);
     m.mulStat('fireRate', 0.7);
   },
   update(w, p, st, _dt, firing, aim) {

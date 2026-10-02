@@ -16,7 +16,7 @@ import { Entity } from '../src/game/entity';
 loadContent();
 
 /** QA bot median boss dps per floor (measured; re-measure when weapons / items change). */
-const BOT_BOSS_DPS: Record<number, number> = { 1: 30, 2: 44, 3: 62, 4: 92, 5: 131 };
+const BOT_BOSS_DPS: Record<number, number> = { 1: 30, 2: 44, 3: 69, 4: 92, 5: 143, 6: 217 };
 
 const KNOBS = ['hpMult', 'bossHpMult', 'enemyDamage', 'enemySpeed', 'shotSpeed', 'budget', 'championChance', 'roomCount'] as const;
 
@@ -65,8 +65,8 @@ describe('difficulty table', () => {
   });
 
   it('bosses last ~30-60 s against a typical build on their floor', () => {
-    // floors 1-5: the QA bot's median boss dps (scripts/qa-run.mjs --suite balance, 4 characters x
-    // several seeds; blessings, items, releases and dodging included). It grows ~1.45x per floor.
+    // the QA bot's median boss dps per floor (scripts/qa-run.mjs --suite balance, 4 characters x
+    // 15 seeds; blessings, items, releases and dodging included): it grows ~1.45x per floor.
     for (const e of Enemies.all()) {
       if (!e.boss) continue;
       for (const fl of e.bossFloors ?? []) {

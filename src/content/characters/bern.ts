@@ -156,7 +156,7 @@ defineCharacter({
   keys: 1,
   baseStats: {
     moveSpeed: 86,
-    damage: 13,
+    damage: 11,
     range: 160,
     knockback: 90,
     dashCooldown: 0.8,

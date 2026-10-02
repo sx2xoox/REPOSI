@@ -1,6 +1,10 @@
-// Character select: a carousel of keepers on lit pedestals over the stairwell,
-// with name / story, stat bars, starting kit icons, the lantern-release
-// description, and locked silhouettes with unlock hints. Mouse, keys and pad.
+// Character select: a carousel of keepers on lit pedestals over the stairwell.
+// Every keeper shows why to pick it: a one-line pitch and the story (left),
+// stat bars and consumables (right), playstyle tags + difficulty under the name,
+// and the kit strip (signature passive, dash, lantern release) at the bottom;
+// the starting weapon and the favoured weapon class sit under the story.
+// Locked keepers show a silhouette with the unlock hint. Mouse, keys, pad and
+// touch (phone layouts shift the strip up and the buttons down).
 
 import type { Scene, TouchButtonSpec } from './scene';
 import { touchUiActive } from './touch-mode';
@@ -9,18 +13,18 @@ import { UI_H, UI_W, UI_W_BASE, uiCenterX } from '../engine/renderer';
 import { app } from '../game/app';
 import { input } from '../engine/input';
 import { sfx } from '../audio/audio';
-import { Actives, Artifacts, Weapons, type CharacterDef } from '../game/defs';
+import { Weapons, type CharacterDef } from '../game/defs';
 import { save } from '../engine/save';
 import { randomSeedString } from '../engine/rng';
-import { animFrame, hasAnim } from '../engine/sprites';
+import { animFrame, hasAnim, hasSprite } from '../engine/sprites';
 import { clamp, ease } from '../engine/math';
 import { backdrop } from './backdrop';
 import { Repeater, Spring, appear } from './anim';
 import { C } from './theme';
-import { divider, frame, gauge, glow, iconSlot, keyHintRow } from './frame';
-import { characterOrder, characterStatRows, characterStats, isUnlocked } from './logic';
+import { divider, fitScale, frame, gauge, glow, iconSlot, keyHintRow, spriteCentered } from './frame';
+import { characterKitRows, characterOrder, characterStatRows, characterStats, isUnlocked, DIFFICULTY_LABELS, weaponKindLabel } from './logic';
 
-const WEAPON_KIND: Record<string, string> = { ranged: '원거리', melee: '근접', charge: '차지', beam: '광선' };
+const KIT_LABEL_COLORS = { passive: C.goldHi, dash: C.info, release: C.emberHi } as const;
 
 export class CharacterSelectScene implements Scene {
   private idx = 0;
@@ -86,6 +90,13 @@ export class CharacterSelectScene implements Scene {
     this.starting = 0;
   }
 
+  /** Layout that depends on the touch chrome (the strip moves up, the buttons down). */
+  private layout(): { baseY: number; panelH: number; stripY: number; stripH: number } {
+    const touch = touchUiActive();
+    const stripY = touch ? 280 : 292;
+    return { baseY: touch ? 214 : 226, panelH: stripY - 66 - 6, stripY, stripH: 88 };
+  }
+
   update(dt: number): void {
     this.t += dt;
     this.selT += dt;
@@ -116,9 +127,10 @@ export class CharacterSelectScene implements Scene {
     const m = app.renderer.displayToUI(input.mouseX, input.mouseY);
     m.x -= uiCenterX();
     if (input.pressed('fire')) {
+      const { baseY } = this.layout();
       for (let i = 0; i < this.chars.length; i++) {
         const { x, s } = this.slotPos(i);
-        if (Math.abs(m.x - x) < 10 * s && m.y > 120 && m.y < 250) {
+        if (Math.abs(m.x - x) < 10 * s && m.y > baseY - 120 && m.y < baseY + 14) {
           if (i === this.idx) this.start();
           else this.choose(i);
           break;
@@ -129,7 +141,8 @@ export class CharacterSelectScene implements Scene {
 
   touchButtons(): TouchButtonSpec[] {
     if (this.starting >= 0) return [];
-    const y = 360;
+    const sa = app.renderer.uiSafe;
+    const y = UI_H - 42 - Math.min(sa.b, 24);
     const ox = uiCenterX();
     return [
       { x: ox + 196, y, w: 64, h: 40, icon: 'tc_arrow_l', tap: 'uiLeft' },
@@ -164,6 +177,7 @@ export class CharacterSelectScene implements Scene {
     const cur = this.chars[this.idx];
     if (!cur) return;
     const open = this.open(cur);
+    const L = this.layout();
 
     // header
     r.uiText('등불지기 선택', UI_W_BASE / 2, 16, { size: 24, bold: true, align: 'center', color: C.text, outline: C.ink, alpha: A });
@@ -173,7 +187,7 @@ export class CharacterSelectScene implements Scene {
 
     // carousel (back to front)
     const order = this.chars.map((c, i) => ({ c, i, p: this.slotPos(i) })).sort((a, b) => Math.abs(b.p.d) - Math.abs(a.p.d));
-    const baseY = 236;
+    const baseY = L.baseY;
     for (const { c, i, p } of order) {
       if (p.a <= 0) continue;
       const isSel = i === this.idx;
@@ -232,72 +246,108 @@ export class CharacterSelectScene implements Scene {
         r.uiText('새로운!', x, ny - 6, { size: 10, font: 'small', align: 'center', color: C.goldHi, alpha: A * p.a });
       }
       if (!isSel && focus < 0.5) {
-        r.uiText(unlocked ? c.name : '???', x, baseY + 12, { size: 10, font: 'small', align: 'center', color: unlocked ? C.textDim : C.textMute, alpha: A * p.a });
+        r.uiText(unlocked ? c.name : '???', x, baseY + 10, { size: 10, font: 'small', align: 'center', color: unlocked ? C.textDim : C.textMute, alpha: A * p.a });
       }
     }
     // arrows
     const bob = Math.sin(this.t * 4) * 3;
-    r.uiSprite('ui_arrow_l', UI_W_BASE / 2 - 66 - bob, 170, 3, { alpha: A * 0.9 });
-    r.uiSprite('ui_arrow_r', UI_W_BASE / 2 + 66 + bob, 170, 3, { alpha: A * 0.9 });
+    r.uiSprite('ui_arrow_l', UI_W_BASE / 2 - 66 - bob, baseY - 66, 3, { alpha: A * 0.9 });
+    r.uiSprite('ui_arrow_r', UI_W_BASE / 2 + 66 + bob, baseY - 66, 3, { alpha: A * 0.9 });
     // name plate under the selected keeper
     const k = appear(this.selT, 0.3);
-    r.uiText(open ? cur.name : '???', UI_W_BASE / 2, baseY + 12 + (1 - k) * 6, { size: 24, bold: true, align: 'center', color: open ? cur.color : C.textFaint, outline: C.ink, alpha: A * k });
-    r.uiText(open ? cur.title : '잠긴 등불지기', UI_W_BASE / 2, baseY + 42, { size: 12, align: 'center', color: C.textDim, alpha: A * k });
+    r.uiText(open ? cur.name : '???', UI_W_BASE / 2, baseY + 8 + (1 - k) * 6, { size: 24, bold: true, align: 'center', color: open ? cur.color : C.textFaint, outline: C.ink, alpha: A * k });
+    r.uiText(open ? cur.title : '잠긴 등불지기', UI_W_BASE / 2, baseY + 36, { size: 12, align: 'center', color: C.textDim, alpha: A * k });
+    this.drawTags(r, cur, open, A, k, baseY + 54);
 
-    this.drawInfo(r, cur, open, A, k);
-    this.drawStats(r, cur, open, A, k);
-    this.drawRelease(r, cur, open, A, k);
+    this.drawInfo(r, cur, open, A, k, L.panelH);
+    this.drawStats(r, cur, open, A, k, L.panelH);
+    this.drawKit(r, cur, open, A, k, L.stripY, L.stripH);
 
     if (!touchUiActive()) keyHintRow(r, [['←→', '선택'], ['Enter', '하강 시작'], ['Esc', '뒤로']], UI_W_BASE / 2, UI_H - 12, { alpha: A * 0.85, pad: input.aimMode === 'pad' });
     if (out > 0) r.uiRect(0, 0, UI_W, UI_H, '#000000', ease.inQuad(out) * 0.9);
   }
 
-  private drawInfo(r: Renderer, c: CharacterDef, open: boolean, A: number, k: number): void {
+  /** Playstyle pills + difficulty lanterns, centered under the title. */
+  private drawTags(r: Renderer, c: CharacterDef, open: boolean, A: number, k: number, y: number): void {
+    const tags = open ? c.playstyle ?? [] : [];
+    const diff = open ? c.difficulty ?? 2 : 0;
+    const diffLabel = diff ? `난이도 ${DIFFICULTY_LABELS[diff] ?? ''}` : '난이도 ?';
+    const pillW = tags.map((t) => r.measureText(t, 10, false, 'small') + 14);
+    const diffW = r.measureText(diffLabel, 10, false, 'small') + 6 + 3 * 7 + 2;
+    const total = pillW.reduce((s, w) => s + w + 4, 0) + 10 + diffW;
+    let x = UI_W_BASE / 2 - total / 2;
+    const a = A * k;
+    tags.forEach((t, i) => {
+      frame(r, x, y - 8, pillW[i], 18, 'tooltip', { color: c.color, alpha: a * 0.9 });
+      r.uiText(t, x + pillW[i] / 2, y - 5, { size: 10, font: 'small', align: 'center', color: C.text, alpha: a });
+      x += pillW[i] + 4;
+    });
+    x += 10;
+    r.uiText(diffLabel, x, y - 5, { size: 10, font: 'small', color: C.textDim, alpha: a });
+    x += r.measureText(diffLabel, 10, false, 'small') + 6;
+    for (let i = 0; i < 3; i++) {
+      const on = i < diff;
+      r.uiRect(x + i * 7, y - 2, 5, 5, C.ink, a);
+      r.uiRect(x + i * 7 + 1, y - 1, 3, 3, on ? C.ember : '#2a2236', a);
+    }
+  }
+
+  private drawInfo(r: Renderer, c: CharacterDef, open: boolean, A: number, k: number, h: number): void {
     const x = 18;
     const y = 66;
     const w = 214;
-    const h = 222;
     frame(r, x - (1 - k) * 10, y, w, h, 'panel', { alpha: A * 0.95 });
     const tx = x + 14 - (1 - k) * 10;
+    const tw = w - 28;
     r.uiText('이야기', tx, y + 12, { size: 10, font: 'small', color: C.gold, alpha: A });
-    const desc = open ? c.desc : c.unlockHint ?? '아직 잠겨 있습니다.';
-    const lines = r.wrapText(desc, w - 28, 12);
-    lines.slice(0, 6).forEach((l, i) => r.uiText(l, tx, y + 28 + i * 16, { size: 12, color: open ? C.text : C.textFaint, alpha: A * k }));
-    let ky = y + 30 + Math.min(6, lines.length) * 16 + 8;
-    divider(r, x + w / 2, ky, w - 40, C.goldDark, A * 0.8);
-    ky += 12;
-    r.uiText('시작 장비', tx, ky, { size: 10, font: 'small', color: C.gold, alpha: A });
-    ky += 16;
+    let cy = y + 28;
     if (!open) {
-      r.uiSprite('ui_lock', tx + 10, ky + 14, 2, { alpha: A });
-      r.uiText('해금 조건', tx + 26, ky + 2, { size: 12, color: C.textDim, alpha: A });
-      r.uiText(c.unlockHint ? '위 조건을 달성하세요' : '???', tx + 26, ky + 18, { size: 10, font: 'small', color: C.textFaint, alpha: A });
+      const lines = r.wrapText(c.unlockHint ?? '아직 잠겨 있습니다.', tw, 12);
+      lines.slice(0, 5).forEach((l, i) => r.uiText(l, tx, cy + i * 16, { size: 12, color: C.textFaint, alpha: A * k }));
+      cy += Math.min(5, lines.length) * 16 + 10;
+      divider(r, x + w / 2, cy, w - 40, C.goldDark, A * 0.8);
+      cy += 14;
+      r.uiSprite('ui_lock', tx + 10, cy + 12, 2, { alpha: A });
+      r.uiText('해금 조건', tx + 26, cy, { size: 12, color: C.textDim, alpha: A });
+      r.uiText(c.unlockHint ? '위 조건을 달성하세요' : '???', tx + 26, cy + 16, { size: 10, font: 'small', color: C.textFaint, alpha: A });
       return;
     }
+    // the pitch: why pick this keeper (gold, up to 2 lines)
+    if (c.pitch) {
+      const pl = r.wrapText(c.pitch, tw, 12, true).slice(0, 2);
+      pl.forEach((l, i) => r.uiText(l, tx, cy + i * 16, { size: 12, bold: true, color: C.goldHi, alpha: A * k }));
+      cy += pl.length * 16 + 4;
+    }
+    const story = r.wrapText(c.desc, tw, 12);
+    const maxStory = Math.max(2, Math.floor((h - (cy - y) - 96) / 16));
+    story.slice(0, maxStory).forEach((l, i) => r.uiText(l, tx, cy + i * 16, { size: 12, color: C.text, alpha: A * k }));
+    cy += Math.min(maxStory, story.length) * 16 + 6;
+    divider(r, x + w / 2, cy, w - 40, C.goldDark, A * 0.8);
+    cy += 10;
+    // starting weapon
     const wdef = Weapons.get(c.weapon);
-    const slots: { icon: string; name: string; sub: string }[] = [];
-    if (wdef) slots.push({ icon: wdef.icon, name: wdef.name, sub: `무기 · ${WEAPON_KIND[wdef.kind] ?? ''}` });
-    for (const id of c.artifacts ?? []) {
-      const a = Artifacts.get(id);
-      if (a) slots.push({ icon: a.icon, name: a.name, sub: '고유 유물' });
+    r.uiText('시작 무기', tx, cy, { size: 10, font: 'small', color: C.gold, alpha: A });
+    cy += 14;
+    if (wdef) {
+      iconSlot(r, wdef.icon, tx + 15, cy + 13, 30, { alpha: A, scale: fitScale(wdef.icon, 22, 1.5) });
+      r.uiText(wdef.name, tx + 38, cy + 1, { size: 12, color: C.text, alpha: A });
+      r.uiText(`${wdef.archetype ?? weaponKindLabel(wdef.kind)}`, tx + 38, cy + 16, { size: 10, font: 'small', color: C.textFaint, alpha: A });
     }
-    if (c.active) {
-      const a = Actives.get(c.active);
-      if (a) slots.push({ icon: a.icon, name: a.name, sub: '액티브' });
-    }
-    slots.slice(0, 3).forEach((s, i) => {
-      const sy = ky + i * 40;
-      iconSlot(r, s.icon, tx + 17, sy + 16, 36, { alpha: A, scale: 1.5 });
-      r.uiText(s.name, tx + 42, sy + 3, { size: 12, color: C.text, alpha: A });
-      r.uiText(s.sub, tx + 42, sy + 18, { size: 10, font: 'small', color: C.textFaint, alpha: A });
-    });
+    cy += 34;
+    // favoured weapon class
+    const aff = c.affinity;
+    r.uiText('선호 무기', tx, cy, { size: 10, font: 'small', color: C.gold, alpha: A });
+    r.uiText(aff ? aff.name : '없음', tx + 50, cy, { size: 10, font: 'small', color: aff ? C.good : C.textDim, alpha: A });
+    cy += 13;
+    const affDesc = aff ? aff.desc : '어떤 무기든 고르게 다룬다.';
+    const al = r.wrapText(affDesc, tw, 10, false, 'small').slice(0, 2);
+    al.forEach((l, i) => r.uiText(l, tx, cy + i * 12, { size: 10, font: 'small', color: C.textDim, alpha: A * k }));
   }
 
-  private drawStats(r: Renderer, c: CharacterDef, open: boolean, A: number, k: number): void {
+  private drawStats(r: Renderer, c: CharacterDef, open: boolean, A: number, k: number, h: number): void {
     const w = 214;
     const x = UI_W_BASE - 18 - w;
     const y = 66;
-    const h = 222;
     frame(r, x + (1 - k) * 10, y, w, h, 'panel', { alpha: A * 0.95 });
     const tx = x + 14 + (1 - k) * 10;
     r.uiText('능력치', tx, y + 12, { size: 10, font: 'small', color: C.gold, alpha: A });
@@ -312,8 +362,9 @@ export class CharacterSelectScene implements Scene {
     for (let i = 0; i < (open ? c.soulHearts ?? 0 : 0); i++) r.uiSprite('hud_soul_full', tx + 84 + (hearts + i) * 18, hy, 2, { alpha: A });
     const st = characterStats(c);
     const rows = characterStatRows(st);
+    const rowH = Math.min(24, Math.floor((h - 34 - 30 - 22) / rows.length));
     rows.forEach((row, i) => {
-      const ry = hy + 24 + i * 24;
+      const ry = hy + 24 + i * rowH;
       r.uiSprite(row.icon, tx + 6, ry, 2, { alpha: A });
       r.uiText(row.label, tx + 22, ry - 6, { size: 12, color: C.textDim, alpha: A });
       const fill = open ? row.frac * appear(this.selT, 0.45, i * 0.04) : 0;
@@ -321,7 +372,7 @@ export class CharacterSelectScene implements Scene {
       r.uiText(open ? row.text : '?', tx + w - 28, ry - 6, { size: 10, font: 'small', align: 'right', color: C.text, alpha: A });
     });
     // consumables
-    const cy = hy + 24 + rows.length * 24 + 4;
+    const cy = hy + 24 + rows.length * rowH + 2;
     const cons: [string, number][] = [['hud_coin', open ? c.coins ?? 0 : 0], ['hud_bomb', open ? c.bombs ?? 1 : 0], ['hud_key', open ? c.keys ?? 0 : 0]];
     cons.forEach(([icon, n], i) => {
       const cx = tx + 10 + i * 56;
@@ -330,19 +381,33 @@ export class CharacterSelectScene implements Scene {
     });
   }
 
-  private drawRelease(r: Renderer, c: CharacterDef, open: boolean, A: number, k: number): void {
-    const w = 460;
-    const h = 52;
+  /** The kit strip: three rows — signature passive, dash, lantern release. */
+  private drawKit(r: Renderer, c: CharacterDef, open: boolean, A: number, k: number, y: number, h: number): void {
+    const w = 500;
     const x = UI_W_BASE / 2 - w / 2;
-    const y = 300;
-    frame(r, x, y + (1 - k) * 8, w, h, 'tooltip', { alpha: A * 0.95, color: open ? '#c8662a' : C.rim });
-    const fl = 0.8 + 0.2 * Math.sin(this.t * 8);
-    if (open) glow(r, x + 22, y + 26, 30, '#ff8a30', 0.25 * A * fl);
-    r.uiSprite(open ? 'ui_flame' : 'ui_question', x + 22, y + 26 + (1 - k) * 8, 2, { alpha: A });
-    r.uiText('등불 해방', x + 42, y + 8 + (1 - k) * 8, { size: 12, bold: true, color: open ? C.emberHi : C.textFaint, alpha: A });
-    r.uiText(touchUiActive() ? '게이지가 가득 차면 해방 버튼' : '게이지가 가득 차면 F', x + w - 12, y + 9 + (1 - k) * 8, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: A });
-    const desc = open ? c.releaseDesc ?? '등불을 터뜨려 주변의 적과 탄환을 태운다.' : '???';
-    const lines = r.wrapText(desc, w - 60, 10, false, 'small');
-    lines.slice(0, 2).forEach((l, i) => r.uiText(l, x + 42, y + 26 + i * 12 + (1 - k) * 8, { size: 10, font: 'small', color: open ? C.text : C.textMute, alpha: A * k }));
+    const oy = (1 - k) * 8;
+    frame(r, x, y + oy, w, h, 'tooltip', { alpha: A * 0.95, color: open ? c.color : C.rim });
+    const rows = characterKitRows(c, open, touchUiActive());
+    const rowH = (h - 8) / rows.length;
+    rows.forEach((row, i) => {
+      const ry = y + oy + 5 + i * rowH;
+      const col = KIT_LABEL_COLORS[row.kind];
+      // icon
+      const icon = open && hasSprite(row.icon) ? row.icon : 'ui_question';
+      if (row.kind === 'release' && open) {
+        const fl = 0.8 + 0.2 * Math.sin(this.t * 8);
+        glow(r, x + 22, ry + rowH / 2, 22, '#ff8a30', 0.22 * A * fl);
+      }
+      spriteCentered(r, icon, x + 22, ry + rowH / 2, fitScale(icon, 20, 1.5), { alpha: A });
+      // label · name
+      r.uiText(row.label, x + 42, ry + 1, { size: 10, font: 'small', color: open ? col : C.textFaint, alpha: A });
+      r.uiText(open ? row.name : '???', x + 42, ry + 12, { size: 12, bold: true, color: open ? C.text : C.textMute, alpha: A * k });
+      // description (up to 2 small lines)
+      const dx = x + 176;
+      const lines = open ? r.wrapText(row.desc, x + w - 12 - dx, 10, false, 'small').slice(0, 2) : ['???'];
+      lines.forEach((l, j) => r.uiText(l, dx, ry + 3 + j * 12, { size: 10, font: 'small', color: open ? C.text : C.textMute, alpha: A * k }));
+      if (row.hint) r.uiText(row.hint, x + w - 12, ry + 1, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: A * 0.9 });
+      if (i > 0) r.uiRect(x + 10, Math.round(ry - 2), w - 20, 1, C.rimDark, A * 0.8);
+    });
   }
 }

@@ -65,6 +65,7 @@ defineWeapon({
   rarity: 'common',
   pools: ['treasure', 'shop'],
   stats(m) {
+    m.mulStat('damage', 0.89);
     m.mulStat('fireRate', 0.55);
     m.mulStat('range', 0.55);
   },
@@ -177,7 +178,7 @@ defineWeapon({
   rarity: 'rare',
   pools: ['treasure', 'shop', 'boss'],
   stats(m) {
-    m.mulStat('damage', 1.15);
+    m.mulStat('damage', 1.02);
     m.mulStat('fireRate', 0.95);
     m.addStat('knockback', 80);
   },

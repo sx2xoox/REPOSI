@@ -48,6 +48,7 @@ defineWeapon({
   heldSprite: 'w_lantern',
   kind: 'ranged',
   rarity: 'common',
+  tags: ['arcane'],
   pools: ['shop'],
   update(w, p, st, dt, firing, aim) {
     // pendulum: the lantern lags behind movement and jolts on every shot

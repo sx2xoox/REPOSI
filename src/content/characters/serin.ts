@@ -155,7 +155,7 @@ defineCharacter({
   coins: 5,
   baseStats: {
     moveSpeed: 106,
-    damage: 11,
+    damage: 10,
     range: 215,
     dashCooldown: 0.6,
     dashSpeed: 400,

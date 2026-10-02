@@ -121,8 +121,8 @@ defineWeapon({
   rarity: 'rare',
   pools: ['treasure', 'boss'],
   stats(m) {
-    m.mulStat('damage', 2.3);
-    m.mulStat('fireRate', 0.48);
+    m.mulStat('damage', 1.75);
+    m.mulStat('fireRate', 0.43);
     m.addStat('knockback', 40);
   },
   update(w, p, st, dt, firing, aim) {

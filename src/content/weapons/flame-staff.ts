@@ -62,7 +62,11 @@ defineWeapon({
   heldSprite: 'w_flame_staff',
   kind: 'ranged',
   rarity: 'rare',
+  tags: ['arcane'],
   pools: ['treasure', 'boss', 'shop'],
+  stats(m) {
+    m.mulStat('damage', 0.7);
+  },
   update(w, p, st, dt, firing, aim) {
     if (!firing) {
       st.mem.atk = 0;

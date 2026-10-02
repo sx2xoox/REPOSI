@@ -100,9 +100,10 @@ defineWeapon({
   kind: 'ranged',
   archetype: '소환',
   rarity: 'epic',
+  tags: ['arcane'],
   pools: ['treasure', 'boss', 'secret'],
   stats(m) {
-    m.mulStat('damage', 0.9);
+    m.mulStat('damage', 0.62);
     m.mulStat('fireRate', 0.9);
   },
   update(w, p, st, _dt, firing, aim) {
@@ -182,7 +183,7 @@ defineWeapon({
   rarity: 'rare',
   pools: ['treasure', 'shop', 'boss'],
   stats(m) {
-    m.mulStat('damage', 1.5);
+    m.mulStat('damage', 1.4);
     m.mulStat('fireRate', 0.7);
     m.addStat('knockback', 60);
   },
@@ -354,9 +355,11 @@ defineWeapon({
   kind: 'ranged',
   archetype: '전설 등불',
   rarity: 'legendary',
+  tags: ['arcane'],
   pools: ['boss', 'secret'],
   stats(m) {
-    m.mulStat('fireRate', 0.95);
+    m.mulStat('damage', 0.6);
+    m.mulStat('fireRate', 0.8);
     m.addStat('homing', 1.2);
   },
   update(w, p, st, dt, firing, aim) {
@@ -487,9 +490,11 @@ defineWeapon({
   kind: 'ranged',
   archetype: '전설 소환',
   rarity: 'legendary',
+  tags: ['arcane'],
   pools: ['boss', 'secret'],
   stats(m) {
-    m.mulStat('fireRate', 0.55);
+    m.mulStat('damage', 0.58);
+    m.mulStat('fireRate', 0.45);
   },
   update(w, p, st, _dt, firing, aim) {
     if (!firing || st.cooldown > 0) return;

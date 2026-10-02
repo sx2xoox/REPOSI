@@ -41,10 +41,11 @@ defineWeapon({
   heldSprite: 'w_sentinel_blade',
   kind: 'melee',
   rarity: 'rare',
+  tags: ['blade'],
   pools: ['treasure', 'boss'],
   stats(m) {
-    m.mulStat('damage', 1.25);
-    m.mulStat('fireRate', 0.95);
+    m.mulStat('damage', 0.95);
+    m.mulStat('fireRate', 0.7);
   },
   update(w, p, st, _dt, firing, aim) {
     if (!attackInput(st, w, firing) || st.cooldown > 0) return;

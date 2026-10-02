@@ -44,7 +44,11 @@ defineWeapon({
   heldSprite: 'w_void_eye',
   kind: 'beam',
   rarity: 'epic',
+  tags: ['arcane'],
   pools: ['secret', 'boss'],
+  stats(m) {
+    m.mulStat('damage', 0.76);
+  },
   update(w, p, st, dt, firing, aim) {
     const m = st.mem;
     if (m.fade && m.fade > 0) m.fade -= dt;

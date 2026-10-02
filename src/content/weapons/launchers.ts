@@ -86,7 +86,7 @@ defineWeapon({
   rarity: 'rare',
   pools: ['treasure', 'shop', 'boss'],
   stats(m) {
-    m.mulStat('damage', 1.3);
+    m.mulStat('damage', 0.98);
     m.mulStat('fireRate', 0.48);
   },
   update(w, p, st, _dt, firing, aim) {
@@ -185,6 +185,7 @@ defineWeapon({
   rarity: 'epic',
   pools: ['treasure', 'boss'],
   stats(m) {
+    m.mulStat('damage', 0.68);
     m.mulStat('fireRate', 0.52);
     m.mulStat('range', 1.3);
   },

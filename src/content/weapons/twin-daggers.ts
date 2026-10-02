@@ -40,8 +40,8 @@ defineWeapon({
   rarity: 'common',
   pools: ['treasure', 'shop'],
   stats(m) {
-    m.mulStat('damage', 0.55);
-    m.mulStat('fireRate', 2.1);
+    m.mulStat('damage', 0.39);
+    m.mulStat('fireRate', 1.95);
   },
   update(w, p, st, _dt, firing, aim) {
     if (!attackInput(st, w, firing) || st.cooldown > 0) return;

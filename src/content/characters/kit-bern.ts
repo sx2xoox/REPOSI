@@ -15,7 +15,7 @@ import { O } from './kit';
 
 export const BERN_MAX_STACKS = 5;
 /** attack speed / move speed per stack */
-export const BERN_STACK_FIRE = 0.07;
+export const BERN_STACK_FIRE = 0.06;
 export const BERN_STACK_MOVE = 0.05;
 /** seconds without a hit before stacks start dropping, and the drop interval */
 export const BERN_DECAY_DELAY = 1.6;
@@ -161,6 +161,7 @@ export const BERN_AFFINITY: AffinityDef = {
   name: '근접 무기',
   desc: '근접 무기를 들면 피해 +12%, 넉백 +20%.',
   kinds: ['melee'],
+  tags: ['blade'],
   stats(m) {
     m.mulStat('damage', 1.12);
     m.mulStat('knockback', 1.2);

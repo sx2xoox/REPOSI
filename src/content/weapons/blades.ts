@@ -89,10 +89,11 @@ defineWeapon({
   kind: 'melee',
   archetype: '도',
   rarity: 'legendary',
+  tags: ['blade'],
   pools: ['boss', 'secret'],
   stats(m) {
-    m.mulStat('damage', 1.25);
-    m.mulStat('fireRate', 1.15);
+    m.mulStat('damage', 0.77);
+    m.mulStat('fireRate', 0.85);
   },
   update(w, p, st, _dt, firing, aim) {
     if (!attackInput(st, w, firing) || st.cooldown > 0) return;
@@ -196,9 +197,10 @@ defineWeapon({
   kind: 'charge',
   archetype: '대검',
   rarity: 'epic',
+  tags: ['blade'],
   pools: ['treasure', 'boss'],
   stats(m) {
-    m.mulStat('damage', 1.6);
+    m.mulStat('damage', 0.98);
     m.mulStat('fireRate', 0.7);
     m.addStat('knockback', 40);
   },
@@ -346,10 +348,11 @@ defineWeapon({
   kind: 'melee',
   archetype: '큰낫',
   rarity: 'epic',
+  tags: ['blade'],
   pools: ['treasure', 'boss', 'curse'],
   stats(m) {
-    m.mulStat('damage', 2.2);
-    m.mulStat('fireRate', 0.62);
+    m.mulStat('damage', 1.36);
+    m.mulStat('fireRate', 0.57);
   },
   update(w, p, st, _dt, firing, aim) {
     if (!attackInput(st, w, firing) || st.cooldown > 0) return;

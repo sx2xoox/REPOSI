@@ -102,9 +102,10 @@ defineWeapon({
   heldSprite: 'proj_void_orb',
   kind: 'ranged',
   rarity: 'epic',
+  tags: ['arcane'],
   pools: ['treasure', 'boss', 'secret'],
   stats(m) {
-    m.mulStat('damage', 1.1);
+    m.mulStat('damage', 0.8);
   },
   update(w, p, st, dt, firing, aim) {
     const s = p.stats;

@@ -71,7 +71,7 @@ Commands:
   regular 25–45, tough 60–120; bosses 700–1150.
 - **Floors & difficulty** (`content/floors.ts`): floors are 1..N and the deepest defined floor is
   the last (`lastFloorIndex()` / `isLastFloor()` in defs.ts): its boss gets `boss_final` music and
-  the victory cinematic; every other boss (무명 on floor 5 too, once deeper floors exist) leaves a
+  the victory cinematic; every other boss (incl. 무명, the act-1 finale on floor 5) leaves a
   reward + trapdoor. A floor spreads its row of `DIFFICULTY` into `defineFloor({ ...DIFFICULTY[n] })`
   (`tests/floors.test.ts` enforces it and the monotonic curve):
 
@@ -79,17 +79,17 @@ Commands:
   |---|---|---|---|---|---|---|---|
   | 1 | 1.3 | 1.35 | 1, 2 | 1.00 / 1.00 | 3–5 | 3% | 8–10 |
   | 2 | 1.75 | 2.05 | 1, 2 | 1.02 / 1.02 | 4–6 | 6% | 10–12 |
-  | 3 | 2.4 | 2.7 | 1, 2 | 1.03 / 1.04 | 5–7 | 8% | 11–13 |
-  | 4 | 3.6 | 3.8 | 1, 2 | 1.05 / 1.06 | 6–8 | 10% | 12–14 |
-  | 5 | 4.9 | 5.5 | 1, 2 | 1.06 / 1.08 | 7–9 | 12% | 12–15 |
-  | 6 | 6.3 | 7.2 | 1, 3 | 1.08 / 1.10 | 7–10 | 14% | 13–15 |
-  | 7 | 7.9 | 9.2 | 2, 3 | 1.09 / 1.12 | 8–10 | 16% | 13–16 |
-  | 8 | 9.8 | 11.6 | 2, 3 | 1.10 / 1.14 | 8–11 | 18% | 14–16 |
-  | 9 | 12 | 14.4 | 2, 4 | 1.12 / 1.16 | 9–11 | 20% | 14–17 |
-  | 10 | 14.4 | 17.6 | 2, 4 | 1.13 / 1.18 | 9–12 | 22% | 15–17 |
+  | 3 | 2.4 | 2.9 | 1, 2 | 1.03 / 1.04 | 5–7 | 8% | 11–13 |
+  | 4 | 3.6 | 4.2 | 1, 2 | 1.05 / 1.06 | 6–8 | 10% | 12–14 |
+  | 5 | 4.9 | 6.0 | 1, 2 | 1.06 / 1.08 | 7–9 | 12% | 12–15 |
+  | 6 | 6.3 | 11 | 1, 3 | 1.08 / 1.10 | 7–10 | 14% | 13–15 |
+  | 7 | 7.7 | 13.8 | 2, 3 | 1.09 / 1.12 | 8–10 | 16% | 13–16 |
+  | 8 | 9.4 | 17.2 | 2, 3 | 1.10 / 1.14 | 8–11 | 18% | 14–16 |
+  | 9 | 11.5 | 21.5 | 2, 4 | 1.12 / 1.16 | 9–11 | 20% | 14–17 |
+  | 10 | 14 | 26.9 | 2, 4 | 1.13 / 1.18 | 9–12 | 22% | 15–17 |
 
-  Floors 1–5 are measured (QA bot median: rooms ~6–10 s, bosses ~30–50 s; the bot's boss dps grows
-  ~1.45x per floor); 6–10 are extrapolated — re-measure with
+  Floors 1–6 are measured (QA bot median: rooms ~6–10 s, bosses ~30–50 s, humans ~1.3x longer; the
+  bot's boss dps grows ~1.45x per floor; boss def.hp ~700–1150); 7–10 are extrapolated — re-measure with
   `node scripts/qa-run.mjs --suite balance --seeds 3` (per-floor table: room / boss seconds, damage
   taken, would-die count, release share) once their content exists. From floor 7 a regular hit costs
   a full heart, so bosses drop one heart pickup per half-heart of regular damage. Deeper floors need

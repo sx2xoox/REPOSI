@@ -40,6 +40,8 @@ const TABS = [
 ] as const;
 /** seconds the discard stays armed ("한 번 더 눌러 버리기") */
 const ARM_TIME = 3;
+/** equipment panel height (weapon / active row + the keeper's passive row) */
+const EQUIP_H = 120;
 const WEAPON_KIND: Record<string, string> = { ranged: '원거리', melee: '근접', charge: '차지', beam: '광선' };
 
 export class StatusOverlay implements Scene {
@@ -410,13 +412,16 @@ export class StatusOverlay implements Scene {
     const x = 460;
     const y = 58 + oy;
     const ww = UI_W_BASE - 30 - x;
-    frame(r, x, y, ww, 92, 'panel', { alpha: k });
+    frame(r, x, y, ww, EQUIP_H, 'panel', { alpha: k });
     r.uiText('장비', x + 12, y + 8, { size: 10, font: 'small', color: C.gold, alpha: k });
     const wdef = Weapons.get(p.weaponId);
     if (wdef) {
       iconSlot(r, wdef.icon, x + 30, y + 42, 36, { alpha: k, selected: true });
       r.uiText(wdef.name, x + 54, y + 22, { size: 12, bold: true, color: C.text, alpha: k });
-      r.uiText(`무기 · ${wdef.archetype ?? WEAPON_KIND[wdef.kind] ?? ''}`, x + 54, y + 37, { size: 10, font: 'small', color: C.textFaint, alpha: k });
+      const kind = `무기 · ${wdef.archetype ?? WEAPON_KIND[wdef.kind] ?? ''}`;
+      r.uiText(kind, x + 54, y + 37, { size: 10, font: 'small', color: C.textFaint, alpha: k });
+      // favoured weapon class of the keeper (CharacterDef.affinity) in hand
+      if (p.flags.has('affinity')) r.uiText('선호 무기', x + 54 + r.measureText(kind, 10, false, 'small') + 6, y + 37, { size: 10, font: 'small', color: C.good, alpha: k });
     }
     // second weapon slot (swap key)
     const w2 = p.weapon2Id ? Weapons.get(p.weapon2Id) : undefined;
@@ -448,6 +453,21 @@ export class StatusOverlay implements Scene {
     };
     if (wdef) r.uiText(dl(wdef.desc), x + 12, y + 70, { size: 10, font: 'small', color: C.textDim, alpha: k });
     if (act) r.uiText(dl(act.desc), half, y + 70, { size: 10, font: 'small', color: C.textDim, alpha: k });
+    // the keeper's signature passive (CharacterDef.passive), dash and favoured class
+    const ch = p.character;
+    const py = y + 86;
+    r.uiRect(x + 12, py - 2, ww - 24, 1, C.rimDark, k);
+    const pas = ch.passive;
+    const flashT = pas ? this.t - this.lastPassiveProc(w.items.lastProc(`passive:${ch.id}`), w.time) : 9;
+    const pop = flashT < 0.4 ? 1 + 0.2 * (1 - flashT / 0.4) : 1;
+    iconSlot(r, pas?.icon ?? null, x + 30, py + 16, 28, { alpha: k, selected: flashT < 0.4, scale: pas ? fitScale(pas.icon, 20, 1.5) * pop : 1 });
+    r.uiText(`고유 능력 · ${pas ? pas.name : '없음'}`, x + 54, py + 2, { size: 12, bold: true, color: pas ? ch.color : C.textMute, alpha: k });
+    const dashName = ch.dash?.name ?? '질주';
+    const aff = ch.affinity;
+    r.uiText(`대시 · ${dashName}${aff ? `   선호 · ${aff.name}` : ''}`, x + ww - 12, py + 4, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: k });
+    const pdesc = pas ? pas.desc : '특별한 능력 없이 유물에 의지한다.';
+    const pl = r.wrapText(pdesc, ww - 66, 10, false, 'small');
+    r.uiText(pl.length > 1 ? `${pl[0]}…` : pl[0] ?? '', x + 54, py + 17, { size: 10, font: 'small', color: C.textDim, alpha: k });
     if (p.potionId) {
       const def = Potions.get(p.potionId);
       const known = w.run.identified.has(p.potionId);
@@ -457,12 +477,18 @@ export class StatusOverlay implements Scene {
   }
 
   // ---------------------------------------------------------------- resonance
+  /** World time of the last passive proc, as a value comparable with the overlay clock. */
+  private lastPassiveProc(procAt: number, worldTime: number): number {
+    if (!isFinite(procAt)) return -99;
+    return this.t - (worldTime - procAt);
+  }
+
   private drawResonance(r: Renderer, k: number, oy: number): void {
     const w = this.game.world;
     const x = 460;
-    const y = 156 + oy;
+    const y = 58 + EQUIP_H + 6 + oy;
     const ww = UI_W_BASE - 30 - x;
-    const h = 140;
+    const h = 118;
     frame(r, x, y, ww, h, 'panel', { alpha: k });
     r.uiText('등불 공명', x + 12, y + 8, { size: 12, bold: true, color: C.goldHi, alpha: k });
     const sets = [...(w.items.computed?.sets ?? [])].sort((a, b) => b.active.length - a.active.length || b.count - a.count);
@@ -516,7 +542,7 @@ export class StatusOverlay implements Scene {
     const w = this.game.world;
     const p = w.player;
     const x = 460;
-    const y = 302 + oy;
+    const y = 58 + EQUIP_H + 6 + 118 + 6 + oy;
     const ww = UI_W_BASE - 30 - x;
     const h = UI_H - 30 - y + oy - 6;
     frame(r, x, y, ww, h, 'panel', { alpha: k });

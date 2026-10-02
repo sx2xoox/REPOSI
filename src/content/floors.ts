@@ -9,29 +9,31 @@ export type FloorDifficulty = Required<Pick<FloorDef, 'hpMult' | 'bossHpMult' | 
 
 /**
  * Difficulty by floor (1..10): every floor is clearly harder than the one above.
- *  - hpMult / bossHpMult: enemy / boss HP = def.hp (floor-1 value) x mult. Grows
- *    ~1.3x per floor, a little ahead of a typical build with a blessing per floor
- *    (QA bot: rooms ~6-10 s, bosses ~30-45 s on floors 1-5).
+ *  - hpMult / bossHpMult: enemy / boss HP = def.hp (floor-1 units) x mult. Typical
+ *    builds (a blessing + ~4 items per floor) deal ~1.45x more damage each floor, so
+ *    HP grows about as fast: QA bot medians on floors 1-6 are rooms ~6-10 s and
+ *    bosses ~30-50 s (humans ~1.3x longer). Floors 7-10 are extrapolated (~1.25x).
+ *    bossHpMult assumes boss def.hp ~700-1150 (floor 6's bosses sit low, hence 11).
  *  - enemyDamage [regular, heavy] half-hearts: floors 1-5 stay at half a heart
  *    (heavy hits a full heart); floor 6 makes heavy hits 1.5 hearts, from floor 7
- *    every hit costs a full heart, floors 9-10 heavy hits 2 hearts. Player max HP
- *    grows by ~1 heart per 2 floors, and hearts heal 2 half-hearts, so late floors
- *    trade fewer, bigger hits.
+ *    every hit costs a full heart (bosses then drop 2 hearts), floors 9-10 heavy
+ *    hits 2 hearts. Late floors trade fewer, bigger hits.
  *  - enemySpeed / shotSpeed: small, up to +13% / +18% at floor 10 (telegraph
  *    times are never scaled).
  *  - budget: enemy cost per normal room [min, max]; championChance; roomCount (map cells).
+ * Re-measure with `node scripts/qa-run.mjs --suite balance --seeds 3`.
  */
 export const DIFFICULTY: Record<number, FloorDifficulty> = {
   1: { hpMult: 1.3, bossHpMult: 1.35, enemyDamage: [1, 2], enemySpeed: 1.0, shotSpeed: 1.0, budget: [3, 5], championChance: 0.03, roomCount: [8, 10] },
   2: { hpMult: 1.75, bossHpMult: 2.05, enemyDamage: [1, 2], enemySpeed: 1.02, shotSpeed: 1.02, budget: [4, 6], championChance: 0.06, roomCount: [10, 12] },
-  3: { hpMult: 2.4, bossHpMult: 2.7, enemyDamage: [1, 2], enemySpeed: 1.03, shotSpeed: 1.04, budget: [5, 7], championChance: 0.08, roomCount: [11, 13] },
-  4: { hpMult: 3.6, bossHpMult: 3.8, enemyDamage: [1, 2], enemySpeed: 1.05, shotSpeed: 1.06, budget: [6, 8], championChance: 0.1, roomCount: [12, 14] },
-  5: { hpMult: 4.9, bossHpMult: 5.5, enemyDamage: [1, 2], enemySpeed: 1.06, shotSpeed: 1.08, budget: [7, 9], championChance: 0.12, roomCount: [12, 15] },
-  6: { hpMult: 6.3, bossHpMult: 7.2, enemyDamage: [1, 3], enemySpeed: 1.08, shotSpeed: 1.1, budget: [7, 10], championChance: 0.14, roomCount: [13, 15] },
-  7: { hpMult: 7.9, bossHpMult: 9.2, enemyDamage: [2, 3], enemySpeed: 1.09, shotSpeed: 1.12, budget: [8, 10], championChance: 0.16, roomCount: [13, 16] },
-  8: { hpMult: 9.8, bossHpMult: 11.6, enemyDamage: [2, 3], enemySpeed: 1.1, shotSpeed: 1.14, budget: [8, 11], championChance: 0.18, roomCount: [14, 16] },
-  9: { hpMult: 12, bossHpMult: 14.4, enemyDamage: [2, 4], enemySpeed: 1.12, shotSpeed: 1.16, budget: [9, 11], championChance: 0.2, roomCount: [14, 17] },
-  10: { hpMult: 14.4, bossHpMult: 17.6, enemyDamage: [2, 4], enemySpeed: 1.13, shotSpeed: 1.18, budget: [9, 12], championChance: 0.22, roomCount: [15, 17] },
+  3: { hpMult: 2.4, bossHpMult: 2.9, enemyDamage: [1, 2], enemySpeed: 1.03, shotSpeed: 1.04, budget: [5, 7], championChance: 0.08, roomCount: [11, 13] },
+  4: { hpMult: 3.6, bossHpMult: 4.2, enemyDamage: [1, 2], enemySpeed: 1.05, shotSpeed: 1.06, budget: [6, 8], championChance: 0.1, roomCount: [12, 14] },
+  5: { hpMult: 4.9, bossHpMult: 6, enemyDamage: [1, 2], enemySpeed: 1.06, shotSpeed: 1.08, budget: [7, 9], championChance: 0.12, roomCount: [12, 15] },
+  6: { hpMult: 6.3, bossHpMult: 11, enemyDamage: [1, 3], enemySpeed: 1.08, shotSpeed: 1.1, budget: [7, 10], championChance: 0.14, roomCount: [13, 15] },
+  7: { hpMult: 7.7, bossHpMult: 13.8, enemyDamage: [2, 3], enemySpeed: 1.09, shotSpeed: 1.12, budget: [8, 10], championChance: 0.16, roomCount: [13, 16] },
+  8: { hpMult: 9.4, bossHpMult: 17.2, enemyDamage: [2, 3], enemySpeed: 1.1, shotSpeed: 1.14, budget: [8, 11], championChance: 0.18, roomCount: [14, 16] },
+  9: { hpMult: 11.5, bossHpMult: 21.5, enemyDamage: [2, 4], enemySpeed: 1.12, shotSpeed: 1.16, budget: [9, 11], championChance: 0.2, roomCount: [14, 17] },
+  10: { hpMult: 14, bossHpMult: 26.9, enemyDamage: [2, 4], enemySpeed: 1.13, shotSpeed: 1.18, budget: [9, 12], championChance: 0.22, roomCount: [15, 17] },
 };
 
 defineFloor({

@@ -63,8 +63,10 @@ defineWeapon({
   kind: 'charge',
   archetype: '연발 쇠뇌',
   rarity: 'rare',
+  tags: ['bow'],
   pools: ['treasure', 'shop'],
   stats(m) {
+    m.mulStat('damage', 0.75);
     m.mulStat('shotSpeed', 1.45);
     m.mulStat('range', 1.1);
   },
@@ -192,9 +194,10 @@ defineWeapon({
   kind: 'ranged',
   archetype: '저격',
   rarity: 'rare',
+  tags: ['bow'],
   pools: ['treasure', 'boss'],
   stats(m) {
-    m.mulStat('damage', 3.3);
+    m.mulStat('damage', 2.75);
     m.mulStat('fireRate', 0.38);
     m.mulStat('shotSpeed', 2.6);
     m.mulStat('range', 1.9);

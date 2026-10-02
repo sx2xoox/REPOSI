@@ -2,7 +2,7 @@
 // display formatting, grid navigation, minimap helpers, hint bookkeeping.
 // Kept separate so it can be unit-tested in node (tests/ui.test.ts).
 
-import { Characters, Weapons, Artifacts, type CharacterDef } from '../game/defs';
+import { Characters, Weapons, Artifacts, weaponMatchesAffinity, type CharacterDef, type WeaponDef } from '../game/defs';
 import { BASE_STATS, StatMods, computeStats, type StatKey, type Stats } from '../game/stats';
 import type { RoomKind } from '../game/constants';
 
@@ -27,15 +27,18 @@ export function applyTyped(cur: string, typed: string[]): string {
 }
 
 // ---------------------------------------------------------------- characters
-/** Effective starting stats of a character (base + character + weapon + starting artifact stats). */
+/** Effective starting stats of a character (base + character + weapon + affinity + passive + starting artifact stats). */
 export function characterStats(def: CharacterDef): Stats {
   const base: Stats = { ...BASE_STATS, ...(def.baseStats ?? {}) };
   base.maxHearts = def.hearts;
   const m = new StatMods();
+  const weapon = Weapons.get(def.weapon);
   try {
-    Weapons.get(def.weapon)?.stats?.(m);
+    weapon?.stats?.(m);
+    if (weaponMatchesAffinity(def.affinity, weapon)) def.affinity?.stats?.(m);
+    def.passive?.stats?.(m, 1, undefined as never);
   } catch {
-    // weapon stat hooks are pure in practice; ignore failures in previews
+    // weapon / kit stat hooks are pure in practice (a passive may read w.vars with no world); ignore failures in previews
   }
   for (const id of def.artifacts ?? []) {
     const a = Artifacts.get(id);
@@ -46,6 +49,50 @@ export function characterStats(def: CharacterDef): Stats {
     }
   }
   return computeStats(base, m);
+}
+
+export const WEAPON_KIND_LABELS: Record<WeaponDef['kind'], string> = { ranged: '원거리', melee: '근접', charge: '차지', beam: '광선' };
+export function weaponKindLabel(kind: WeaponDef['kind']): string {
+  return WEAPON_KIND_LABELS[kind] ?? kind;
+}
+
+export const DIFFICULTY_LABELS: Record<number, string> = { 1: '쉬움', 2: '보통', 3: '어려움' };
+
+export interface KitRow {
+  kind: 'passive' | 'dash' | 'release';
+  /** small label above the name ("고유 능력" / "대시" / "등불 해방") */
+  label: string;
+  name: string;
+  desc: string;
+  icon: string;
+  /** right-aligned hint (how to use) */
+  hint?: string;
+}
+
+/** Default descriptions for keepers without a kit (plain rush, default release). */
+export const DEFAULT_DASH_DESC = '짧게 질주해 적의 공격을 피한다.';
+export const DEFAULT_RELEASE_DESC = '등불을 터뜨려 주변의 적과 탄환을 태운다.';
+
+/** The three kit rows of the character select strip (passive / dash / release), with defaults when absent. */
+export function characterKitRows(c: CharacterDef, open = true, touch = false): KitRow[] {
+  const pas = c.passive;
+  const dash = c.dash;
+  return [
+    {
+      kind: 'passive', label: '고유 능력', icon: pas?.icon ?? 'ui_question',
+      name: pas ? pas.name : '없음', desc: pas ? pas.desc : '특별한 능력 없이 유물에 의지하는 평범한 등불지기.',
+    },
+    {
+      kind: 'dash', label: '대시', icon: dash?.icon ?? 'st_dash',
+      name: dash ? dash.name : '질주', desc: dash ? dash.desc : DEFAULT_DASH_DESC,
+      hint: open ? (touch ? '대시 버튼' : 'Space') : undefined,
+    },
+    {
+      kind: 'release', label: '등불 해방', icon: 'ui_flame',
+      name: c.releaseName ?? '등불 해방', desc: c.releaseDesc ?? DEFAULT_RELEASE_DESC,
+      hint: open ? (touch ? '게이지가 가득 차면 해방 버튼' : '게이지가 가득 차면 F') : undefined,
+    },
+  ];
 }
 
 export interface StatRow {

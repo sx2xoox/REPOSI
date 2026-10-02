@@ -13,7 +13,7 @@ import { Renderer } from '../src/engine/renderer';
 import { World, type WorldHost } from '../src/game/world';
 import { RunState } from '../src/game/run';
 import { FIXED_DT } from '../src/game/constants';
-import { Enemies, Weapons, defineEnemy } from '../src/game/defs';
+import { Characters, Enemies, Weapons, defineCharacter, defineEnemy } from '../src/game/defs';
 import { HELD, PRESS, fixedRules, type PlayerInput } from '../src/game/seam';
 import type { Enemy } from '../src/game/enemy';
 
@@ -23,6 +23,16 @@ export const DUMMY_ID = '__dps_dummy';
 if (!Enemies.has(DUMMY_ID)) {
   defineEnemy({
     id: DUMMY_ID, name: '훈련 인형', hp: 1e7, radius: 7, sprite: Enemies.all()[0].sprite, contactDamage: 0, mass: Infinity, deathFx: 'none', shadow: 0,
+  });
+}
+
+/** A keeper with base stats and no kit: measures the weapon alone. */
+export const PLAIN_ID = '__plain';
+if (!Characters.has(PLAIN_ID)) {
+  const ria = Characters.must('ria');
+  defineCharacter({
+    id: PLAIN_ID, name: '맨손 등불지기', title: '기준', desc: '측정용', spritePrefix: ria.spritePrefix, portrait: ria.portrait, color: '#ffffff',
+    hearts: 3, weapon: 'lantern_bolt', unlocked: false,
   });
 }
 
