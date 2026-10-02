@@ -63,7 +63,7 @@ function setStacks(w: World, n: number): void {
 
 export const BERN_PASSIVE: PassiveDef = {
   name: '기세',
-  desc: '연속으로 적중하면 기세가 쌓여 공격·이동 속도가 오른다 (최대 5). 탄환을 쳐내면 등불이 찬다.',
+  desc: '연속 적중마다 기세가 쌓여 공격·이동 속도가 오른다 (최대 5). 탄환을 쳐내면 등불이 찬다.',
   icon: 'icon_bern_passive',
   look: { aura: '#b8d0ff', hit: '#e0ecff' },
   stats(m, _power, w) {

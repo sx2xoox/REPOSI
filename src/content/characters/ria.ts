@@ -153,5 +153,5 @@ defineCharacter({
   dash: RIA_DASH,
   playstyle: ['균형', '등불 해방', '불꽃'],
   difficulty: 1,
-  pitch: '해방을 가장 자주 터뜨리는 등불지기. 어떤 무기든 불씨를 남긴다.',
+  pitch: '해방을 가장 자주 터뜨리고, 어떤 무기든 불씨를 남긴다.',
 });

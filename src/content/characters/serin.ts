@@ -173,5 +173,5 @@ defineCharacter({
   affinity: SERIN_AFFINITY,
   playstyle: ['원거리', '표식', '치명타'],
   difficulty: 2,
-  pitch: '첫 발은 반드시 치명타. 거리를 재며 한 발씩 끊어 쏘는 이에게.',
+  pitch: '첫 발은 반드시 치명타. 거리를 재며 쏘는 이에게.',
 });

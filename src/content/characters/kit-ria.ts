@@ -100,7 +100,7 @@ export function emberSpark(w: World, e: Enemy): void {
 
 export const RIA_PASSIVE: PassiveDef = {
   name: '불씨 심지',
-  desc: '해방 게이지가 40% 빨리 찬다. 같은 적을 네 번 때리면 불씨가 터져 주변을 태운다.',
+  desc: '등불이 40% 빨리 차고, 같은 적을 네 번 때리면 불씨가 터져 주변을 태운다.',
   icon: 'icon_ria_passive',
   look: { aura: '#ffd8a0', hit: '#ffb040', step: '#ff9a3a' },
   onHit(w, t, hit) {

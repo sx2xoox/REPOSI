@@ -87,7 +87,7 @@ export function spawnEcho(w: World, angle: number): Projectile {
 
 export const NIEL_PASSIVE: PassiveDef = {
   name: '공허 메아리',
-  desc: '네 번째 공격마다 공허의 메아리가 적을 쫓아간다. 발이 땅에 닿지 않아 함정 위를 지난다.',
+  desc: '네 번째 공격마다 공허의 메아리가 적을 쫓는다. 발이 땅에 닿지 않아 함정 위를 지난다.',
   icon: 'icon_niel_passive',
   look: { step: '#8a5ad8', aura: '#4a2a7a', mote: '#b070ff' },
   stats(m) {
@@ -185,7 +185,7 @@ export class VoidRift extends Entity {
 
 export const NIEL_DASH: DashDef = {
   name: '공허 걸음',
-  desc: '짧게 순간이동한다. 떠난 자리에 공허의 틈이 열려 적을 끌어당기고 깨문다.',
+  desc: '짧게 순간이동하고, 떠난 자리에 적을 끌어당겨 깨무는 공허의 틈을 남긴다.',
   icon: 'icon_niel_dash',
   color: '#b070ff',
   sfx: 'blink',

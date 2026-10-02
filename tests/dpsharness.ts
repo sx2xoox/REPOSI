@@ -59,6 +59,8 @@ export interface DpsResult {
   /** hits that connected (applyHit calls that dealt damage) */
   hits: number;
   world: World;
+  /** the training dummies (the center one first; also in `world.enemies` after the first step) */
+  dummies: Enemy[];
 }
 
 const host: WorldHost = { openInventory() {}, onGameOver() {} };
@@ -138,12 +140,13 @@ export function measureDps(o: DpsOpts): DpsResult {
     if (ok && (target as { hp: number }).hp < before) hits++;
     return ok;
   };
+  const all = [...dummies];
   for (let i = 0; i < steps; i++) {
     w.update(FIXED_DT);
     dummies = dummies.filter((e) => e.alive);
   }
   const damage = w.run.stats.damageDealt;
-  return { dps: damage / T, damage, hits, world: w };
+  return { dps: damage / T, damage, hits, world: w, dummies: all };
 }
 
 /** Best of a near and a far engagement (ranged weapons prefer distance, melee closes in anyway). */

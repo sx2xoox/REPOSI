@@ -271,7 +271,9 @@ describe('two weapon slots', () => {
     expect(p.weapon2Id).toBe('lantern_bolt');
     expect(p.weapon2).toBe(firstState);
     // weapon stats follow the held weapon only
-    expect(p.stats.damage).toBeCloseTo(BASE_STATS.damage * 1.6);
+    const gm = new StatMods();
+    Weapons.must('titan_greatsword').stats!(gm);
+    expect(p.stats.damage).toBeCloseTo(computeStats(BASE_STATS, gm).damage);
     // both full: the held weapon is dropped
     expect(equipWeapon(w, p, 'moon_katana')).toBe('titan_greatsword');
     expect(p.weaponId).toBe('moon_katana');

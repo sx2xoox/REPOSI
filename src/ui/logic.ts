@@ -90,7 +90,7 @@ export function characterKitRows(c: CharacterDef, open = true, touch = false): K
     {
       kind: 'release', label: '등불 해방', icon: 'ui_flame',
       name: c.releaseName ?? '등불 해방', desc: c.releaseDesc ?? DEFAULT_RELEASE_DESC,
-      hint: open ? (touch ? '게이지가 가득 차면 해방 버튼' : '게이지가 가득 차면 F') : undefined,
+      hint: open ? (touch ? '해방 버튼' : '게이지가 가득 차면 F') : undefined,
     },
   ];
 }

@@ -461,10 +461,13 @@ export class StatusOverlay implements Scene {
     const flashT = pas ? this.t - this.lastPassiveProc(w.items.lastProc(`passive:${ch.id}`), w.time) : 9;
     const pop = flashT < 0.4 ? 1 + 0.2 * (1 - flashT / 0.4) : 1;
     iconSlot(r, pas?.icon ?? null, x + 30, py + 16, 28, { alpha: k, selected: flashT < 0.4, scale: pas ? fitScale(pas.icon, 20, 1.5) * pop : 1 });
-    r.uiText(`고유 능력 · ${pas ? pas.name : '없음'}`, x + 54, py + 2, { size: 12, bold: true, color: pas ? ch.color : C.textMute, alpha: k });
-    const dashName = ch.dash?.name ?? '질주';
-    const aff = ch.affinity;
-    r.uiText(`대시 · ${dashName}${aff ? `   선호 · ${aff.name}` : ''}`, x + ww - 12, py + 4, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: k });
+    const title = `고유 능력 · ${pas ? pas.name : '없음'}`;
+    r.uiText(title, x + 54, py + 2, { size: 12, bold: true, color: pas ? ch.color : C.textMute, alpha: k });
+    // the dash's name beside it when there is room (the favoured class shows on the weapon line)
+    const dashTxt = `대시 · ${ch.dash?.name ?? '질주'}`;
+    if (r.measureText(title, 12, true) + r.measureText(dashTxt, 10, false, 'small') + 70 < ww) {
+      r.uiText(dashTxt, x + ww - 12, py + 4, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: k });
+    }
     const pdesc = pas ? pas.desc : '특별한 능력 없이 유물에 의지한다.';
     const pl = r.wrapText(pdesc, ww - 66, 10, false, 'small');
     r.uiText(pl.length > 1 ? `${pl[0]}…` : pl[0] ?? '', x + 54, py + 17, { size: 10, font: 'small', color: C.textDim, alpha: k });

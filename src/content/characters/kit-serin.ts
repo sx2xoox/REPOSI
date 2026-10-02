@@ -81,7 +81,7 @@ class ScentMarks extends EnemyOverlay {
 
 export const SERIN_PASSIVE: PassiveDef = {
   name: '사냥 감각',
-  desc: '적중한 적에게 냄새 표식을 남겨 드러내고 피해 +12%. 멀쩡한 적을 처음 때리면 반드시 치명타.',
+  desc: '적중한 적을 냄새로 표식해 드러내고 피해 +12%. 멀쩡한 적의 첫 타는 반드시 치명타.',
   icon: 'icon_serin_passive',
   look: { orbit: '#ffe08a', hit: '#ffe08a', step: '#a8e070' },
   modifyHit(w, t, hit) {

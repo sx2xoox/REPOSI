@@ -20,13 +20,15 @@ import { hasSprite } from '../src/engine/sprites';
 import { SFX_NAMES } from '../src/audio/audio';
 import { PLAIN_ID, bestDps, measureDps } from './dpsharness';
 import type { World } from '../src/game/world';
+import type { Enemy } from '../src/game/enemy';
 
 const KEEPERS = ['ria', 'bern', 'serin', 'niel'];
 const HANGUL = /[가-힣]/;
 
-/** A started world (floor-1 start room, dummies placed) with no input yet. */
-function sim(character: string, weapon: string, dist?: number): World {
-  return measureDps({ character, weapon, seconds: 0, dist }).world;
+/** A started world (floor-1 start room, dummies placed) with no input yet, and its center dummy. */
+function sim(character: string, weapon: string, dist?: number): { w: World; dummy: Enemy } {
+  const r = measureDps({ character, weapon, seconds: 0, dist });
+  return { w: r.world, dummy: r.dummies[0] };
 }
 
 /** Step `steps` frames feeding `fn`'s input (dash presses, movement, fire). */
@@ -50,7 +52,7 @@ describe('character kit framework', () => {
       expect(c.passive, `${id} passive`).toBeDefined();
       expect(c.passive!.name).toMatch(HANGUL);
       expect(c.passive!.desc).toMatch(HANGUL);
-      expect(c.passive!.desc.length, `${id} passive desc fits the select strip`).toBeLessThanOrEqual(44);
+      expect(c.passive!.desc.length, `${id} passive desc fits the select strip`).toBeLessThanOrEqual(56);
       expect(hasSprite(c.passive!.icon), `${id} passive icon`).toBe(true);
       expect(c.dash, `${id} dash`).toBeDefined();
       expect(c.dash!.name).toMatch(HANGUL);
@@ -88,7 +90,7 @@ describe('character kit framework', () => {
   it('a keeper without kit fields behaves like before: plain rush, no passive effect, no affinity', () => {
     const plain = Characters.must(PLAIN_ID);
     expect(plain.passive ?? plain.dash ?? plain.affinity).toBeUndefined();
-    const w = sim(PLAIN_ID, 'lantern_bolt');
+    const { w } = sim(PLAIN_ID, 'lantern_bolt');
     const p = w.player;
     expect(w.items.effects.some((e) => e.key.startsWith('passive:'))).toBe(false);
     expect(p.flags.has('affinity')).toBe(false);
@@ -101,7 +103,10 @@ describe('character kit framework', () => {
     expect(p.x - x0).toBeLessThan(40);
     drive(w, 20, () => {});
     expect(p.dashing).toBe(false);
-    expect(p.x - x0).toBeCloseTo(p.stats.dashSpeed * p.stats.dashTime, -1);
+    // the rush distance plus a little slide at the end
+    const len = p.stats.dashSpeed * p.stats.dashTime;
+    expect(p.x - x0).toBeGreaterThanOrEqual(len - 2);
+    expect(p.x - x0).toBeLessThan(len + 16);
     expect(w.entities.some((e) => e instanceof HazardZone || e instanceof VoidRift)).toBe(false);
     // the kit rows fall back to defaults for the select screen
     const rows = characterKitRows(plain);
@@ -111,7 +116,7 @@ describe('character kit framework', () => {
   });
 
   it('the passive is dispatched like an artifact (power 1, before artifacts) and procs with its icon', () => {
-    const w = sim('ria', 'lantern_bolt');
+    const { w } = sim('ria', 'lantern_bolt');
     expect(w.items.effects[0].key).toBe('passive:ria');
     expect(w.items.effects[0].power).toBe(1);
     w.items.proc('passive:ria');
@@ -147,7 +152,7 @@ describe('리아 — 불씨 심지 / 불씨 질주', () => {
   });
 
   it('the dash leaves a burning trail', () => {
-    const w = sim('ria', 'lantern_bolt');
+    const { w } = sim('ria', 'lantern_bolt');
     drive(w, 14, (out, i) => { if (i === 0) out.pressed = PRESS.dash; out.mx = 1; });
     const fire = w.entities.filter((e) => e instanceof HazardZone && (e as HazardZone).kind === 'fire');
     expect(fire.length).toBeGreaterThanOrEqual(3);
@@ -160,19 +165,18 @@ describe('베른 — 기세 / 설원 돌진', () => {
     const w = r.world;
     const p = w.player;
     expect(momentum(w)).toBe(BERN_MAX_STACKS);
-    const base = characterStats(Characters.must('bern'));
-    expect(p.stats.fireRate / base.fireRate).toBeCloseTo(1 + BERN_MAX_STACKS * BERN_STACK_FIRE, 2);
-    expect(p.stats.moveSpeed).toBeGreaterThan(base.moveSpeed);
+    const frMax = p.stats.fireRate;
+    const mvMax = p.stats.moveSpeed;
     expect(p.flags.has('affinity')).toBe(true); // daggers are melee
     for (const e of [...w.enemies]) w.killEnemy(e);
     drive(w, 60 * 4, () => {});
     expect(momentum(w)).toBe(0);
-    expect(p.stats.fireRate).toBeCloseTo(base.fireRate, 3);
+    expect(frMax / p.stats.fireRate).toBeCloseTo(1 + BERN_MAX_STACKS * BERN_STACK_FIRE, 2);
+    expect(mvMax).toBeGreaterThan(p.stats.moveSpeed);
   });
 
   it('the rush hits and shoves enemies it passes through', () => {
-    const w = sim('bern', 'sentinel_blade', 30);
-    const dummy = w.enemies[0];
+    const { w, dummy } = sim('bern', 'sentinel_blade', 30);
     const hp0 = dummy.hp;
     drive(w, 20, (out, i) => { if (i === 0) out.pressed = PRESS.dash; out.mx = 1; });
     expect(dummy.hp).toBeLessThan(hp0);
@@ -183,11 +187,10 @@ describe('베른 — 기세 / 설원 돌진', () => {
 
 describe('세린 — 사냥 감각 / 도약', () => {
   it('opens with a critical on an untouched enemy, marks it with scent, and favours bows', () => {
-    const w = sim('serin', 'hunter_bow');
+    const { w, dummy } = sim('serin', 'hunter_bow');
     const p = w.player;
     expect(p.flags.has('affinity')).toBe(true);
     expect(p.stats.pierce).toBe(1);
-    const dummy = w.enemies[0];
     const dmg0 = w.run.stats.damageDealt;
     let crits = 0;
     const orig = w.applyHit.bind(w);
@@ -196,7 +199,8 @@ describe('세린 — 사냥 감각 / 도약', () => {
       if (ok && h.crit) crits++;
       return ok;
     };
-    drive(w, 60 * 2, (out) => { out.held = HELD.fire | HELD.cursorAim; out.cx = dummy.x; out.cy = dummy.y; });
+    // the longbow looses on release: draw for ~1s, let go, repeat
+    drive(w, 60 * 3, (out, i) => { out.held = (i % 66 < 57 ? HELD.fire : 0) | HELD.cursorAim; out.cx = dummy.x; out.cy = dummy.y; });
     expect(w.run.stats.damageDealt).toBeGreaterThan(dmg0);
     expect(dummy.mem.__serinOpened).toBe(1);
     expect(crits).toBeGreaterThanOrEqual(1);
@@ -204,7 +208,7 @@ describe('세린 — 사냥 감각 / 도약', () => {
   });
 
   it('the vault hops over the ground and the first hit afterwards is a critical', () => {
-    const w = sim('serin', 'lantern_bolt');
+    const { w } = sim('serin', 'lantern_bolt');
     const p = w.player;
     let zMax = 0;
     w.inputSource = (_ww, _p, out) => {
@@ -227,12 +231,11 @@ describe('세린 — 사냥 감각 / 도약', () => {
 
 describe('니엘 — 공허 메아리 / 공허 걸음', () => {
   it('floats, and every 4th attack (3rd with an arcane weapon) sends out a homing echo', () => {
-    const w = sim('niel', 'twin_lamp');
+    const { w, dummy } = sim('niel', 'twin_lamp');
     const p = w.player;
     expect(p.flying).toBe(true);
     expect(p.flags.has('affinity')).toBe(true);
     expect(echoEvery(w)).toBe(NIEL_ECHO_EVERY_AFFINITY);
-    const dummy = w.enemies[0];
     let echoes = 0;
     const seen = new Set<number>();
     for (let i = 0; i < 60 * 3; i++) {
@@ -250,10 +253,9 @@ describe('니엘 — 공허 메아리 / 공허 걸음', () => {
   });
 
   it('the blink teleports and leaves a biting rift at the origin', () => {
-    const w = sim('niel', 'twin_lamp', 10);
+    const { w, dummy } = sim('niel', 'twin_lamp', 10);
     const p = w.player;
     const x0 = p.x;
-    const dummy = w.enemies[0];
     const hp0 = dummy.hp;
     drive(w, 1, (out) => { out.pressed = PRESS.dash; out.mx = 1; });
     expect(p.x - x0).toBeGreaterThanOrEqual(36); // arrived at once

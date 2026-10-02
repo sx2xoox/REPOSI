@@ -284,11 +284,10 @@ export class CharacterSelectScene implements Scene {
     });
     x += 10;
     r.uiText(diffLabel, x, y - 5, { size: 10, font: 'small', color: C.textDim, alpha: a });
-    x += r.measureText(diffLabel, 10, false, 'small') + 6;
+    x += r.measureText(diffLabel, 10, false, 'small') + 8;
     for (let i = 0; i < 3; i++) {
       const on = i < diff;
-      r.uiRect(x + i * 7, y - 2, 5, 5, C.ink, a);
-      r.uiRect(x + i * 7 + 1, y - 1, 3, 3, on ? C.ember : '#2a2236', a);
+      r.uiSprite('ui_flame', x + 4 + i * 11, y + 1, 1, { alpha: a * (on ? 1 : 0.3), tint: on ? undefined : '#2a2236', tintAmount: on ? 0 : 0.7 });
     }
   }
 
@@ -318,22 +317,24 @@ export class CharacterSelectScene implements Scene {
       pl.forEach((l, i) => r.uiText(l, tx, cy + i * 16, { size: 12, bold: true, color: C.goldHi, alpha: A * k }));
       cy += pl.length * 16 + 4;
     }
+    // the story: as many lines as fit above the weapon block (an ellipsis when cut)
     const story = r.wrapText(c.desc, tw, 12);
-    const maxStory = Math.max(2, Math.floor((h - (cy - y) - 96) / 16));
-    story.slice(0, maxStory).forEach((l, i) => r.uiText(l, tx, cy + i * 16, { size: 12, color: C.text, alpha: A * k }));
-    cy += Math.min(maxStory, story.length) * 16 + 6;
+    const bottom = 92; // divider + weapon row + favoured class block
+    const maxStory = Math.max(2, Math.floor((h - (cy - y) - bottom) / 16));
+    const shown = story.slice(0, maxStory);
+    if (story.length > maxStory) shown[shown.length - 1] = `${shown[shown.length - 1].replace(/[,.\s]+$/, '')}…`;
+    shown.forEach((l, i) => r.uiText(l, tx, cy + i * 16, { size: 12, color: C.text, alpha: A * k }));
+    cy += shown.length * 16 + 4;
     divider(r, x + w / 2, cy, w - 40, C.goldDark, A * 0.8);
-    cy += 10;
+    cy += 8;
     // starting weapon
     const wdef = Weapons.get(c.weapon);
-    r.uiText('시작 무기', tx, cy, { size: 10, font: 'small', color: C.gold, alpha: A });
-    cy += 14;
     if (wdef) {
-      iconSlot(r, wdef.icon, tx + 15, cy + 13, 30, { alpha: A, scale: fitScale(wdef.icon, 22, 1.5) });
-      r.uiText(wdef.name, tx + 38, cy + 1, { size: 12, color: C.text, alpha: A });
-      r.uiText(`${wdef.archetype ?? weaponKindLabel(wdef.kind)}`, tx + 38, cy + 16, { size: 10, font: 'small', color: C.textFaint, alpha: A });
+      iconSlot(r, wdef.icon, tx + 15, cy + 15, 30, { alpha: A, scale: fitScale(wdef.icon, 22, 1.5) });
+      r.uiText(wdef.name, tx + 38, cy + 2, { size: 12, color: C.text, alpha: A });
+      r.uiText(`시작 무기 · ${wdef.archetype ?? weaponKindLabel(wdef.kind)}`, tx + 38, cy + 18, { size: 10, font: 'small', color: C.textFaint, alpha: A });
     }
-    cy += 34;
+    cy += 36;
     // favoured weapon class
     const aff = c.affinity;
     r.uiText('선호 무기', tx, cy, { size: 10, font: 'small', color: C.gold, alpha: A });
@@ -402,11 +403,12 @@ export class CharacterSelectScene implements Scene {
       // label · name
       r.uiText(row.label, x + 42, ry + 1, { size: 10, font: 'small', color: open ? col : C.textFaint, alpha: A });
       r.uiText(open ? row.name : '???', x + 42, ry + 12, { size: 12, bold: true, color: open ? C.text : C.textMute, alpha: A * k });
-      // description (up to 2 small lines)
+      // description (up to 2 small lines), the key hint to its right
       const dx = x + 176;
-      const lines = open ? r.wrapText(row.desc, x + w - 12 - dx, 10, false, 'small').slice(0, 2) : ['???'];
+      const hintW = row.hint ? r.measureText(row.hint, 10, false, 'small') + 10 : 0;
+      const lines = open ? r.wrapText(row.desc, x + w - 12 - hintW - dx, 10, false, 'small').slice(0, 2) : ['???'];
       lines.forEach((l, j) => r.uiText(l, dx, ry + 3 + j * 12, { size: 10, font: 'small', color: open ? C.text : C.textMute, alpha: A * k }));
-      if (row.hint) r.uiText(row.hint, x + w - 12, ry + 1, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: A * 0.9 });
+      if (row.hint) r.uiText(row.hint, x + w - 12, ry + 3, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: A * 0.9 });
       if (i > 0) r.uiRect(x + 10, Math.round(ry - 2), w - 20, 1, C.rimDark, A * 0.8);
     });
   }
