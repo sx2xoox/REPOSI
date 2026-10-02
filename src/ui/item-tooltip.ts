@@ -256,54 +256,75 @@ export class ItemTooltip {
       if (this.card) {
         const c = this.card;
         this.lines = r.wrapText(c.desc, CARD_W - PAD * 2, 10, false, 'small').slice(0, 3);
-        this.h = PAD + 30 + 4 + this.lines.length * LINE + c.extra.length * LINE + (c.action || c.note || c.price ? 24 : 2) + 4;
+        this.h = PAD + 32 + 3 + this.lines.length * LINE + c.extra.length * LINE + 5;
       }
     }
     const c = this.card;
     if (!c) return;
     const k = ease.outCubic(clamp(this.a, 0, 1));
     const sa = r.uiSafe;
-    // anchor: the item's top in world space -> UI units
+    // anchor: the item's top / bottom in world space -> UI units
     const top = e instanceof Pedestal ? e.y - 22 : e instanceof Pickup ? e.y - 9 : e.y - 10;
     const bottom = e instanceof Pedestal ? e.y + 14 : e.y + 8;
     const at = r.displayToUI(...xy(r.worldToDisplay(e.x, top)));
     const ab = r.displayToUI(...xy(r.worldToDisplay(e.x, bottom)));
     const W = CARD_W;
     const H = this.h;
-    let below = false;
+    const minY = sa.t + HUD_TOP;
+    const maxY = UI_H - sa.b - 6 - H;
+    const minX = sa.l + 6;
+    const maxX = UI_W - sa.r - 6 - W;
+    // above the item; else beside it (never over the keeper, who usually stands below); else below
+    let side: 'up' | 'left' | 'right' | 'down' = 'up';
+    let x = at.x - W / 2;
     let y = at.y - 8 - H;
-    if (y < sa.t + HUD_TOP) {
-      below = true;
-      y = ab.y + 8;
+    if (y < minY) {
+      const mid = (at.y + ab.y) / 2;
+      y = clamp(mid - H / 2, minY, maxY);
+      if (at.x + 20 + W <= UI_W - sa.r - 6) {
+        side = 'right';
+        x = at.x + 20;
+      } else if (at.x - 20 - W >= minX) {
+        side = 'left';
+        x = at.x - 20 - W;
+      } else {
+        side = 'down';
+        x = at.x - W / 2;
+        y = ab.y + 8;
+      }
     }
-    y = clamp(y, sa.t + 6, UI_H - sa.b - 6 - H);
-    const x = clamp(at.x - W / 2, sa.l + 6, UI_W - sa.r - 6 - W);
-    const slide = (1 - k) * (below ? -6 : 6);
+    x = clamp(x, minX, maxX);
+    y = clamp(y, sa.t + 6, maxY);
+    const off = (1 - k) * 6;
+    const sx = side === 'right' ? -off : side === 'left' ? off : 0;
+    const sy = side === 'up' ? off : side === 'down' ? -off : 0;
     // snap to whole display pixels so the cached bitmap is reused while the camera moves
     const s = r.uiScale;
-    const ox = (Math.round(r.uiOffsetX + x * s) - r.uiOffsetX) / s;
-    const oy = (Math.round(r.uiOffsetY + (y + slide) * s) - r.uiOffsetY) / s;
+    const ox = (Math.round(r.uiOffsetX + (x + sx) * s) - r.uiOffsetX) / s;
+    const oy = (Math.round(r.uiOffsetY + (y + sy) * s) - r.uiOffsetY) / s;
     const A = k * alpha;
-    // pointer tail toward the item (live: two tiny rects)
-    const tx = clamp(at.x, ox + 12, ox + W - 12);
-    const rim = c.color;
+    // pointer tail toward the item (live: a few 1-unit rects)
     const d = r.dctx;
     d.globalAlpha = A;
+    const ty0 = clamp((at.y + ab.y) / 2, oy + 10, oy + H - 10);
+    const tx0 = clamp(at.x, ox + 12, ox + W - 12);
     for (let i = 0; i < 4; i++) {
-      const wdt = (4 - i) * 2;
-      const ty = below ? oy - 1 - i : oy + H - 1 + i;
-      d.fillStyle = i === 3 ? C.ink : rim;
-      d.fillRect(Math.round(tx - wdt / 2), Math.round(ty), wdt, 1);
+      const len = (4 - i) * 2;
+      d.fillStyle = i === 3 ? C.ink : c.color;
+      if (side === 'up') d.fillRect(Math.round(tx0 - len / 2), Math.round(oy + H - 1 + i), len, 1);
+      else if (side === 'down') d.fillRect(Math.round(tx0 - len / 2), Math.round(oy - i), len, 1);
+      else if (side === 'right') d.fillRect(Math.round(ox - i), Math.round(ty0 - len / 2), 1, len);
+      else d.fillRect(Math.round(ox + W - 1 + i), Math.round(ty0 - len / 2), 1, len);
     }
     d.globalAlpha = 1;
     this.pr = r;
     this.ly.draw(r, `${this.sig}|${H}`, ox, oy, 0, 0, W, H, A, this.paint);
     this.pr = null;
-    // "can't pay" shake hint: the price blinks red right after a refused press
+    // a refused press (can't pay): the price blinks red for a moment
     const deny = e instanceof Pedestal ? e.mem.denyT : undefined;
     if (deny !== undefined && w.time - deny < 0.5 && c.price) {
       const bl = 0.5 + 0.5 * Math.sin(this.t * 40);
-      r.uiRect(ox + W - 60, oy + H - 24, 52, 18, C.bad, 0.25 * bl * A);
+      r.uiRect(ox + W - 64, oy + PAD - 2, 58, 16, C.bad, 0.3 * bl * A);
     }
   }
 
@@ -312,44 +333,50 @@ export class ItemTooltip {
     const W = CARD_W;
     const H = this.h;
     frame(r, 0, 0, W, H, 'tooltip', { color: c.color });
-    iconSlot(r, c.icon, PAD + 14, PAD + 14, 30);
-    r.uiText(c.name, PAD + 36, PAD, { size: 12, bold: true, color: c.color });
-    let sx = PAD + 36;
-    for (const s of c.sub) {
-      r.uiText(s.t, sx, PAD + 16, { size: 10, font: 'small', color: s.c });
-      sx += r.measureText(s.t, 10, false, 'small');
+    iconSlot(r, c.icon, PAD + 15, PAD + 15, 30);
+    // right column: price (top) and the interact key / how it is taken (below)
+    let right = W - PAD;
+    if (c.price) {
+      const pc = c.price.ok ? C.goldHi : C.bad;
+      r.uiText(c.price.text, right, PAD - 1, { size: 12, bold: true, align: 'right', color: pc });
+      const tw = r.measureText(c.price.text, 12, true);
+      r.uiSprite(c.price.icon, right - tw - 16, PAD, 2);
+      if (!c.price.ok) r.uiText('부족', right - tw - 25, PAD + 1, { size: 10, font: 'small', align: 'right', color: C.bad });
     }
-    let y = PAD + 34;
+    const subY = PAD + 17;
+    if (c.action) {
+      const a = c.action;
+      const lw = r.measureText(a.label, 10, false, 'small');
+      r.uiText(a.label, right, subY, { size: 10, font: 'small', align: 'right', color: a.ok ? C.goldHi : C.textFaint });
+      const kw = keycap(r, a.key, right - lw - 4, subY + 6, { align: 'right', pad: a.pad });
+      right -= lw + 4 + kw + 6;
+    } else if (c.note) {
+      r.uiText(c.note, right, subY, { size: 10, font: 'small', align: 'right', color: C.textFaint });
+      right -= r.measureText(c.note, 10, false, 'small') + 6;
+    }
+    const nameRight = c.price ? W - PAD - 64 : W - PAD;
+    let name = c.name;
+    while (name.length > 2 && PAD + 38 + r.measureText(name, 12, true) > nameRight) name = name.slice(0, -1);
+    r.uiText(name === c.name ? name : `${name}…`, PAD + 38, PAD, { size: 12, bold: true, color: c.color });
+    let sx = PAD + 38;
+    for (const sg of c.sub) {
+      const tw = r.measureText(sg.t, 10, false, 'small');
+      if (sx + tw > right) break;
+      r.uiText(sg.t, sx, subY, { size: 10, font: 'small', color: sg.c });
+      sx += tw;
+    }
+    let y = PAD + 35;
     for (const l of this.lines) {
       r.uiText(l, PAD, y, { size: 10, font: 'small', color: C.text });
       y += LINE;
     }
     for (const row of c.extra) {
       let ex = PAD;
-      for (const s of row) {
-        r.uiText(s.t, ex, y, { size: 10, font: 'small', color: s.c });
-        ex += r.measureText(s.t, 10, false, 'small') + (s.t.endsWith('▲') || s.t.endsWith('▼') ? 8 : 0);
+      for (const sg of row) {
+        r.uiText(sg.t, ex, y, { size: 10, font: 'small', color: sg.c });
+        ex += r.measureText(sg.t, 10, false, 'small') + (sg.t.endsWith('▲') || sg.t.endsWith('▼') ? 8 : 0);
       }
       y += LINE;
-    }
-    if (!(c.action || c.note || c.price)) return;
-    // footer: interact key (or how it is taken) + price
-    const fy = H - 22;
-    r.uiRect(PAD, fy - 3, W - PAD * 2, 1, C.rimDark);
-    const cy = fy + 9;
-    if (c.action) {
-      const a = c.action;
-      const kw = keycap(r, a.key, PAD, cy, { align: 'left', pad: a.pad });
-      r.uiText(a.label, PAD + kw + 5, cy - 6, { size: 10, font: 'small', color: a.ok ? C.goldHi : C.textFaint });
-    } else if (c.note) {
-      r.uiText(c.note, PAD, cy - 6, { size: 10, font: 'small', color: C.textFaint });
-    }
-    if (c.price) {
-      const pc = c.price.ok ? C.goldHi : C.bad;
-      r.uiText(c.price.text, W - PAD, cy - 7, { size: 12, bold: true, align: 'right', color: pc });
-      const tw = r.measureText(c.price.text, 12, true);
-      r.uiSprite(c.price.icon, W - PAD - tw - 18, cy - 8, 2);
-      if (!c.price.ok) r.uiText('부족', W - PAD - tw - 24, cy - 6, { size: 10, font: 'small', align: 'right', color: C.bad });
     }
   }
 }
