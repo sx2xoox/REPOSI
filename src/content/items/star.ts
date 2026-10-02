@@ -74,7 +74,7 @@ defineDrawnSprite('icon_constellation_needle', 16, 16, (p) => {
 defineArtifact({
   id: 'constellation_needle',
   name: '별바늘',
-  desc: '공격이 15% 확률로 별표식을 새긴다. 표식이 있는 적은 다음 공격에 치명타를 맞는다',
+  desc: '공격이 15% 확률로 별표식을 새긴다 (다음 공격 치명타)',
   quote: '별자리를 꿰매는 바늘.',
   rarity: 'common',
   tags: ['star'],
@@ -137,7 +137,7 @@ defineDrawnSprite('icon_moon_satellite', 16, 16, (p) => {
 defineArtifact({
   id: 'moon_satellite',
   name: '작은 달',
-  desc: '작은 달이 주위를 돌며 적 탄환을 막고 닿은 적에게 피해를 준다',
+  desc: '작은 달이 주위를 돌며 적 탄환을 막고 적을 친다',
   quote: '작은 달에게도 중력은 있다.',
   rarity: 'rare',
   tags: ['star'],
@@ -178,7 +178,7 @@ defineDrawnSprite('icon_fortune_moth', 16, 16, (p) => {
 defineArtifact({
   id: 'fortune_moth',
   name: '복나방',
-  desc: '행운 +2. 방을 클리어하면 25% 확률로 보상이 한 번 더 나온다',
+  desc: '행운 +2. 방 클리어 시 25% 확률로 보상이 하나 더',
   quote: '불빛을 따라온 행운.',
   rarity: 'rare',
   tags: ['star'],
@@ -279,7 +279,7 @@ function makeLance(w: World, p: Projectile, power: number): void {
 defineArtifact({
   id: 'radiant_lance',
   name: '광휘의 창',
-  desc: '탄환이 하나의 빛의 창으로 합쳐져 모든 적을 꿰뚫는다 (근접: 공격마다 빛의 창을 던진다)',
+  desc: '공격이 모든 적을 꿰뚫는 빛의 창 하나로 합쳐진다',
   quote: '흩어진 빛을 모으면 창이 된다.',
   rarity: 'legendary',
   tags: ['star'],
@@ -340,7 +340,7 @@ defineDrawnSprite('icon_lantern_sun', 16, 16, (p) => {
 defineArtifact({
   id: 'lantern_sun',
   name: '품 안의 태양',
-  desc: '작은 태양이 주위를 돌며 적 탄환을 녹이고 닿는 모든 것을 태운다',
+  desc: '작은 태양이 주위를 돌며 탄환을 녹이고 적을 태운다',
   quote: '등불 속에 태양을 가두었다. 이제 태양이 등불을 지킨다.',
   rarity: 'legendary',
   tags: ['flame', 'star'],

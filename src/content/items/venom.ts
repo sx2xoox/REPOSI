@@ -63,8 +63,8 @@ defineDrawnSprite('icon_rot_mushroom', 16, 16, (p) => {
 defineArtifact({
   id: 'rot_mushroom',
   name: '썩은 버섯',
-  desc: '최대 체력 +1. 전투가 시작되면 포자를 뿜어 근처 적을 중독시킨다',
-  quote: '몸에 좋은 것은 아닐지도.',
+  desc: '최대 체력 +1. 전투가 시작되면 포자로 적을 중독시킨다',
+  quote: '유통기한은 묻지 마라.',
   rarity: 'common',
   tags: ['venom'],
   icon: 'icon_rot_mushroom',
@@ -145,7 +145,7 @@ defineDrawnSprite('icon_swelling_seed', 16, 16, (p) => {
 defineArtifact({
   id: 'swelling_seed',
   name: '부푸는 씨앗',
-  desc: '사거리 +10%. 탄환이 날아갈수록 커지고 강해진다 (탄환 한정)',
+  desc: '사거리 +10%. 탄환이 갈수록 커지고 세진다 (탄환 한정)',
   quote: '작게 시작해 크게 끝난다.',
   rarity: 'common',
   tags: ['venom'],
@@ -266,7 +266,7 @@ defineDrawnSprite('icon_nightshade_wreath', 16, 16, (p) => {
 defineArtifact({
   id: 'nightshade_wreath',
   name: '까마중 화관',
-  desc: '중독된 적이 죽으면 독이 주변 적에게 번지고 등불 게이지가 찬다',
+  desc: '중독된 적이 죽으면 독이 번지고 등불 게이지가 찬다',
   quote: '아름다운 것엔 독이 있다.',
   rarity: 'epic',
   tags: ['venom'],

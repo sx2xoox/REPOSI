@@ -72,7 +72,7 @@ defineDrawnSprite('icon_alchemist_scale', 16, 16, (p) => {
 defineArtifact({
   id: 'alchemist_scale',
   name: '연금술사의 저울',
-  desc: '동전을 주우면 8% 확률로 폭탄이나 열쇠가 함께 떨어진다',
+  desc: '동전을 주우면 8% 확률로 폭탄이나 열쇠가 나온다',
   quote: '동전 한 닢의 무게는 생각보다 다양하다.',
   rarity: 'common',
   tags: [],
@@ -108,7 +108,7 @@ defineDrawnSprite('icon_paper_ward', 16, 16, (p) => {
 defineArtifact({
   id: 'paper_ward',
   name: '종이 부적',
-  desc: '적이 있는 방에 들어설 때마다 피해를 한 번 막는 보호막을 두른다',
+  desc: '전투가 시작될 때마다 피해 1회를 막는 보호막을 얻는다',
   quote: '한 번은 막아준다. 딱 한 번.',
   rarity: 'common',
   tags: [],
@@ -157,7 +157,7 @@ defineDrawnSprite('icon_soul_wax', 16, 16, (p) => {
 defineArtifact({
   id: 'soul_wax',
   name: '영혼 밀랍',
-  desc: '영혼 하트 +1. 새로운 층에 도착할 때마다 영혼 하트 반 칸',
+  desc: '영혼 하트 +1. 새 층에 도착할 때마다 영혼 하트 반 칸',
   quote: '영혼을 녹여 굳힌 밀랍.',
   rarity: 'common',
   tags: [],
@@ -289,7 +289,7 @@ defineDrawnSprite('icon_greedy_purse', 16, 16, (p) => {
 defineArtifact({
   id: 'greedy_purse',
   name: '탐욕의 지갑',
-  desc: '적이 12% 확률로 동전을 떨군다. 피격 시 동전 2개를 흘린다',
+  desc: '처치 시 12% 확률로 동전. 피격 시 동전 2개를 흘린다',
   quote: '주머니가 무거울수록 발은 느려진다.',
   rarity: 'rare',
   tags: [],
@@ -329,7 +329,7 @@ defineDrawnSprite('icon_mirror_shard', 16, 16, (p) => {
 defineArtifact({
   id: 'mirror_shard',
   name: '거울 파편',
-  desc: '주위를 도는 거울 조각이 적 탄환을 적에게 되돌려 보낸다',
+  desc: '거울 조각이 주위를 돌며 적 탄환을 되돌려 보낸다',
   quote: '깨진 거울도 빛은 되돌려준다.',
   rarity: 'rare',
   tags: [],
@@ -363,7 +363,7 @@ defineDrawnSprite('icon_sweet_sachet', 16, 16, (p) => {
 defineArtifact({
   id: 'sweet_sachet',
   name: '달콤한 향주머니',
-  desc: '공격이 7% 확률로 적을 매혹해 잠시 내 편으로 싸우게 한다',
+  desc: '공격이 7% 확률로 적을 매혹해 내 편으로 싸우게 한다',
   quote: '적도 향기에는 약하다.',
   rarity: 'rare',
   tags: [],

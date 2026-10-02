@@ -50,7 +50,8 @@ describe('passive artifacts', () => {
       expect(a.name, id).toMatch(HANGUL);
       expect(a.desc, id).toMatch(HANGUL);
       expect(a.quote ?? '', id).toMatch(HANGUL);
-      expect(a.desc.length, id).toBeLessThan(60);
+      // the pickup banner shows desc on a single line (~26 Hangul at 12px)
+      expect(a.desc.length, id).toBeLessThanOrEqual(36);
       expect(['common', 'rare', 'epic', 'legendary']).toContain(a.rarity);
       expect(a.pools.length, id).toBeGreaterThan(0);
       for (const p of a.pools) expect(POOLS, id).toContain(p);

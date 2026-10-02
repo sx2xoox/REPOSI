@@ -74,7 +74,7 @@ defineDrawnSprite('icon_bramble_corset', 16, 16, (p) => {
 defineArtifact({
   id: 'bramble_corset',
   name: '가시덩굴 코르셋',
-  desc: '피격 시 가시가 터져 주변 적에게 피해를 주고 출혈시킨다',
+  desc: '피격 시 가시가 터져 주변 적에게 피해와 출혈을 준다',
   quote: '안아주려는 자에게도 가시가 돋는다.',
   rarity: 'common',
   tags: ['blood'],
@@ -110,7 +110,7 @@ defineDrawnSprite('icon_iron_quill', 16, 16, (p) => {
 defineArtifact({
   id: 'iron_quill',
   name: '무쇠 깃촉',
-  desc: '탄환이 적 하나를 더 관통하고, 관통할 때마다 피해 +20% (탄환 한정)',
+  desc: '관통 +1. 관통할 때마다 피해 +20% (탄환 한정)',
   quote: '펜은 칼보다 깊이 박힌다.',
   rarity: 'common',
   tags: ['blood'],
@@ -261,7 +261,7 @@ defineDrawnSprite('fx_blood_moon_small', 7, 7, (p) => {
 defineArtifact({
   id: 'blood_moon',
   name: '핏빛 달',
-  desc: '공격력 +1. 적을 처치하면 핏빛 화살 4발이 다른 적을 쫓아간다',
+  desc: '공격력 +1. 처치 시 핏빛 화살 4발이 다른 적을 쫓는다',
   quote: '달이 붉게 물드는 밤엔, 사냥꾼도 사냥감이 된다.',
   rarity: 'legendary',
   tags: ['blood', 'shadow'],

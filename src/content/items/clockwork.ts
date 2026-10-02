@@ -235,7 +235,7 @@ defineDrawnSprite('icon_pendulum_weight', 16, 16, (p) => {
 defineArtifact({
   id: 'pendulum_weight',
   name: '진자 추',
-  desc: '탄환이 부메랑처럼 되돌아오며 적을 꿰뚫는다 (탄환 한정). 넉백 +30%',
+  desc: '탄환이 부메랑처럼 되돌아온다 (탄환 한정). 넉백 +30%',
   quote: '떠난 것은 반드시 돌아온다.',
   rarity: 'rare',
   tags: ['clockwork'],
@@ -272,7 +272,7 @@ defineDrawnSprite('icon_armillary', 16, 16, (p) => {
 defineArtifact({
   id: 'armillary',
   name: '작은 혼천의',
-  desc: '세 번째 공격마다 탄환이 주위를 공전하다 강해져서 적에게 날아간다',
+  desc: '3번째 공격마다 탄환이 주위를 돌다 강해져 날아간다',
   quote: '하늘의 길을 손안에 담았다.',
   rarity: 'epic',
   tags: ['clockwork', 'star'],

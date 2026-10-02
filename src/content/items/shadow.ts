@@ -214,7 +214,7 @@ defineDrawnSprite('icon_hollow_mask', 16, 16, (p) => {
 defineArtifact({
   id: 'hollow_mask',
   name: '텅 빈 가면',
-  desc: '공격이 10% 확률로 적을 공포에 빠뜨린다. 겁먹은 적에게 피해 +25%',
+  desc: '10% 확률로 공포를 건다. 겁먹은 적에게 피해 +25%',
   quote: '가면 뒤엔 아무도 없다. 그래서 무섭다.',
   rarity: 'rare',
   tags: ['shadow'],

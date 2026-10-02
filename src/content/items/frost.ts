@@ -165,7 +165,7 @@ defineDrawnSprite('icon_winter_orb', 16, 16, (p) => {
 defineArtifact({
   id: 'winter_orb',
   name: '겨울을 품은 구슬',
-  desc: '주위를 도는 얼음 구슬이 적 탄환을 막고 닿은 적을 얼린다',
+  desc: '얼음 구슬이 주위를 돌며 적 탄환을 막고 적을 얼린다',
   quote: '작은 구슬 속에서 눈이 그치지 않는다.',
   rarity: 'rare',
   tags: ['frost'],
@@ -198,7 +198,7 @@ defineDrawnSprite('icon_hoarfrost_mantle', 16, 16, (p) => {
 defineArtifact({
   id: 'hoarfrost_mantle',
   name: '상고대 망토',
-  desc: '영혼 하트 +1. 피격 시 주변 적을 얼리고 적 탄환을 지운다',
+  desc: '영혼 하트 +1. 피격 시 주변 적을 얼리고 탄환을 지운다',
   quote: '상처가 닿는 곳마다 서리가 핀다.',
   rarity: 'epic',
   tags: ['frost'],

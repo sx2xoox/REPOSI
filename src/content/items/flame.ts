@@ -319,7 +319,7 @@ defineArtifact({
   id: 'twin_wick',
   name: '쌍심지',
   desc: '등불 해방이 잠시 후 한 번 더 발동한다',
-  quote: '심지가 둘이면, 불꽃도 둘.',
+  quote: '눈에 쌍심지를 켜고 덤벼라.',
   rarity: 'epic',
   tags: ['flame'],
   icon: 'icon_twin_wick',

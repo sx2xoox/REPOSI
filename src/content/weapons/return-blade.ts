@@ -96,6 +96,8 @@ defineWeapon({
     m.mulStat('damage', 1.2);
   },
   update(w: World, p, st, _dt, firing, aim) {
+    // safety: blades lost to a room change / timeout come back to the hand
+    if ((st.mem.out ?? 0) > 0 && (st.mem.room !== w.node.id || w.time - (st.mem.thrownAt ?? 0) > 4.2)) st.mem.out = 0;
     if (!firing || st.cooldown > 0 || (st.mem.out ?? 0) > 0) return;
     const s = p.stats;
     st.sinceAttack = 0;
@@ -109,6 +111,8 @@ defineWeapon({
       behaviors: [returnBehavior(st, outDist, speed)],
     });
     st.mem.out = shots.length;
+    st.mem.thrownAt = w.time;
+    st.mem.room = w.node.id;
     st.cooldown = attackInterval(p, 0.35);
     kick(w, aim, 0.8);
     w.sfx('whoosh', { vol: 0.5, pitch: 1.2 });
