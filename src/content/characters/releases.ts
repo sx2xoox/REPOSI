@@ -10,7 +10,8 @@ import { Entity } from '../../game/entity';
 import { Enemy } from '../../game/enemy';
 import { RingFx, GroundWarning } from '../../game/effects';
 import { orbSprite } from '../../game/projectile';
-import { MeleeSwing } from '../../game/melee';
+import { MeleeSwing, SMEAR_FRAMES, smearSprite } from '../../game/melee';
+import { BASE_STATS } from '../../game/stats';
 import { angleTo, clamp, dist, rotateToward, TAU } from '../../engine/math';
 import { fx } from '../../engine/rng';
 import { registerWarmup } from '../../engine/sprites';
@@ -25,9 +26,14 @@ const BLOOM_BOLT = orbSprite(7, '#ffd078');
 const BLOOM_PETAL = glowSprite(7, '#ffd078');
 const BLOOM_HALO = glowSprite(34, '#ffb040');
 const WHIRL_WAVE = swordWaveSprite('#ffe2a0');
+const WHIRL_COLORS = ['#cfe0ff', '#ffe2a0'];
+/** whirlwind swing reach (see releaseWhirlwind) */
+const whirlReach = (range: number) => 38 + range * 0.03;
+// full-circle smears of the whirlwind at the base range (other ranges compile on first use)
+for (const c of WHIRL_COLORS) for (let f = 0; f < SMEAR_FRAMES; f++) smearSprite(whirlReach(BASE_STATS.range), TAU, c, f);
 registerWarmup(() => {
   prewarmLight('#ffc050', 22); // bloom bolts
-  prewarmLight('#ffc070', 50, 120); // bloom halo
+  prewarmLight('#ffc070', 30, 120); // bloom halo (shrinks to 36)
   prewarmLight('#ffe2a0', 22); // sword waves
   prewarmLight('#b8d0ff', 90); // whirlwind
   prewarmLight('#ffe08a', 18); // falling arrows
@@ -261,8 +267,8 @@ export function releaseWhirlwind(w: World, p: Player): void {
       acc -= 0.12;
       n++;
       ww.spawn(new MeleeSwing(pl, {
-        angle: t * 22, arc: TAU, reach: 38 + pl.stats.range * 0.03, damage: pl.stats.damage * 1.1, knockback: 160,
-        color: n % 2 ? '#cfe0ff' : '#ffe2a0', reflect: true, visual: 0.14, duration: 0.08, noProc: true, hitKick: 0.8,
+        angle: t * 22, arc: TAU, reach: whirlReach(pl.stats.range), damage: pl.stats.damage * 1.1, knockback: 160,
+        color: WHIRL_COLORS[n % 2 ? 0 : 1], reflect: true, visual: 0.14, duration: 0.08, noProc: true, hitKick: 0.8,
         swingDir: 1,
       }));
       ww.sfx('swing', { vol: 0.5, pitch: 0.9 + (n % 3) * 0.08 });
