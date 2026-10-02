@@ -88,6 +88,9 @@ export const BUL = {
   void: { color: '#ff4fae', core: '#ffe6f4', rim: '#a0105e', outline: '#14000a' },
   eldritch: { color: '#3cffc4', core: '#eafff8', rim: '#0a8a6c', outline: '#001410' },
   star: { color: '#ffec50', core: '#ffffff', rim: '#ff8a1a', outline: '#1c0a00' },
+  // floor 6 (drowned archive): glowing ink glyphs, old parchment pages
+  glyph: { color: '#56e8ff', core: '#f0ffff', rim: '#1a3a9a', outline: '#040a18' },
+  page: { color: '#ffd978', core: '#fff8e0', rim: '#a0601a', outline: '#1a0e02' },
 } satisfies Record<string, BulletPal>;
 export type BulletKind = keyof typeof BUL;
 

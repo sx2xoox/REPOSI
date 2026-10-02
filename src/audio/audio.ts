@@ -18,6 +18,8 @@ export const SFX_NAMES = [
   'enemy_hurt', 'enemy_die', 'enemy_die_big', 'enemy_shoot', 'enemy_charge', 'enemy_jump',
   'enemy_land', 'enemy_roar', 'enemy_spawn', 'warn', 'summon', 'slam', 'whoosh', 'orb',
   'beam_charge', 'laser', 'lightning', 'fire', 'freeze', 'poison', 'spike',
+  // floor 6 (drowned archive): wet ink, fluttering paper, water surging
+  'ink_splash', 'paper_flutter', 'water_surge',
   // bosses
   'boss_roar', 'boss_die', 'boss_phase',
   // world
@@ -32,7 +34,7 @@ export const SFX_NAMES = [
 export type SfxName = (typeof SFX_NAMES)[number];
 
 export const MUSIC_IDS = [
-  'title', 'floor1', 'floor2', 'floor3', 'floor4', 'floor5', 'boss', 'boss_final',
+  'title', 'floor1', 'floor2', 'floor3', 'floor4', 'floor5', 'floor6', 'boss', 'boss_final',
   'shop', 'secret', 'victory', 'gameover',
 ] as const;
 export type MusicId = (typeof MUSIC_IDS)[number];

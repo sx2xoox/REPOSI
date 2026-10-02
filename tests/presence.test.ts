@@ -153,13 +153,16 @@ describe('등불의 축복 (floor blessings)', () => {
 
 describe('getting stronger', () => {
   it('enemy hp grows gently per floor (items outpace it)', () => {
-    const m = Floors.all().sort((x, y) => x.index - y.index).map((f) => f.hpMult);
+    const sorted = Floors.all().sort((x, y) => x.index - y.index);
+    const m = sorted.map((f) => f.hpMult);
     expect(m[0]).toBe(1);
     for (let i = 1; i < m.length; i++) {
       expect(m[i]).toBeGreaterThan(m[i - 1]);
       expect(m[i] / m[i - 1]).toBeLessThanOrEqual(1.32);
     }
-    expect(m[m.length - 1]).toBeLessThanOrEqual(2.8);
+    // act 1 (floors 1–5) stays flat on purpose; act 2 keeps growing gently below it
+    const act1 = sorted.filter((f) => f.index <= 5).map((f) => f.hpMult);
+    expect(act1[act1.length - 1]).toBeLessThanOrEqual(2.8);
   });
 
   it('the power number rises with damage and with every artifact', () => {

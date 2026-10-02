@@ -261,6 +261,84 @@ export interface WeaponDef {
   onHolster?(w: World, p: Player, st: WeaponState): void;
   /** short Korean archetype label for UI (e.g. '산탄', '대검'); falls back to `kind` */
   archetype?: string;
+  /** classification tags for character affinities (e.g. 'bow', 'arcane', 'blade'); see AffinityDef */
+  tags?: string[];
+}
+
+// ------------------------------------------------------------------ characters
+/**
+ * A character's dash ("대시"). The movement, i-frames and after-images stay in
+ * `Player.tryDash`; these hooks add the keeper's own flavour (a burning trail,
+ * a damaging rush, a blink that leaves a rift ...). Distance and cooldown come
+ * from the character's `baseStats` (dashSpeed x dashTime, dashCooldown).
+ */
+export interface DashDef {
+  /** Korean name, e.g. "불씨 질주" */
+  name: string;
+  /** one-line Korean description (character select) */
+  desc: string;
+  /** 16x16 icon sprite (character select) */
+  icon?: string;
+  /** extra invulnerability after the dash ends, seconds (default 0.06) */
+  iframes?: number;
+  /**
+   * Teleport to the dash end point instead of rushing there (crosses pits and
+   * enemies, stops at walls / rocks); `dashTime` becomes the re-appearance delay
+   * during which the keeper stands still and is invulnerable.
+   */
+  blink?: boolean;
+  /** after-image / trail color (default: the character's lightColor) */
+  color?: string;
+  /** sound played instead of the default 'dash' */
+  sfx?: SfxName;
+  /** the dash started (`p.dashDX/DY` is the direction, `p.dashX0/Y0` where it began) */
+  start?(w: World, p: Player): void;
+  /** every update while dashing */
+  update?(w: World, p: Player, dt: number): void;
+  /** the dash ended */
+  end?(w: World, p: Player): void;
+}
+
+/**
+ * A character's signature passive: ItemHooks owned by the keeper, always
+ * active with power 1 and dispatched by the item system like an artifact
+ * (key `passive:<characterId>`; `proc(w, 'passive:<id>')` pops its icon).
+ */
+export interface PassiveDef extends ItemHooks {
+  /** Korean name, e.g. "불씨 심지" */
+  name: string;
+  /** one-line Korean description (character select, Tab screen) */
+  desc: string;
+  /** 16x16 icon sprite (Tab screen, proc pops) */
+  icon: string;
+  /** visible traces composed like an artifact's (aura ring, step sparkles, hit sparks ...) */
+  look?: ArtifactLook;
+}
+
+/**
+ * Favoured weapon class: while a matching weapon is held the keeper gets
+ * `p.flags` 'affinity' plus the optional stat bonus. A weapon matches when its
+ * kind is in `kinds`, one of its tags is in `tags`, or its id is in `ids`.
+ */
+export interface AffinityDef {
+  /** Korean name, e.g. "근접 무기" */
+  name: string;
+  /** one-line Korean description of the bonus */
+  desc: string;
+  kinds?: WeaponDef['kind'][];
+  tags?: string[];
+  ids?: string[];
+  /** stat bonus while a matching weapon is held */
+  stats?(m: StatMods): void;
+}
+
+/** Does `weapon` count as a favoured weapon of `aff`? */
+export function weaponMatchesAffinity(aff: AffinityDef | undefined, weapon: WeaponDef | undefined): boolean {
+  if (!aff || !weapon) return false;
+  if (aff.kinds?.includes(weapon.kind)) return true;
+  if (aff.ids?.includes(weapon.id)) return true;
+  if (aff.tags && weapon.tags) for (const t of weapon.tags) if (aff.tags.includes(t)) return true;
+  return false;
 }
 
 export interface CharacterDef {
@@ -298,6 +376,23 @@ export interface CharacterDef {
   release?(w: World, p: Player): void;
   /** one-line description of the release shown on character select */
   releaseDesc?: string;
+  /** Korean name of the release (character select), e.g. "등불 개화" */
+  releaseName?: string;
+  // ---- character kit (all optional; absent = plain keeper)
+  /** signature passive, always active (see PassiveDef) */
+  passive?: PassiveDef;
+  /** custom dash behaviour (default: a plain rush) */
+  dash?: DashDef;
+  /** favoured weapon class with a modest bonus */
+  affinity?: AffinityDef;
+  /** playstyle tags for character select (Korean), e.g. ['해방', '화염'] */
+  playstyle?: string[];
+  /** 1 easy .. 3 hard (character select) */
+  difficulty?: 1 | 2 | 3;
+  /** one-line "why pick me" (character select) */
+  pitch?: string;
+  /** lantern light radius in px (default 95) */
+  lightRadius?: number;
 }
 
 // ------------------------------------------------------------------ world content

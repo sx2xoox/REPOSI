@@ -90,6 +90,9 @@ export class Player extends Actor {
   dashCD = 0;
   dashDX = 0;
   dashDY = 1;
+  /** where the current / last dash started (character dash hooks: trails, rifts) */
+  dashX0 = 0;
+  dashY0 = 0;
   private afterT = 0;
   /** dash pressed slightly before the cooldown ended: performed as soon as possible */
   private dashBuffer = 0;
@@ -212,17 +215,26 @@ export class Player extends Actor {
 
     // movement
     if (this.dashT > 0) {
+      const dd = this.character.dash;
       this.dashT -= dt;
-      this.vx = this.dashDX * s.dashSpeed;
-      this.vy = this.dashDY * s.dashSpeed;
-      this.afterT -= dt;
-      if (this.afterT <= 0) {
-        this.afterT = 0.03;
-        w.spawn(new Afterimage(this.frameName(), this.x, this.y, this.flip, this.character.lightColor ?? '#7ad0ff'));
+      if (dd?.blink) {
+        // already at the destination: stand still while re-appearing
+        this.vx = 0;
+        this.vy = 0;
+      } else {
+        this.vx = this.dashDX * s.dashSpeed;
+        this.vy = this.dashDY * s.dashSpeed;
+        this.afterT -= dt;
+        if (this.afterT <= 0) {
+          this.afterT = 0.03;
+          w.spawn(new Afterimage(this.frameName(), this.x, this.y, this.flip, dd?.color ?? this.character.lightColor ?? '#7ad0ff'));
+        }
       }
+      dd?.update?.(w, this, dt);
       if (this.dashT <= 0) {
         this.vx *= 0.35;
         this.vy *= 0.35;
+        dd?.end?.(w, this);
       }
     } else {
       const speed = s.moveSpeed * this.speedMult() * (this.firing && this.weaponSlowsMove() ? 0.85 : 1);

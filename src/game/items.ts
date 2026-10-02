@@ -7,10 +7,10 @@
 
 import type { World } from './world';
 import {
-  Actives, Artifacts, GlobalHooks, RARITY_WEIGHT, Sets, Weapons,
-  type ItemHooks, type ItemPool, type Rarity,
+  Actives, Artifacts, Characters, GlobalHooks, RARITY_WEIGHT, Sets, Weapons, weaponMatchesAffinity,
+  type ArtifactDef, type CharacterDef, type ItemHooks, type ItemPool, type Rarity,
 } from './defs';
-import { LookSystem } from './look';
+import { LookSystem, type LookSource } from './look';
 import { BASE_STATS, StatMods, computeStats, type Stats } from './stats';
 import { makeItem, type InvComputed, type InvItem } from './inventory';
 import type { PedestalItem } from './pickups';
@@ -56,6 +56,22 @@ const EVENT_HOOKS = new Set<keyof ItemHooks>([
 export const PROC_FLASH_CD = 0.6;
 export const PROC_POP_CD = 2.5;
 
+/** Effect key of a character's passive (see CharacterDef.passive). */
+export const passiveKey = (c: CharacterDef): string => `passive:${c.id}`;
+
+const passiveLooks = new WeakMap<CharacterDef, LookSource>();
+/** The passive's `look` as a look source (an artifact-shaped stand-in, built once per character). */
+function passiveLook(c: CharacterDef): LookSource | null {
+  const pas = c.passive;
+  if (!pas?.look) return null;
+  let src = passiveLooks.get(c);
+  if (!src) {
+    const def: ArtifactDef = { id: passiveKey(c), name: pas.name, desc: pas.desc, rarity: 'rare', tags: [], icon: pas.icon, pools: [], hidden: true, look: pas.look };
+    passiveLooks.set(c, (src = { def, power: 1, order: -1 }));
+  }
+  return src;
+}
+
 export class ItemSystem {
   effects: ActiveEffect[] = [];
   /** composed visual traces of the held artifacts (shots, motes, aura ...) */
@@ -88,6 +104,8 @@ export class ItemSystem {
     const comp = p.inv.compute();
     this.computed = comp;
     const effects: ActiveEffect[] = [];
+    // the keeper's own passive runs first (before any artifact)
+    if (p.character.passive) effects.push({ key: passiveKey(p.character), hooks: p.character.passive, power: 1 });
     for (const a of comp.artifacts) effects.push({ key: `a:${a.def.id}`, hooks: a.def, power: a.power });
     for (const set of comp.sets) {
       for (const tier of set.active) effects.push({ key: `set:${set.def.tag}:${tier.count}`, hooks: tier.hooks, power: 1 });
@@ -103,7 +121,8 @@ export class ItemSystem {
     for (const e of oldEffects) if (!newKeys.has(e.key)) safe(() => e.hooks.onRemove?.(w));
     for (const e of effects) if (!this.activeKeys.has(e.key)) safe(() => e.hooks.onAcquire?.(w, e.power));
     this.activeKeys = newKeys;
-    this.look.compose(comp.artifacts);
+    const pl = passiveLook(p.character);
+    this.look.compose(pl ? [pl, ...comp.artifacts] : comp.artifacts);
 
     this.recomputeStats();
   }
@@ -116,6 +135,12 @@ export class ItemSystem {
     const m = new StatMods();
     const weapon = Weapons.get(p.weaponId);
     weapon?.stats?.(m);
+    // favoured weapon class: flag + modest bonus (CharacterDef.affinity)
+    const aff = p.character.affinity;
+    if (aff && weaponMatchesAffinity(aff, weapon)) {
+      m.flag('affinity');
+      safe(() => aff.stats?.(m));
+    }
     for (const e of this.effects) safe(() => e.hooks.stats?.(m, e.power, w));
     const oldMax = p.stats ? p.maxRed : -1;
     p.stats = computeStats(base, m);
@@ -172,6 +197,7 @@ export class ItemSystem {
     if (now - (this.procFlashAt.get(id) ?? -9) < PROC_FLASH_CD) return;
     let icon: string | undefined;
     if (id.startsWith('set:')) icon = Sets.get(id.slice(4))?.icon;
+    else if (id.startsWith('passive:')) icon = Characters.get(id.slice(8))?.passive?.icon;
     else icon = Artifacts.get(id)?.icon;
     if (!icon) return;
     this.procFlashAt.set(id, now);
@@ -203,6 +229,12 @@ export class ItemSystem {
     if (!e || !this.curEvent) return;
     if (e.key.startsWith('a:')) this.proc(e.key.slice(2));
     else if (e.key.startsWith('set:')) this.proc(`set:${e.key.split(':')[1]}`);
+    else if (e.key.startsWith('passive:')) this.proc(e.key);
+  }
+
+  /** Is the held weapon one of the character's favoured class (CharacterDef.affinity)? */
+  get affinityActive(): boolean {
+    return this.w.player.flags.has('affinity');
   }
 
   update(dt: number): void {

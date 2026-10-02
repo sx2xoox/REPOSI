@@ -1,7 +1,9 @@
-// Renders a sheet PNG of every enemy and boss. Usage: node scripts/sheet-enemies.mjs out.png
+// Renders a sheet PNG of every enemy and boss. Usage: node scripts/sheet-enemies.mjs out.png [floor]
+// With a floor number only the regular enemies of that floor (and its bosses) are drawn.
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 const out = process.argv[2];
+const onlyFloor = process.argv[3] ? Number(process.argv[3]) : 0;
 const port = 6100 + Math.floor(Math.random() * 300);
 const server = spawn('node_modules/.bin/vite', ['--port', String(port), '--strictPort'], { stdio: 'pipe' });
 await new Promise((res, rej) => { const t = setTimeout(() => rej(new Error('vite timeout')), 30000); server.stdout.on('data', (d) => { if (String(d).includes('Local')) { clearTimeout(t); res(); } }); });
@@ -12,12 +14,14 @@ try {
   await page.goto(`http://localhost:${port}/`);
   await page.waitForFunction(() => !!window.__lk, null, { timeout: 30000 });
   await page.waitForTimeout(500);
-  const h = await page.evaluate(async () => {
+  const h = await page.evaluate(async (onlyFloor) => {
     const sp = await import('/src/engine/sprites.ts');
     const defs = await import('/src/game/defs.ts');
     const all = defs.Enemies.all();
-    const regular = all.filter((e) => !e.boss).sort((a, b) => (Math.min(...(a.floors ?? [9])) - Math.min(...(b.floors ?? [9]))));
-    const bosses = all.filter((e) => e.boss);
+    const regular = all
+      .filter((e) => !e.boss && (!onlyFloor || (e.floors ?? []).includes(onlyFloor)))
+      .sort((a, b) => (Math.min(...(a.floors ?? [99])) - Math.min(...(b.floors ?? [99]))));
+    const bosses = all.filter((e) => e.boss && (!onlyFloor || (e.bossFloors ?? []).includes(onlyFloor)));
     const S = 4;
     const cols = 6, cellW = 200, cellH = 170;
     const rowsR = Math.ceil(regular.length / cols);
@@ -31,8 +35,8 @@ try {
     c.imageSmoothingEnabled = false;
     c.fillStyle = '#14111b'; c.fillRect(0, 0, W, H);
     c.fillStyle = '#ffe0a0'; c.font = "bold 32px 'Galmuri11'";
-    c.fillText(`등불지기 — 적 (${regular.length}종)`, 30, 50);
-    const floorCol = { 1: '#9aa0c8', 2: '#7ad08a', 3: '#ff9a50', 4: '#8ae0ff', 5: '#c08aff' };
+    c.fillText(`등불지기 — 적 (${regular.length}종)${onlyFloor ? ` · ${onlyFloor}층` : ''}`, 30, 50);
+    const floorCol = { 1: '#9aa0c8', 2: '#7ad08a', 3: '#ff9a50', 4: '#8ae0ff', 5: '#c08aff', 6: '#56e8d0', 7: '#e0c070', 8: '#ff7aa0', 9: '#a0ff70', 10: '#ffffff' };
     const draw = (e, cx, cy, scale) => {
       const name = e.sprite;
       const frame = sp.hasAnim(name) ? sp.animFrame(name, 0.1) : name;
@@ -82,7 +86,7 @@ try {
     cv.style.display = 'block';
     document.body.appendChild(cv);
     return H;
-  });
+  }, onlyFloor);
   await page.setViewportSize({ width: 1280, height: h });
   await page.screenshot({ path: out });
 } finally {

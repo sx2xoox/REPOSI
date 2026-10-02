@@ -57,7 +57,7 @@ describe('enemy definitions', () => {
     }
   });
 
-  it('every regular enemy has a defined sprite / animation and floors in 1..5', () => {
+  it('every regular enemy has a defined sprite / animation and floors in 1..10', () => {
     for (const d of Enemies.all()) {
       if (d.boss) continue;
       expect(spriteDefined(d.sprite), `${d.id} sprite "${d.sprite}"`).toBe(true);
@@ -65,7 +65,7 @@ describe('enemy definitions', () => {
       for (const f of d.floors ?? []) {
         expect(Number.isInteger(f), d.id).toBe(true);
         expect(f, d.id).toBeGreaterThanOrEqual(1);
-        expect(f, d.id).toBeLessThanOrEqual(5);
+        expect(f, d.id).toBeLessThanOrEqual(10);
       }
     }
   });

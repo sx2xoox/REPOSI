@@ -59,3 +59,9 @@ defineFloor({
   theme: 'abyss', music: 'floor5', ...DIFFICULTY[5],
   extraRooms: { curse: 0.7, shrine: 0.4 },
 });
+
+defineFloor({
+  index: 6, id: 'archive', name: '6층 · 수몰된 서고', subtitle: '젖은 책장마다 꺼진 이름들.',
+  theme: 'archive', music: 'floor6', ...DIFFICULTY[6],
+  extraRooms: { challenge: 0.5, shrine: 0.5, curse: 0.6 },
+});
