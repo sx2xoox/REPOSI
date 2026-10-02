@@ -27,6 +27,9 @@ export const SFX_NAMES = [
   'boss_roar', 'boss_die', 'boss_phase',
   // floor 6 bosses (drowned archive)
   'quill_write', 'page_rip', 'ink_burst', 'lamp_hum', 'foghorn', 'tide_slam',
+  // floor 7 bosses (clockwork spire): the clockmaker's ticks and time tricks, the dancer's music box
+  'clockboss_tick', 'clockboss_wind', 'clockboss_freeze', 'clockboss_rewind', 'clockboss_sweep', 'clockboss_gear',
+  'clockboss_chime', 'clockboss_shatter', 'clockboss_pirouette', 'clockboss_box', 'clockboss_detune',
   // world
   'explosion', 'bomb_place', 'fuse', 'rock_break', 'pot_break', 'door_open', 'door_close',
   'door_unlock', 'secret_found', 'trapdoor', 'floor_start', 'room_clear', 'teleport',
@@ -45,7 +48,7 @@ export const SFX_NAMES = [
 export type SfxName = (typeof SFX_NAMES)[number];
 
 export const MUSIC_IDS = [
-  'title', 'floor1', 'floor2', 'floor3', 'floor4', 'floor5', 'floor6', 'floor7', 'boss', 'boss_final', 'boss_drowned',
+  'title', 'floor1', 'floor2', 'floor3', 'floor4', 'floor5', 'floor6', 'floor7', 'boss', 'boss_final', 'boss_drowned', 'boss_clockwork',
   'shop', 'secret', 'victory', 'gameover',
 ] as const;
 export type MusicId = (typeof MUSIC_IDS)[number];

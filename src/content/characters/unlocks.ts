@@ -1,6 +1,10 @@
 // Meta progression for characters (always-active global hooks):
 //  - 니엘 unlocks (save flag `unlock:niel`) the first time a floor-3+ boss falls
 //    (or a run reaches floor 4+ / is won). Seeded runs don't count.
+//  - 보리 (the rescue dog) comes looking after the keeper has fallen 3 times in
+//    total (checked at every floor start of the next run).
+//  - 백구 unlocks when a floor boss is beaten without taking a single hit inside
+//    the boss room. 모리 unlocks after 300 kills in total.
 //  - After a boss fight, a weapon pedestal sometimes appears beside the reward.
 
 import { defineGlobalHooks, Characters, isLastFloor } from '../../game/defs';
