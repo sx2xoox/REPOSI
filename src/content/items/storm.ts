@@ -4,7 +4,7 @@ import { defineArtifact } from '../../game/defs';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { ramp } from '../../engine/painter';
 import { fx } from '../../engine/rng';
-import { O, ZapFx, chainLightning, isPrimary, roll, skyBolt, stackMul, syncFamiliars } from './lib';
+import { O, ZapFx, chainLightning, isPrimary, roll, rollHit, skyBolt, stackMul, syncFamiliars } from './lib';
 import { BallLightning } from './familiars';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
@@ -39,7 +39,7 @@ defineArtifact({
   icon: 'icon_copper_coil',
   pools: ['treasure', 'shop'],
   onHit(w, t, hit, power) {
-    if (!isPrimary(hit) || !roll(w, 0.1, power)) return;
+    if (!isPrimary(hit) || !rollHit(w, hit, 0.1, power)) return;
     chainLightning(w, t.x, t.y - t.z - 4, { jumps: 2, damage: dmg(w) * 0.7, exclude: new Set([t.id]) });
   },
 });
@@ -237,17 +237,20 @@ defineArtifact({
 
 // ------------------------------------------------------------------ 폭풍의 심장 (legendary)
 defineDrawnSprite('icon_tempest_heart', 16, 16, (p) => {
-  p.circle(5, 5.5, 4, '#5a6ad8');
-  p.circle(11, 5.5, 4, '#5a6ad8');
-  p.poly([1.2, 7, 14.8, 7, 8, 15], '#5a6ad8');
-  p.shadeSphere(8, 8, 7.5, 7.5, ['#22285a', '#3a48a8', '#5a6ad8', '#8a9af0', '#c8d0ff']);
-  p.poly([9, 3, 5.5, 8.5, 8, 8.5, 6.5, 13, 11, 7, 8.5, 7, 10, 3], BOLT);
-  p.line(9, 4, 7, 7, '#ffffff');
+  p.circle(4.8, 5.4, 3.7, '#5a6ad8');
+  p.circle(11.2, 5.4, 3.7, '#5a6ad8');
+  p.poly([1.1, 6.4, 14.9, 6.4, 8, 15], '#5a6ad8');
+  p.shadeSphere(8, 7.5, 7.5, 7.5, ['#232a62', '#3a48a8', '#5a6ad8', '#8a9af0', '#c8d0ff'], { dither: false });
+  p.px(8, 3, null);
+  p.px(8, 2, null);
+  p.poly([9.5, 3.5, 5.5, 9, 8, 9, 6.5, 13.5, 11.5, 7.2, 9, 7.2, 10.5, 3.5], BOLT);
+  p.line(9, 4.5, 7, 7.5, '#ffffff');
   p.px(3, 3, '#e0e8ff');
-  p.px(4, 3, '#e0e8ff');
+  p.px(4, 2, '#e0e8ff');
   p.px(0, 1, BOLT);
   p.px(15, 1, BOLT);
   p.px(15, 12, '#ffffff');
+  p.px(1, 12, BOLT);
 }, { outline: '#0c0c28' });
 
 defineArtifact({

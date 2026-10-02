@@ -5,12 +5,11 @@
 
 import { defineWeapon } from '../../game/defs';
 import { defineDrawnSprite } from '../../engine/sprites';
-import { orbSprite } from '../../game/projectile';
 import { clamp, rotateToward } from '../../engine/math';
 import { fx } from '../../engine/rng';
 import { TILE } from '../../game/constants';
 import { tileProps } from '../../game/tiles';
-import { O, handPos, rayLength, segDist } from './common';
+import { O, glowSprite, handPos, rayLength, segDist } from './common';
 
 defineDrawnSprite('w_void_eye', 9, 9, (p) => {
   p.circle(4.5, 4.5, 4.2, '#2a1c48');
@@ -138,8 +137,8 @@ defineWeapon({
       r.line(o.x, o.y, ex, ey, '#a060ff', wd, 0.9);
       r.line(o.x, o.y, ex, ey, '#e8d0ff', Math.max(1, wd * 0.45), 1);
       r.line(o.x, o.y, ex, ey, '#ffffff', Math.max(1, wd * 0.2), 1);
-      r.sprite(orbSprite(6 + wd * 1.6, '#c890ff'), ex, ey, { alpha: 0.6 * fade, additive: true });
-      r.sprite(orbSprite(5 + wd, '#ffffff'), o.x, o.y, { alpha: 0.7 * fade, additive: true });
+      r.sprite(glowSprite(8 + wd * 2, '#c890ff'), ex, ey, { alpha: 0.8 * fade, additive: true });
+      r.sprite(glowSprite(6 + wd * 1.4, '#e8d0ff'), o.x, o.y, { alpha: 0.8 * fade, additive: true });
     }
     r.sprite('w_void_eye', o.x, o.y + (on ? 0 : bob), { rot: on ? a * 0.15 : 0, flash: on ? 0.25 + 0.2 * Math.sin(w.time * 30) : 0 });
   },

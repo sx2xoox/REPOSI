@@ -14,6 +14,8 @@ import type { WeaponState } from '../../game/defs';
 import { clamp, ease } from '../../engine/math';
 import { TILE } from '../../game/constants';
 import { Tile, tileProps } from '../../game/tiles';
+import { defineDrawnSprite, hasSprite } from '../../engine/sprites';
+import { bayer } from '../../engine/painter';
 
 export const O = '#0c0810';
 
@@ -152,4 +154,34 @@ export function pixLine(r: Renderer, x0: number, y0: number, x1: number, y1: num
     if (e2 >= dy) { err += dy; ax += sx; }
     if (e2 <= dx) { err += dx; ay += sy; }
   }
+}
+
+/**
+ * Soft round glow (no outline) for additive drawing: a dithered disk that is
+ * brightest in the middle. Cached per diameter/color.
+ */
+export function glowSprite(d: number, color: string): string {
+  const D = Math.max(3, Math.min(48, Math.round(d)));
+  const name = `__glow_${D}_${color}`;
+  if (hasSprite(name)) return name;
+  defineDrawnSprite(name, D, D, (p) => {
+    const r = D / 2;
+    for (let y = 0; y < D; y++) {
+      for (let x = 0; x < D; x++) {
+        const k = Math.hypot(x + 0.5 - r, y + 0.5 - r) / r;
+        if (k > 1) continue;
+        const v = 1 - k;
+        if (v * v * 1.6 + bayer(x, y) * 0.35 < 0.3) continue;
+        const a = Math.round(Math.min(1, 0.25 + v * 0.9) * 255).toString(16).padStart(2, '0');
+        p.px(x, y, (k < 0.3 ? mixWhite(color) : color) + a);
+      }
+    }
+  }, { origin: [Math.floor(D / 2), Math.floor(D / 2)] });
+  return name;
+}
+
+function mixWhite(c: string): string {
+  const n = parseInt(c.slice(1, 7), 16);
+  const f = (v: number) => Math.round(v + (255 - v) * 0.55).toString(16).padStart(2, '0');
+  return `#${f((n >> 16) & 255)}${f((n >> 8) & 255)}${f(n & 255)}`;
 }

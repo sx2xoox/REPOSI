@@ -124,6 +124,7 @@ defineCharacter({
   color: '#8fb0ff',
   hearts: 4,
   weapon: 'sentinel_blade',
+  artifacts: ['sentinel_oath'],
   bombs: 1,
   keys: 1,
   baseStats: {

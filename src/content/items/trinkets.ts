@@ -8,7 +8,7 @@ import { ramp } from '../../engine/painter';
 import { Bomb, Pickup } from '../../game/pickups';
 import { fx } from '../../engine/rng';
 import { TAU } from '../../engine/math';
-import { O, addHitStatus, grantPerCopy, isAttack, roll, spawnShards, syncFamiliars, watch } from './lib';
+import { O, addHitStatus, grantPerCopy, isAttack, roll, rollHit, spawnShards, syncFamiliars, watch } from './lib';
 import { MirrorShard } from './familiars';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
@@ -370,25 +370,34 @@ defineArtifact({
   icon: 'icon_sweet_sachet',
   pools: ['treasure', 'shop', 'shrine'],
   modifyHit(w, t, hit, power) {
-    if (isAttack(hit) && !t.hasStatus('charm') && roll(w, 0.07, power)) addHitStatus(w, t, hit, { kind: 'charm', duration: 4 });
+    if (isAttack(hit) && !t.hasStatus('charm') && rollHit(w, hit, 0.07, power)) addHitStatus(w, t, hit, { kind: 'charm', duration: 4 });
   },
 });
 
 // ------------------------------------------------------------------ 산탄 화약통
 defineDrawnSprite('icon_cluster_powder', 16, 16, (p) => {
-  p.poly([1, 13, 3, 9, 8, 5, 12, 2, 14, 4, 11, 8, 6, 12, 3, 15], '#d8c090');
-  p.shadeSphere(7, 8, 8, 7, ramp('#d0b080', 4));
-  p.line(3, 9, 6, 12, '#7a5a30');
-  p.line(8, 5, 11, 8, '#7a5a30');
-  p.rect(12, 1, 3, 3, '#5a4a3a');
-  p.line(0, 15, 2, 13, '#3a2a1a');
-  p.px(13, 0, '#ffe080');
-  p.px(10, 0, '#ff9030');
-  p.px(15, 5, '#ff9030');
-  p.px(15, 0, '#ffffff');
-  p.rect(4, 2, 2, 2, '#2a2a38');
-  p.rect(1, 5, 2, 2, '#2a2a38');
-  p.px(4, 2, '#7a7a90');
+  p.ellipse(7.5, 10, 5.5, 5, '#8a5a30');
+  p.rect(2.5, 6, 10, 8, '#8a5a30');
+  p.shadeSphere(7, 9.5, 6.5, 6.5, ramp('#9a6a38', 4), { dither: false });
+  p.ellipse(7.5, 5.8, 5, 1.6, '#c09060');
+  p.ellipse(7.5, 5.8, 3, 0.9, '#2a1a10');
+  p.line(2, 8, 13, 8, '#3a3a48');
+  p.line(2, 12, 13, 12, '#3a3a48');
+  p.px(3, 8, '#9a9ab0');
+  p.px(3, 12, '#9a9ab0');
+  p.px(6, 10, '#e8d0a0');
+  p.px(8, 10, '#e8d0a0');
+  p.px(7, 11, '#e8d0a0');
+  p.line(9, 5, 12, 2, '#c8a060');
+  p.px(13, 1, '#ffe080');
+  p.px(14, 0, '#ffffff');
+  p.px(12, 0, '#ff9030');
+  p.px(14, 2, '#ff9030');
+  p.rect(0, 2, 2, 2, '#3a3a48');
+  p.px(1, 1, '#ffb040');
+  p.rect(14, 8, 2, 2, '#3a3a48');
+  p.px(15, 7, '#ffb040');
+  p.rect(1, 14, 2, 2, '#3a3a48');
 }, { outline: O });
 
 const bombWatch = new WeakMap<World, Map<Bomb, unknown>>();

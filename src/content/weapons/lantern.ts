@@ -4,9 +4,8 @@
 import { defineWeapon } from '../../game/defs';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { ramp } from '../../engine/painter';
-import { orbSprite } from '../../game/projectile';
 import { clamp } from '../../engine/math';
-import { O, handPos, kick, muzzle } from './common';
+import { O, glowSprite, handPos, kick, muzzle } from './common';
 
 // hanging lantern, pivot at the handle ring (top center)
 defineDrawnSprite('w_lantern', 9, 13, (p) => {
@@ -74,7 +73,7 @@ defineWeapon({
     const h = handPos(p, aim, 7 - p.recoil * 0.8);
     const rot = (st.mem.sway ?? 0) * (1 - Math.min(1, Math.abs(Math.sin(aim)) * 0.3));
     const glow = 0.18 + 0.08 * Math.sin(p.age * 7) + st.anim * 0.35;
-    r.sprite(orbSprite(14 + st.anim * 6, '#ffb040'), h.x - Math.sin(rot) * 6, h.y + 6, { alpha: glow, additive: true });
+    r.sprite(glowSprite(16 + st.anim * 8, '#ffb040'), h.x - Math.sin(rot) * 6, h.y + 6, { alpha: glow, additive: true });
     r.sprite('w_lantern', h.x, h.y - 1, { rot, flash: st.anim * 0.5 });
   },
 });

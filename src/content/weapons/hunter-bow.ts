@@ -7,9 +7,8 @@ import { defineWeapon, type WeaponState } from '../../game/defs';
 import type { World } from '../../game/world';
 import type { Player } from '../../game/player';
 import { defineDrawnSprite } from '../../engine/sprites';
-import { orbSprite } from '../../game/projectile';
 import { RingFx } from '../../game/effects';
-import { O, attackInterval, chargeTime, handPos, kick, muzzle, pixLine } from './common';
+import { O, attackInterval, chargeTime, glowSprite, handPos, kick, muzzle, pixLine } from './common';
 
 // bow seen from above, pointing right; pivot at the grip
 defineDrawnSprite('w_hunter_bow', 7, 19, (p) => {
@@ -135,7 +134,7 @@ defineWeapon({
         const tx = lx(nock + 15, 0);
         const ty = ly(nock + 15, 0);
         const pulse = full ? 1 + 0.25 * Math.sin(w.time * 25) : 1;
-        r.sprite(orbSprite(4 + g * 10 * pulse, full ? '#fff0b0' : '#ffb040'), tx, ty, { alpha: 0.35 + g * 0.4, additive: true });
+        r.sprite(glowSprite(5 + g * 12 * pulse, full ? '#fff0b0' : '#ffb040'), tx, ty, { alpha: 0.45 + g * 0.45, additive: true });
       }
     }
   },

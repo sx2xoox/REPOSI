@@ -4,7 +4,7 @@ import { defineArtifact } from '../../game/defs';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { ramp } from '../../engine/painter';
 import { fx } from '../../engine/rng';
-import { O, addHitStatus, cooldown, enemiesNear, familiarsOf, isAttack, isMelee, itemHit, roll, stackMul, syncFamiliars } from './lib';
+import { O, addHitStatus, cooldown, enemiesNear, familiarsOf, isAttack, isMelee, itemHit, roll, rollHit, stackMul, syncFamiliars } from './lib';
 import { TwinShadow } from './familiars';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
@@ -12,18 +12,23 @@ const VIO = ['#1a0c38', '#3a1a70', '#6a3ad0', '#9a6aff', '#d0b8ff'];
 
 // ------------------------------------------------------------------ 연기 베일
 defineDrawnSprite('icon_smoke_veil', 16, 16, (p) => {
-  p.poly([3, 2, 13, 2, 14, 10, 12, 13, 10, 11, 8, 14, 6, 11, 4, 13, 2, 10], '#8a80a0');
-  p.shadeSphere(7, 5, 9, 10, ['#4a4060', '#6a6080', '#8a80a0', '#b8b0cc']);
-  p.line(5, 3, 4, 11, '#5a5070');
-  p.line(9, 3, 9, 12, '#5a5070');
-  p.line(12, 3, 12.5, 10, '#5a5070');
-  p.rect(3, 1, 10, 2, '#c8c0dc');
-  p.circle(2, 14, 1.4, '#a8a0c0');
-  p.circle(14.5, 14, 1.1, '#a8a0c0');
-  p.px(0, 12, '#c8c0dc');
-  p.px(15, 11, '#c8c0dc');
-  p.px(4, 2, '#ffffff');
-}, { outline: O });
+  const c = '#9a8cc0';
+  p.circle(4.5, 7.5, 3.6, c);
+  p.circle(9, 5.5, 4.4, c);
+  p.circle(12.5, 8.5, 3.2, c);
+  p.rect(3, 8, 11, 3.5, c);
+  p.shadeSphere(8.5, 7, 7.5, 5.5, ['#4e4478', '#6e62a0', '#9a8cc0', '#cfc6ec'], { dither: false });
+  p.px(7, 2, '#ffffff');
+  p.px(8, 2, '#ffffff');
+  p.px(2, 5, '#e8e0ff');
+  p.line(4, 12, 5, 15, '#7a6ea8');
+  p.line(8, 12, 9, 14, '#7a6ea8');
+  p.line(12, 12, 13, 15, '#7a6ea8');
+  p.px(6, 9, '#5a4e88');
+  p.px(10, 9, '#5a4e88');
+  p.px(6, 8, '#e8e0ff');
+  p.px(10, 8, '#e8e0ff');
+}, { outline: '#120c24' });
 
 defineArtifact({
   id: 'smoke_veil',
@@ -41,20 +46,22 @@ defineArtifact({
 
 // ------------------------------------------------------------------ 밤의 덧신
 defineDrawnSprite('icon_night_slippers', 16, 16, (p) => {
-  p.ellipse(5, 10, 4, 2.6, '#2a3a7a');
-  p.ellipse(11, 12, 4, 2.6, '#2a3a7a');
-  p.ellipse(4, 9.5, 2.6, 1.6, '#3a4a9a');
-  p.ellipse(10, 11.5, 2.6, 1.6, '#3a4a9a');
-  p.line(1, 11, 8, 11, '#141a40');
-  p.line(7, 13, 14, 13, '#141a40');
-  p.ellipse(6.5, 9, 1.4, 1, '#0c1028');
-  p.ellipse(12.5, 11, 1.4, 1, '#0c1028');
-  p.circle(8, 3.5, 2.6, '#ffe880');
-  p.circle(9.3, 2.6, 2.2, null);
-  p.px(12, 2, '#ffffff');
-  p.px(3, 4, '#d8c8ff');
-  p.px(2, 7, '#5a6ad8');
-  p.px(14, 8, '#5a6ad8');
+  p.ellipse(10.5, 9.5, 5, 2.6, '#34449a');
+  p.ellipse(9.5, 8.7, 3.2, 1.6, '#5a6ad0');
+  p.line(6, 11.5, 15, 11.5, '#1a1c48');
+  p.ellipse(12.5, 8.6, 1.6, 1.1, '#141838');
+  p.ellipse(6, 12.5, 5.2, 2.7, '#4a5ac0');
+  p.ellipse(5, 11.6, 3.4, 1.7, '#7a8ae8');
+  p.line(1, 14.5, 11, 14.5, '#1a1c48');
+  p.ellipse(8.4, 11.6, 1.8, 1.2, '#141838');
+  p.circle(1.6, 11.4, 1.5, '#f4f0ff');
+  p.circle(6.2, 8.6, 1.2, '#e0dcf8');
+  p.circle(9, 3.5, 3, '#ffe880');
+  p.circle(10.4, 2.6, 2.5, null);
+  p.px(7, 3, '#fffbe0');
+  p.px(13, 2, '#ffffff');
+  p.px(3, 6, '#d8c8ff');
+  p.px(14, 6, '#9aa8ff');
 }, { outline: O });
 
 defineArtifact({
@@ -109,19 +116,20 @@ defineArtifact({
 
 // ------------------------------------------------------------------ 등 뒤의 눈
 defineDrawnSprite('icon_rear_eye', 16, 16, (p) => {
-  for (let i = 0; i <= 10; i++) {
-    const a = Math.PI * 0.15 + (i / 10) * Math.PI * 1.25;
-    p.px(8 + Math.cos(a) * 7, 8 - Math.sin(a) * 6.5, VIO[3]);
-    p.px(8 + Math.cos(a) * 6.2, 8 - Math.sin(a) * 5.8, VIO[2]);
+  for (let i = 0; i <= 16; i++) {
+    const a = (i / 16) * Math.PI;
+    p.px(8.5 + Math.cos(a) * 5, 6.5 - Math.sin(a) * 4.6, VIO[3]);
+    p.px(8.5 + Math.cos(a) * 4, 6.5 - Math.sin(a) * 3.6, VIO[2]);
   }
-  p.poly([12.5, 10, 15.5, 9, 14.5, 13], VIO[3]);
-  p.ellipse(8, 8, 5, 3.4, '#f4f0ff');
-  p.shadeSphere(8, 8, 5, 3.4, ['#a8a0c0', '#d8d0e8', '#f4f0ff', '#ffffff'], { dither: false });
-  p.circle(5.5, 8, 2.2, VIO[2]);
-  p.circle(5.2, 8, 1.1, '#140828');
-  p.px(6, 7, '#ffffff');
-  p.line(3, 5, 12, 5, '#3a2a50');
-  p.line(4, 11, 11, 11, '#5a4a70');
+  p.poly([0.5, 6, 6, 5, 3.5, 9.5], VIO[3]);
+  p.px(2, 6, VIO[4]);
+  p.ellipse(8, 11.5, 6.5, 3.6, '#f4f0ff');
+  p.shadeSphere(8, 11.5, 6.5, 3.6, ['#b0a8c8', '#dcd6ec', '#f4f0ff', '#ffffff'], { dither: false });
+  p.circle(5, 11.5, 2.4, VIO[2]);
+  p.circle(4.6, 11.5, 1.2, '#140828');
+  p.px(5, 10, '#ffffff');
+  p.line(2, 8.5, 13, 8.5, '#3a2a50');
+  p.line(3, 14.5, 12, 14.5, '#6a5a80');
 }, { outline: O });
 
 defineArtifact({
@@ -214,7 +222,7 @@ defineArtifact({
   pools: ['treasure', 'curse'],
   modifyHit(w, t, hit, power) {
     if (t.hasStatus('fear')) hit.damage *= 1.25;
-    else if (isAttack(hit) && roll(w, 0.1, power)) addHitStatus(w, t, hit, { kind: 'fear', duration: 2.5 });
+    else if (isAttack(hit) && rollHit(w, hit, 0.1, power)) addHitStatus(w, t, hit, { kind: 'fear', duration: 2.5 });
   },
 });
 

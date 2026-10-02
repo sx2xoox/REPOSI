@@ -3,7 +3,7 @@
 import { defineArtifact } from '../../game/defs';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { RingFx } from '../../game/effects';
-import { O, addHitStatus, cooldown, enemiesNear, grantPerCopy, inflict, isAttack, roll, sineBehavior, syncFamiliars } from './lib';
+import { O, addHitStatus, cooldown, enemiesNear, grantPerCopy, inflict, isAttack, roll, rollHit, sineBehavior, syncFamiliars } from './lib';
 import { WinterOrb } from './familiars';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
@@ -33,7 +33,7 @@ defineArtifact({
   icon: 'icon_rime_shard',
   pools: ['treasure', 'shop'],
   modifyHit(w, t, hit, power) {
-    if (isAttack(hit) && roll(w, 0.15, power)) addHitStatus(w, t, hit, { kind: 'slow', duration: 2.5, power: 0.45 });
+    if (isAttack(hit) && rollHit(w, hit, 0.15, power)) addHitStatus(w, t, hit, { kind: 'slow', duration: 2.5, power: 0.45 });
   },
 });
 
@@ -137,7 +137,7 @@ defineArtifact({
     if (p.generation === 0) p.color = '#a8e8ff';
   },
   modifyHit(w, t, hit, power) {
-    if (isAttack(hit) && !t.hasStatus('freeze') && roll(w, 0.1, power)) {
+    if (isAttack(hit) && !t.hasStatus('freeze') && rollHit(w, hit, 0.1, power)) {
       addHitStatus(w, t, hit, { kind: 'freeze', duration: 1.2 });
       w.sfx('freeze', { vol: 0.35 });
     }

@@ -114,8 +114,6 @@ export const NIEL: CharSpec = {
 
 defineCharacter2D(NIEL);
 
-export const NIEL_UNLOCK_FLAG = 'unlock:niel';
-
 defineCharacter({
   id: 'niel',
   name: '니엘',
@@ -127,6 +125,7 @@ defineCharacter({
   hearts: 2,
   soulHearts: 2,
   weapon: 'void_gaze',
+  artifacts: ['void_body'],
   bombs: 0,
   baseStats: {
     moveSpeed: 90,

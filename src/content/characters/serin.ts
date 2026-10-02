@@ -121,6 +121,7 @@ defineCharacter({
   color: '#a8e070',
   hearts: 2,
   weapon: 'hunter_bow',
+  artifacts: ['hunter_eye'],
   bombs: 1,
   coins: 5,
   baseStats: {

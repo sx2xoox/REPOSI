@@ -7,7 +7,7 @@
 
 import type { World } from './world';
 import {
-  Actives, Artifacts, RARITY_WEIGHT, Weapons,
+  Actives, Artifacts, GlobalHooks, RARITY_WEIGHT, Weapons,
   type ItemHooks, type ItemPool, type Rarity,
 } from './defs';
 import { BASE_STATS, StatMods, computeStats, type Stats } from './stats';
@@ -61,6 +61,7 @@ export class ItemSystem {
       for (const tier of set.active) effects.push({ key: `set:${set.def.tag}:${tier.count}`, hooks: tier.hooks, power: 1 });
     }
     for (const b of this.buffs) effects.push({ key: `buff:${b.key}`, hooks: b.hooks, power: 1 });
+    for (const g of GlobalHooks.all()) effects.push({ key: `global:${g.id}`, hooks: g, power: 1 });
 
     // acquire / remove notifications
     const newKeys = new Set(effects.map((e) => e.key));

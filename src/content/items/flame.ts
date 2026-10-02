@@ -7,7 +7,7 @@ import { RingFx } from '../../game/effects';
 import { defaultRelease } from '../../game/player';
 import { fx } from '../../engine/rng';
 import {
-  O, HazardZone, addHitStatus, enemiesNear, isAttack, isPrimary, itemHit, miniBlast, roll, shout, stackMul,
+  O, HazardZone, addHitStatus, enemiesNear, isAttack, hitWeight, isPrimary, itemHit, miniBlast, roll, rollHit, shout, stackMul,
 } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
@@ -47,7 +47,7 @@ defineArtifact({
   icon: 'icon_tinder_pouch',
   pools: ['treasure', 'shop'],
   modifyHit(w, t, hit, power) {
-    if (isAttack(hit) && roll(w, 0.15, power)) addHitStatus(w, t, hit, { kind: 'burn', duration: 3, power: dmg(w) * 0.4 });
+    if (isAttack(hit) && rollHit(w, hit, 0.15, power)) addHitStatus(w, t, hit, { kind: 'burn', duration: 3, power: dmg(w) * 0.4 });
   },
 });
 
@@ -112,7 +112,7 @@ defineArtifact({
   pools: ['treasure', 'shop', 'shrine'],
   onHit(w, _t, hit, power) {
     if (!isAttack(hit)) return;
-    w.player.addEmber(1.0 * power);
+    w.player.addEmber(1.0 * power * hitWeight(hit));
   },
 });
 
@@ -197,7 +197,7 @@ defineArtifact({
     if (!isPrimary(hit)) return;
     const k = '__kilnT';
     if ((w.vars[k] ?? -1) > w.time) return;
-    w.vars[k] = w.time + 0.06;
+    w.vars[k] = w.time + (hit.kind === 'laser' ? 0.15 : 0.06);
     miniBlast(w, t.x, t.y - 3, 20 + 3 * (power - 1), dmg(w) * 0.5 * stackMul(power), '#ff8a30');
   },
 });

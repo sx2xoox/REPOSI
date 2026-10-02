@@ -389,6 +389,16 @@ export const Floors = makeRegistry<FloorDef>('floor');
 export const Themes = makeRegistry<ThemeDef>('theme');
 export const RoomTemplates = makeRegistry<RoomTemplate>('room template');
 
+/**
+ * Always-active hooks that are not items: meta progression (unlocks), global
+ * run rules, achievements. Dispatched by the item system like an artifact with
+ * power 1 for every run; not shown in the inventory.
+ */
+export interface GlobalHookDef extends ItemHooks {
+  id: string;
+}
+export const GlobalHooks = makeRegistry<GlobalHookDef>('global hook');
+
 const setMap = new Map<string, SetDef>();
 export const Sets = {
   map: setMap,
@@ -416,6 +426,7 @@ export const defineCharacter = (d: CharacterDef) => Characters.register(d);
 export const defineFloor = (d: FloorDef) => Floors.register(d);
 export const defineTheme = (d: ThemeDef) => Themes.register(d);
 export const defineRoom = (d: RoomTemplate) => RoomTemplates.register(d);
+export const defineGlobalHooks = (d: GlobalHookDef) => GlobalHooks.register(d);
 
 export function defaultPrice(r: Rarity): number {
   return r === 'common' ? 15 : r === 'rare' ? 20 : r === 'epic' ? 30 : 45;

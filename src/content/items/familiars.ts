@@ -230,6 +230,9 @@ export class MoonSatellite extends Familiar {
     this.blockBullets(w, 5.5);
     const hit = this.contact(w, 5, dmgOf(w) * 0.7, 0.3);
     if (hit.length) w.sfx('hit', { vol: 0.3, pitch: 1.4 });
+    if (fx.chance(dt * 14)) {
+      w.particles.spawn({ x: this.x + fx.range(-1, 1), y: this.y - this.z * 0.5 + fx.range(-1, 1), life: 0.3, colors: ['#e8e4ff', '#8a86c8'], size: 2, sizeEnd: 0, fade: true });
+    }
   }
 
   override draw(r: Renderer): void {

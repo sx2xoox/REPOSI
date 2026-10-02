@@ -519,7 +519,8 @@ export class Player extends Actor {
   }
 
   private drawWeapon(r: Renderer, w: World, wdef = Weapons.get(this.weaponId)): void {
-    if (!wdef || this.holdT > 0) return;
+    // `weapon.mem.hideUntil` lets special moves hide the held weapon for a moment
+    if (!wdef || this.holdT > 0 || (this.weapon.mem.hideUntil ?? -1) > w.time) return;
     if (wdef.draw) {
       wdef.draw(w, this, r, this.weapon);
       return;

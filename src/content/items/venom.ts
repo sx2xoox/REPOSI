@@ -7,7 +7,7 @@ import { RingFx } from '../../game/effects';
 import { Pickup } from '../../game/pickups';
 import { fx } from '../../engine/rng';
 import {
-  O, addHitStatus, cooldown, enemiesNear, growBehavior, inflict, isAttack, isMelee, isPrimary, roll, spawnShards,
+  O, addHitStatus, cooldown, enemiesNear, growBehavior, inflict, isAttack, isMelee, isPrimary, roll, rollHit, spawnShards,
 } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
@@ -36,7 +36,7 @@ defineArtifact({
   icon: 'icon_viper_fang',
   pools: ['treasure', 'shop'],
   modifyHit(w, t, hit, power) {
-    if (isAttack(hit) && roll(w, 0.2, power)) addHitStatus(w, t, hit, { kind: 'poison', duration: 4, power: dmg(w) * 0.22 });
+    if (isAttack(hit) && rollHit(w, hit, 0.2, power)) addHitStatus(w, t, hit, { kind: 'poison', duration: 4, power: dmg(w) * 0.22 });
   },
 });
 

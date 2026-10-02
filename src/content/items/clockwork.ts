@@ -8,7 +8,7 @@ import { RingFx } from '../../game/effects';
 import { Projectile } from '../../game/projectile';
 import { fx } from '../../engine/rng';
 import {
-  O, addHitStatus, boomerangBehavior, enemiesNear, grantPerCopy, inflict, isAttack, isMelee, orbitBehavior, roll, shout,
+  O, addHitStatus, boomerangBehavior, enemiesNear, grantPerCopy, inflict, isAttack, isMelee, orbitBehavior, roll, rollHit, shout,
   syncFamiliars, tickTimeStop, timeStop, timeStopped, watch,
 } from './lib';
 import { GearTurret } from './familiars';
@@ -135,19 +135,26 @@ defineArtifact({
 
 // ------------------------------------------------------------------ 녹슨 못
 defineDrawnSprite('icon_rusted_nail', 16, 16, (p) => {
-  p.rect(1, 2, 7, 2, '#8a5a3a');
-  p.line(1, 2, 7, 2, '#c08060');
-  p.line(4, 4, 8, 9, '#9a6040');
-  p.line(5, 4, 9, 9, '#6a3a20');
-  p.line(8, 9, 13, 11, '#9a6040');
-  p.line(8, 10, 13, 12, '#6a3a20');
-  p.line(13, 11, 15, 13, '#7a4a30');
-  p.px(6, 6, '#c86a30');
-  p.px(10, 10, '#c86a30');
-  p.px(3, 3, '#5a3020');
-  p.px(12, 11, '#d88040');
-  p.px(7, 13, '#8a5030');
-  p.px(9, 14, '#6a3a20');
+  p.poly([3, 4.5, 5.5, 3, 10.2, 8.4, 8, 10.2], '#7a6a62');
+  p.poly([8, 10.2, 10.2, 8.4, 13.4, 14, 11.8, 15.6], '#6a5a54');
+  p.line(5, 4, 9.5, 8.5, '#b8a898');
+  p.line(10, 9.5, 12.6, 14, '#a09080');
+  p.ellipse(4.2, 3.4, 3.9, 2.3, '#7a6a62');
+  p.ellipse(4.2, 2.9, 3.1, 1.4, '#c0a890');
+  p.px(2, 2, '#e8d8c0');
+  p.px(6, 6, '#d0702c');
+  p.px(7, 7, '#a04a1c');
+  p.px(7, 6, '#e08a40');
+  p.px(9, 10, '#d0702c');
+  p.px(10, 10, '#e08a40');
+  p.px(11, 13, '#a04a1c');
+  p.px(12, 13, '#d0702c');
+  p.px(5, 2, '#a04a1c');
+  p.px(3, 4, '#d0702c');
+  p.px(12, 15, '#3a2a28');
+  p.px(14, 9, '#d0702c');
+  p.px(15, 11, '#8a3a18');
+  p.px(13, 7, '#a04a1c');
 }, { outline: O });
 
 defineArtifact({
@@ -160,29 +167,35 @@ defineArtifact({
   icon: 'icon_rusted_nail',
   pools: ['treasure', 'shop', 'curse'],
   modifyHit(w, t, hit, power) {
-    if (isAttack(hit) && !t.hasStatus('weak') && roll(w, 0.15, power)) addHitStatus(w, t, hit, { kind: 'weak', duration: 4 });
+    if (isAttack(hit) && !t.hasStatus('weak') && rollHit(w, hit, 0.15, power)) addHitStatus(w, t, hit, { kind: 'weak', duration: 4 });
   },
 });
 
 // ------------------------------------------------------------------ 톱니 포탑
 defineDrawnSprite('icon_gear_turret', 16, 16, (p) => {
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    p.rect(4 + Math.cos(a) * 4.5 - 1, 11 + Math.sin(a) * 3 - 1, 2, 2, BRASS[1]);
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2;
+    p.rect(4.5 + Math.cos(a) * 4.2 - 1, 4.5 + Math.sin(a) * 4.2 - 1, 2, 2, BRASS[1]);
   }
-  p.ellipse(4, 11, 3.6, 2.6, BRASS[2]);
-  p.px(4, 11, BRASS[0]);
-  p.line(7, 15, 9, 11, '#5a3a18');
-  p.line(14, 15, 12, 11, '#5a3a18');
-  p.ellipse(10.5, 8, 4.6, 3.8, '#d8a850');
-  p.shadeSphere(10.5, 8, 4.6, 3.8, ramp('#c89848', 4));
-  p.rect(6, 9, 9, 2, BRASS[1]);
-  p.line(6, 9, 14, 9, BRASS[3]);
-  p.ellipse(10.5, 7, 1.5, 1.5, '#3a2410');
-  p.px(10, 7, '#ff7040');
-  p.rect(12, 4, 4, 2, '#8a6a3a');
-  p.line(12, 4, 15, 4, BRASS[3]);
-  p.px(15, 2, '#ffd080');
+  p.circle(4.5, 4.5, 3.5, BRASS[2]);
+  p.circle(4.5, 4.5, 1.3, BRASS[0]);
+  p.px(3, 3, BRASS[4]);
+  p.line(4, 15, 6, 11, '#4a2c10');
+  p.line(12, 15, 10, 11, '#4a2c10');
+  p.line(8, 15, 8, 12, '#4a2c10');
+  p.ellipse(8, 9, 5.5, 4.2, '#d8a850');
+  p.shadeSphere(8, 9, 5.5, 4.2, ramp('#c89848', 4), { dither: false });
+  p.rect(2.5, 10, 11, 2, BRASS[1]);
+  p.line(3, 10, 13, 10, BRASS[3]);
+  p.px(4, 11, BRASS[4]);
+  p.px(12, 11, BRASS[4]);
+  p.circle(8, 7.8, 1.7, '#3a2410');
+  p.px(8, 8, '#ff7040');
+  p.px(7, 7, '#ffb080');
+  p.rect(12, 6, 4, 2, '#8a6a3a');
+  p.line(12, 6, 15, 6, BRASS[3]);
+  p.px(15, 4, '#ffd080');
+  p.px(14, 3, '#fff4c0');
 }, { outline: O });
 
 defineArtifact({
@@ -291,19 +304,22 @@ defineArtifact({
 
 // ------------------------------------------------------------------ 메트로놈 심장
 defineDrawnSprite('icon_metronome_heart', 16, 16, (p) => {
-  p.poly([3, 15, 13, 15, 10.5, 2, 5.5, 2], '#8a3a2a');
-  p.shadeSphere(7, 8, 7, 9, ['#4a1810', '#6a2a1c', '#8a3a2a', '#b05a40']);
+  p.poly([3.5, 14.5, 12.5, 14.5, 9.6, 1, 6.4, 1], '#7a3a24');
+  p.poly([3.5, 14.5, 8, 14.5, 8, 1, 6.4, 1], '#a8603c');
+  p.line(6.4, 1, 3.6, 14, '#c8805a');
   p.rect(2, 14, 12, 2, BRASS[1]);
   p.line(2, 14, 13, 14, BRASS[3]);
-  p.circle(6.5, 10, 1.6, '#e02838');
-  p.circle(9.5, 10, 1.6, '#e02838');
-  p.poly([5, 10.5, 11, 10.5, 8, 13.5], '#e02838');
-  p.px(6, 9, '#ff9aa8');
-  p.line(8, 12, 12, 1, '#d8d8e0');
+  p.rect(5.5, 7.5, 5, 5, '#2a1008');
+  p.circle(7, 9.4, 1.3, '#e8283c');
+  p.circle(9, 9.4, 1.3, '#e8283c');
+  p.poly([5.6, 9.8, 10.4, 9.8, 8, 12.4], '#e8283c');
+  p.px(7, 9, '#ffb0b8');
+  p.line(8, 11, 12, 1, '#e8e8f0');
   p.rect(10, 4, 2, 2, BRASS[3]);
-  p.px(13, 0, '#ffffff');
-  p.px(3, 3, BRASS[3]);
-  p.px(14, 6, BRASS[3]);
+  p.px(10, 4, BRASS[4]);
+  p.px(14, 2, '#fff4c0');
+  p.px(15, 5, BRASS[3]);
+  p.px(13, 0, BRASS[3]);
 }, { outline: O });
 
 function metronomeOn(w: { time: number; player: { lastHurtAt: number } }): boolean {

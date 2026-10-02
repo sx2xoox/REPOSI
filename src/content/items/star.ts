@@ -8,7 +8,7 @@ import { Projectile } from '../../game/projectile';
 import { angleDiff } from '../../engine/math';
 import { fx } from '../../engine/rng';
 import type { World } from '../../game/world';
-import { O, addHitStatus, isAttack, isMelee, isPrimary, roll, spawnShards, syncFamiliars } from './lib';
+import { O, addHitStatus, isAttack, isMelee, isPrimary, roll, rollHit, spawnShards, syncFamiliars } from './lib';
 import { LanternSun, MoonSatellite } from './familiars';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
@@ -81,7 +81,7 @@ defineArtifact({
   icon: 'icon_constellation_needle',
   pools: ['treasure', 'shop'],
   modifyHit(w, t, hit, power) {
-    if (isAttack(hit) && !t.hasStatus('mark') && roll(w, 0.15, power)) addHitStatus(w, t, hit, { kind: 'mark', duration: 6 });
+    if (isAttack(hit) && !t.hasStatus('mark') && rollHit(w, hit, 0.15, power)) addHitStatus(w, t, hit, { kind: 'mark', duration: 6 });
   },
 });
 
@@ -153,22 +153,26 @@ defineArtifact({
 
 // ------------------------------------------------------------------ 복나방
 defineDrawnSprite('icon_fortune_moth', 16, 16, (p) => {
-  p.ellipse(4.5, 6, 4, 4.5, '#e8b840');
-  p.ellipse(11.5, 6, 4, 4.5, '#e8b840');
-  p.ellipse(5, 11.5, 3, 2.8, '#c89030');
-  p.ellipse(11, 11.5, 3, 2.8, '#c89030');
-  p.shadeSphere(4.5, 6, 4, 4.5, ramp('#e8b840', 4), { dither: false });
-  p.shadeSphere(11.5, 6, 4, 4.5, ramp('#e8b840', 4), { dither: false });
-  star(p, 4.5, 6, 2, 0.9, 4, '#6a3aa8', 0);
-  star(p, 11.5, 6, 2, 0.9, 4, '#6a3aa8', 0);
-  p.px(4, 5, '#fff4c0');
-  p.px(11, 5, '#fff4c0');
+  const g = '#e8b840';
+  p.poly([7, 6, 2, 1, 0, 5, 2, 9, 7, 8.5], g);
+  p.poly([9, 6, 14, 1, 16, 5, 14, 9, 9, 8.5], g);
+  p.poly([7, 8.5, 2.5, 10, 3, 14, 6, 13.5, 7.5, 10.5], '#c8902c');
+  p.poly([9, 8.5, 13.5, 10, 13, 14, 10, 13.5, 8.5, 10.5], '#c8902c');
+  p.line(2, 1, 0, 5, '#fff0b0');
+  p.line(14, 1, 16, 5, '#fff0b0');
+  p.px(1, 3, '#fff8d8');
+  p.circle(3.5, 5, 1.6, '#5a2a90');
+  p.circle(12.5, 5, 1.6, '#5a2a90');
+  p.px(3, 5, '#ffe880');
+  p.px(12, 5, '#ffe880');
+  p.px(5, 11.5, '#8a5a18');
+  p.px(11, 11.5, '#8a5a18');
   p.rect(7, 4, 2, 10, '#5a3a1a');
-  p.px(7, 4, '#8a6a3a');
-  p.line(7, 3, 5, 0, '#5a3a1a');
-  p.line(8, 3, 10, 0, '#5a3a1a');
-  p.px(14, 14, '#ffe880');
-  p.px(1, 13, '#ffe880');
+  p.rect(7, 4, 2, 2, '#9a7a4a');
+  p.line(7, 4, 5, 0, '#5a3a1a');
+  p.line(8, 4, 10, 0, '#5a3a1a');
+  p.px(5, 0, '#ffe880');
+  p.px(10, 0, '#ffe880');
 }, { outline: O });
 
 defineArtifact({

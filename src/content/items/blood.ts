@@ -5,26 +5,32 @@ import { defineDrawnSprite } from '../../engine/sprites';
 import { ramp } from '../../engine/painter';
 import { RingFx } from '../../game/effects';
 import { fx } from '../../engine/rng';
-import { O, addHitStatus, enemiesNear, isAttack, itemHit, roll, spawnShards, stackMul } from './lib';
+import { O, addHitStatus, enemiesNear, isAttack, itemHit, roll, rollHit, spawnShards, stackMul } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 const RED = ['#4a0812', '#8a1020', '#c81c30', '#ff4a5a', '#ffb0b8'];
 
 // ------------------------------------------------------------------ 거머리 이빨
 defineDrawnSprite('icon_leech_tooth', 16, 16, (p) => {
-  const path: [number, number, number][] = [[3, 13, 2.2], [4.5, 10.5, 2.5], [6.5, 8.5, 2.6], [9, 7, 2.7], [11.5, 5.5, 2.8]];
-  for (const [x, y, r] of path) p.circle(x, y, r, '#6a1a2a');
-  for (const [x, y, r] of path) p.circle(x - 0.6, y - 0.6, r * 0.55, '#9a3040');
-  p.line(3, 12, 4, 11, '#c05060');
-  p.circle(12, 4.5, 2.6, '#8a2030');
-  p.circle(12, 4.5, 1.5, '#2a0408');
-  p.px(11, 3, '#fff0f0');
-  p.px(13, 3, '#fff0f0');
-  p.px(11, 5, '#fff0f0');
-  p.px(13, 5, '#fff0f0');
-  p.px(12, 2, '#ffe0e0');
-  p.ellipse(13, 10, 1.3, 1.6, '#e02838');
-  p.px(13, 9, '#ff9aa8');
+  const path: [number, number, number][] = [[2.5, 13.5, 2.1], [4, 11, 2.4], [6, 9, 2.6], [8.5, 7.5, 2.7], [11, 6.2, 2.8]];
+  for (const [x, y, r] of path) p.circle(x, y, r, '#5a1424');
+  for (const [x, y, r] of path) p.circle(x - 0.7, y - 0.7, r * 0.6, '#8a2a3c');
+  for (const [x, y] of path.slice(0, 4)) p.px(x + 1, y + 1, '#3a0a14');
+  p.px(2, 12, '#c8606e');
+  p.px(4, 10, '#c8606e');
+  p.px(6, 8, '#c8606e');
+  p.circle(12.2, 4.6, 3, '#8a2a3c');
+  p.circle(12.2, 4.6, 1.8, '#1a0206');
+  p.px(11, 3, '#fff4f0');
+  p.px(13, 3, '#fff4f0');
+  p.px(11, 6, '#fff4f0');
+  p.px(13, 6, '#fff4f0');
+  p.px(14, 4, '#fff4f0');
+  p.px(10, 4, '#fff4f0');
+  p.px(12, 4, '#e02838');
+  p.ellipse(14, 10, 1.3, 1.6, '#e02838');
+  p.px(14, 9, '#ff9aa8');
+  p.px(12, 12, '#e02838');
 }, { outline: O });
 
 defineArtifact({
@@ -45,7 +51,7 @@ defineArtifact({
 // ------------------------------------------------------------------ 가시덩굴 코르셋
 defineDrawnSprite('icon_bramble_corset', 16, 16, (p) => {
   p.poly([3, 1, 13, 1, 11, 8, 13, 15, 3, 15, 5, 8], '#7a2030');
-  p.shadeSphere(7, 6, 8, 10, [RED[0], '#5a1420', '#7a2030', '#a03848']);
+  p.shadeSphere(7, 6, 8, 10, [RED[0], '#5a1420', '#7a2030', '#a03848'], { dither: false });
   for (let y = 3; y <= 13; y += 2) {
     p.px(7, y, '#e8c0a0');
     p.px(9, y, '#e8c0a0');
@@ -129,21 +135,23 @@ defineArtifact({
 defineDrawnSprite('icon_crimson_edge', 16, 16, (p) => {
   for (let y = 0; y < 16; y++) {
     for (let x = 0; x < 16; x++) {
-      const d1 = Math.hypot(x + 0.5 - 3, y + 0.5 - 13);
-      const d2 = Math.hypot(x + 0.5 - 1, y + 0.5 - 15.5);
-      if (d1 < 12.5 && d2 > 12 && x > 2 && y < 12) {
-        const edge = 12.5 - d1;
-        p.px(x, y, edge < 1.3 ? '#ffd0d8' : edge < 2.6 ? RED[3] : RED[2]);
+      const d1 = Math.hypot(x + 0.5 - 2, y + 0.5 - 14);
+      const d2 = Math.hypot(x + 0.5 - 0, y + 0.5 - 16.5);
+      if (d1 < 13 && d2 > 12.6 && x > 3 && y < 11) {
+        const edge = 13 - d1;
+        p.px(x, y, edge < 1.3 ? '#ffd8e0' : edge < 2.8 ? RED[3] : RED[2]);
       }
     }
   }
-  p.line(2, 12, 4, 10, '#d8b050');
-  p.line(1, 11, 5, 13, '#d8b050');
-  p.line(0, 15, 2, 13, '#3a1a1a');
-  p.line(1, 15, 3, 13, '#5a2a2a');
-  p.px(13, 4, '#ffffff');
-  p.px(9, 12, RED[3]);
-  p.px(10, 14, RED[2]);
+  p.line(3, 9, 7, 13, '#e8c060');
+  p.px(3, 9, '#fff0a0');
+  p.line(1, 14, 4, 11, '#5a1a20');
+  p.line(2, 14, 5, 11, '#3a0a10');
+  p.rect(0, 14, 2, 2, '#e8c060');
+  p.px(13, 3, '#ffffff');
+  p.px(12, 2, '#ffffff');
+  p.px(10, 12, RED[3]);
+  p.px(11, 14, RED[2]);
 }, { outline: O });
 
 defineArtifact({
@@ -156,7 +164,7 @@ defineArtifact({
   icon: 'icon_crimson_edge',
   pools: ['treasure', 'challenge', 'curse'],
   modifyHit(w, t, hit, power) {
-    if (isAttack(hit) && roll(w, 0.15, power)) addHitStatus(w, t, hit, { kind: 'bleed', duration: 3, power: dmg(w) * 0.3 });
+    if (isAttack(hit) && rollHit(w, hit, 0.15, power)) addHitStatus(w, t, hit, { kind: 'bleed', duration: 3, power: dmg(w) * 0.3 });
   },
 });
 
@@ -165,7 +173,7 @@ defineDrawnSprite('icon_heartstring', 16, 16, (p) => {
   p.circle(5, 6, 3.6, RED[2]);
   p.circle(11, 6, 3.6, RED[2]);
   p.poly([1.5, 7, 14.5, 7, 8, 14.5], RED[2]);
-  p.shadeSphere(8, 8, 7, 7, ramp('#d82838', 4));
+  p.shadeSphere(8, 8, 7, 7, ramp('#d82838', 4), { dither: false });
   p.line(2, 9, 13, 5, '#f8e8e0');
   p.line(3, 11, 12, 8, '#f8e8e0');
   p.px(7, 3, '#f8e8e0');
@@ -232,7 +240,7 @@ defineArtifact({
 defineDrawnSprite('icon_blood_moon', 16, 16, (p) => {
   p.circle(8, 8, 7.2, '#3a0a14');
   p.circle(8, 8, 6.2, RED[2]);
-  p.shadeSphere(8, 8, 6.2, 6.2, [RED[1], RED[2], RED[3], RED[4]]);
+  p.shadeSphere(8, 8, 6.2, 6.2, [RED[1], RED[2], RED[3], RED[4]], { dither: false });
   p.circle(11, 6, 5.2, '#3a0a14');
   p.circle(11.5, 5.5, 4.4, null);
   p.px(4, 5, '#ffd0d8');

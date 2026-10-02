@@ -11,7 +11,7 @@ import { Actives } from '../../game/defs';
 import { fx } from '../../engine/rng';
 import {
   O, HazardZone, Starfall, addHitStatus, chainLightning, cooldown, enemiesNear, inflict, isAttack, isPrimary,
-  itemHit, roll, shout, spawnShards, tickTimeStop, timeStop,
+  itemHit, roll, rollHit, shout, spawnShards, tickTimeStop, timeStop,
 } from './lib';
 
 // ------------------------------------------------------------------ 8x8 icons
@@ -122,7 +122,7 @@ const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.dam
 resonance('flame', '불꽃', '#ff9a40', 'res_flame', [
   [2, '공격이 20% 확률로 적을 불태운다', {
     modifyHit(w, t, hit) {
-      if (isAttack(hit) && roll(w, 0.2, 1)) addHitStatus(w, t, hit, { kind: 'burn', duration: 3, power: dmg(w) * 0.4 });
+      if (isAttack(hit) && rollHit(w, hit, 0.2, 1)) addHitStatus(w, t, hit, { kind: 'burn', duration: 3, power: dmg(w) * 0.4 });
     },
   }],
   [4, '불타는 적이 죽으면 폭발한다', {
@@ -151,12 +151,12 @@ resonance('flame', '불꽃', '#ff9a40', 'res_flame', [
 resonance('frost', '서리', '#8fe0ff', 'res_frost', [
   [2, '공격이 15% 확률로 적을 둔화시킨다', {
     modifyHit(w, t, hit) {
-      if (isAttack(hit) && roll(w, 0.15, 1)) addHitStatus(w, t, hit, { kind: 'slow', duration: 2.5, power: 0.4 });
+      if (isAttack(hit) && rollHit(w, hit, 0.15, 1)) addHitStatus(w, t, hit, { kind: 'slow', duration: 2.5, power: 0.4 });
     },
   }],
   [3, '둔화된 적을 공격하면 12% 확률로 얼린다', {
     modifyHit(w, t, hit) {
-      if (isAttack(hit) && t.hasStatus('slow') && !t.hasStatus('freeze') && roll(w, 0.12, 1)) {
+      if (isAttack(hit) && t.hasStatus('slow') && !t.hasStatus('freeze') && rollHit(w, hit, 0.12, 1)) {
         addHitStatus(w, t, hit, { kind: 'freeze', duration: 1.3 });
         w.sfx('freeze', { vol: 0.4 });
       }
@@ -176,7 +176,7 @@ resonance('frost', '서리', '#8fe0ff', 'res_frost', [
 resonance('venom', '독', '#8aff5a', 'res_venom', [
   [2, '공격이 20% 확률로 적을 중독시킨다', {
     modifyHit(w, t, hit) {
-      if (isAttack(hit) && roll(w, 0.2, 1)) addHitStatus(w, t, hit, { kind: 'poison', duration: 4, power: dmg(w) * 0.2 });
+      if (isAttack(hit) && rollHit(w, hit, 0.2, 1)) addHitStatus(w, t, hit, { kind: 'poison', duration: 4, power: dmg(w) * 0.2 });
     },
   }],
   [3, '중독된 적이 죽으면 독 웅덩이를 남긴다', {
@@ -198,7 +198,7 @@ resonance('venom', '독', '#8aff5a', 'res_venom', [
 resonance('storm', '번개', '#ffe95a', 'res_storm', [
   [2, '공격이 8% 확률로 근처 적에게 번개를 튕긴다', {
     onHit(w, t, hit) {
-      if (!isPrimary(hit) || !roll(w, 0.08, 1)) return;
+      if (!isPrimary(hit) || !rollHit(w, hit, 0.08, 1)) return;
       chainLightning(w, t.x, t.y - t.z - 4, { jumps: 2, damage: dmg(w) * 0.6, exclude: new Set([t.id]) });
     },
   }],
@@ -234,7 +234,8 @@ resonance('blood', '피', '#e83048', 'res_blood', [
       const p = w.player;
       if (p.alive || w.vars.__bloodOathFloor === w.run.floor) return;
       w.vars.__bloodOathFloor = w.run.floor;
-      p.red = 1;
+      if (p.maxRed > 0) p.red = 1;
+      else p.soul = 1;
       p.invuln = Math.max(p.invuln, 1.6);
       w.renderer.screenFlash('#ff2040', 0.5);
       w.sfx('heal', { pitch: 0.6 });

@@ -46,6 +46,16 @@ export function roll(w: World, base: number, power: number, luckK?: number): boo
   return w.rng.chance(procChance(w, base, power, luckK));
 }
 
+/** Weight of a hit for per-hit procs: continuous beams tick ~2x as often as shots, so they proc at half chance. */
+export function hitWeight(hit: HitInfo): number {
+  return hit.kind === 'laser' ? 0.5 : 1;
+}
+
+/** Per-hit proc roll that accounts for the hit's weight (see hitWeight). */
+export function rollHit(w: World, hit: HitInfo, base: number, power: number, luckK?: number): boolean {
+  return w.rng.chance(procChance(w, base * hitWeight(hit), power, luckK));
+}
+
 /** Diminishing stack multiplier: 1, 1.6, 2.0, 2.3 ... */
 export function stackMul(power: number): number {
   return 1 + Math.log2(Math.max(1, power)) * 0.6;
@@ -465,8 +475,11 @@ export class HazardZone extends Entity {
     if (this.tickT <= 0) {
       this.tickT = this.tick;
       const color = this.kind === 'fire' ? 'burn' : this.kind === 'poison' ? 'poison' : 'other';
+      // overlapping zones of the same kind share one tick per enemy (no stacking)
+      const key = `__hz_${this.kind}`;
       for (const e of enemiesNear(w, this.x, this.y, this.radius)) {
-        if (e.z > 10) continue;
+        if (e.z > 10 || (e.mem[key] ?? -1) > w.time) continue;
+        e.mem[key] = w.time + this.tick * 0.9;
         if (this.damage > 0) zoneDamage(w, e, this.damage, color, this.statuses);
         else if (this.statuses) for (const s of this.statuses) inflict(w, e, s, false);
       }
@@ -601,8 +614,11 @@ export function syncFamiliars<T extends Familiar>(w: World, key: string, want: n
   let reg = familiarReg.get(w);
   if (!reg) familiarReg.set(w, (reg = new Map()));
   let list = (reg.get(key) ?? []) as T[];
+  // familiars left behind in the previous room are replaced silently (no spawn poof)
+  let followed = false;
   list = list.filter((f) => {
     const ok = !f.dead && f.room === w.room;
+    if (!ok && !f.dead) followed = true;
     if (!ok) f.dead = true;
     return ok;
   });
@@ -614,7 +630,7 @@ export function syncFamiliars<T extends Familiar>(w: World, key: string, want: n
       const f = make(w);
       w.spawn(f);
       list.push(f);
-      w.particles.burst(f.x, f.y - 8, { count: 8, speed: [20, 60], life: [0.2, 0.4], colors: ['#ffffff', '#ffe8a0'], size: [1, 2] });
+      if (!followed) w.particles.burst(f.x, f.y - 8, { count: 10, speed: [20, 70], life: [0.25, 0.5], colors: ['#ffffff', '#ffe8a0', '#ffc860'], size: [1, 2], additive: true });
     }
   }
   list.forEach((f, i) => {
