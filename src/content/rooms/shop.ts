@@ -98,6 +98,8 @@ defineDrawnSprite('shop_wares', 46, 8, (p) => {
 // ------------------------------------------------------------------ speech bubble
 /** Short Korean line in a bubble over a speaker (drawn above the lighting). */
 export class SpeechBubble extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   text: string;
   follow: Entity;
   life: number;

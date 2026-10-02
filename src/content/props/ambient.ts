@@ -51,6 +51,8 @@ function bannerSprite(cloth: string, emblem: string): string {
 
 /** Cloth banner hanging from the top of a wall face, swaying gently. */
 export class Banner extends Prop {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   sprite: string;
   constructor(x: number, y: number, cloth = '#6a1a2a', emblem = '#c8a050') {
     super(x, y, 0);
@@ -73,6 +75,8 @@ export class Banner extends Prop {
 // ------------------------------------------------------------------ chain
 /** Iron chain hanging from the wall top, slowly swinging; optional hook. */
 export class Chain extends Prop {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   len: number;
   hook: boolean;
   constructor(x: number, y: number, len = 18, hook = true) {
@@ -110,6 +114,8 @@ export class Chain extends Prop {
 // ------------------------------------------------------------------ water drip
 /** Water drips falling from a wall onto the floor, splashing (caves). */
 export class Drip extends Prop {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   floorY: number;
   timer: number;
   constructor(x: number, y: number, floorY: number) {
@@ -144,6 +150,8 @@ export class Drip extends Prop {
 // ------------------------------------------------------------------ ember vent
 /** Glowing floor crack that breathes and spits embers (forge). */
 export class EmberVent extends Prop {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   constructor(x: number, y: number) {
     super(x, y, 0);
   }
@@ -167,6 +175,8 @@ export class EmberVent extends Prop {
 // ------------------------------------------------------------------ pit effects
 /** Animated surface + light for lava / void / water pits of a room. */
 export class PitFx extends Prop {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   kind: 'lava' | 'void' | 'water';
   tiles: { x: number; y: number; h: number }[] = [];
   lightsAt: { x: number; y: number }[] = [];
@@ -258,6 +268,8 @@ defineDrawnSprite('prop_frozen_statue', 16, 30, (p) => {
 
 /** Hooded worshipper frozen in a shell of ice, standing against the wall (sanctum). */
 export class FrozenStatue extends Prop {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   constructor(x: number, y: number) {
     super(x, y, 0);
   }
@@ -280,6 +292,8 @@ export class FrozenStatue extends Prop {
 // ------------------------------------------------------------------ watching eye
 /** An eye embedded in the wall that follows the player and blinks (abyss). */
 export class WallEye extends Prop {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   blinkT: number;
   big: boolean;
   constructor(x: number, y: number, big = false) {
@@ -343,6 +357,8 @@ for (let v = 0; v < 3; v++) {
 
 /** Chunks of rock drifting weightlessly over the wall tops (abyss). */
 export class FloatingDebris extends Prop {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   v: number;
   ph: number;
   constructor(x: number, y: number, v: number) {
@@ -366,6 +382,8 @@ export class FloatingDebris extends Prop {
 // ------------------------------------------------------------------ light shaft
 /** Soft column of light from above (where the player dropped in). */
 export class LightShaft extends Prop {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   color: string;
   constructor(x: number, y: number, color = '#c8d8ff') {
     super(x, y, 2);
@@ -423,6 +441,8 @@ const DOOR_GLOW: Partial<Record<DoorKind, { color: string; parts: string[]; rate
 
 /** Colored light and motes around a special-room doorway. */
 export class DoorGlow extends Prop {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   door: Door;
   constructor(door: Door) {
     super(door.x, door.y, 0);

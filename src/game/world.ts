@@ -431,7 +431,7 @@ export class World {
       console.warn(`[world] unknown enemy ${id}`);
       return null;
     }
-    const e = new Enemy(def, x, y, this.floor.hpMult);
+    const e = new Enemy(def, x, y, def.boss ? this.floor.bossHpMult ?? this.floor.hpMult : this.floor.hpMult);
     if (!def.flying && !def.phasing) {
       const f = this.room.nearestFree(x, y, Math.min(def.radius, 7));
       e.x = f.x;
@@ -765,7 +765,7 @@ export class World {
   /** Damage-over-time tick (burn/poison/bleed). */
   statusDamage(target: Actor, dmg: number, kind: StatusKind): void {
     if (target === this.player) {
-      if (kind === 'burn' || kind === 'poison') this.player.hurt(this, 1, kind === 'burn' ? '화상' : '독');
+      if (kind === 'burn' || kind === 'poison') this.player.hurt(this, 1, kind === 'burn' ? '화상' : '독', true);
       return;
     }
     this.applyHit(target, { damage: dmg, kind: 'status', attacker: this.player, light: true, noProc: true, procs: [kind] });
@@ -870,7 +870,8 @@ export class World {
     for (const h of [...this.hittables]) if (dist(x, y, h.x, h.y) < radius + h.r) h.takeHit(this, { damage, kind: 'explosion', attacker: p });
     if ((o.hurtsPlayer ?? true) && !p.flags.has('bombImmune') && dist(x, y, p.x, p.y) < radius + p.r - 4) {
       // enemy blasts (e.g. bursting bloaters) name their owner on the death screen
-      if (p.hurt(this, 2, o.source instanceof Enemy ? o.source.def.name : '폭발')) {
+      // enemy blasts scale with the floor's enemy damage; the keeper's own bombs do not
+      if (p.hurt(this, 2, o.source instanceof Enemy ? o.source.def.name : '폭발', !(o.source instanceof Enemy))) {
         const d = dist(x, y, p.x, p.y) || 1;
         p.knock((p.x - x) / d, (p.y - y) / d, 240);
       }
@@ -1790,10 +1791,6 @@ function makeChampion(e: Enemy, rng: RNG): void {
   const k = rng.pick(kinds);
   e.championColor = k.color;
   k.apply();
-}
-
-function bySortY(a: Entity, b: Entity): number {
-  return a.sortY - b.sortY;
 }
 
 const NUMBER_OFFSETS: [number, number][] = [[0, 0], [11, 6], [-11, 6], [0, 10], [11, 11]];

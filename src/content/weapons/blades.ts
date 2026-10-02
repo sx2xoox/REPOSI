@@ -302,6 +302,8 @@ defineDrawnSprite('icon_reaper_scythe', 16, 16, (p) => {
 
 /** A wisp that floats from a fallen enemy into the player (cosmetic). */
 class SoulWisp extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   constructor(x: number, y: number) {
     super();
     this.x = x;

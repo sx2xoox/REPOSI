@@ -9,6 +9,8 @@ import { clamp, ease, TAU } from '../engine/math';
 import { fx } from '../engine/rng';
 
 export class FloatingText extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   text: string;
   color: string;
   life: number;
@@ -58,6 +60,8 @@ const DMG_FADE = 0.25;
  * drifts up and fades once the hits stop.
  */
 export class DamageNumber extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   amount: number;
   color: string;
   /** seconds since the last added hit */
@@ -129,6 +133,8 @@ export class DamageNumber extends Entity {
 
 /** Soft glow + sparkles in an opened doorway (room-clear moment). */
 export class DoorClearGlow extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   private dx: number;
   private dy: number;
   private color: string;
@@ -182,6 +188,8 @@ export class DoorClearGlow extends Entity {
 
 /** Plays an animation (or static sprite) once, then disappears. */
 export class AnimEffect extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   anim: string;
   duration: number;
   rot: number;
@@ -280,6 +288,8 @@ export class GroundWarning extends Entity {
 
 /** Expanding ring (shockwaves, pickups). Purely visual. */
 export class RingFx extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   radius: number;
   maxR: number;
   dur: number;
@@ -312,6 +322,8 @@ export class RingFx extends Entity {
 
 /** Fading copy of a sprite (dash afterimages). */
 export class Afterimage extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   sprite: string;
   flipX: boolean;
   dur: number;
@@ -344,6 +356,8 @@ export class Afterimage extends Entity {
 
 /** Instant laser / beam visual between two points (damage is applied by the caller). */
 export class BeamFx extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   x2: number;
   y2: number;
   width: number;
@@ -386,6 +400,8 @@ export class BeamFx extends Entity {
 
 /** Little decorative torch on a wall (theme decoration). */
 export class Torch extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   color: string;
   constructor(x: number, y: number, color = '#ffb050') {
     super();

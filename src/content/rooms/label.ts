@@ -7,6 +7,8 @@ import { dist } from '../../engine/math';
 import { pixelTextCanvas } from './floortext';
 
 export class HintLabel extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   text: string;
   color: string;
   near: number;

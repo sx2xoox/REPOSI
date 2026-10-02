@@ -39,6 +39,8 @@ class SmokeScreen extends Entity {
 
 /** 밤의 실내화 signature: violet afterimages left behind while dashing. */
 class AfterImage extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   private readonly frame: string;
   private readonly flip: boolean;
   constructor(w: World) {

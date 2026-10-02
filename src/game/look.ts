@@ -411,6 +411,8 @@ const EMPTY_PLAYER: PlayerLook = { motes: [], aura: [], step: [], hit: [], glow:
 
 /** Floor-layer companion entity: feet aura ring, back motes, colored glow. */
 class LookFx extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   room: unknown;
   constructor(w: World, readonly sys: LookSystem) {
     super();

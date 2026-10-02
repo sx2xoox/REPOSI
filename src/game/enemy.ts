@@ -12,7 +12,7 @@
 import { Actor, type HitInfo, type StatusApply } from './entity';
 import { Enemies, type EnemyDef } from './defs';
 import type { World } from './world';
-import type { Renderer } from '../engine/renderer';
+import type { DrawOpts, Renderer } from '../engine/renderer';
 import { ScriptRunner, type Script } from '../engine/script';
 import { animFrame, hasAnim } from '../engine/sprites';
 import { angleTo, clamp, dist, norm, TAU } from '../engine/math';
@@ -107,7 +107,8 @@ export class Enemy extends Actor {
     this.updateKnockback(dt);
     this.updateSquash(dt);
 
-    const sm = this.speedMult() * w.enemyTimeScale;
+    // floor difficulty: deeper floors move a little faster (FloorDef.enemySpeed)
+    const sm = this.speedMult() * w.enemyTimeScale * (w.floor?.enemySpeed ?? 1);
     const edt = dt * w.enemyTimeScale;
 
     if (this.dormant > 0) {
@@ -390,22 +391,26 @@ export class Enemy extends Actor {
   drawDefault(r: Renderer, spriteName = this.frame(), yOffset = this.def.spriteYOffset ?? 0): void {
     const tint = this.statusTint();
     const tel = this.telegraphT > 0 && Math.floor(this.telegraphT * 16) % 2 === 0;
-    r.sprite(spriteName, this.x, this.y - this.z + yOffset, {
-      flipX: this.facing < 0,
-      sx: this.squashX * this.scale,
-      sy: this.squashY * this.scale,
-      rot: this.rot,
-      alpha: this.alpha * (this.dormant > 0.3 ? 0.6 + 0.4 * Math.sin(this.age * 40) : 1),
-      flash: this.flash > 0 ? 1 : tel ? 0.55 : 0,
-      tint: this.champion ? this.championColor : tint?.color,
-      tintAmount: this.champion ? 0.35 : tint?.amount,
-    });
+    // one shared options object (every enemy is drawn every frame)
+    const o = DEFAULT_DRAW;
+    o.flipX = this.facing < 0;
+    o.sx = this.squashX * this.scale;
+    o.sy = this.squashY * this.scale;
+    o.rot = this.rot;
+    o.alpha = this.alpha * (this.dormant > 0.3 ? 0.6 + 0.4 * Math.sin(this.age * 40) : 1);
+    o.flash = this.flash > 0 ? 1 : tel ? 0.55 : 0;
+    o.tint = this.champion ? this.championColor : tint?.color;
+    o.tintAmount = this.champion ? 0.35 : tint?.amount;
+    r.sprite(spriteName, this.x, this.y - this.z + yOffset, o);
   }
 
   override light(w: World): void {
     if (this.def.light && !this.hidden) w.lights.add(this.x, this.y - this.z, this.def.light.radius, this.def.light.color);
   }
 }
+
+/** reused by Enemy.drawDefault */
+const DEFAULT_DRAW: DrawOpts = {};
 
 // Shared enemy bullet sprites are defined lazily through orbSprite(); re-export for scripts.
 export { orbSprite };

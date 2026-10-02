@@ -1,8 +1,13 @@
-// QA bot: plays full runs (floor 1 -> 5 -> victory) on a production build and
-// records errors, soft-locks, NaN positions, entity counts and frame costs.
+// QA bot: plays full runs (floor 1 -> last floor -> victory) on a production build and
+// records errors, soft-locks, NaN positions, entity counts and frame costs, plus
+// balance metrics (damage taken, room / boss fight times, release share; printed
+// as a per-floor table and written to balance.json).
 //
-//   node scripts/qa-run.mjs --out qa-out [--dist dist] [--build] [--suite full|quick|checks]
-//        [--char ria] [--seed S] [--god 1|0] [--chaos] [--parallel 3] [--turbo 4] [--audio]
+//   node scripts/qa-run.mjs --out qa-out [--dist dist] [--build] [--suite full|quick|checks|balance]
+//        [--char ria[,bern]] [--seed S] [--god 1|0] [--immortal] [--chaos] [--parallel 3] [--turbo 4] [--audio]
+//
+// `--immortal` (and the `balance` suite, `--seeds N`): the keeper takes real hits but
+// is topped up instead of dying, so every floor gets measured ("wouldDie" counts).
 //
 // The bot runs inside the page (window.__bot) and drives `__lk.input.touchMove /
 // touchAim / touchTap` (analog move + aim), stepping the simulation with
@@ -45,14 +50,21 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, { 'content-type': MIME[extname(f)] ?? 'application/octet-stream' });
   createReadStream(f).pipe(res);
 });
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
+await new Promise((r) => server.listen(Number(args.port ?? 0), '127.0.0.1', r));
 const url = `http://127.0.0.1:${server.address().port}/`;
 console.log(`[qa] serving ${dist} at ${url}`);
 
 // ------------------------------------------------------------------ run specs
 function specs() {
   if (suite === 'custom') {
-    return [{ name: `${args.char}-${args.seed ?? 'S1'}${args.chaos ? '-chaos' : ''}${args.god === '0' ? '-mortal' : ''}`, character: args.char, seed: String(args.seed ?? 'QA-S1'), god: args.god !== '0', chaos: !!args.chaos }];
+    const imm = !!args.immortal;
+    return String(args.char).split(',').map((c) => ({ name: `${c}-${args.seed ?? 'S1'}${args.chaos ? '-chaos' : ''}${imm ? '-immortal' : args.god === '0' ? '-mortal' : ''}`, character: c, seed: String(args.seed ?? 'QA-S1'), god: !imm && args.god !== '0', immortal: imm, chaos: !!args.chaos }));
+  }
+  if (suite === 'balance') {
+    // balance measurement: every character, `--seeds` seeds, real hits but never dies (see botMain `immortal`)
+    const list = [];
+    for (let n = 1; n <= Number(args.seeds ?? 1); n++) for (const c of ['ria', 'bern', 'serin', 'niel']) list.push({ name: `${c}-bal-${n}`, character: c, seed: `QA-BAL-${c.toUpperCase()}-${n}`, god: false, immortal: true });
+    return list;
   }
   if (suite === 'quick') return [{ name: 'ria-quick', character: 'ria', seed: 'QA-QUICK', god: true }];
   if (suite === 'checks' || suite === 'sweep') return [];
@@ -96,6 +108,102 @@ function botMain(opts) {
     return e;
   };
   const hyp = Math.hypot;
+
+  // ---------------------------------------------------------------- balance metrics
+  // Per floor: damage taken, player power, release share of damage dealt; per
+  // room: clear time vs enemy HP; per boss: fight duration. With `immortal` the
+  // keeper takes real hits (invuln frames, shields, dodge) but is topped up
+  // instead of dying, so later floors still get measured ("wouldDie" counts it).
+  const BAL = (B.bal = { floors: [], rooms: [], bosses: [], wouldDie: 0 });
+  const bal = { room: null, boss: null, lastRel: 0, relT: -99, hooked: null };
+  const estDps = (s) => Math.max(0, s.damage) * Math.max(0, s.fireRate) * (1 + Math.max(0, s.critChance) * Math.max(0, s.critMult - 1))
+    * (1 + Math.max(0, s.shots - 1) * 0.7) * (1 + Math.min(3, Math.max(0, s.pierce)) * 0.12);
+  function balFloor(w) {
+    let f = BAL.floors.find((x) => x.floor === w.run.floor);
+    if (!f) {
+      const p = w.player, s = p.stats;
+      f = {
+        floor: w.run.floor, hpMult: w.floor.hpMult, t0: +w.time.toFixed(1), dps: +estDps(s).toFixed(1), damage: +s.damage.toFixed(1),
+        items: p.inv?.items?.length ?? 0, weapon: p.weaponId, maxRed: p.maxRed, red: p.red, soul: p.soul,
+        taken: 0, hits: 0, wouldDie: 0, allDmg: 0, relDmg: 0, releases: 0,
+      };
+      BAL.floors.push(f);
+    }
+    return f;
+  }
+  function balHook(w) {
+    if (bal.hooked === w) return;
+    bal.hooked = w;
+    const p = w.player;
+    const origHit = w.applyHit.bind(w);
+    w.applyHit = (t, h) => {
+      const before = t.hp;
+      const ok = origHit(t, h);
+      if (ok && t !== p && t.team === 'enemy' && h.attacker === p) {
+        const dealt = Math.max(0, before - Math.max(0, t.hp));
+        const f = balFloor(w);
+        const rel = h.noProc && h.kind !== 'status' && w.time - bal.relT < 3.6;
+        f.allDmg += dealt;
+        if (rel) f.relDmg += dealt;
+        if (bal.boss) { bal.boss.allDmg += dealt; if (rel) bal.boss.relDmg += dealt; }
+      }
+      return ok;
+    };
+    const origHurt = p.hurt.bind(p);
+    p.hurt = (ww, hh, src) => {
+      const pre = p.red + p.soul;
+      if (opts.immortal && pre <= 6) { if (p.maxRed > 0) p.red = p.maxRed; else p.soul += 6; }
+      const mid = p.red + p.soul;
+      const ok = origHurt(ww, hh, src);
+      const taken = mid - (p.red + p.soul);
+      if (ok && taken > 0) {
+        const f = balFloor(w);
+        f.taken += taken; f.hits++;
+        if (taken >= pre) { f.wouldDie++; BAL.wouldDie++; }
+        if (bal.room && !bal.room.done) bal.room.taken += taken;
+        if (bal.boss) bal.boss.taken += taken;
+      }
+      return ok;
+    };
+  }
+  function balTick(w) {
+    if (!w.player) return;
+    balHook(w);
+    const f = balFloor(w);
+    if (w.run.stats.releases !== bal.lastRel) {
+      bal.lastRel = w.run.stats.releases; bal.relT = w.time; f.releases++;
+      if (bal.boss) bal.boss.releases++;
+    }
+    const key = `${w.run.floor}:${w.node.id}`;
+    if (!bal.room || bal.room.key !== key) {
+      bal.room = null;
+      if (!w.node.cleared && ['normal', 'challenge', 'boss', 'curse'].includes(w.node.kind)) {
+        bal.room = { key, floor: w.run.floor, kind: w.node.kind, t0: w.time, hp: 0, n: 0, seen: new Set(), taken: 0, fb: B.fallbacks };
+      }
+    }
+    const r = bal.room;
+    if (r && !r.done) {
+      for (const e of w.enemies) {
+        if (r.seen.has(e.id)) continue;
+        r.seen.add(e.id);
+        if (!e.ignoreForClear) { r.hp += e.maxHp; r.n++; }
+      }
+      if (w.node.cleared) {
+        r.done = true;
+        BAL.rooms.push({ floor: r.floor, kind: r.kind, dur: +(w.time - r.t0).toFixed(1), hp: Math.round(r.hp), n: r.n, taken: r.taken, fallback: B.fallbacks !== r.fb });
+      }
+    }
+    const bosses = w.bosses;
+    if (!bal.boss && bosses.length && !w.bossIntro && bosses.every((b) => b.dormant <= 0)) {
+      bal.boss = { floor: w.run.floor, id: bosses[0].def.id, hp: Math.round(bosses.reduce((s, b) => s + b.maxHp, 0)), t0: w.time, taken: 0, allDmg: 0, relDmg: 0, releases: 0, fb: B.fallbacks, red0: w.player.red + w.player.soul };
+    }
+    if (bal.boss && !bosses.length) {
+      const b = bal.boss;
+      BAL.bosses.push({ ...b, dur: +(w.time - b.t0).toFixed(1), t0: undefined, fb: undefined, fallback: B.fallbacks !== b.fb, allDmg: Math.round(b.allDmg), relDmg: Math.round(b.relDmg) });
+      bal.boss = null;
+    }
+    f.allDmg = +f.allDmg.toFixed(1);
+  }
 
   function hostiles(w) {
     return w.enemies.filter((e) => !e.dead && !e.ignoreForClear);
@@ -483,6 +591,7 @@ function botMain(opts) {
     const p = w.player;
     B.tickN++;
     floorCheck(w);
+    if (!w.gameOver) balTick(w);
     if (B.tickN % 10 === 0) sample(w);
     if (w.gameOver) {
       setInput({ x: 0, y: 0 }, null, p);
@@ -589,7 +698,8 @@ function botMain(opts) {
         }
         move = navTo(w, trap.x, trap.y, false) ?? { x: 0, y: 0 };
         if (d < 3) move = { x: 0, y: 0 };
-      } else if (w.node.kind === 'boss' && w.node.cleared && w.floor.index >= 5) {
+      } else if (w.node.kind === 'boss' && w.node.cleared && !trap) {
+        // last floor: the victory cinematic is playing (other floors: the trapdoor is about to open)
         B.obj = 'final-wait';
       } else {
         const wantBoss = w.time - B.floorStartT > (opts.exploreSec ?? 300);
@@ -648,7 +758,7 @@ function botMain(opts) {
       room: w?.node.kind, hp: w ? `${w.player.red}+${w.player.soul}/${w.player.maxRed}` : '',
     };
   };
-  B.summary = () => ({ outcome: B.outcome, death: B.death, floors: B.floors, samples: B.samples, cost: B.cost, fallbacks: B.fallbacks });
+  B.summary = () => ({ outcome: B.outcome, death: B.death, floors: B.floors, samples: B.samples, cost: B.cost, fallbacks: B.fallbacks, balance: B.bal });
   loop();
 }
 /* eslint-enable */
@@ -701,7 +811,7 @@ async function runOne(browser, spec) {
       await page.waitForTimeout(900);
     }
     if (args.invuln) await page.evaluate(() => { window.__world.player.god = true; });
-    await page.evaluate(botMain, { god: spec.god, turbo, exploreSec: spec.god ? 300 : 240 });
+    await page.evaluate(botMain, { god: spec.god, immortal: !!spec.immortal, turbo, exploreSec: spec.god ? 300 : 240 });
     let lastLog = 0;
     for (;;) {
       await page.waitForTimeout(700);
@@ -782,8 +892,8 @@ async function runChecks(browser) {
     await page.waitForTimeout(1500);
     await shot('title');
     noErr('title');
-    // 도감 (collection): title index 2
-    await key('ArrowDown', 2);
+    // 도감 (collection): title index 3 (after 새 게임 / 함께하기 / 시드 입력)
+    await key('ArrowDown', 3);
     await key('Enter', 1, 600);
     await shot('collection');
     await key('ArrowRight', 3);
@@ -792,7 +902,7 @@ async function runChecks(browser) {
     await shot('collection-2');
     await key('Escape', 1, 500);
     noErr('collection');
-    // 설정 (settings): index 3
+    // 설정 (settings): index 4
     await key('ArrowDown', 1);
     await key('Enter', 1, 600);
     await shot('settings');
@@ -802,14 +912,14 @@ async function runChecks(browser) {
     await shot('settings-2');
     await key('Escape', 1, 500);
     noErr('settings');
-    // 크레딧 (credits): index 4
+    // 크레딧 (credits): index 5
     await key('ArrowDown', 1);
     await key('Enter', 1, 800);
     await shot('credits');
     await key('Escape', 1, 500);
     noErr('credits');
     // character select: 니엘 locked
-    await key('ArrowUp', 4);
+    await key('ArrowUp', 5);
     await key('Enter', 1, 800);
     await shot('charselect');
     check('fresh profile: niel locked', !(await flags()).includes('unlock:niel'));
@@ -990,5 +1100,35 @@ server.close();
 writeFileSync(join(out, 'summary.json'), JSON.stringify({ wallSec: Math.round((Date.now() - t0) / 1000), runs: all }, null, 1));
 console.log('\n[qa] SUMMARY');
 for (const r of all) if (r.brief) console.log(' ', r.brief);
+balanceReport(all.filter((r) => r.balance));
+
+/** Per-floor balance table over every run that recorded metrics (see botMain BAL). */
+function balanceReport(runs) {
+  if (!runs.length) return;
+  const avg = (a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN);
+  const f1 = (v) => (Number.isFinite(v) ? v.toFixed(1) : '-');
+  const floors = [...new Set(runs.flatMap((r) => r.balance.floors.map((f) => f.floor)))].sort((a, b) => a - b);
+  const rows = floors.map((fl) => {
+    const fs = runs.map((r) => r.balance.floors.find((f) => f.floor === fl)).filter(Boolean);
+    const rooms = runs.flatMap((r) => r.balance.rooms.filter((x) => x.floor === fl && x.kind === 'normal' && !x.fallback && x.n > 0));
+    const bosses = runs.flatMap((r) => r.balance.bosses.filter((x) => x.floor === fl && !x.fallback));
+    const all = fs.reduce((s, f) => s + f.allDmg, 0);
+    const rel = fs.reduce((s, f) => s + f.relDmg, 0);
+    return {
+      floor: fl, runs: fs.length, hpMult: fs[0]?.hpMult, dpsEst: +f1(avg(fs.map((f) => f.dps))), items: +f1(avg(fs.map((f) => f.items))),
+      hearts: +f1(avg(fs.map((f) => f.maxRed / 2))), roomSec: +f1(avg(rooms.map((x) => x.dur))), roomHp: Math.round(avg(rooms.map((x) => x.hp))),
+      roomTaken: +f1(avg(rooms.map((x) => x.taken))), bossSec: +f1(avg(bosses.map((x) => x.dur))), bossHp: Math.round(avg(bosses.map((x) => x.hp))),
+      bossTaken: +f1(avg(bosses.map((x) => x.taken))), bossRelPct: Math.round((100 * bosses.reduce((s, b) => s + b.relDmg, 0)) / Math.max(1, bosses.reduce((s, b) => s + b.allDmg, 0))),
+      taken: +f1(avg(fs.map((f) => f.taken))), wouldDie: +f1(avg(fs.map((f) => f.wouldDie))), relPct: Math.round((100 * rel) / Math.max(1, all)),
+    };
+  });
+  console.log('\n[qa] BALANCE (normal rooms / bosses without fallbacks; taken in half-hearts)');
+  console.table(rows);
+  for (const r of runs) {
+    const b = r.balance.bosses.map((x) => `f${x.floor} ${x.id} ${x.dur}s hp${x.hp} rel${Math.round((100 * x.relDmg) / Math.max(1, x.allDmg))}% taken${x.taken}${x.fallback ? ' (fallback)' : ''}`).join(' | ');
+    console.log(`  ${r.name}: ${b}`);
+  }
+  writeFileSync(join(out, 'balance.json'), JSON.stringify({ rows, runs: runs.map((r) => ({ name: r.name, balance: r.balance })) }, null, 1));
+}
 const bad = all.some((r) => r.crash || (r.consoleErrors?.length ?? 0) > 0 || (r.lkErrors?.length ?? 0) > 0 || r.checks?.checks?.some((c) => !c.ok));
 process.exit(bad ? 1 : 0);

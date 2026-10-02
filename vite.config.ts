@@ -1,8 +1,24 @@
 import { defineConfig, type Plugin } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import { createHash } from 'node:crypto';
+import { execSync } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+
+/**
+ * Build id for online co-op (lockstep needs identical code on every peer):
+ * git short hash + build time; 'dev' for the dev server and tests.
+ */
+function buildId(command: string): string {
+  if (command !== 'build') return 'dev';
+  let hash = 'nogit';
+  try {
+    hash = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() || hash;
+  } catch {
+    // not a git checkout
+  }
+  return `${hash}-${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12)}`;
+}
 
 /** Files under public/ (copied verbatim to the build root), as POSIX paths. */
 function publicFiles(dir = 'public'): string[] {
@@ -44,7 +60,8 @@ function swSource(version: string, precache: string[]): string {
 const CACHE = 'lanternkeeper-${version}';
 const PRECACHE = ${JSON.stringify(precache)};
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
+  // cache: 'reload' bypasses the HTTP cache so a fresh deploy never precaches a stale page
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(
@@ -57,9 +74,10 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   if (req.mode === 'navigate') {
-    // the page: network first (updates), cached shell when offline
+    // the page: network first, revalidated past the HTTP cache (updates show up at once), cached shell when offline
     e.respondWith(
-      fetch(req)
+      fetch(req, { cache: 'no-cache' })
+        .catch(() => fetch(req))
         .then((res) => {
           if (res.ok) {
             const copy = res.clone();
@@ -97,8 +115,11 @@ function stripPwaLinks(): Plugin {
 
 // `vite build --mode single` produces one self-contained HTML file (fonts inlined)
 // that can be opened directly from disk or published anywhere.
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode, command }) => ({
   base: './',
+  define: {
+    __LK_BUILD__: JSON.stringify(buildId(command)),
+  },
   plugins: mode === 'single' ? [viteSingleFile(), stripPwaLinks()] : [serviceWorker()],
   publicDir: mode === 'single' ? false : 'public',
   build: {

@@ -45,7 +45,7 @@ export interface EnemyDef {
   spriteYOffset?: number;
   /** cost in the room difficulty budget (default 1) */
   cost?: number;
-  /** floors (1..5) where this enemy appears in normal rooms; omit to only spawn via scripts */
+  /** floors (1..N) where this enemy appears in normal rooms; omit to only spawn via scripts */
   floors?: number[];
   /** spawn weight within its floors (default 1) */
   weight?: number;
@@ -332,8 +332,13 @@ export interface ThemeDef {
   ambientFx?(w: World, dt: number): void;
 }
 
+/**
+ * One floor of the descent. Floors are 1..N: the run is won on the deepest
+ * defined floor (`lastFloorIndex()`); every other floor's boss leaves a trapdoor.
+ * Difficulty fields follow the per-floor table `DIFFICULTY` in content/floors.ts.
+ */
 export interface FloorDef {
-  /** 1..5 */
+  /** 1..N (consecutive) */
   index: number;
   id: string;
   name: string;
@@ -345,6 +350,18 @@ export interface FloorDef {
   roomCount: [number, number];
   /** enemy hp multiplier */
   hpMult: number;
+  /** boss hp multiplier (default: hpMult) */
+  bossHpMult?: number;
+  /**
+   * Half-hearts an enemy hit deals on this floor: [regular, heavy] (default [1, 2]).
+   * A base-1 hit (contact, bullet) deals `regular`; a base-2+ hit (slam, blast)
+   * deals base + (heavy - 2). See `enemyHitDamage`.
+   */
+  enemyDamage?: [number, number];
+  /** enemy move speed multiplier (default 1) */
+  enemySpeed?: number;
+  /** enemy bullet speed multiplier (default 1) */
+  shotSpeed?: number;
   /** difficulty budget per normal room [min, max] */
   budget: [number, number];
   championChance: number;
@@ -356,7 +373,7 @@ export interface RoomTemplate {
   id: string;
   shape: RoomShape;
   kinds: RoomKind[];
-  /** restrict to floors (1..5) */
+  /** restrict to floors (1..N) */
   floors?: number[];
   /** 1 easy .. 3 hard */
   difficulty?: number;
@@ -444,6 +461,36 @@ export const defineFloor = (d: FloorDef) => Floors.register(d);
 export const defineTheme = (d: ThemeDef) => Themes.register(d);
 export const defineRoom = (d: RoomTemplate) => RoomTemplates.register(d);
 export const defineGlobalHooks = (d: GlobalHookDef) => GlobalHooks.register(d);
+
+// ------------------------------------------------------------------ floors
+/** Floor definition by index (1..N). */
+export function floorAt(index: number): FloorDef | undefined {
+  for (const f of Floors.map.values()) if (f.index === index) return f;
+  return undefined;
+}
+
+/** The deepest defined floor: beating its boss wins the run. */
+export function lastFloorIndex(): number {
+  let max = 0;
+  for (const f of Floors.map.values()) if (f.index > max) max = f.index;
+  return max;
+}
+
+/** Is floor `index` the last one of the descent (its boss ends the run)? */
+export function isLastFloor(index: number): boolean {
+  return index >= lastFloorIndex();
+}
+
+/**
+ * Half-hearts an enemy hit of base strength `halfHearts` deals on `floor`
+ * (FloorDef.enemyDamage = [regular, heavy]; default [1, 2] = unchanged).
+ */
+export function enemyHitDamage(floor: FloorDef | undefined, halfHearts: number): number {
+  const base = Math.max(1, Math.round(halfHearts));
+  const d = floor?.enemyDamage;
+  if (!d) return base;
+  return base <= 1 ? d[0] : Math.max(d[0], base + d[1] - 2);
+}
 
 export function defaultPrice(r: Rarity): number {
   return r === 'common' ? 15 : r === 'rare' ? 20 : r === 'epic' ? 30 : 45;

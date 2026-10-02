@@ -15,6 +15,7 @@ import { GameScene } from './ui/game-scene';
 import { installDebug } from './debug';
 import { touch } from './ui/touch';
 import { applyGraphics } from './ui/quality';
+import { installServiceWorker } from './net/build';
 import { perfmon } from './engine/perfmon';
 import { effectiveMaxFps, save } from './engine/save';
 
@@ -134,11 +135,10 @@ async function boot(): Promise<void> {
 }
 
 // offline play: register the service worker in production web builds only
-// (not in dev, and not in the single-file build which has no sw.js)
+// (not in dev, and not in the single-file build which has no sw.js); a newer
+// deploy reloads the page while the player is on the title screen
 if (import.meta.env.PROD && import.meta.env.MODE !== 'single' && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('service worker registration failed', e));
-  });
+  installServiceWorker(() => app.scenes?.top instanceof TitleScene);
 }
 
 boot().catch((e) => {

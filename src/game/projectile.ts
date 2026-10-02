@@ -211,8 +211,10 @@ export class Projectile extends Entity {
 
     const px = this.x;
     const py = this.y;
-    this.x += this.vx * dt;
-    this.y += this.vy * dt;
+    // floor difficulty: enemy bullets fly a little faster deeper down (FloorDef.shotSpeed)
+    const k = this.team === 'enemy' ? (w.floor?.shotSpeed ?? 1) : 1;
+    this.x += this.vx * dt * k;
+    this.y += this.vy * dt * k;
     this.traveled += Math.hypot(this.x - px, this.y - py);
 
     // trail particles for player shots

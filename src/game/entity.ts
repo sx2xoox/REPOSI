@@ -60,6 +60,15 @@ export interface HitInfo {
 // down from -1 on their own, so spawning them conditionally (settings, `fx`
 // chances, unlock banners) never shifts the ids of gameplay entities.
 let nextEntityId = 1;
+
+// shared status tints (Actor.statusTint)
+const TINT_FREEZE = { color: '#9fe8ff', amount: 0.55 } as const;
+const TINT_CHARM = { color: '#ff7ad9', amount: 0.4 } as const;
+const TINT_FEAR = { color: '#7a4dff', amount: 0.35 } as const;
+const TINT_BURN = { color: '#ff7a2a', amount: 0.25 };
+const TINT_POISON = { color: '#7dff5a', amount: 0.3 } as const;
+const TINT_SLOW = { color: '#8fa8d8', amount: 0.3 } as const;
+const TINT_WEAK = { color: '#d0d0d0', amount: 0.25 } as const;
 let nextCosmeticId = -1;
 
 /** Restart entity ids (called when a run's World is created). */
@@ -261,15 +270,23 @@ export abstract class Actor extends Entity {
     }
   }
 
-  /** Visual tint for active statuses (used by draw). */
-  statusTint(): { color: string; amount: number } | null {
-    if (this.statuses.has('freeze')) return { color: '#9fe8ff', amount: 0.55 };
-    if (this.statuses.has('charm')) return { color: '#ff7ad9', amount: 0.4 };
-    if (this.statuses.has('fear')) return { color: '#7a4dff', amount: 0.35 };
-    if (this.statuses.has('burn')) return { color: '#ff7a2a', amount: 0.25 + 0.15 * Math.sin(this.age * 30) };
-    if (this.statuses.has('poison')) return { color: '#7dff5a', amount: 0.3 };
-    if (this.statuses.has('slow')) return { color: '#8fa8d8', amount: 0.3 };
-    if (this.statuses.has('weak')) return { color: '#d0d0d0', amount: 0.25 };
+  /**
+   * Visual tint for active statuses (used by draw). Returns a shared object
+   * (no allocation per draw): read it right away, do not keep or modify it.
+   */
+  statusTint(): { readonly color: string; readonly amount: number } | null {
+    const st = this.statuses;
+    if (st.size === 0) return null;
+    if (st.has('freeze')) return TINT_FREEZE;
+    if (st.has('charm')) return TINT_CHARM;
+    if (st.has('fear')) return TINT_FEAR;
+    if (st.has('burn')) {
+      TINT_BURN.amount = 0.25 + 0.15 * Math.sin(this.age * 30);
+      return TINT_BURN;
+    }
+    if (st.has('poison')) return TINT_POISON;
+    if (st.has('slow')) return TINT_SLOW;
+    if (st.has('weak')) return TINT_WEAK;
     return null;
   }
 

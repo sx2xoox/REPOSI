@@ -59,7 +59,7 @@ export class NetError extends Error {
 export function netErrorText(code: NetErrorCode): { title: string; hint: string } {
   switch (code) {
     case 'not-found':
-      return { title: '방을 찾을 수 없어요', hint: '코드를 다시 확인해 주세요. 방장이 방을 열어 두고 있어야 해요.' };
+      return { title: '방을 찾을 수 없어요', hint: '코드를 다시 확인해 주세요.\n방장이 방을 열어 두고 있어야 해요.' };
     case 'full':
       return { title: '방이 가득 찼어요', hint: '한 방에는 최대 4명까지 들어갈 수 있어요.' };
     case 'started':
@@ -69,13 +69,13 @@ export function netErrorText(code: NetErrorCode): { title: string; hint: string 
     case 'stale':
       return { title: '새 버전이 나왔어요 — 새로고침 해주세요', hint: '새로고침하면 최신 버전으로 바뀌어요.' };
     case 'timeout':
-      return { title: '연결 시간이 초과됐어요', hint: '일부 모바일 데이터 망은 기기 간 직접 연결을 막아요. Wi-Fi로 바꿔 다시 시도해 보세요.' };
+      return { title: '연결 시간이 초과됐어요', hint: '일부 모바일 데이터 망은 기기 간 직접 연결을 막아요.\nWi-Fi로 바꿔 다시 시도해 보세요.' };
     case 'network':
-      return { title: '연결 서버에 접속할 수 없어요', hint: '인터넷 연결을 확인하고 잠시 후 다시 시도해 주세요.' };
+      return { title: '연결 서버에 접속할 수 없어요', hint: '인터넷 연결을 확인하고\n잠시 후 다시 시도해 주세요.' };
     case 'unsupported':
       return { title: '이 브라우저는 온라인 협동을 지원하지 않아요', hint: '최신 Chrome, Safari, Firefox에서 시도해 주세요.' };
     case 'closed':
-      return { title: '방장이 방을 닫았어요', hint: '새 방을 만들거나 다른 코드로 참가해 보세요.' };
+      return { title: '방장이 방을 닫았어요', hint: '새 방을 만들거나\n다른 코드로 참가해 보세요.' };
     case 'host-lost':
       return { title: '방장과의 연결이 끊어졌어요', hint: '네트워크가 불안정하면 Wi-Fi로 바꿔 보세요.' };
     case 'kicked':

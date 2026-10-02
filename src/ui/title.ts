@@ -21,6 +21,7 @@ import { divider, frame, glow, keyHintRow } from './frame';
 import { CharacterSelectScene } from './charselect';
 import { CollectionScene } from './collection';
 import { CreditsScene } from './credits';
+import { LobbyScene, consumeRoomLink } from './lobby';
 import { Characters } from '../game/defs';
 import { appear } from './anim';
 
@@ -33,6 +34,7 @@ export class TitleScene implements Scene {
   private seedOpen = false;
   private seedT = 0;
   private seed = '';
+  private linkChecked = false;
 
   /** touch: ✕ closes the seed box */
   get touchBack(): 'close' | false {
@@ -61,11 +63,12 @@ export class TitleScene implements Scene {
   constructor() {
     this.menu = new Menu([
       { label: '새 게임', action: () => app.scenes.set(new CharacterSelectScene()), hint: '무작위 시드로 새로운 하강을 시작합니다.' },
+      { label: '함께하기', action: () => app.scenes.set(new LobbyScene()), hint: '방 코드로 친구와 최대 4명까지 함께 하강합니다.' },
       { label: '시드 입력', action: () => this.openSeed(), hint: '같은 시드는 같은 던전을 만듭니다. (기록에는 남지 않음)' },
       { label: '도감', action: () => app.scenes.push(new CollectionScene()), hint: '발견한 유물과 마주친 적들의 기록.' },
       { label: '설정', action: () => app.scenes.push(new SettingsOverlay({ fromTitle: true })), hint: '소리, 화면, 조작 설정.' },
       { label: '크레딧', action: () => app.scenes.push(new CreditsScene()), hint: '등불지기를 만든 사람들.' },
-    ], UI_W / 2, 238, { width: 196, size: 13, lineH: 26, hintY: 382 });
+    ], UI_W / 2, 226, { width: 196, size: 13, lineH: 25, hintY: 382 });
     const last = save.history[0]?.character;
     const ch = (last && Characters.get(last)) || Characters.all()[0];
     if (ch) backdrop().keeper = ch.spritePrefix;
@@ -99,6 +102,15 @@ export class TitleScene implements Scene {
   }
 
   update(dt: number): void {
+    if (!this.linkChecked) {
+      // a co-op share link (?room=CODE) opens the join box directly
+      this.linkChecked = true;
+      const code = consumeRoomLink();
+      if (code) {
+        app.scenes.set(new LobbyScene({ join: code }));
+        return;
+      }
+    }
     this.t += dt;
     const bd = backdrop();
     bd.update(dt);

@@ -4,7 +4,7 @@
 import { Actor, type HitInfo } from './entity';
 import type { World } from './world';
 import type { Renderer } from '../engine/renderer';
-import { Actives, Potions, Weapons, type CharacterDef, type WeaponState } from './defs';
+import { Actives, Potions, Weapons, enemyHitDamage, type CharacterDef, type WeaponState } from './defs';
 import { Inventory } from './inventory';
 import { BASE_STATS, type Stats } from './stats';
 import { angleOf, clamp, fromAngle, norm } from '../engine/math';
@@ -484,8 +484,12 @@ export class Player extends Actor {
   }
 
   // -------------------------------------------------------------- damage
-  /** Player takes `halfHearts` damage. Returns true if damage was applied. */
-  hurt(w: World, halfHearts: number, source = '???'): boolean {
+  /**
+   * Player takes `halfHearts` damage. Returns true if damage was applied. The
+   * amount is scaled by the floor's enemy damage (FloorDef.enemyDamage) unless
+   * `raw` (the keeper's own bombs, status ticks).
+   */
+  hurt(w: World, halfHearts: number, source = '???', raw = false): boolean {
     if (!this.alive || this.invuln > 0 || this.god || w.transitioning) return false;
     if (this.shields > 0) {
       this.shields--;
@@ -502,7 +506,8 @@ export class Player extends Actor {
       w.sfx('shield_block');
       return false;
     }
-    let dmg = Math.max(1, Math.round(halfHearts));
+    halfHearts = raw ? Math.max(1, Math.round(halfHearts)) : enemyHitDamage(w.floor, halfHearts);
+    let dmg = halfHearts;
     const fromSoul = Math.min(this.soul, dmg);
     this.soul -= fromSoul;
     dmg -= fromSoul;

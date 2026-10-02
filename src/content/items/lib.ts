@@ -181,6 +181,8 @@ export function watch(w: World, key: string, value: number): void {
 // ====================================================================== lightning
 /** Jagged lightning bolt between two points (visual only). */
 export class ZapFx extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   x2: number;
   y2: number;
   dur: number;
@@ -722,6 +724,8 @@ export function timeStopped(w: World): boolean {
 
 /** Blue-grey screen wash + ticking clock ring while time is stopped. */
 class TimeStopFx extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   room: unknown;
   constructor(w: World) {
     super();
@@ -781,6 +785,8 @@ defineDrawnSprite('fx_stun_star', 5, 5, (p) => {
 
 /** Draws small readable icons above enemies for statuses without a body tint. */
 class StatusMarks extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   room: unknown;
   constructor(w: World) {
     super();

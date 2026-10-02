@@ -148,6 +148,8 @@ export function withSwapPop(r: Renderer, w: World, p: Player, draw: () => void):
 
 /** The weapon that was put away flips over the shoulder and fades (world effect). */
 export class HolsterFx extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   private p: Player;
   private icon: string;
   private side: number;

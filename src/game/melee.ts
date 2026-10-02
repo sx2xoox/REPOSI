@@ -224,6 +224,8 @@ export function reflectProjectile(w: World, p: Projectile, sw: { x: number; y: n
 
 /** Short 4-point star flash at an impact point. */
 export class ImpactFx extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   ang: number;
   size: number;
   color: string;

@@ -138,6 +138,8 @@ const STYLE_LIGHT: Record<WallLightStyle, { color: string; radius: number; inten
 
 /** A light source mounted on a wall face. */
 export class WallLight extends Prop {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   style: WallLightStyle;
   face: Face;
   constructor(x: number, y: number, style: WallLightStyle, face: Face = 'top') {
@@ -246,6 +248,8 @@ defineFlame('prop_flame_small_blood', ['#a01040', '#ff4070', '#ffd0e0'], 3, 5);
 
 /** A small cluster of lit candles standing on the floor (no collision). */
 export class Candles extends Prop {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   items: { dx: number; dy: number; tall: boolean }[];
   tone: CandleTone;
   /** `tone` also accepts a boolean (true = cold blue flames) */
@@ -297,6 +301,8 @@ defineDrawnSprite('prop_shroom_dot', 3, 2, (p) => {
 
 /** Cluster of bioluminescent mushrooms on the floor (caves). */
 export class GlowShrooms extends Prop {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   items: { dx: number; dy: number; big: boolean; ph: number }[] = [];
   color: string;
   constructor(x: number, y: number, n = 4, color = '#40e0c0') {

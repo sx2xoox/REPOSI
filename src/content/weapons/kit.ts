@@ -133,6 +133,8 @@ export function enemyInCone(w: World, x: number, y: number, angle: number, half:
 // ------------------------------------------------------------------ lightning
 /** Jagged lightning bolt between two points (pure visual; re-jitters while alive). */
 export class Zap extends Entity {
+  /** purely visual: separate (negative) ids, not in the state hash */
+  static override readonly cosmetic = true;
   x2: number;
   y2: number;
   color: string;
