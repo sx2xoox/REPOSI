@@ -390,20 +390,41 @@ export function fitScale(icon: string, box: number, max = 2): number {
   return k;
 }
 
+const glowCache = new Map<string, HTMLCanvasElement>();
+const GLOW_SIZE = 128;
+
+/** Radial glow bitmap per color (drawn scaled: no gradient object per frame). */
+function glowSprite(color: string): HTMLCanvasElement {
+  let c = glowCache.get(color);
+  if (c) return c;
+  c = document.createElement('canvas');
+  c.width = c.height = GLOW_SIZE;
+  const g = c.getContext('2d')!;
+  const h = GLOW_SIZE / 2;
+  const gr = g.createRadialGradient(h, h, 0, h, h, h);
+  gr.addColorStop(0, color);
+  gr.addColorStop(0.4, color + '80');
+  gr.addColorStop(1, color + '00');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, GLOW_SIZE, GLOW_SIZE);
+  glowCache.set(color, c);
+  return c;
+}
+
 /** Soft radial glow (additive) in UI space — used behind logos, ready icons, flares. */
 export function glow(r: Renderer, x: number, y: number, radius: number, color: string, alpha = 0.5): void {
   if (alpha <= 0 || radius <= 0) return;
   const d = r.dctx;
-  d.save();
+  const op = d.globalCompositeOperation;
+  const ga = d.globalAlpha;
+  const sm = d.imageSmoothingEnabled;
   d.globalCompositeOperation = 'lighter';
   d.globalAlpha = clamp(alpha, 0, 1);
-  const g = d.createRadialGradient(x, y, 0, x, y, radius);
-  g.addColorStop(0, color);
-  g.addColorStop(0.4, color + '80');
-  g.addColorStop(1, color + '00');
-  d.fillStyle = g;
-  d.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-  d.restore();
+  d.imageSmoothingEnabled = true;
+  d.drawImage(glowSprite(color), x - radius, y - radius, radius * 2, radius * 2);
+  d.imageSmoothingEnabled = sm;
+  d.globalAlpha = ga;
+  d.globalCompositeOperation = op;
 }
 
 /** Full-screen dim layer with a soft vignette (overlays). */

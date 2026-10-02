@@ -32,6 +32,8 @@ export interface MapDrawOpts {
   /** draw the player marker on the current room */
   marker?: boolean;
   alpha?: number;
+  /** pulsing outline on the current room (default true; false for cached layers) */
+  pulse?: boolean;
 }
 
 /**
@@ -92,7 +94,7 @@ export function drawRooms(r: Renderer, w: World, ox: number, oy: number, cx: num
       d.fillRect(rx, ry, rw, 1);
       d.fillRect(rx, ry, 1, rh);
     }
-    if (isCur) {
+    if (isCur && o.pulse !== false) {
       const pulse = 0.5 + 0.5 * Math.sin(o.t * 5);
       d.globalAlpha = a * (0.35 + 0.4 * pulse);
       d.strokeStyle = C.goldHi;
@@ -115,6 +117,10 @@ export function drawRooms(r: Renderer, w: World, ox: number, oy: number, cx: num
   d.globalAlpha = 1;
 }
 
+function settle(sp: Spring): void {
+  if (sp.value !== sp.target && Math.abs(sp.target - sp.value) < 0.002 && Math.abs(sp.vel) < 0.02) sp.set(sp.target);
+}
+
 /** HUD minimap with smooth recentering. */
 export class MinimapView {
   private sx = new Spring(0, 140, 22);
@@ -135,7 +141,50 @@ export class MinimapView {
     this.sy.target = ty;
     this.sx.update(dt);
     this.sy.update(dt);
+    // snap once visually at rest (lets the HUD cache the minimap)
+    settle(this.sx);
+    settle(this.sy);
     this.flash = Math.max(0, this.flash - dt * 1.6);
+  }
+
+  /** Not recentering and no room-clear flash: the map image only changes with the floor state. */
+  get settled(): boolean {
+    return this.init && this.flash <= 0 && this.sx.value === this.sx.target && this.sy.value === this.sy.target;
+  }
+
+  /** Cheap hash of everything the map shows (rooms known / visited / cleared, revealed doors, current room). */
+  signature(w: World): number {
+    let h = (w.node.id * 31 + (w.flags.has('mapRevealSecret') ? 7 : 0) + Math.round(this.sx.value * 8) * 1009 + Math.round(this.sy.value * 8) * 9176) | 0;
+    const nodes = w.map.nodes;
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      h = (h * 33 + ((n.discovered ? 1 : 0) | (n.visited ? 2 : 0) | (n.cleared ? 4 : 0))) | 0;
+      const ds = n.doors;
+      for (let j = 0; j < ds.length; j++) if ((ds[j] as { revealed?: boolean }).revealed) h = (h * 33 + ds[j].to + 1) | 0;
+    }
+    return h;
+  }
+
+  /** The current room's pulsing outline (drawn live over a cached minimap). */
+  drawPulse(r: Renderer, w: World, x: number, y: number, mw: number, mh: number, t: number, alpha = 1): void {
+    const n = w.node;
+    const cell = 14;
+    const gap = Math.max(4, Math.round(cell * 0.22));
+    const rx = Math.round(x + mw / 2 + (n.gx - this.sx.value) * cell) + gap / 2;
+    const ry = Math.round(y + mh / 2 + (n.gy - this.sy.value) * cell) + gap / 2;
+    const rw = n.cw * cell - gap;
+    const rh = n.ch * cell - gap;
+    const d = r.dctx;
+    const pulse = 0.5 + 0.5 * Math.sin(t * 5);
+    d.save();
+    d.beginPath();
+    d.rect(x + 4, y + 4, mw - 8, mh - 8);
+    d.clip();
+    d.globalAlpha = alpha * (0.35 + 0.4 * pulse);
+    d.strokeStyle = C.goldHi;
+    d.lineWidth = 2;
+    d.strokeRect(rx - 2, ry - 2, rw + 4, rh + 4);
+    d.restore();
   }
 
   /** Snap to the current room (new floor). */
@@ -143,14 +192,15 @@ export class MinimapView {
     this.init = false;
   }
 
-  draw(r: Renderer, w: World, x: number, y: number, mw: number, mh: number, t: number, alpha = 1): void {
+  /** `staticOnly`: without the pulsing outline / flash (for the HUD's cached layer). */
+  draw(r: Renderer, w: World, x: number, y: number, mw: number, mh: number, t: number, alpha = 1, staticOnly = false): void {
     frame(r, x, y, mw, mh, 'glass', { alpha });
     const d = r.dctx;
     d.save();
     d.beginPath();
     d.rect(x + 4, y + 4, mw - 8, mh - 8);
     d.clip();
-    drawRooms(r, w, x + mw / 2, y + mh / 2, this.sx.value, this.sy.value, { cell: 14, t, flash: this.flash, marker: true, alpha });
+    drawRooms(r, w, x + mw / 2, y + mh / 2, this.sx.value, this.sy.value, { cell: 14, t, flash: staticOnly ? 0 : this.flash, marker: true, alpha, pulse: !staticOnly });
     d.restore();
   }
 }

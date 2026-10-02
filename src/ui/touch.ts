@@ -203,6 +203,9 @@ export class TouchControls {
   /** current auto-aim direction (target, else movement, else last aim) */
   private aimDir: Vec = { x: 1, y: 0 };
   private cands: TargetCandidate[] = [];
+  private candPool: TargetCandidate[] = [];
+  /** the aim vector handed to input.touchAim (reused) */
+  private aimOut: Vec = { x: 1, y: 0 };
   private candEnemy = new Map<number, Enemy>();
   /** reticle: displayed world position (eased toward the target) and fade */
   private ret = { x: 0, y: 0, half: 8, a: 0, id: -1 };
@@ -233,6 +236,9 @@ export class TouchControls {
         return this.layout;
       },
       target: () => (this.target ? { id: this.target.id, x: this.target.x, y: this.target.y } : null),
+      /** profiling hooks: the touch layer itself and the running GameScene (HUD) */
+      self: () => this,
+      game: () => this.gameScene(),
       aim: () => ({ ...this.aimDir }),
       mode: () => this.mode,
       visible: () => touchUiActive(),
@@ -450,7 +456,11 @@ export class TouchControls {
     }
     const g = this.gameScene();
     if (g) this.updateTarget(g.world);
-    input.touchAim = this.router.manualAim() ?? { ...this.aimDir };
+    const man = this.router.manualAim();
+    const src = man ?? this.aimDir;
+    this.aimOut.x = src.x;
+    this.aimOut.y = src.y;
+    input.touchAim = this.aimOut;
   }
 
   // ------------------------------------------------------------ auto-aim
@@ -462,12 +472,21 @@ export class TouchControls {
       this.targetId = null;
       return;
     }
+    // reuse candidate objects (no per-frame allocation)
+    const pool = this.candPool;
     const cands = this.cands;
     cands.length = 0;
     this.candEnemy.clear();
     for (const e of w.enemies) {
       if (e.dead || !e.alive || e.hidden || !e.vulnerable) continue;
-      cands.push({ id: e.id, x: e.x, y: e.y, visible: w.room.lineOfSight(p.x, p.y, e.x, e.y), weight: e.hasStatus('charm') ? 1.8 : 1 });
+      let c = pool[cands.length];
+      if (!c) pool.push((c = { id: 0, x: 0, y: 0, visible: true, weight: 1 }));
+      c.id = e.id;
+      c.x = e.x;
+      c.y = e.y;
+      c.visible = w.room.lineOfSight(p.x, p.y, e.x, e.y);
+      c.weight = e.hasStatus('charm') ? 1.8 : 1;
+      cands.push(c);
       this.candEnemy.set(e.id, e);
     }
     const mv = input.touchMove;
@@ -594,7 +613,7 @@ export class TouchControls {
     const k = this.k;
     const d = r.dctx;
     d.save();
-    d.setTransform(k, 0, 0, k, 0, 0);
+    d.setTransform(k, 0, 0, k, this.tox, this.toy);
     r.uiText(str, x, y, { size, font: 'small', align, color, alpha, outline: C.ink });
     d.restore();
   }
@@ -603,23 +622,135 @@ export class TouchControls {
     const L = this.layout;
     const st = this.router[side];
     if (!st) {
+      // resting ghost stick + label: one cached bitmap
       const rest = side === 'left' ? L.leftRest : L.rightRest;
-      this.disc(r, rest, L.stickR, 'ghost', A * 0.8);
-      this.disc(r, rest, L.knobR, 'knob', A * 0.35);
-      if (side === 'right') this.text(r, '조준', rest.x, rest.y - 5, 10, C.textDim, A * 0.55);
-      else this.text(r, '이동', rest.x, rest.y - 5, 10, C.textDim, A * 0.55);
+      const key = `${side}|${rest.x},${rest.y}|${L.stickR}|${this.k}|${this.artPx()}`;
+      if (this.compBegin(r, side === 'left' ? 'stickL' : 'stickR', key, rest, L.stickR + 4)) {
+        this.disc(r, rest, L.stickR, 'ghost', 0.8);
+        this.disc(r, rest, L.knobR, 'knob', 0.35);
+        this.text(r, side === 'right' ? '조준' : '이동', rest.x, rest.y - 5, 10, C.textDim, 0.55);
+        this.compEnd(r);
+      }
+      this.compBlit(r, side === 'left' ? 'stickL' : 'stickR', A);
       return;
     }
-    const rp = this.disc(r, st.base, L.stickR, 'base', A);
+    this.disc(r, st.base, L.stickR, 'base', A);
     const kp = knobPosition(st.base, st.finger, L.stickR);
     if (side === 'right' && st.engaged) {
       // direction pip on the rim
       const a = Math.atan2(st.out.y, st.out.x);
-      const pip = { x: st.base.x + Math.cos(a) * (L.stickR - 5 * L.u), y: st.base.y + Math.sin(a) * (L.stickR - 5 * L.u) };
-      this.disc(r, pip, 6 * L.u, 'ready', A);
+      this.disc(r, { x: st.base.x + Math.cos(a) * (L.stickR - 5 * L.u), y: st.base.y + Math.sin(a) * (L.stickR - 5 * L.u) }, 6 * L.u, 'ready', A);
     }
-    void rp;
     this.disc(r, kp, L.knobR, hot ? 'knobHot' : 'knob', A * 0.95);
+  }
+
+  // ------------------------------------------------------------ cached composites
+  // Every button (disc + progress ring + icon + label + badge) is painted once into
+  // an offscreen canvas at display resolution and blitted with one drawImage per
+  // frame until its look changes (key). Text outlines are never re-stroked per frame.
+  private comps = new Map<string, { key: string; cv: HTMLCanvasElement; g: CanvasRenderingContext2D; x0: number; y0: number }>();
+  private compSlot = '';
+  private compPrev: CanvasRenderingContext2D | null = null;
+  /** translation applied by `text()` while painting a composite (display px) */
+  private tox = 0;
+  private toy = 0;
+
+  /** Start repainting composite `slot` around c (CSS px, half-size `extent`) if `key` changed; returns false when the cache is valid. */
+  private compBegin(r: Renderer, slot: string, key: string, c: Vec, extent: number): boolean {
+    let e = this.comps.get(slot);
+    if (e && e.key === key) return false;
+    const k = this.k;
+    const half = Math.ceil(extent * k) + 2;
+    const x0 = Math.round(c.x * k) - half;
+    const y0 = Math.round(c.y * k) - half;
+    if (!e) {
+      const cv = document.createElement('canvas');
+      e = { key, cv, g: cv.getContext('2d')!, x0, y0 };
+      this.comps.set(slot, e);
+    }
+    e.key = key;
+    e.x0 = x0;
+    e.y0 = y0;
+    if (e.cv.width !== half * 2 || e.cv.height !== half * 2) {
+      e.cv.width = half * 2;
+      e.cv.height = half * 2;
+    } else {
+      e.g.setTransform(1, 0, 0, 1, 0, 0);
+      e.g.clearRect(0, 0, e.cv.width, e.cv.height);
+    }
+    e.g.setTransform(1, 0, 0, 1, -x0, -y0);
+    e.g.imageSmoothingEnabled = false;
+    const rr = r as unknown as { dctx: CanvasRenderingContext2D };
+    this.compPrev = rr.dctx;
+    rr.dctx = e.g;
+    this.compSlot = slot;
+    this.tox = -x0;
+    this.toy = -y0;
+    return true;
+  }
+
+  private compEnd(r: Renderer): void {
+    const rr = r as unknown as { dctx: CanvasRenderingContext2D };
+    if (this.compPrev) rr.dctx = this.compPrev;
+    this.compPrev = null;
+    this.compSlot = '';
+    this.tox = 0;
+    this.toy = 0;
+  }
+
+  private compBlit(r: Renderer, slot: string, alpha: number): void {
+    const e = this.comps.get(slot);
+    if (!e || alpha <= 0.003) return;
+    const d = r.dctx;
+    d.globalAlpha = alpha > 1 ? 1 : alpha;
+    d.drawImage(e.cv, e.x0, e.y0);
+    d.globalAlpha = 1;
+  }
+
+  /** A round action / system button (cached composite) with optional progress ring, label and badge. */
+  private drawBtn(r: Renderer, id: TouchButtonId, A: number, held: boolean, icon: string, enabled = true, ready = false, frac = 1, fracColor = '', label = '', badge = ''): void {
+    const c: Circle = this.layout.buttons[id];
+    const fl = this.flash[id] ?? 0;
+    const style: DiscStyle = held ? 'pressed' : ready ? 'ready' : 'button';
+    const scale = held ? 0.92 : 1 + fl * 0.04;
+    const P = this.artPx();
+    const rp = Math.max(5, Math.round((c.r * scale * this.k) / P));
+    const fq = frac < 1 ? Math.floor(clamp(frac, 0, 1) * 48) : 48;
+    const key = `${style}|${rp}|${P}|${icon}|${enabled ? 1 : 0}|${fq}|${fracColor}|${label}|${badge}|${c.x},${c.y},${c.r}|${this.k}`;
+    if (this.compBegin(r, id, key, c, c.r * 1.3 + 8)) {
+      const da = held ? 0.95 : enabled ? 0.78 : 0.45;
+      this.disc(r, c, c.r * scale, style, da);
+      if (fq < 48) this.ring(r, c, rp, fq / 48, fracColor || C.gold, da);
+      this.icon(r, icon, c, rp, enabled ? 1 : 0.5, { dy: label ? -1 : 0 });
+      if (label) this.text(r, label, c.x, c.y + c.r * 0.38, 10, enabled ? C.text : C.textFaint, enabled ? 0.95 : 0.6);
+      if (badge) this.text(r, badge, c.x + c.r * 0.62, c.y + c.r * 0.28, 10, enabled ? C.goldHi : C.textFaint, 1);
+      this.compEnd(r);
+    }
+    this.compBlit(r, id, A);
+    if (ready && !held) this.fullRing(r, c, rp, '#ffe09a', A * 0.35 * (0.5 + 0.5 * Math.sin(this.t * 6)));
+  }
+
+  private rimCvs = new Map<string, HTMLCanvasElement>();
+
+  /** A complete rim ring (cached bitmap) — the pulsing "ready" highlight. */
+  private fullRing(r: Renderer, c: Vec, rp: number, color: string, alpha: number): void {
+    if (alpha <= 0.003) return;
+    const key = `${rp}|${color}`;
+    let cv = this.rimCvs.get(key);
+    if (!cv) {
+      cv = document.createElement('canvas');
+      cv.width = cv.height = rp * 2;
+      const g = cv.getContext('2d')!;
+      g.fillStyle = color;
+      for (const p of rimPixels(rp)) g.fillRect(p.x, p.y, 1, 1);
+      this.rimCvs.set(key, cv);
+    }
+    const k = this.k;
+    const P = this.artPx();
+    const d = r.dctx;
+    d.globalAlpha = alpha;
+    d.drawImage(cv, Math.round(c.x * k - rp * P), Math.round(c.y * k - rp * P), rp * 2 * P, rp * 2 * P);
+    d.globalAlpha = 1;
   }
 
   /** Ease the reticle toward the current target (world coords). */
@@ -656,12 +787,13 @@ export class TouchControls {
     const d = r.dctx;
     const arm = 3;
     const px = (x: number, y: number, w: number, h: number) => d.fillRect(Math.round(c.x + x * P), Math.round(c.y + y * P), Math.ceil(w * P), Math.ceil(h * P));
-    const corners: [number, number][] = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
-    for (const pass of [0, 1]) {
+    for (let pass = 0; pass < 2; pass++) {
       d.globalAlpha = A * R.a * (pass ? 1 : 0.8);
       d.fillStyle = pass ? (held ? '#ffe09a' : '#f4ead8') : C.ink;
       const o = pass ? 0 : 1; // outline pass is 1px fatter
-      for (const [sx, sy] of corners) {
+      for (let ci = 0; ci < 4; ci++) {
+        const sx = ci & 1 ? 1 : -1;
+        const sy = ci & 2 ? 1 : -1;
         const x0 = sx * half - (sx > 0 ? 1 : 0);
         const y0 = sy * half - (sy > 0 ? 1 : 0);
         // horizontal arm
@@ -699,16 +831,24 @@ export class TouchControls {
     if (!c || !p) return;
     const at = this.router.attack;
     const on = !!at;
-    const rp = this.disc(r, c, c.r * (on ? 0.95 : 1), on ? 'pressed' : 'button', A * (on ? 0.95 : 0.8));
     const wdef = Weapons.get(p.weaponId);
+    const P = this.artPx();
+    const rp = Math.max(5, Math.round((c.r * (on ? 0.95 : 1) * this.k) / P));
     // charge weapons: the draw progress on the rim
     const st = p.weapon;
-    if (wdef?.kind === 'charge' && st?.mem?.drawing) {
-      const full = st.charge >= 1;
-      this.ring(r, c, rp, clamp(st.charge, 0, 1), full ? '#ffffff' : '#7ad0ff', A * (full ? 0.6 + 0.4 * Math.sin(this.t * 30) : 1));
+    const drawing = wdef?.kind === 'charge' && !!st?.mem?.drawing;
+    const cq = drawing ? Math.floor(clamp(st.charge, 0, 1) * 48) : -1;
+    const icon = wdef?.icon ?? 'tc_attack';
+    const key = `${on ? 1 : 0}|${rp}|${P}|${icon}|${cq}|${c.x},${c.y},${c.r}|${this.k}`;
+    if (this.compBegin(r, 'attack', key, c, c.r * 1.2 + 6)) {
+      this.disc(r, c, c.r * (on ? 0.95 : 1), on ? 'pressed' : 'button', on ? 0.95 : 0.8);
+      if (cq >= 0 && cq < 48) this.ring(r, c, rp, cq / 48, '#7ad0ff', 1);
+      this.icon(r, icon, c, rp, on ? 1 : 0.92, { fill: 0.5, dy: -2 });
+      this.text(r, '공격', c.x, c.y + c.r * 0.42, 10, on ? C.goldHi : C.text, 0.95);
+      this.compEnd(r);
     }
-    this.icon(r, wdef?.icon ?? 'tc_attack', c, rp, A * (on ? 1 : 0.92), { fill: 0.5, dy: -2 });
-    this.text(r, '공격', c.x, c.y + c.r * 0.42, 10, on ? C.goldHi : C.text, A * 0.95);
+    this.compBlit(r, 'attack', A);
+    if (cq >= 48) this.fullRing(r, c, rp, '#ffffff', A * (0.6 + 0.4 * Math.sin(this.t * 30)));
     if (!at) return;
     if (at.manual) {
       // direction pip on the button rim + the finger knob
@@ -737,49 +877,28 @@ export class TouchControls {
     if (L.scheme === 'twin') this.drawStick(r, 'right', A, !!this.router.right?.engaged);
     else this.drawAttack(r, w, A);
 
-    const btn = (id: TouchButtonId, opts: { icon: string; enabled?: boolean; ready?: boolean; frac?: number; fracColor?: string; label?: string; badge?: string; hidden?: boolean }) => {
-      const c: Circle = L.buttons[id];
-      if (opts.hidden) return;
-      const on = held.has(id);
-      const fl = this.flash[id] ?? 0;
-      const style: DiscStyle = on ? 'pressed' : opts.ready ? 'ready' : 'button';
-      const en = opts.enabled !== false;
-      const alpha = A * (on ? 0.95 : en ? 0.78 : 0.45);
-      const scale = on ? 0.92 : 1 + fl * 0.04;
-      const rp = this.disc(r, c, c.r * scale, style, alpha);
-      if (opts.frac !== undefined && opts.frac < 1) this.ring(r, c, rp, opts.frac, opts.fracColor ?? C.gold, alpha);
-      if (opts.ready && !on) {
-        const pulse = 0.5 + 0.5 * Math.sin(this.t * 6);
-        this.ring(r, c, rp, 1, '#ffe09a', A * 0.35 * pulse);
-      }
-      this.icon(r, opts.icon, c, rp, A * (en ? 1 : 0.5), { dy: opts.label ? -1 : 0 });
-      if (opts.label) this.text(r, opts.label, c.x, c.y + c.r * 0.38, 10, en ? C.text : C.textFaint, A * (en ? 0.95 : 0.6));
-      if (opts.badge) this.text(r, opts.badge, c.x + c.r * 0.62, c.y + c.r * 0.28, 10, en ? C.goldHi : C.textFaint, A);
-    };
-
     // dash: cooldown sweep
     const dashMax = p.stats?.dashCooldown || 1;
     const dashFrac = p.dashCD > 0 ? 1 - p.dashCD / dashMax : 1;
-    btn('dash', { icon: 'tc_dash', frac: dashFrac, fracColor: '#7ac8ff', label: '대시', enabled: dashFrac >= 1 });
+    this.drawBtn(r, 'dash', A, held.has('dash'), 'tc_dash', dashFrac >= 1, false, dashFrac, '#7ac8ff', '대시');
     // bomb: count
-    btn('bomb', { icon: 'hud_bomb', enabled: p.bombs > 0, badge: String(p.bombs) });
-    // lantern release: ember gauge
+    this.drawBtn(r, 'bomb', A, held.has('bomb'), 'hud_bomb', p.bombs > 0, false, 1, '', '', String(p.bombs));
+    // lantern release: ember gauge on the rim
     const ember = clamp(p.ember / EMBER_MAX, 0, 1);
     const full = ember >= 1;
-    btn('special', { icon: full ? animFrame('ui_lantern', this.t) : 'ui_lantern_0', frac: ember, fracColor: C.ember, ready: full, enabled: full, label: '해방' });
-    // active item: charge
+    this.drawBtn(r, 'special', A, held.has('special'), full ? animFrame('ui_lantern', this.t) : 'ui_lantern_0', full, full, ember, C.ember, '해방');
+    // active item: charge (only while held)
     const adef = p.activeId ? Actives.get(p.activeId) : undefined;
     if (adef) {
       const frac = adef.charge > 0 ? clamp(p.activeCharge / adef.charge, 0, 1) : 1;
-      btn('active', { icon: adef.icon, frac, fracColor: '#8ee07a', ready: frac >= 1, enabled: frac >= 1 });
-    } else btn('active', { icon: 'tc_pause', hidden: true });
+      this.drawBtn(r, 'active', A, held.has('active'), adef.icon, frac >= 1, frac >= 1, frac, '#8ee07a');
+    }
     // potion
-    if (p.potionId) btn('consumable', { icon: potionSpriteFor(w, p.potionId) });
-    else btn('consumable', { icon: 'tc_pause', hidden: true });
+    if (p.potionId) this.drawBtn(r, 'consumable', A, held.has('consumable'), potionSpriteFor(w, p.potionId));
     // system
-    btn('pause', { icon: 'tc_pause' });
-    btn('map', { icon: 'tc_map' });
-    btn('inventory', { icon: 'tc_bag' });
+    this.drawBtn(r, 'pause', A, held.has('pause'), 'tc_pause');
+    this.drawBtn(r, 'map', A, held.has('map'), 'tc_map');
+    this.drawBtn(r, 'inventory', A, held.has('inventory'), 'tc_bag');
   }
 
   private drawMenuChrome(r: Renderer): void {

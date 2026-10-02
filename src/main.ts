@@ -6,6 +6,7 @@ import { input } from './engine/input';
 import { audio } from './audio/audio';
 import { warmAllSprites } from './engine/sprites';
 import { FIXED_DT } from './game/constants';
+import { FramePacer } from './engine/pacing';
 import { loadContent } from './content';
 import { TitleScene, CharacterSelectScene } from './ui/title';
 import { GameScene } from './ui/game-scene';
@@ -74,33 +75,33 @@ async function boot(): Promise<void> {
     setTimeout(() => bootEl.remove(), 450);
   }
 
-  let last = performance.now();
-  let acc = 0;
+  // fixed 60 Hz steps; snapped rAF deltas and no redraw of an unchanged state
+  // (a 120 Hz ProMotion display draws a steady 60 fps, see engine/pacing.ts)
+  const pacer = new FramePacer(FIXED_DT);
+  pacer.reset(performance.now());
   let fpsAcc = 0;
   let fpsFrames = 0;
+  let drawn = false;
   const frame = (now: number) => {
-    let delta = (now - last) / 1000;
-    last = now;
-    if (delta > 0.25) delta = 0.25; // tab was hidden
-    acc += delta;
+    const delta = pacer.delta(now);
     fpsAcc += delta;
-    fpsFrames++;
+    touch.frame();
+    const steps = pacer.steps(delta);
+    for (let i = 0; i < steps; i++) {
+      input.update();
+      app.scenes.update(FIXED_DT);
+    }
+    if (steps > 0 || !drawn) {
+      app.scenes.draw();
+      touch.draw(app.renderer);
+      drawn = true;
+      fpsFrames++;
+    }
     if (fpsAcc >= 0.5) {
       app.fps = fpsFrames / fpsAcc;
       fpsAcc = 0;
       fpsFrames = 0;
     }
-    touch.frame();
-    let steps = 0;
-    while (acc >= FIXED_DT && steps < 5) {
-      input.update();
-      app.scenes.update(FIXED_DT);
-      acc -= FIXED_DT;
-      steps++;
-    }
-    if (steps >= 5) acc = 0;
-    app.scenes.draw();
-    touch.draw(app.renderer);
     input.endFrame();
     requestAnimationFrame(frame);
   };

@@ -31,6 +31,8 @@ import { C, splitFloorName } from './theme';
 import { formatDelta, heartSlots, hudStats, type HeartKind } from './logic';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
+import { UiLayer } from './layer-cache';
+import type { HudStat } from './logic';
 
 /** HUD minimap size and margin (UI units). */
 export const MINIMAP_W = 124;
@@ -62,6 +64,11 @@ interface Shard {
   age: number;
   life: number;
   color: string;
+}
+
+/** A counter is animating (pop / floating delta) */
+function counterBusy(tr: ChangeTracker): boolean {
+  return tr.pop > 0 || (tr.age < 1.1 && tr.delta !== 0);
 }
 
 export class Hud {
@@ -107,6 +114,41 @@ export class Hud {
   /** HUD area inside the safe insets (UI units); corner elements are drawn translated to its top-left */
   private W = UI_W;
   private H = UI_H;
+  // ---- cached layers (static HUD parts are painted once and blitted until their inputs change)
+  private statRows: HudStat[] = [];
+  private statVals = [NaN, NaN, NaN, NaN, NaN, NaN];
+  private statKey = '';
+  private statTrackers: ChangeTracker[] = [];
+  private heartsKey = '';
+  private readonly lyHearts = new UiLayer();
+  private readonly lyLeft = new UiLayer();
+  private readonly lyActive = new UiLayer();
+  private readonly lyMap = new UiLayer();
+  private readonly lyEmber = new UiLayer();
+  private readonly lySlots = new UiLayer();
+  /** world / renderer of the current draw call (for the prebound paint callbacks) */
+  private cw: World | null = null;
+  private cr: Renderer | null = null;
+  private readonly paintHearts = () => this.drawHearts(this.cr!, this.cw!, 1);
+  private readonly paintLeft = () => {
+    this.drawConsumables(this.cr!, this.cw!, 1);
+    this.drawStats(this.cr!, this.cw!, 1);
+  };
+  private readonly paintActive = () => this.drawActive(this.cr!, this.cw!, 1, false);
+  private readonly paintMap = () => this.drawMinimap(this.cr!, this.cw!, 1, true);
+  private readonly paintEmber = () => this.drawEmber(this.cr!, this.cw!, 1);
+  private readonly paintSlots = () => this.drawSlots(this.cr!, this.cw!, 1);
+  private readonly lyBoss = new UiLayer();
+  private bossBy = 0;
+  private readonly paintBossName = () => {
+    const r = this.cr!;
+    const by = this.bossBy;
+    r.uiText(this.bossName, this.W / 2, by - 18, { size: 12, bold: true, align: 'center', color: '#ffd8d8', outline: '#2a0408' });
+    if (this.bossTitle) {
+      const nw = r.measureText(this.bossName, 12, true);
+      r.uiText(this.bossTitle, this.W / 2 - nw / 2 - 8, by - 16, { size: 10, font: 'small', align: 'right', color: '#b06068', alpha: 0.9, outline: '#2a0408' });
+    }
+  };
 
   update(w: World, dt: number): void {
     this.t += dt;
@@ -125,6 +167,7 @@ export class Hud {
       this.slotDir[i] = nv >= bv ? 1 : -1;
       if (nv < bv) this.spawnShards(i, before === 'soul' || before === 'soulHalf' ? C.soul : C.heart);
     }
+    if (slots.length !== this.slots.length || slots.some((k, i) => k !== this.slots[i])) this.heartsKey = slots.join(',');
     this.slots = slots;
     const hp = p.red + p.soul;
     if (this.lastHp >= 0 && hp < this.lastHp) this.hurtFlash = 1;
@@ -136,18 +179,31 @@ export class Hud {
       s.x += s.vx * dt;
       s.y += s.vy * dt;
     }
-    this.shards = this.shards.filter((s) => s.age < s.life);
+    if (this.shards.length) this.shards = this.shards.filter((s) => s.age < s.life);
     // ---- counters
     this.coins.update(p.coins, dt);
     this.bombs.update(p.bombs, dt);
     this.keys.update(p.keys, dt);
-    for (const st of hudStats(p.stats)) {
+    const ps = p.stats;
+    const sv = this.statVals;
+    if (sv[0] !== ps.moveSpeed || sv[1] !== ps.fireRate || sv[2] !== ps.damage || sv[3] !== ps.range || sv[4] !== ps.shotSpeed || sv[5] !== ps.luck) {
+      sv[0] = ps.moveSpeed;
+      sv[1] = ps.fireRate;
+      sv[2] = ps.damage;
+      sv[3] = ps.range;
+      sv[4] = ps.shotSpeed;
+      sv[5] = ps.luck;
+      this.statRows = hudStats(ps);
+      this.statKey = this.statRows.map((st) => st.text).join('|');
+    }
+    for (const st of this.statRows) {
       const v = Math.round(st.value * 100) / 100;
       let tr = this.stats.get(st.key);
       if (!tr) {
         tr = new ChangeTracker(v, 0.45);
         tr.reset(v);
         this.stats.set(st.key, tr);
+        this.statTrackers.push(tr);
       }
       tr.update(v, dt);
     }
@@ -264,22 +320,15 @@ export class Hud {
     this.H = UI_H - sa.t - sa.b;
     const touchUi = touchUiActive();
     const d = r.dctx;
+    this.cr = r;
+    this.cw = w;
     d.save();
     d.translate(sa.l, sa.t);
-    if (A > 0.01) {
-      this.drawActive(r, w, A);
-      this.drawHearts(r, w, A);
-      this.drawBuffs(r, w, A);
-      this.drawConsumables(r, w, A);
-      this.drawStats(r, w, A);
-      this.drawMinimap(r, w, A);
-      if (!touchUi) {
-        this.drawEmber(r, w, A);
-        this.drawSlots(r, w, A);
-      }
-    }
+    if (A > 0.01) this.drawCorners(r, w, A, sa.l, sa.t, touchUi);
     this.drawBoss(r, A);
     d.restore();
+    this.cr = null;
+    this.cw = null;
     drawBanners(r, w);
     if (this.clearT >= 0) drawRoomClear(r, this.clearT, w.banners.length === 0 && !w.floorCard);
     if (w.floorCard) drawFloorCard(r, w.floorCard);
@@ -288,7 +337,61 @@ export class Hud {
     if (save.settings.showFps) r.uiText(`${Math.round(fps)} FPS`, UI_W / 2, 4, { size: 10, font: 'small', align: 'center', color: '#80ff80' });
   }
 
-  private drawActive(r: Renderer, w: World, A: number): void {
+  /** Corner HUD: cached layers while nothing animates, live drawing during animations. */
+  private drawCorners(r: Renderer, w: World, A: number, ox: number, oy: number, touchUi: boolean): void {
+    const p = w.player;
+    // active item box (the ready glow pulses live under the cached box)
+    if (p.activeId) {
+      const def = Actives.get(p.activeId);
+      if (def && (this.activeFlash > 0 || this.activeUse > 0 || this.activePop > 0)) this.drawActive(r, w, A);
+      else if (def) {
+        const ready = p.activeCharge >= def.charge;
+        const pulse = 0.5 + 0.5 * Math.sin(this.t * 5);
+        if (ready) glow(r, 10 + 22, 10 + 22, 40, '#ffd060', (0.18 + 0.12 * pulse) * A);
+        const fh = Math.round(36 * clamp(p.activeCharge / def.charge, 0, 1));
+        const key = `${def.icon}|${ready ? (pulse > 0.5 ? 2 : 1) : 0}|${fh}|${def.charge}|${input.aimMode === 'pad' ? 1 : 0}`;
+        this.lyActive.draw(r, key, ox, oy, 0, 0, 72, 64, A, this.paintActive);
+      }
+    }
+    // hearts
+    const low = p.red + p.soul <= 2 && p.alive;
+    let heartsBusy = low || this.hurtFlash > 0 || this.shards.length > 0 || p.shields > 0;
+    for (let i = 0; i < this.slots.length && !heartsBusy; i++) if ((this.slotPop[i] ?? 0) > 0) heartsBusy = true;
+    if (heartsBusy) this.drawHearts(r, w, A);
+    else this.lyHearts.draw(r, this.heartsKey, ox, oy, 68, 8, 122, 6 + Math.ceil(this.slots.length / 6) * 18, A, this.paintHearts);
+    this.drawBuffs(r, w, A);
+    // counters + stats column
+    let leftBusy = counterBusy(this.coins) || counterBusy(this.bombs) || counterBusy(this.keys);
+    for (let i = 0; i < this.statTrackers.length && !leftBusy; i++) {
+      const tr = this.statTrackers[i];
+      if (tr.age < 2.5 && tr.delta !== 0) leftBusy = true;
+    }
+    if (leftBusy) {
+      this.drawConsumables(r, w, A);
+      this.drawStats(r, w, A);
+    } else {
+      const key = `${p.coins}|${p.bombs}|${p.keys}|${p.activeId ? 1 : 0}|${this.statKey}`;
+      this.lyLeft.draw(r, key, ox, oy, 4, 40, 92, 186, A, this.paintLeft);
+    }
+    // minimap (+ floor name, seed); the current-room pulse is drawn live on top
+    if (!this.minimap.settled) this.drawMinimap(r, w, A);
+    else {
+      const key = `${this.minimap.signature(w)}|${w.floor.name}|${w.run.seed}|${this.W}`;
+      this.lyMap.draw(r, key, ox, oy, this.W - MINIMAP_W - MINIMAP_MARGIN - 40, MINIMAP_MARGIN - 2, MINIMAP_W + MINIMAP_MARGIN + 40, MINIMAP_H + 32, A, this.paintMap);
+      this.minimap.drawPulse(r, w, this.W - MINIMAP_W - MINIMAP_MARGIN, MINIMAP_MARGIN, MINIMAP_W, MINIMAP_H, this.t, A);
+    }
+    if (touchUi) return; // the touch buttons carry the ember gauge, weapon and potion
+    if (this.emberFull || this.emberFlash > 0 || this.releaseFlash > 0) this.drawEmber(r, w, A);
+    else this.lyEmber.draw(r, `${Math.round(108 * clamp(this.emberShown, 0, 1))}`, ox, oy, 0, this.H - 44, 160, 44, A, this.paintEmber);
+    if (this.potionPop > 0 || this.weaponPop > 0) this.drawSlots(r, w, A);
+    else {
+      const known = p.potionId ? w.run.identified.has(p.potionId) : false;
+      const key = `${p.potionId ?? ''}|${known ? 1 : 0}|${p.weaponId}|${input.aimMode === 'pad' ? 1 : 0}|${p.potionId ? potionSpriteFor(w, p.potionId) : ''}`;
+      this.lySlots.draw(r, key, ox, oy, this.W - 150, this.H - 64, 150, 64, A, this.paintSlots);
+    }
+  }
+
+  private drawActive(r: Renderer, w: World, A: number, withGlow = true): void {
     const p = w.player;
     if (!p.activeId) return;
     const def = Actives.get(p.activeId);
@@ -298,7 +401,7 @@ export class Hud {
     const s = 44;
     const ready = p.activeCharge >= def.charge;
     const pulse = 0.5 + 0.5 * Math.sin(this.t * 5);
-    if (ready) glow(r, x + s / 2, y + s / 2, 40, '#ffd060', (0.18 + 0.12 * pulse) * A);
+    if (ready && withGlow) glow(r, x + s / 2, y + s / 2, 40, '#ffd060', (0.18 + 0.12 * pulse) * A);
     frame(r, x, y, s, s, ready ? 'slotHi' : 'slot', { alpha: A });
     const sc = popScale(this.activePop, 0.4);
     spriteCentered(r, def.icon, x + s / 2, y + s / 2, fitScale(def.icon, 34, 2) * sc, {
@@ -419,7 +522,7 @@ export class Hud {
   private drawStats(r: Renderer, w: World, A: number): void {
     const p = w.player;
     const y0 = (p.activeId ? 64 : 48) + 3 * 18 + 8;
-    hudStats(p.stats).forEach((st, i) => {
+    this.statRows.forEach((st, i) => {
       const y = y0 + i * 15;
       const tr = this.stats.get(st.key);
       r.uiSprite(st.icon, 18, y + 6, 1.5, { alpha: A * 0.85 });
@@ -434,13 +537,13 @@ export class Hud {
     });
   }
 
-  private drawMinimap(r: Renderer, w: World, A: number): void {
+  private drawMinimap(r: Renderer, w: World, A: number, staticOnly = false): void {
     const mw = MINIMAP_W;
     const mh = MINIMAP_H;
     const RW = this.W;
     const x = RW - mw - MINIMAP_MARGIN;
     const y = MINIMAP_MARGIN;
-    this.minimap.draw(r, w, x, y, mw, mh, this.t, A);
+    this.minimap.draw(r, w, x, y, mw, mh, this.t, A, staticOnly);
     const [no, name] = splitFloorName(w.floor.name);
     r.uiText(name, RW - 10, y + mh + 4, { size: 10, font: 'small', align: 'right', color: C.textDim, alpha: A, outline: C.ink });
     if (no) r.uiText(no, RW - 12 - r.measureText(name, 10, false, 'small') - 6, y + mh + 4, { size: 10, font: 'small', align: 'right', color: C.gold, alpha: A, outline: C.ink });
@@ -505,14 +608,13 @@ export class Hud {
     const bw = 280;
     const bx = (this.W - bw) / 2;
     const by = this.H - 24 + (1 - k) * 30;
+    this.bossBy = by;
     const a = k;
     // name + title
     r.uiSprite('ui_skull', bx - 12, by + 6, 2, { alpha: a, flash: this.bossFlash * 0.6 });
-    r.uiText(this.bossName, this.W / 2, by - 18, { size: 12, bold: true, align: 'center', color: '#ffd8d8', alpha: a, outline: '#2a0408' });
-    if (this.bossTitle) {
-      const nw = r.measureText(this.bossName, 12, true);
-      r.uiText(this.bossTitle, this.W / 2 - nw / 2 - 8, by - 16, { size: 10, font: 'small', align: 'right', color: '#b06068', alpha: a * 0.9, outline: '#2a0408' });
-    }
+    // name + title: cached bitmap (outlined text is not re-stroked every frame)
+    const sa = r.uiSafe;
+    this.lyBoss.draw(r, `${this.bossName}|${this.bossTitle}|${this.W}|${Math.round(by * 4)}`, sa.l, sa.t, 0, by - 22, this.W, 22, a, this.paintBossName);
     const shake = this.bossFlash > 0 ? (Math.random() - 0.5) * 2 * this.bossFlash : 0;
     gauge(r, bx + shake, by, bw, 13, this.bossFrac, {
       fill: '#d02838', hi: '#ff6a70', lo: '#7a0a18', back: '#2a0810',

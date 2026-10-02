@@ -261,7 +261,8 @@ export class Renderer {
     this.world = document.createElement('canvas');
     this.world.width = VIEW_W;
     this.world.height = VIEW_H;
-    this.ctx = this.world.getContext('2d')!;
+    // opaque: beginWorld() fills it every frame, so the upscale blit needs no blending
+    this.ctx = this.world.getContext('2d', { alpha: false })!;
     this.ctx.imageSmoothingEnabled = false;
     this.resize();
   }
@@ -510,10 +511,21 @@ export class Renderer {
     d.setTransform(1, 0, 0, 1, 0, 0);
     d.globalAlpha = 1;
     d.globalCompositeOperation = 'source-over';
+    const ww = Math.round(VIEW_W * this.scale);
+    const wh = Math.round(VIEW_H * this.scale);
+    const ox = this.offsetX;
+    const oy = this.offsetY;
+    const dw = this.display.width;
+    const dh = this.display.height;
+    // black letterbox bars only: the opaque world image covers the rest (a
+    // full-screen fill is a whole extra screen of pixels per frame on Retina)
     d.fillStyle = '#000';
-    d.fillRect(0, 0, this.display.width, this.display.height);
+    if (oy > 0) d.fillRect(0, 0, dw, oy);
+    if (oy + wh < dh) d.fillRect(0, oy + wh, dw, dh - oy - wh);
+    if (ox > 0) d.fillRect(0, oy, ox, wh);
+    if (ox + ww < dw) d.fillRect(ox + ww, oy, dw - ox - ww, wh);
     d.imageSmoothingEnabled = false;
-    d.drawImage(this.world, this.offsetX, this.offsetY, Math.round(VIEW_W * this.scale), Math.round(VIEW_H * this.scale));
+    d.drawImage(this.world, ox, oy, ww, wh);
     if (this.flashAlpha > 0) {
       d.globalAlpha = clamp(this.flashAlpha, 0, 1);
       d.fillStyle = this.flashColor;

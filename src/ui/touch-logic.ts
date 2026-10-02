@@ -384,9 +384,12 @@ export class TouchRouter {
     return this.attack && this.attack.manual ? { ...this.attack.dir } : null;
   }
 
-  /** Buttons currently held by some pointer. */
+  private held = new Set<TouchButtonId>();
+
+  /** Buttons currently held by some pointer (a reused set: read it right away). */
   heldButtons(): Set<TouchButtonId> {
-    const s = new Set<TouchButtonId>();
+    const s = this.held;
+    s.clear();
     for (const o of this.owners.values()) if (o.kind === 'button') s.add(o.id);
     return s;
   }
