@@ -4,7 +4,7 @@
 
 import type { Scene } from './scene';
 import type { Renderer } from '../engine/renderer';
-import { UI_H, UI_W } from '../engine/renderer';
+import { UI_H, UI_W, UI_W_BASE, uiCenterX } from '../engine/renderer';
 import type { GameScene } from './game-scene';
 import { input } from '../engine/input';
 import { app } from '../game/app';
@@ -81,6 +81,7 @@ export class StatusOverlay implements Scene {
       if (this.rep.d.update(input.held('uiDown'), dt)) this.sel = gridMove(this.sel, n, COLS, 0, 1);
       if (this.rep.u.update(input.held('uiUp'), dt)) this.sel = gridMove(this.sel, n, COLS, 0, -1);
       const m = app.renderer.displayToUI(input.mouseX, input.mouseY);
+      m.x -= uiCenterX();
       this.hover = -1;
       for (let i = 0; i < n; i++) {
         const { x, y } = this.cellPos(i);
@@ -108,8 +109,9 @@ export class StatusOverlay implements Scene {
     r.beginUI();
     const k = this.closing >= 0 ? 1 - clamp(this.closing / 0.14, 0, 1) : appear(this.t, 0.2);
     r.uiRect(0, 0, UI_W, UI_H, C.void, 0.8 * k);
+    r.dctx.translate(uiCenterX(), 0); // 768-wide layout centered on wide screens
     const oy = (1 - k) * 10;
-    frame(r, 12, 8 + oy, UI_W - 24, UI_H - 16, 'ornate', { alpha: k });
+    frame(r, 12, 8 + oy, UI_W_BASE - 24, UI_H - 16, 'ornate', { alpha: k });
 
     // header
     r.uiText('소지품', 30, 20 + oy, { size: 24, bold: true, color: C.text, outline: C.ink, alpha: k });
@@ -118,7 +120,7 @@ export class StatusOverlay implements Scene {
     r.uiText(ch.name, 156, 22 + oy, { size: 12, bold: true, color: ch.color, alpha: k });
     r.uiText(ch.title, 156, 37 + oy, { size: 10, font: 'small', color: C.textFaint, alpha: k });
     const [no, fname] = splitFloorName(w.floor.name);
-    const hx = UI_W - 30 - (touchUiActive() ? 46 : 0); // leave room for the touch ✕ button
+    const hx = UI_W_BASE - 30 - (touchUiActive() ? 46 : 0); // leave room for the touch ✕ button
     r.uiText(`${no} · ${fname}`, hx, 20 + oy, { size: 12, align: 'right', color: C.textDim, alpha: k });
     r.uiText(`${formatTime(w.run.stats.timeSec)}  ·  처치 ${w.run.stats.kills}  ·  시드 ${w.run.seed}`, hx, 37 + oy, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: k });
 
@@ -220,7 +222,7 @@ export class StatusOverlay implements Scene {
     const p = w.player;
     const x = 460;
     const y = 58 + oy;
-    const ww = UI_W - 30 - x;
+    const ww = UI_W_BASE - 30 - x;
     frame(r, x, y, ww, 92, 'panel', { alpha: k });
     r.uiText('장비', x + 12, y + 8, { size: 10, font: 'small', color: C.gold, alpha: k });
     const wdef = Weapons.get(p.weaponId);
@@ -260,7 +262,7 @@ export class StatusOverlay implements Scene {
     const w = this.game.world;
     const x = 460;
     const y = 156 + oy;
-    const ww = UI_W - 30 - x;
+    const ww = UI_W_BASE - 30 - x;
     const h = 140;
     frame(r, x, y, ww, h, 'panel', { alpha: k });
     r.uiText('등불 공명', x + 12, y + 8, { size: 12, bold: true, color: C.goldHi, alpha: k });
@@ -316,7 +318,7 @@ export class StatusOverlay implements Scene {
     const p = w.player;
     const x = 460;
     const y = 302 + oy;
-    const ww = UI_W - 30 - x;
+    const ww = UI_W_BASE - 30 - x;
     const h = UI_H - 30 - y + oy - 6;
     frame(r, x, y, ww, h, 'panel', { alpha: k });
     r.uiText('능력치', x + 12, y + 8, { size: 10, font: 'small', color: C.gold, alpha: k });

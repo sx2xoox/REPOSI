@@ -4,6 +4,7 @@
 import type { Action } from '../engine/input';
 import { input } from '../engine/input';
 import { touchUiActive } from './touch-mode';
+import { save } from '../engine/save';
 
 const KEY_NAMES: Record<string, string> = {
   Space: 'Space',
@@ -87,7 +88,7 @@ export const CONTROL_ROWS: { label: string; actions: Action[]; padLabel?: string
   { label: '일시정지', actions: ['pause'] },
 ];
 
-/** Touch controls reference: [icon sprite or '', name, description]. */
+/** Touch controls reference ('twin' scheme): [icon sprite or '', name, description]. */
 export const TOUCH_CONTROL_ROWS: [string, string, string][] = [
   ['', '왼쪽 화면', '끌어서 이동'],
   ['', '오른쪽 화면', '끌어서 조준 · 자동 공격'],
@@ -99,6 +100,16 @@ export const TOUCH_CONTROL_ROWS: [string, string, string][] = [
   ['tc_map', '지도', ''],
   ['tc_bag', '소지품', ''],
 ];
+
+/** Touch controls reference for the current scheme (설정 > 터치 조작 방식). */
+export function touchControlRows(): [string, string, string][] {
+  if (save.settings.touchScheme === 'twin') return TOUCH_CONTROL_ROWS;
+  return [
+    ['', '왼쪽 화면', '끌어서 이동'],
+    ['tc_attack', '공격 버튼', '누르면 자동 조준 · 끌면 직접 조준'],
+    ...TOUCH_CONTROL_ROWS.slice(2),
+  ];
+}
 
 /** Compact key text for a controls row (e.g. "WASD", "↑←↓→ / 좌클릭"). */
 export function controlKeys(bindings: Record<Action, string[]>, actions: Action[]): string {

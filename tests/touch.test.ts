@@ -1,28 +1,36 @@
 import { describe, expect, it } from 'vitest';
 import {
-  AIM_ENGAGE, GAME_BUTTONS, MOVE_DEAD_ZONE, MOVE_FULL_AT, SCROLL_STEP, SYSTEM_BUTTONS, TAP_SLOP,
-  TapTracker, TouchRouter, computeTouchLayout, followBase, hitButton, knobPosition, qualityProfile, stickVector, touchVisible,
-  type Insets, type TouchButtonId, type TouchLayout,
+  AIM_ENGAGE, GAME_BUTTONS, MANUAL_ENGAGE, MANUAL_RELEASE, MOVE_DEAD_ZONE, MOVE_FULL_AT, SCROLL_STEP, SYSTEM_BUTTONS, TAP_SLOP, TARGET_DEFAULTS,
+  TapTracker, TouchRouter, computeTouchLayout, followBase, hitButton, knobPosition, pickTarget, qualityProfile, stickVector, touchScheme, touchVisible,
+  type HudGeometry, type Insets, type TargetCandidate, type TouchButtonId, type TouchLayout, type TouchScheme,
 } from '../src/ui/touch-logic';
 import { Input } from '../src/engine/input';
+import { fitViewport, UI_H, VIEW_H } from '../src/engine/renderer';
 
 const NO_SAFE: Insets = { l: 0, r: 0, t: 0, b: 0 };
 
-/** 16:9 game rect letterboxed into a viewport (what the renderer does). */
-function gameRect(w: number, h: number) {
-  const s = Math.min(w / 384, h / 216);
-  const gw = 384 * s;
-  const gh = 216 * s;
-  return { x: (w - gw) / 2, y: (h - gh) / 2, w: gw, h: gh };
+/** What the renderer + HUD produce for a viewport (CSS px, dpr 1): world image rect and minimap block. */
+function hudGeom(w: number, h: number, safe: Insets = NO_SAFE): HudGeometry {
+  const f = fitViewport(w, h);
+  const game = { x: f.offsetX, y: f.offsetY, w: f.viewW * f.scale, h: VIEW_H * f.scale };
+  const us = f.uiScale;
+  // HUD: minimap 124x86 (+ 2 text lines) 8 units from the safe top-right corner of the UI space
+  const uiRight = f.uiOffsetX + f.uiW * us;
+  const safeR = Math.max(0, uiRight - (w - safe.r));
+  const safeT = Math.max(0, safe.t - f.uiOffsetY);
+  const minimap = { x: uiRight - safeR - (124 + 8) * us, y: f.uiOffsetY + safeT + 8 * us, w: 124 * us, h: 116 * us };
+  return { game, minimap };
 }
 
 const VIEWS: { name: string; w: number; h: number; safe: Insets }[] = [
-  { name: 'pixel 7', w: 863, h: 360, safe: NO_SAFE },
-  { name: 'iphone 14 (notch)', w: 844, h: 390, safe: { l: 47, r: 47, t: 0, b: 21 } },
+  { name: 'pixel 7 (20:9)', w: 915, h: 412, safe: NO_SAFE },
+  { name: 'iphone 16e (notch)', w: 844, h: 390, safe: { l: 47, r: 47, t: 0, b: 21 } },
+  { name: 'iphone pro max (19.5:9)', w: 932, h: 430, safe: { l: 59, r: 59, t: 0, b: 21 } },
+  { name: '21:9 android', w: 960, h: 411, safe: { l: 0, r: 32, t: 0, b: 0 } },
   { name: 'iphone se (16:9)', w: 667, h: 375, safe: NO_SAFE },
-  { name: 'ipad', w: 1194, h: 834, safe: { l: 0, r: 0, t: 0, b: 20 } },
+  { name: 'ipad', w: 1180, h: 820, safe: { l: 0, r: 0, t: 0, b: 20 } },
+  { name: 'ipad 4:3', w: 1024, h: 768, safe: NO_SAFE },
 ];
-
 describe('stick math', () => {
   it('ignores the dead zone', () => {
     const v = stickVector(40 * MOVE_DEAD_ZONE * 0.9, 0, 40);
@@ -54,60 +62,124 @@ describe('stick math', () => {
   });
 });
 
+describe('adaptive viewport', () => {
+  it('16:9 is exactly the classic 384x216 / 768x432', () => {
+    for (const [w, h] of [[1280, 720], [1920, 1080], [3840, 2160], [667, 375]]) {
+      const f = fitViewport(w, h);
+      expect(f.viewW, `${w}x${h}`).toBe(384);
+      expect(f.uiW).toBe(768);
+      expect(f.uiScale).toBeCloseTo(f.scale / 2, 9);
+      expect(Math.abs(f.offsetX)).toBeLessThanOrEqual(1);
+      expect(Math.abs(f.offsetY)).toBeLessThanOrEqual(1);
+    }
+  });
+  it('wide phones fill the screen (no bars) with a wider world', () => {
+    for (const [w, h, dpr] of [[844, 390, 3], [932, 430, 3], [915, 412, 2.625], [960, 411, 3], [800, 360, 2]]) {
+      const W = Math.round(w * dpr);
+      const H = Math.round(h * dpr);
+      const f = fitViewport(W, H);
+      expect(f.viewW % 2, `${w}x${h}`).toBe(0);
+      expect(f.viewW).toBeGreaterThan(384);
+      // world image covers the whole display (at most a world pixel is cropped)
+      expect(f.offsetX).toBeLessThanOrEqual(0);
+      expect(f.offsetX).toBeGreaterThan(-f.scale * 1.01);
+      expect(f.offsetX + f.viewW * f.scale).toBeGreaterThanOrEqual(W - 1);
+      expect(Math.abs(f.offsetY)).toBeLessThanOrEqual(1);
+      expect(VIEW_H * f.scale).toBeGreaterThanOrEqual(H - 1);
+      // the UI space spans the same rect, twice the world resolution
+      expect(f.uiW).toBe(f.viewW * 2);
+      expect(UI_H * f.uiScale).toBeCloseTo(VIEW_H * f.scale, 6);
+    }
+    expect(fitViewport(844 * 3, 390 * 3).viewW).toBe(468);
+    expect(fitViewport(915, 412).viewW).toBe(480);
+  });
+  it('ultrawide is capped (pillarbox) and tall tablets keep a 768x432 UI band', () => {
+    const uw = fitViewport(2560, 1080);
+    expect(uw.viewW).toBe(512);
+    const sw = fitViewport(3440, 1440);
+    expect(sw.viewW).toBe(512);
+    expect(sw.offsetX).toBeGreaterThan(0);
+    const ipad = fitViewport(1180, 820);
+    expect(ipad.viewW).toBeGreaterThanOrEqual(304);
+    expect(ipad.viewW).toBeLessThan(384);
+    expect(ipad.offsetY).toBe(0); // world fills the height
+    expect(ipad.uiW).toBe(768);
+    expect(ipad.uiOffsetY).toBeGreaterThan(0); // UI band centered vertically
+    expect(ipad.uiScale * 768).toBeCloseTo(ipad.viewW * ipad.scale, 6);
+    const ipad43 = fitViewport(1024, 768);
+    expect(ipad43.viewW).toBe(304);
+    expect(ipad43.offsetY).toBeGreaterThan(0); // slight letterbox below 1.41:1
+    expect(ipad43.offsetY).toBeLessThan(768 * 0.04);
+  });
+  it('pixel-perfect keeps an integer scale', () => {
+    const f = fitViewport(1280, 720, true);
+    expect(f.scale).toBe(3);
+    expect(f.offsetX).toBeLessThanOrEqual(0);
+  });
+});
+
 describe('layout', () => {
-  for (const v of VIEWS) {
-    describe(v.name, () => {
-      const game = gameRect(v.w, v.h);
-      const L = computeTouchLayout({ w: v.w, h: v.h }, v.safe, game);
-      const all = [...GAME_BUTTONS, ...SYSTEM_BUTTONS] as TouchButtonId[];
-      it('keeps every button and stick inside the safe area', () => {
-        for (const id of all) {
-          const c = L.buttons[id];
-          expect(c.x - c.r, id).toBeGreaterThanOrEqual(v.safe.l);
-          expect(c.x + c.r, id).toBeLessThanOrEqual(v.w - v.safe.r);
-          expect(c.y - c.r, id).toBeGreaterThanOrEqual(v.safe.t);
-          expect(c.y + c.r, id).toBeLessThanOrEqual(v.h - v.safe.b);
-        }
-        for (const rest of [L.leftRest, L.rightRest]) {
-          expect(rest.x - L.stickR).toBeGreaterThanOrEqual(v.safe.l);
-          expect(rest.x + L.stickR).toBeLessThanOrEqual(v.w - v.safe.r);
-          expect(rest.y + L.stickR).toBeLessThanOrEqual(v.h - v.safe.b);
-        }
-        for (const c of [L.back, L.backLeft]) {
-          expect(c.x - c.r).toBeGreaterThanOrEqual(v.safe.l);
-          expect(c.x + c.r).toBeLessThanOrEqual(v.w - v.safe.r);
-        }
-      });
-      it('buttons do not overlap each other or the resting aim stick', () => {
-        for (let i = 0; i < all.length; i++) {
-          for (let j = i + 1; j < all.length; j++) {
-            const a = L.buttons[all[i]];
-            const b = L.buttons[all[j]];
-            expect(Math.hypot(a.x - b.x, a.y - b.y), `${all[i]}/${all[j]}`).toBeGreaterThan(a.r + b.r);
+  for (const scheme of ['auto', 'twin'] as TouchScheme[]) {
+    for (const v of VIEWS) {
+      describe(`${scheme} · ${v.name}`, () => {
+        const hud = hudGeom(v.w, v.h, v.safe);
+        const L = computeTouchLayout({ w: v.w, h: v.h }, v.safe, hud, scheme);
+        const all = [...GAME_BUTTONS, ...SYSTEM_BUTTONS] as TouchButtonId[];
+        const circles = [...all.map((id) => ({ id: id as string, c: L.buttons[id] })), ...(L.attack ? [{ id: 'attack', c: L.attack }] : [])];
+        it('keeps every button and stick inside the safe area', () => {
+          for (const { id, c } of circles) {
+            expect(c.x - c.r, id).toBeGreaterThanOrEqual(v.safe.l);
+            expect(c.x + c.r, id).toBeLessThanOrEqual(v.w - v.safe.r);
+            expect(c.y - c.r, id).toBeGreaterThanOrEqual(v.safe.t);
+            expect(c.y + c.r, id).toBeLessThanOrEqual(v.h - v.safe.b);
           }
-          const c = L.buttons[all[i]];
-          expect(Math.hypot(c.x - L.rightRest.x, c.y - L.rightRest.y), all[i]).toBeGreaterThan(c.r + L.stickR);
-        }
+          for (const rest of [L.leftRest, L.rightRest]) {
+            expect(rest.x - L.stickR).toBeGreaterThanOrEqual(v.safe.l);
+            expect(rest.x + L.stickR).toBeLessThanOrEqual(v.w - v.safe.r);
+            expect(rest.y + L.stickR).toBeLessThanOrEqual(v.h - v.safe.b);
+          }
+          for (const c of [L.back, L.backLeft]) {
+            expect(c.x - c.r).toBeGreaterThanOrEqual(v.safe.l);
+            expect(c.x + c.r).toBeLessThanOrEqual(v.w - v.safe.r);
+          }
+        });
+        it('buttons do not overlap each other, the attack button or the resting sticks', () => {
+          for (let i = 0; i < circles.length; i++) {
+            for (let j = i + 1; j < circles.length; j++) {
+              const a = circles[i].c;
+              const b = circles[j].c;
+              expect(Math.hypot(a.x - b.x, a.y - b.y), `${circles[i].id}/${circles[j].id}`).toBeGreaterThan(a.r + b.r);
+            }
+          }
+          for (const id of all) {
+            const c = L.buttons[id];
+            if (scheme === 'twin') expect(Math.hypot(c.x - L.rightRest.x, c.y - L.rightRest.y), id).toBeGreaterThan(c.r + L.stickR);
+            expect(Math.hypot(c.x - L.leftRest.x, c.y - L.leftRest.y), id).toBeGreaterThan(c.r + L.stickR);
+          }
+        });
+        it('system buttons stay clear of the HUD minimap', () => {
+          const mm = hud.minimap;
+          for (const id of SYSTEM_BUTTONS) {
+            const c = L.buttons[id];
+            const inside = c.x + c.r > mm.x && c.x - c.r < mm.x + mm.w && c.y + c.r > mm.y && c.y - c.r < mm.y + mm.h;
+            expect(inside, id).toBe(false);
+          }
+        });
+        it('gameplay buttons are >= 44pt and stay on the right half', () => {
+          for (const id of GAME_BUTTONS) {
+            expect(L.buttons[id].r * 2, id).toBeGreaterThanOrEqual(44);
+            expect(L.buttons[id].x - L.buttons[id].r, id).toBeGreaterThan(L.splitX);
+          }
+          if (scheme === 'auto') expect(L.attack!.r * 2).toBeGreaterThanOrEqual(68);
+          else expect(L.attack).toBe(null);
+        });
       });
-      it('system buttons stay clear of the HUD minimap', () => {
-        const s = game.w / 768;
-        const mm = { x: game.x + 636 * s, y: game.y + 8 * s, w: 124 * s, h: 120 * s }; // map + floor name lines
-        for (const id of SYSTEM_BUTTONS) {
-          const c = L.buttons[id];
-          const inside = c.x + c.r > mm.x && c.x - c.r < mm.x + mm.w && c.y + c.r > mm.y && c.y - c.r < mm.y + mm.h;
-          expect(inside, id).toBe(false);
-        }
-      });
-      it('buttons are big enough to hit with a thumb', () => {
-        expect(L.buttons.dash.r * 2).toBeGreaterThanOrEqual(44);
-        for (const id of all) expect(L.buttons[id].r * 2 * 1.25, id).toBeGreaterThanOrEqual(34);
-      });
-    });
+    }
   }
 });
 
-function layout(): TouchLayout {
-  return computeTouchLayout({ w: 863, h: 360 }, NO_SAFE, gameRect(863, 360));
+function layout(scheme: TouchScheme = 'twin'): TouchLayout {
+  return computeTouchLayout({ w: 863, h: 360 }, NO_SAFE, hudGeom(863, 360), scheme);
 }
 
 describe('hit testing', () => {
@@ -178,6 +250,99 @@ describe('TouchRouter', () => {
     r.move(1, 200, 250);
     expect(r.moveVector()).toEqual({ x: 0, y: 0 });
     expect(r.up(1)).toEqual({ kind: 'ignored' });
+  });
+});
+
+describe('TouchRouter · auto-aim attack button', () => {
+  it('holding the attack button attacks; dragging past the dead zone aims manually', () => {
+    const r = new TouchRouter(layout('auto'));
+    const A = r.layout.attack!;
+    expect(r.down(1, A.x + 3, A.y - 2)).toEqual({ kind: 'attack' });
+    expect(r.attackHeld()).toBe(true);
+    expect(r.manualAim()).toBe(null); // auto-aim
+    // small wobble stays auto
+    r.move(1, A.x + 3 + A.r * MANUAL_ENGAGE * 0.6, A.y - 2);
+    expect(r.manualAim()).toBe(null);
+    // drag up past the dead zone: manual aim up
+    r.move(1, A.x + 3, A.y - 2 - A.r * 0.9);
+    expect(r.manualAim()!.y).toBeCloseTo(-1, 5);
+    // hysteresis: slightly back toward the center keeps manual ...
+    r.move(1, A.x + 3, A.y - 2 - A.r * (MANUAL_RELEASE + 0.05));
+    expect(r.manualAim()).not.toBe(null);
+    // ... returning to the touch point goes back to auto
+    r.move(1, A.x + 3, A.y - 2);
+    expect(r.manualAim()).toBe(null);
+    expect(r.attackHeld()).toBe(true);
+    expect(r.up(1)).toEqual({ kind: 'attack' });
+    expect(r.attackHeld()).toBe(false);
+  });
+  it('anywhere on the right half (off the buttons) also attacks; left half moves; buttons win', () => {
+    const L = layout('auto');
+    const r = new TouchRouter(L);
+    expect(r.down(1, L.splitX + 20, 60)).toEqual({ kind: 'attack' });
+    expect(r.attack!.onButton).toBe(false);
+    expect(r.down(2, 100, 250)).toEqual({ kind: 'stick', side: 'left' });
+    // a second attack finger is ignored
+    expect(r.down(3, L.attack!.x, L.attack!.y).kind).toBe('ignored');
+    const d = L.buttons.dash;
+    expect(r.down(4, d.x, d.y)).toEqual({ kind: 'button', id: 'dash' });
+    r.reset();
+    expect(r.attackHeld()).toBe(false);
+    expect(r.up(1)).toEqual({ kind: 'ignored' });
+  });
+  it('a disabled button under the finger falls through to the attack', () => {
+    const L = layout('auto');
+    const r = new TouchRouter(L);
+    const p = L.buttons.consumable;
+    expect(r.down(1, p.x, p.y, (id) => id !== 'consumable')).toEqual({ kind: 'attack' });
+  });
+  it('scheme setting parsing', () => {
+    expect(touchScheme(undefined)).toBe('auto');
+    expect(touchScheme('twin')).toBe('twin');
+    expect(touchScheme('bogus')).toBe('auto');
+  });
+});
+
+describe('auto-aim target selection', () => {
+  const O = { x: 0, y: 0 };
+  const c = (id: number, x: number, y: number, visible = true, weight?: number): TargetCandidate => ({ id, x, y, visible, weight });
+  it('picks the nearest visible enemy', () => {
+    const t = pickTarget(O, null, [c(1, 120, 0), c(2, 60, 40), c(3, -200, 0)], null);
+    expect(t!.id).toBe(2);
+  });
+  it('ignores nothing-in-range and returns null for no candidates', () => {
+    expect(pickTarget(O, null, [], null)).toBe(null);
+    expect(pickTarget(O, null, [c(1, TARGET_DEFAULTS.maxDist + 50, 0)], null)).toBe(null);
+  });
+  it('prefers targets roughly in the facing / move direction', () => {
+    const cands = [c(1, -80, 0), c(2, 110, 10)];
+    expect(pickTarget(O, null, cands, null)!.id).toBe(1); // pure nearest
+    expect(pickTarget(O, { x: 1, y: 0 }, cands, null)!.id).toBe(2); // moving right
+    // ... but a much closer enemy behind still wins
+    expect(pickTarget(O, { x: 1, y: 0 }, [c(1, -30, 0), c(2, 200, 0)], null)!.id).toBe(1);
+  });
+  it('prefers line of sight; falls back to hidden-behind-rocks targets', () => {
+    expect(pickTarget(O, null, [c(1, 50, 0, false), c(2, 90, 0, true)], null)!.id).toBe(2);
+    expect(pickTarget(O, null, [c(1, 50, 0, false)], null)!.id).toBe(1);
+  });
+  it('is sticky: the current target is kept until another is clearly better (no flicker)', () => {
+    // two enemies at almost the same distance, swapping order every frame
+    let prev: number | null = null;
+    const picks: number[] = [];
+    for (let f = 0; f < 20; f++) {
+      const wob = f % 2 ? 3 : -3;
+      const t: TargetCandidate = pickTarget(O, null, [c(1, 100 + wob, 0), c(2, 0, 100 - wob)], prev)!;
+      prev = t.id;
+      picks.push(t.id);
+    }
+    expect(new Set(picks).size).toBe(1);
+    // a clearly closer enemy takes over
+    expect(pickTarget(O, null, [c(1, 100, 0), c(2, 0, 50)], 1)!.id).toBe(2);
+    // the current target is kept a bit past the normal range
+    expect(pickTarget(O, null, [c(1, TARGET_DEFAULTS.maxDist * 1.05, 0)], 1)!.id).toBe(1);
+  });
+  it('weights (e.g. charmed enemies) lower the priority', () => {
+    expect(pickTarget(O, null, [c(1, 50, 0, true, 2), c(2, 80, 0)], null)!.id).toBe(2);
   });
 });
 

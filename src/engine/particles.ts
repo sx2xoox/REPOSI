@@ -250,17 +250,36 @@ export class Particles {
   }
 
   draw(r: Renderer, ground: boolean, lights?: Lighting): void {
+    // two passes — normal particles, then additive ones — so the blend mode
+    // changes once per layer instead of once per interleaved particle (every
+    // switch splits the GPU draw batch; a release trails hundreds of glows)
+    const c = r.ctx;
+    c.globalCompositeOperation = 'source-over';
+    if (this.drawPass(r, ground, false, lights)) {
+      c.globalCompositeOperation = 'lighter';
+      this.drawPass(r, ground, true, lights);
+    }
+    c.globalAlpha = 1;
+    c.globalCompositeOperation = 'source-over';
+  }
+
+  /** Draw the particles of one layer and blend mode. Returns true if the layer has additive particles. */
+  private drawPass(r: Renderer, ground: boolean, additive: boolean, lights?: Lighting): boolean {
     const c = r.ctx;
     const vx = r.viewX;
     const vy = r.viewY;
     const l = this.list;
+    const mode = additive ? 'lighter' : 'source-over';
     // canvas state is only touched when it changes (most particles share it)
-    let curAdd = false;
     let curCol = '';
-    c.globalCompositeOperation = 'source-over';
+    let sawAdditive = false;
     for (let i = 0; i < l.length; i++) {
       const p = l[i];
       if (p.ground !== ground) continue;
+      if (p.additive !== additive) {
+        if (p.additive) sawAdditive = true;
+        continue;
+      }
       const t = p.age / p.life;
       const size = p.size + (p.sizeEnd - p.size) * t;
       const sx = p.x - vx;
@@ -272,10 +291,6 @@ export class Particles {
       const cols = p.colors;
       const col = cols.length === 1 ? cols[0] : cols[Math.min(cols.length - 1, Math.floor(t * cols.length))];
       c.globalAlpha = a;
-      if (p.additive !== curAdd) {
-        curAdd = p.additive;
-        c.globalCompositeOperation = curAdd ? 'lighter' : 'source-over';
-      }
       if (col !== curCol) {
         curCol = col;
         c.fillStyle = col;
@@ -323,7 +338,7 @@ export class Particles {
           if (p.sprite) {
             r.spriteScreen(p.sprite, sx, sy, { rot: p.rot, alpha: a, sx: size, sy: size, additive: p.additive });
             // spriteScreen resets the canvas state
-            curAdd = false;
+            c.globalCompositeOperation = mode;
             curCol = '';
           }
           break;
@@ -331,7 +346,6 @@ export class Particles {
       }
       if (lights && p.light > 0) lights.add(p.x, p.y - p.z, p.light * (1 - t * 0.5), p.lightColor ?? col.slice(0, 7), { intensity: a });
     }
-    c.globalAlpha = 1;
-    c.globalCompositeOperation = 'source-over';
+    return sawAdditive;
   }
 }

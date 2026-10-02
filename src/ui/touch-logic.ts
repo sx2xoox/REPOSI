@@ -1,8 +1,15 @@
 // Pure (DOM-free) logic for the on-screen touch controls: floating joystick
-// math, the button layout for a given viewport / safe area / game rect, and a
-// small pointer router that assigns every touch pointer to a stick, a button
-// or nothing. Unit-tested in tests/touch.test.ts; ui/touch.ts binds it to the
-// DOM, feeds engine/input and draws it.
+// math, the button layout for a given viewport / safe area / HUD geometry, a
+// small pointer router that assigns every touch pointer to a stick, a button,
+// the attack button or nothing, and the auto-aim target picker. Unit-tested in
+// tests/touch.test.ts; ui/touch.ts binds it to the DOM, feeds engine/input and
+// draws it.
+//
+// Two schemes (설정 > 터치 조작 방식):
+//   'auto' (default): left floating stick = move, big ATTACK button bottom-right
+//          (hold = attack, auto-aims at the best target; drag past a dead zone =
+//          manual aim in the drag direction), action buttons in an arc around it.
+//   'twin': left floating stick = move, right floating stick = aim + auto-fire.
 //
 // All coordinates here are CSS pixels of the viewport.
 
@@ -33,6 +40,14 @@ export interface Insets {
 
 export type TouchButtonId = 'dash' | 'bomb' | 'active' | 'consumable' | 'special' | 'pause' | 'map' | 'inventory';
 
+export type TouchScheme = 'auto' | 'twin';
+export const TOUCH_SCHEMES: TouchScheme[] = ['auto', 'twin'];
+export const TOUCH_SCHEME_LABEL: Record<TouchScheme, string> = { auto: '자동 조준', twin: '듀얼 스틱' };
+
+export function touchScheme(v: string | undefined): TouchScheme {
+  return v === 'twin' ? 'twin' : 'auto';
+}
+
 export const GAME_BUTTONS: TouchButtonId[] = ['dash', 'bomb', 'special', 'active', 'consumable'];
 export const SYSTEM_BUTTONS: TouchButtonId[] = ['pause', 'map', 'inventory'];
 
@@ -43,6 +58,10 @@ export const MOVE_DEAD_ZONE = 0.16;
 export const MOVE_FULL_AT = 0.82;
 /** Deflection needed before the aim stick starts firing. */
 export const AIM_ENGAGE = 0.28;
+/** Attack button: drag (fraction of its radius) that switches to manual aim ... */
+export const MANUAL_ENGAGE = 0.5;
+/** ... and the distance back toward the touch point that returns to auto-aim. */
+export const MANUAL_RELEASE = 0.28;
 
 /**
  * Analog stick output for a finger offset (dx, dy) from the stick base.
@@ -82,12 +101,16 @@ export function knobPosition(base: Vec, finger: Vec, radius: number): Vec {
 
 // ---------------------------------------------------------------- layout
 export interface TouchLayout {
+  scheme: TouchScheme;
   /** size unit (1 ≈ a 380px tall phone in landscape) */
   u: number;
   stickR: number;
   knobR: number;
   leftRest: Vec;
+  /** twin: resting aim stick; auto: the attack button center */
   rightRest: Vec;
+  /** the big attack button ('auto' scheme), else null */
+  attack: Circle | null;
   /** x (CSS px) dividing the left (move) and right (aim) stick zones */
   splitX: number;
   buttons: Record<TouchButtonId, Circle>;
@@ -99,12 +122,16 @@ export interface TouchLayout {
 
 const clampN = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
-/**
- * Button layout for a landscape viewport. `game` is the rect (CSS px) the
- * 16:9 game image occupies; it is used to keep the system buttons clear of the
- * HUD's minimap (top-right of the game rect).
- */
-export function computeTouchLayout(view: { w: number; h: number }, safe: Insets, game: Rect): TouchLayout {
+/** Where the HUD draws things the touch buttons must stay clear of (CSS px). */
+export interface HudGeometry {
+  /** the world image rect */
+  game: Rect;
+  /** minimap block (map + floor name + seed lines), top-right */
+  minimap: Rect;
+}
+
+/** Button layout for a landscape viewport (CSS px), honoring the safe-area insets. */
+export function computeTouchLayout(view: { w: number; h: number }, safe: Insets, hud: HudGeometry, scheme: TouchScheme = 'auto'): TouchLayout {
   const short = Math.min(view.w, view.h);
   const u = clampN(short / 380, 0.8, 1.3);
   const stickR = 44 * u;
@@ -113,30 +140,53 @@ export function computeTouchLayout(view: { w: number; h: number }, safe: Insets,
   const r = safe.r;
   const t = safe.t;
   const b = safe.b;
-  // resting sticks sit low in the corners, but on tall screens (tablets, with a
-  // letterbox below the game) they are lifted to mostly clear the HUD's bottom row
-  const restY = Math.min(view.h - b - 22 * u - stickR, game.y + game.h - game.h * 0.11 - stickR * 0.4);
+  // >= 44 pt touch targets (radius 22) for every gameplay button
+  const rad = (k: number) => Math.max(22, k * u);
+  const restY = view.h - b - 22 * u - stickR;
   const leftRest = { x: l + 26 * u + stickR, y: restY };
-  const rightRest = { x: view.w - r - 26 * u - stickR, y: restY };
-  const cx = rightRest.x;
-  const cy = rightRest.y;
-  const D = stickR + 42 * u;
-  const D2 = D + 50 * u;
-  const at = (deg: number, dist: number, rad: number): Circle => {
+  let rightRest: Vec;
+  let attack: Circle | null = null;
+  const buttons = {} as Record<TouchButtonId, Circle>;
+  const place = (cx: number, cy: number, id: TouchButtonId, deg: number, dist: number, rr: number) => {
     const a = (deg * Math.PI) / 180;
-    return { x: cx + Math.cos(a) * dist, y: cy - Math.sin(a) * dist, r: rad };
+    buttons[id] = { x: cx + Math.cos(a) * dist, y: cy - Math.sin(a) * dist, r: rr };
   };
-  const buttons = {
-    dash: at(180, D, 27 * u),
-    bomb: at(136, D, 21 * u),
-    special: at(96, D, 24 * u),
-    active: at(120, D2, 20 * u),
-    consumable: at(80, D2, 20 * u),
-  } as Record<TouchButtonId, Circle>;
+  if (scheme === 'auto') {
+    const AR = Math.max(34, 38 * u);
+    const cx = view.w - r - 20 * u - AR;
+    const cy = view.h - b - 16 * u - AR;
+    attack = { x: cx, y: cy, r: AR };
+    rightRest = { x: cx, y: cy };
+    const gap = 10 * u;
+    // inner arc (thumb reach): dash left, bomb upper-left, release above
+    const rDash = rad(27);
+    const rBomb = rad(23);
+    const rSpec = rad(25);
+    place(cx, cy, 'dash', 182, AR + gap + rDash, rDash);
+    place(cx, cy, 'bomb', 135, AR + gap + rBomb, rBomb);
+    place(cx, cy, 'special', 88, AR + gap + rSpec, rSpec);
+    // outer arc: active item + potion (only shown while held)
+    const rItem = rad(23);
+    const outer = AR + gap + 2 * rDash + 8 * u + rItem * 0.3;
+    place(cx, cy, 'active', 112, outer, rItem);
+    place(cx, cy, 'consumable', 157, outer, rItem);
+  } else {
+    rightRest = { x: view.w - r - 26 * u - stickR, y: restY };
+    const cx = rightRest.x;
+    const cy = rightRest.y;
+    const D = stickR + 42 * u;
+    const D2 = D + 50 * u;
+    place(cx, cy, 'dash', 180, D, rad(27));
+    place(cx, cy, 'bomb', 136, D, rad(22));
+    place(cx, cy, 'special', 96, D, rad(24));
+    place(cx, cy, 'active', 120, D2, rad(22));
+    place(cx, cy, 'consumable', 80, D2, rad(22));
+  }
 
-  // system buttons: a column in the right letterbox bar when it is wide enough,
-  // otherwise a row just left of the HUD minimap (top-right of the game rect)
+  // system buttons: a column in the right pillarbox bar when it is wide enough,
+  // otherwise a row just left of the HUD minimap
   const sr = 17 * u;
+  const game = hud.game;
   const barW = view.w - r - (game.x + game.w);
   if (barW >= 2 * sr + 10 * u) {
     const x = view.w - r - Math.max(sr + 6 * u, barW / 2);
@@ -144,15 +194,15 @@ export function computeTouchLayout(view: { w: number; h: number }, safe: Insets,
       buttons[id] = { x, y: t + 8 * u + sr + i * (2 * sr + 10 * u), r: sr };
     });
   } else {
-    const minimapLeft = game.x + game.w * (636 / 768);
-    const right = Math.min(minimapLeft - 8 * u, view.w - r - 8 * u);
+    const right = Math.min(hud.minimap.x - 8 * u, view.w - r - 8 * u);
+    const top = Math.max(t + 4 * u, hud.minimap.y);
     SYSTEM_BUTTONS.forEach((id, i) => {
-      buttons[id] = { x: right - sr - i * (2 * sr + 10 * u), y: Math.max(t, game.y) + 8 * u + sr, r: sr };
+      buttons[id] = { x: right - sr - i * (2 * sr + 10 * u), y: top + sr, r: sr };
     });
   }
   const back = { x: view.w - r - 10 * u - 18 * u, y: t + 10 * u + 18 * u, r: 18 * u };
   const backLeft = { x: l + 10 * u + 18 * u, y: back.y, r: back.r };
-  return { u, stickR, knobR, leftRest, rightRest, splitX: view.w * 0.5, buttons, back, backLeft };
+  return { scheme, u, stickR, knobR, leftRest, rightRest, attack, splitX: view.w * 0.5, buttons, back, backLeft };
 }
 
 /** Distance-based hit test with a generous margin (fingers are fat). */
@@ -160,18 +210,31 @@ export function hitCircle(c: Circle, x: number, y: number, margin = 1.25): boole
   return Math.hypot(x - c.x, y - c.y) <= c.r * margin;
 }
 
-/** Closest enabled button under (x, y), or null. */
+/**
+ * Closest enabled button under (x, y), or null; with `attack` the attack button
+ * competes too (returned as 'attack'). Closeness is relative to each radius.
+ */
 export function hitButton(layout: TouchLayout, x: number, y: number, enabled: (id: TouchButtonId) => boolean, margin = 1.25): TouchButtonId | null {
-  let best: TouchButtonId | null = null;
-  let bestD = Infinity;
+  const h = hitControl(layout, x, y, enabled, margin);
+  return h === 'attack' ? null : h;
+}
+
+export function hitControl(layout: TouchLayout, x: number, y: number, enabled: (id: TouchButtonId) => boolean, margin = 1.25): TouchButtonId | 'attack' | null {
+  let best: TouchButtonId | 'attack' | null = null;
+  let bestK = Infinity;
   for (const id of Object.keys(layout.buttons) as TouchButtonId[]) {
     if (!enabled(id)) continue;
     const c = layout.buttons[id];
-    const d = Math.hypot(x - c.x, y - c.y);
-    if (d <= c.r * margin && d < bestD) {
+    const k = Math.hypot(x - c.x, y - c.y) / c.r;
+    if (k <= margin && k < bestK) {
       best = id;
-      bestD = d;
+      bestK = k;
     }
+  }
+  const a = layout.attack;
+  if (a) {
+    const k = Math.hypot(x - a.x, y - a.y) / a.r;
+    if (k <= 1.3 && k < bestK) best = 'attack';
   }
   return best;
 }
@@ -187,8 +250,23 @@ export interface StickState {
   engaged: boolean;
 }
 
+/** The held attack button ('auto' scheme). */
+export interface AttackState {
+  pointerId: number;
+  /** where the finger landed (follows the finger past `followR`) */
+  base: Vec;
+  finger: Vec;
+  /** dragged past the dead zone: aim in the drag direction instead of auto-aim */
+  manual: boolean;
+  /** last manual aim direction (unit) */
+  dir: Vec;
+  /** the touch started on the attack button itself (vs. anywhere on the right half) */
+  onButton: boolean;
+}
+
 export type Owner =
   | { kind: 'stick'; side: 'left' | 'right' }
+  | { kind: 'attack' }
   | { kind: 'button'; id: TouchButtonId }
   | { kind: 'ignored' };
 
@@ -201,6 +279,7 @@ export class TouchRouter {
   layout: TouchLayout;
   left: StickState | null = null;
   right: StickState | null = null;
+  attack: AttackState | null = null;
   readonly owners = new Map<number, Owner>();
   /** last aim direction (kept while the finger rests in the dead zone) */
   private lastAim: Vec = { x: 1, y: 0 };
@@ -210,10 +289,18 @@ export class TouchRouter {
   }
 
   down(id: number, x: number, y: number, enabled: (b: TouchButtonId) => boolean = () => true): Owner {
-    const btn = hitButton(this.layout, x, y, enabled);
+    const L = this.layout;
+    const hit = hitControl(L, x, y, enabled);
     let owner: Owner;
-    if (btn) owner = { kind: 'button', id: btn };
-    else {
+    if (hit && hit !== 'attack') owner = { kind: 'button', id: hit };
+    else if (L.scheme === 'auto' && (hit === 'attack' || x >= L.splitX)) {
+      // the attack button, or anywhere else on the right half (forgiving: floating attack)
+      if (this.attack) owner = { kind: 'ignored' };
+      else {
+        this.attack = { pointerId: id, base: { x, y }, finger: { x, y }, manual: false, dir: { x: 1, y: 0 }, onButton: hit === 'attack' };
+        owner = { kind: 'attack' };
+      }
+    } else {
       const side: 'left' | 'right' = x < this.layout.splitX ? 'left' : 'right';
       if (this[side]) owner = { kind: 'ignored' };
       else {
@@ -227,6 +314,19 @@ export class TouchRouter {
 
   move(id: number, x: number, y: number): void {
     const o = this.owners.get(id);
+    if (o?.kind === 'attack' && this.attack) {
+      const at = this.attack;
+      const AR = this.layout.attack?.r ?? this.layout.stickR;
+      at.finger = { x, y };
+      at.base = followBase(at.base, at.finger, AR * 1.2);
+      const dx = x - at.base.x;
+      const dy = y - at.base.y;
+      const d = Math.hypot(dx, dy);
+      if (d >= MANUAL_ENGAGE * AR) at.manual = true;
+      else if (d <= MANUAL_RELEASE * AR) at.manual = false;
+      if (at.manual && d > 1e-6) at.dir = { x: dx / d, y: dy / d };
+      return;
+    }
     if (!o || o.kind !== 'stick') return;
     const st = this[o.side];
     if (!st) return;
@@ -253,6 +353,7 @@ export class TouchRouter {
     const o = this.owners.get(id);
     this.owners.delete(id);
     if (o?.kind === 'stick') this[o.side] = null;
+    if (o?.kind === 'attack') this.attack = null;
     return o;
   }
 
@@ -261,6 +362,7 @@ export class TouchRouter {
     for (const id of this.owners.keys()) this.owners.set(id, { kind: 'ignored' });
     this.left = null;
     this.right = null;
+    this.attack = null;
   }
 
   moveVector(): Vec {
@@ -272,12 +374,84 @@ export class TouchRouter {
     return this.right && this.right.engaged ? { ...this.right.out } : null;
   }
 
+  /** Attack button held ('auto' scheme). */
+  attackHeld(): boolean {
+    return !!this.attack;
+  }
+
+  /** Manual aim direction while the attack button is dragged past its dead zone, else null. */
+  manualAim(): Vec | null {
+    return this.attack && this.attack.manual ? { ...this.attack.dir } : null;
+  }
+
   /** Buttons currently held by some pointer. */
   heldButtons(): Set<TouchButtonId> {
     const s = new Set<TouchButtonId>();
     for (const o of this.owners.values()) if (o.kind === 'button') s.add(o.id);
     return s;
   }
+}
+
+// ---------------------------------------------------------------- auto-aim targeting
+export interface TargetCandidate {
+  id: number;
+  x: number;
+  y: number;
+  /** clear line of sight from the shooter */
+  visible: boolean;
+  /** extra cost multiplier (e.g. charmed enemies), default 1 */
+  weight?: number;
+}
+
+export interface TargetParams {
+  /** candidates further away are ignored (the current target gets `keepRange` x this) */
+  maxDist: number;
+  keepRange: number;
+  /** extra cost for targets away from the facing direction (0 = pure nearest) */
+  facingWeight: number;
+  /** cost multiplier for targets behind walls / rocks */
+  losPenalty: number;
+  /** cost multiplier for the current target (hysteresis: < 1 keeps it unless another is clearly better) */
+  stickiness: number;
+}
+
+export const TARGET_DEFAULTS: TargetParams = { maxDist: 340, keepRange: 1.15, facingWeight: 0.6, losPenalty: 2.2, stickiness: 0.72 };
+
+/** Cost of a candidate (lower is better), or Infinity when out of range. */
+export function targetCost(origin: Vec, facing: Vec | null, c: TargetCandidate, prevId: number | null, o: TargetParams = TARGET_DEFAULTS): number {
+  const dx = c.x - origin.x;
+  const dy = c.y - origin.y;
+  const d = Math.hypot(dx, dy);
+  const sticky = c.id === prevId;
+  if (d > o.maxDist * (sticky ? o.keepRange : 1)) return Infinity;
+  let cost = Math.max(d, 1);
+  const fl = facing ? Math.hypot(facing.x, facing.y) : 0;
+  if (facing && fl > 1e-6 && d > 1e-6) {
+    const cos = (dx * facing.x + dy * facing.y) / (d * fl);
+    cost *= 1 + o.facingWeight * (1 - cos) * 0.5;
+  }
+  if (!c.visible) cost *= o.losPenalty;
+  if (c.weight !== undefined) cost *= c.weight;
+  if (sticky) cost *= o.stickiness;
+  return cost;
+}
+
+/**
+ * Best auto-aim target: the nearest enemy with line of sight, preferring ones
+ * roughly in the facing / move direction, sticking to the previous target
+ * unless another is clearly better (no flicker). Null when nothing is in range.
+ */
+export function pickTarget(origin: Vec, facing: Vec | null, cands: readonly TargetCandidate[], prevId: number | null, o: TargetParams = TARGET_DEFAULTS): TargetCandidate | null {
+  let best: TargetCandidate | null = null;
+  let bestCost = Infinity;
+  for (const c of cands) {
+    const cost = targetCost(origin, facing, c, prevId, o);
+    if (cost < bestCost) {
+      bestCost = cost;
+      best = c;
+    }
+  }
+  return best;
 }
 
 // ---------------------------------------------------------------- menu taps / drags

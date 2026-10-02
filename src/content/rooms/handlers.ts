@@ -16,6 +16,7 @@ import { LightShaft } from '../props/ambient';
 import { coinHeap, darkRing, ritualCircle, roundRug, withDecals } from './decor';
 import { paintKeyHint, whenFontsReady } from './floortext';
 import { touchUiActive } from '../../ui/touch-mode';
+import { save } from '../../engine/save';
 
 // ------------------------------------------------------------------ start
 const HINTS: { keys: string[]; label: string; dx: number; row: number }[] = [
@@ -33,12 +34,18 @@ const TOUCH_HINTS: typeof HINTS = [
   { keys: ['왼쪽'], label: '끌어서 이동', dx: -72, row: 0 },
   { keys: ['오른쪽'], label: '끌어서 공격', dx: 72, row: 0 },
 ];
+// default touch scheme: the attack button auto-aims
+const TOUCH_AUTO_HINTS: typeof HINTS = [
+  { keys: ['왼쪽'], label: '끌어서 이동', dx: -72, row: 0 },
+  { keys: ['공격'], label: '누르면 자동 조준', dx: 76, row: 0 },
+];
 
 function paintHints(room: Room): void {
   const top = room.interiorY + 10;
   const bottom = room.interiorY + room.interiorH;
   const rows = [top, top + 20, bottom - 44, bottom - 24];
-  for (const h of touchUiActive() ? TOUCH_HINTS : HINTS) paintKeyHint(room, room.centerX + h.dx, rows[h.row], h.keys, h.label);
+  const touchHints = save.settings.touchScheme === 'twin' ? TOUCH_HINTS : TOUCH_AUTO_HINTS;
+  for (const h of touchUiActive() ? touchHints : HINTS) paintKeyHint(room, room.centerX + h.dx, rows[h.row], h.keys, h.label);
 }
 
 registerRoomHandler('start', {

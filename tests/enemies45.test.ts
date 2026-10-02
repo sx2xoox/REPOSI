@@ -497,7 +497,7 @@ describe('floor 4–5 enemy AI (headless simulation)', () => {
     expect(e.alive).toBe(true);
   });
 
-  it('mirrorSpot is the point reflection, kept inside and at arm\'s length', () => {
+  it('mirrorSpot is the point reflection, kept inside and within melee reach', () => {
     const fw = fakeWorld('mspot');
     fw.player.x = IX + 40;
     fw.player.y = IY + 30;
@@ -507,7 +507,7 @@ describe('floor 4–5 enemy AI (headless simulation)', () => {
     fw.player.x = IX + IW / 2 + 3;
     fw.player.y = IY + IH / 2;
     const c = mirrorSpot(fw.w, 6);
-    expect(Math.hypot(c.x - fw.player.x, c.y - fw.player.y)).toBeGreaterThanOrEqual(51.9);
+    expect(Math.hypot(c.x - fw.player.x, c.y - fw.player.y)).toBeGreaterThanOrEqual(29.9);
     expect(c.x).toBeGreaterThanOrEqual(IX);
     expect(c.x).toBeLessThanOrEqual(IX + IW);
   });

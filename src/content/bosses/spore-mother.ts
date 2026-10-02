@@ -539,7 +539,7 @@ defineBoss({
   name: NAME,
   bossTitle: '썩은 빛의 어머니',
   bossFloors: [2],
-  hp: 900,
+  hp: 780,
   radius: 18,
   speed: 0,
   mass: Infinity,

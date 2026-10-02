@@ -17,6 +17,9 @@ import { animFrame, hasAnim } from '../engine/sprites';
 import { input } from '../engine/input';
 import { app } from '../game/app';
 
+// composed for the 384 px wide 16:9 view; wider / narrower views keep it centered
+// (`ox`) and the top floor is repainted to cover the whole width
+const BASE_W = 384;
 const CX = 192;
 const CY0 = 78;
 const RX0 = 152;
@@ -68,6 +71,8 @@ export class StairwellBackdrop {
   private built = false;
   private levels: Level[] = [];
   private top: HTMLCanvasElement | null = null;
+  /** VIEW_W the top floor / light map / vignette were built for */
+  private builtW = 0;
   private lightCv: HTMLCanvasElement | null = null;
   private vignette: HTMLCanvasElement | null = null;
   private motes: Mote[] = [];
@@ -109,11 +114,21 @@ export class StairwellBackdrop {
     return { x: CX, y: l ? l.cy : CY0 + 80 };
   }
 
+  /** x offset that centers the 384-wide composition in the current view */
+  private get ox(): number {
+    return Math.round((VIEW_W - BASE_W) / 2);
+  }
+
   private build(): void {
-    if (this.built || typeof document === 'undefined') return;
+    if (typeof document === 'undefined') return;
+    if (this.built && this.builtW === VIEW_W) return;
+    const first = !this.built;
     this.built = true;
-    this.geometry();
-    for (const l of this.levels) this.paintLevel(l);
+    this.builtW = VIEW_W;
+    if (first) {
+      this.geometry();
+      for (const l of this.levels) this.paintLevel(l);
+    }
     this.paintTop();
     this.lightCv = document.createElement('canvas');
     this.lightCv.width = VIEW_W;
@@ -129,7 +144,7 @@ export class StairwellBackdrop {
     g.fillRect(0, 0, VIEW_W, VIEW_H);
     this.vignette = v;
     // pre-warm particles so the first frame already looks alive
-    for (let i = 0; i < 240; i++) this.updateMotes(1 / 30);
+    if (first) for (let i = 0; i < 240; i++) this.updateMotes(1 / 30);
   }
 
   private paintLevel(l: Level): void {
@@ -208,9 +223,11 @@ export class StairwellBackdrop {
     const h = VIEW_H + MARGIN * 2;
     const p = new PixelPainter(w, h);
     const ry0 = RX0 * SQ;
+    const ox = this.ox;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const wx = x - MARGIN;
+        const sx0 = x - MARGIN; // screen x
+        const wx = sx0 - ox; // composition x
         const wy = y - MARGIN;
         const nx = (wx + 0.5 - CX) / RX0;
         const ny = (wy + 0.5 - CY0) / ry0;
@@ -232,7 +249,7 @@ export class StairwellBackdrop {
         if (bayer(wx, wy) < 0.12) c = mixColor(c, STONE[1], 0.5);
         // moss toward the corners
         const mossN = hash(Math.floor(wx / 4), Math.floor(wy / 4), 5);
-        if (mossN < 0.08 && (wy < 30 || wx < 40 || wx > VIEW_W - 40)) c = mossN < 0.04 ? '#2e4a2e' : '#3a5a32';
+        if (mossN < 0.08 && (wy < 30 || sx0 < 40 || sx0 > VIEW_W - 40)) c = mossN < 0.04 ? '#2e4a2e' : '#3a5a32';
         // rim stones around the opening
         if (d < 1.07) {
           const a = Math.atan2(ny, nx);
@@ -244,7 +261,7 @@ export class StairwellBackdrop {
           if (d < 1.012 && ny > 0) c = STONE[2];
         }
         // outer darkness toward the screen edges
-        const edge = Math.min(wx + 10, wy + 10, VIEW_W + 10 - wx, VIEW_H + 10 - wy);
+        const edge = Math.min(sx0 + 10, wy + 10, VIEW_W + 10 - sx0, VIEW_H + 10 - wy);
         const fade = edge < 30 ? (30 - edge) / 30 : 0;
         p.px(x, y, shade(c, 0.3 + fade * 0.55));
       }
@@ -254,7 +271,7 @@ export class StairwellBackdrop {
     for (let i = 0; i < 26; i++) {
       const x = Math.floor(rnd(i, 1) * w);
       const y = Math.floor(rnd(i, 2) * h);
-      const nx = (x - MARGIN - CX) / RX0;
+      const nx = (x - MARGIN - ox - CX) / RX0;
       const ny = (y - MARGIN - CY0) / ry0;
       if (nx * nx + ny * ny < 1.25) continue;
       if (rnd(i, 3) < 0.35) {
@@ -343,6 +360,8 @@ export class StairwellBackdrop {
     c.globalCompositeOperation = 'source-over';
     c.fillStyle = VOID;
     c.fillRect(0, 0, VIEW_W, VIEW_H);
+    const ox = this.ox;
+    c.setTransform(1, 0, 0, 1, ox, 0); // composition space (384 wide, centered)
     const par = (depth: number) => {
       const k = 1 - depth / (LEVELS + 2);
       return { x: Math.round(this.camX * k), y: Math.round(this.camY * k) };
@@ -355,7 +374,7 @@ export class StairwellBackdrop {
     g.addColorStop(0, `rgba(160,60,20,${pulseA})`);
     g.addColorStop(1, 'rgba(160,60,20,0)');
     c.fillStyle = g;
-    c.fillRect(0, 0, VIEW_W, VIEW_H);
+    c.fillRect(-ox, 0, VIEW_W, VIEW_H);
 
     // levels deepest first
     for (let i = this.levels.length - 1; i >= 0; i--) {
@@ -368,7 +387,7 @@ export class StairwellBackdrop {
     this.drawChains(r, par(0.5));
     // top floor
     const o0 = par(0);
-    if (this.top) c.drawImage(this.top, -MARGIN + o0.x, -MARGIN + o0.y);
+    if (this.top) c.drawImage(this.top, -MARGIN - ox + o0.x, -MARGIN + o0.y);
     // keeper at the rim
     const kp = this.keeperPos();
     const kx = kp.x + o0.x;
@@ -409,10 +428,11 @@ export class StairwellBackdrop {
     const flick = 0.86 + 0.08 * Math.sin(this.t * 13.1) + 0.06 * Math.sin(this.t * 7.3 + 1.1);
     const lc = this.lightCv!;
     const L = lc.getContext('2d')!;
+    L.setTransform(1, 0, 0, 1, ox, 0);
     L.globalCompositeOperation = 'source-over';
     L.globalAlpha = 1;
     L.fillStyle = mixColor('#2a2440', '#000000', this.dim * 0.5);
-    L.fillRect(0, 0, VIEW_W, VIEW_H);
+    L.fillRect(-ox, 0, VIEW_W, VIEW_H);
     L.globalCompositeOperation = 'lighter';
     const light = (x: number, y: number, rad: number, col: string, a: number) => {
       const gg = L.createRadialGradient(x, y, 0, x, y, rad);
@@ -440,7 +460,7 @@ export class StairwellBackdrop {
     for (const m of this.motes) if (m.kind === 'ember') light(m.x, m.y, 7, '#ff9040', 0.4 * this.emberAlpha(m));
     L.globalAlpha = 1;
     c.globalCompositeOperation = 'multiply';
-    c.drawImage(lc, 0, 0);
+    c.drawImage(lc, -ox, 0);
     c.globalCompositeOperation = 'source-over';
 
     // ---- emissive on top: candle flames, embers, eyes, light shaft
@@ -497,6 +517,7 @@ export class StairwellBackdrop {
         c.globalAlpha = 1;
       }
     }
+    c.setTransform(1, 0, 0, 1, 0, 0);
     if (this.vignette) c.drawImage(this.vignette, 0, 0);
     if (this.dim > 0.01) {
       c.globalAlpha = this.dim * 0.55;

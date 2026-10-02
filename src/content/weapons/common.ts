@@ -156,13 +156,21 @@ export function pixLine(r: Renderer, x0: number, y0: number, x1: number, y1: num
   }
 }
 
+const glowNames = new Map<string, string[]>();
+
 /**
  * Soft round glow (no outline) for additive drawing: a dithered disk that is
  * brightest in the middle. Cached per diameter/color.
  */
 export function glowSprite(d: number, color: string): string {
   const D = Math.max(3, Math.min(48, Math.round(d)));
+  // names are memoized per color/size: called every frame by many effects
+  let row = glowNames.get(color);
+  if (!row) glowNames.set(color, (row = []));
+  const known = row[D];
+  if (known) return known;
   const name = `__glow_${D}_${color}`;
+  row[D] = name;
   if (hasSprite(name)) return name;
   defineDrawnSprite(name, D, D, (p) => {
     const r = D / 2;

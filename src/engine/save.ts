@@ -15,10 +15,13 @@ export interface Settings {
   graphicsQuality: GraphicsQuality;
   /** on-screen touch controls: auto (shown while touch is used) / always / never */
   touchControls: TouchControlsMode;
+  /** touch attack scheme: auto-aim attack button (default) / twin sticks */
+  touchScheme: TouchSchemeSetting;
 }
 
 export type GraphicsQuality = 'high' | 'medium' | 'low';
 export type TouchControlsMode = 'auto' | 'on' | 'off';
+export type TouchSchemeSetting = 'auto' | 'twin';
 
 /** Coarse primary pointer (phones / tablets)? Safe outside the browser. */
 export function isTouchDevice(): boolean {
@@ -74,6 +77,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hitStop: true,
   graphicsQuality: isTouchDevice() ? 'medium' : 'high',
   touchControls: 'auto',
+  touchScheme: 'auto',
 };
 
 export const DEFAULT_PROGRESS: Progress = {

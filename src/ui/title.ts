@@ -52,7 +52,8 @@ export class TitleScene implements Scene {
     }
     if (app.scenes.top !== this) return [];
     if (fullscreenSupported() && !isFullscreen()) {
-      return [{ x: UI_W - 44, y: 10, w: 34, h: 30, icon: 'tc_full', tap: () => toggleFullscreen() }];
+      const sa = app.renderer.uiSafe;
+      return [{ x: UI_W - 44 - sa.r, y: 10 + sa.t, w: 34, h: 30, icon: 'tc_full', tap: () => toggleFullscreen() }];
     }
     return [];
   }
@@ -161,8 +162,9 @@ export class TitleScene implements Scene {
     const rec = p.runs > 0
       ? `하강 ${p.runs}회 · 귀환 ${p.wins}회 · 최고 ${p.bestFloor}층${p.bestTimeSec ? ` · 최단 ${formatTime(p.bestTimeSec)}` : ''}`
       : '첫 하강을 기다리는 중';
-    r.uiText(rec, 12, UI_H - 16, { size: 10, font: 'small', color: C.textFaint, alpha: mA });
-    r.uiText(VERSION, UI_W - 12, UI_H - 16, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: mA });
+    const sa = r.uiSafe;
+    r.uiText(rec, 12 + sa.l, UI_H - 16 - sa.b, { size: 10, font: 'small', color: C.textFaint, alpha: mA });
+    r.uiText(VERSION, UI_W - 12 - sa.r, UI_H - 16 - sa.b, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: mA });
     if (!this.seedOpen && !touchUiActive()) keyHintRow(r, [['↑↓', '선택'], ['Enter', '결정']], UI_W / 2, UI_H - 10, { alpha: mA * 0.8, pad: input.aimMode === 'pad' });
 
     if (this.seedOpen) this.drawSeed(r);

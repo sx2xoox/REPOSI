@@ -4,7 +4,7 @@
 
 import type { Scene } from './scene';
 import type { Renderer } from '../engine/renderer';
-import { UI_H, UI_W } from '../engine/renderer';
+import { UI_H, UI_W, UI_W_BASE, uiCenterX } from '../engine/renderer';
 import { app } from '../game/app';
 import { input } from '../engine/input';
 import { sfx } from '../audio/audio';
@@ -179,6 +179,7 @@ export class CollectionScene implements Scene {
       if (input.wheel) this.scroll = clamp(this.scroll + Math.sign(input.wheel), 0, Math.max(0, Math.ceil(n / COLS) - VISIBLE_ROWS));
     }
     const m = app.renderer.displayToUI(input.mouseX, input.mouseY);
+    m.x -= uiCenterX();
     // tabs
     for (let i = 0; i < TABS.length; i++) {
       const tx = 30 + i * 84;
@@ -204,7 +205,8 @@ export class CollectionScene implements Scene {
     r.beginUI();
     const k = this.closing >= 0 ? 1 - clamp(this.closing / 0.16, 0, 1) : appear(this.t, 0.25);
     r.uiRect(0, 0, UI_W, UI_H, C.void, 0.8 * k);
-    frame(r, 14, 10 + (1 - k) * 10, UI_W - 28, UI_H - 40, 'ornate', { alpha: k });
+    r.dctx.translate(uiCenterX(), 0); // 768-wide layout centered on wide screens
+    frame(r, 14, 10 + (1 - k) * 10, UI_W_BASE - 28, UI_H - 40, 'ornate', { alpha: k });
     r.uiText('도감', 34, 26, { size: 24, bold: true, color: C.text, outline: C.ink, alpha: k });
     r.uiText('등불이 비춘 것들의 기록', 102, 36, { size: 10, font: 'small', color: C.textFaint, alpha: k });
     // tabs
@@ -224,7 +226,7 @@ export class CollectionScene implements Scene {
       this.drawGrid(r, tk);
       this.drawDetail(r, tk);
     }
-    if (!touchUiActive()) keyHintRow(r, [['방향키', '이동'], ['Q/E', '분류'], ['Esc', '닫기']], UI_W / 2, UI_H - 15, { alpha: k * 0.8 });
+    if (!touchUiActive()) keyHintRow(r, [['방향키', '이동'], ['Q/E', '분류'], ['Esc', '닫기']], UI_W_BASE / 2, UI_H - 15, { alpha: k * 0.8 });
   }
 
   private drawGrid(r: Renderer, k: number): void {
@@ -267,7 +269,7 @@ export class CollectionScene implements Scene {
     const e = this.entries[this.sel];
     const x = 444;
     const y = 96;
-    const w = UI_W - 30 - x;
+    const w = UI_W_BASE - 30 - x;
     const h = 286;
     frame(r, x, y, w, h, 'panel', { alpha: k });
     if (!e) return;
@@ -349,7 +351,7 @@ export class CollectionScene implements Scene {
     });
     // recent runs
     const hx = 344;
-    const hw = UI_W - 30 - hx;
+    const hw = UI_W_BASE - 30 - hx;
     frame(r, hx, y, hw, 286, 'panel', { alpha: k });
     r.uiText('최근 하강', hx + 14, y + 12, { size: 12, bold: true, color: C.goldHi, alpha: k });
     if (!save.history.length) {

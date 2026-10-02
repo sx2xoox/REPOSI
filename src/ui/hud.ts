@@ -7,6 +7,10 @@
 //   bottom     ember gauge with flare when full (left) · boss bar with name and
 //              damage trail (center) · weapon + potion slots (right)
 // plus banners, floor / boss cards, room-clear feedback and first-run hints.
+// The UI space widens with the screen (UI_W = 2 * VIEW_W); corner elements are
+// anchored to the edges of the device safe area (`Renderer.uiSafe`). With the
+// touch controls shown, the ember gauge lives on the release button and the
+// weapon / potion slots on the attack / potion buttons (no overlap at the bottom).
 
 import type { Renderer } from '../engine/renderer';
 import { UI_H, UI_W } from '../engine/renderer';
@@ -26,6 +30,20 @@ import { fitScale, frame, gauge, glow, keycap, spriteCentered } from './frame';
 import { C, splitFloorName } from './theme';
 import { formatDelta, heartSlots, hudStats, type HeartKind } from './logic';
 import { actionLabel } from './keys';
+import { touchUiActive } from './touch-mode';
+
+/** HUD minimap size and margin (UI units). */
+export const MINIMAP_W = 124;
+export const MINIMAP_H = 86;
+const MINIMAP_MARGIN = 8;
+
+/**
+ * UI-space rect of the minimap block (map + floor name + seed lines) for a UI
+ * space `uiW` wide with the given safe-area insets (used by the touch layout).
+ */
+export function minimapBlockRect(uiW: number, safe: { l: number; r: number; t: number; b: number }): { x: number; y: number; w: number; h: number } {
+  return { x: uiW - safe.r - MINIMAP_W - MINIMAP_MARGIN, y: safe.t + MINIMAP_MARGIN, w: MINIMAP_W, h: MINIMAP_H + 30 };
+}
 
 const HEART_SPRITE: Record<HeartKind, string> = {
   full: 'hud_heart_full',
@@ -86,6 +104,9 @@ export class Hud {
   private lastHp = -1;
   readonly minimap = new MinimapView();
   readonly hints = new HintSystem();
+  /** HUD area inside the safe insets (UI units); corner elements are drawn translated to its top-left */
+  private W = UI_W;
+  private H = UI_H;
 
   update(w: World, dt: number): void {
     this.t += dt;
@@ -238,6 +259,13 @@ export class Hud {
     if (!p) return;
     const cinematic = w.bossIntro ? clamp(1 - w.bossIntro.t / 0.3, 0, 1) + (w.bossIntro.t > 1.8 ? clamp((w.bossIntro.t - 1.8) / 0.4, 0, 1) : 0) : 1;
     const A = clamp(cinematic, 0, 1);
+    const sa = r.uiSafe;
+    this.W = UI_W - sa.l - sa.r;
+    this.H = UI_H - sa.t - sa.b;
+    const touchUi = touchUiActive();
+    const d = r.dctx;
+    d.save();
+    d.translate(sa.l, sa.t);
     if (A > 0.01) {
       this.drawActive(r, w, A);
       this.drawHearts(r, w, A);
@@ -245,15 +273,18 @@ export class Hud {
       this.drawConsumables(r, w, A);
       this.drawStats(r, w, A);
       this.drawMinimap(r, w, A);
-      this.drawEmber(r, w, A);
-      this.drawSlots(r, w, A);
+      if (!touchUi) {
+        this.drawEmber(r, w, A);
+        this.drawSlots(r, w, A);
+      }
     }
     this.drawBoss(r, A);
+    d.restore();
     drawBanners(r, w);
     if (this.clearT >= 0) drawRoomClear(r, this.clearT, w.banners.length === 0 && !w.floorCard);
     if (w.floorCard) drawFloorCard(r, w.floorCard);
     if (w.bossIntro) drawBossIntro(r, w, w.bossIntro);
-    if (!w.bossIntro) this.hints.draw(r, w, this.bossShown > 0.05 ? UI_H - 56 : UI_H - 18);
+    if (!w.bossIntro) this.hints.draw(r, w, (this.bossShown > 0.05 ? UI_H - 56 : UI_H - 18) - sa.b);
     if (save.settings.showFps) r.uiText(`${Math.round(fps)} FPS`, UI_W / 2, 4, { size: 10, font: 'small', align: 'center', color: '#80ff80' });
   }
 
@@ -404,20 +435,21 @@ export class Hud {
   }
 
   private drawMinimap(r: Renderer, w: World, A: number): void {
-    const mw = 124;
-    const mh = 86;
-    const x = UI_W - mw - 8;
-    const y = 8;
+    const mw = MINIMAP_W;
+    const mh = MINIMAP_H;
+    const RW = this.W;
+    const x = RW - mw - MINIMAP_MARGIN;
+    const y = MINIMAP_MARGIN;
     this.minimap.draw(r, w, x, y, mw, mh, this.t, A);
     const [no, name] = splitFloorName(w.floor.name);
-    r.uiText(name, UI_W - 10, y + mh + 4, { size: 10, font: 'small', align: 'right', color: C.textDim, alpha: A, outline: C.ink });
-    if (no) r.uiText(no, UI_W - 12 - r.measureText(name, 10, false, 'small') - 6, y + mh + 4, { size: 10, font: 'small', align: 'right', color: C.gold, alpha: A, outline: C.ink });
-    r.uiText(w.run.seed, UI_W - 10, y + mh + 17, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: A * 0.9, outline: C.ink });
+    r.uiText(name, RW - 10, y + mh + 4, { size: 10, font: 'small', align: 'right', color: C.textDim, alpha: A, outline: C.ink });
+    if (no) r.uiText(no, RW - 12 - r.measureText(name, 10, false, 'small') - 6, y + mh + 4, { size: 10, font: 'small', align: 'right', color: C.gold, alpha: A, outline: C.ink });
+    r.uiText(w.run.seed, RW - 10, y + mh + 17, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: A * 0.9, outline: C.ink });
   }
 
   private drawEmber(r: Renderer, w: World, A: number): void {
     const x = 12;
-    const y = UI_H - 30;
+    const y = this.H - 30;
     const gw = 112;
     const f = this.emberShown;
     const full = this.emberFull;
@@ -448,8 +480,8 @@ export class Hud {
     const p = w.player;
     const s = 36;
     // potion (rightmost)
-    const px = UI_W - s - 10;
-    const py = UI_H - s - 10;
+    const px = this.W - s - 10;
+    const py = this.H - s - 10;
     if (p.potionId) {
       const def = Potions.get(p.potionId);
       const known = w.run.identified.has(p.potionId);
@@ -471,15 +503,15 @@ export class Hud {
     if (this.bossShown <= 0.01 || A <= 0.01) return;
     const k = ease.outCubic(this.bossShown) * A;
     const bw = 280;
-    const bx = (UI_W - bw) / 2;
-    const by = UI_H - 24 + (1 - k) * 30;
+    const bx = (this.W - bw) / 2;
+    const by = this.H - 24 + (1 - k) * 30;
     const a = k;
     // name + title
     r.uiSprite('ui_skull', bx - 12, by + 6, 2, { alpha: a, flash: this.bossFlash * 0.6 });
-    r.uiText(this.bossName, UI_W / 2, by - 18, { size: 12, bold: true, align: 'center', color: '#ffd8d8', alpha: a, outline: '#2a0408' });
+    r.uiText(this.bossName, this.W / 2, by - 18, { size: 12, bold: true, align: 'center', color: '#ffd8d8', alpha: a, outline: '#2a0408' });
     if (this.bossTitle) {
       const nw = r.measureText(this.bossName, 12, true);
-      r.uiText(this.bossTitle, UI_W / 2 - nw / 2 - 8, by - 16, { size: 10, font: 'small', align: 'right', color: '#b06068', alpha: a * 0.9, outline: '#2a0408' });
+      r.uiText(this.bossTitle, this.W / 2 - nw / 2 - 8, by - 16, { size: 10, font: 'small', align: 'right', color: '#b06068', alpha: a * 0.9, outline: '#2a0408' });
     }
     const shake = this.bossFlash > 0 ? (Math.random() - 0.5) * 2 * this.bossFlash : 0;
     gauge(r, bx + shake, by, bw, 13, this.bossFrac, {

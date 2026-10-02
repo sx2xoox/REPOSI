@@ -3,7 +3,7 @@
 
 import type { Scene } from './scene';
 import type { Renderer } from '../engine/renderer';
-import { UI_H, UI_W } from '../engine/renderer';
+import { UI_H, UI_W, UI_W_BASE, uiCenterX } from '../engine/renderer';
 import type { GameScene } from './game-scene';
 import { Menu } from './widgets';
 import { input } from '../engine/input';
@@ -16,7 +16,7 @@ import { animFrame, hasAnim } from '../engine/sprites';
 import { C, formatTime, splitFloorName } from './theme';
 import { divider, fitScale, frame, glow, keycap, spriteCentered } from './frame';
 import { appear } from './anim';
-import { CONTROL_ROWS, PAD_NAMES, TOUCH_CONTROL_ROWS, controlKeys } from './keys';
+import { CONTROL_ROWS, PAD_NAMES, controlKeys, touchControlRows } from './keys';
 import { touchUiActive } from './touch-mode';
 
 export class PauseOverlay implements Scene {
@@ -84,7 +84,8 @@ export class PauseOverlay implements Scene {
     const run = this.game.run;
     const p = w.player;
     // ---- left: title + menu
-    const lx = 30;
+    const ox = uiCenterX(); // 768-wide layout centered on wide screens
+    const lx = ox + 30;
     const ly = 60 + (1 - k) * 10;
     frame(r, lx, ly, 240, 236, 'ornate', { alpha: k });
     r.uiText('일시정지', lx + 120, ly + 16, { size: 24, bold: true, align: 'center', color: C.text, outline: C.ink, alpha: k });
@@ -95,9 +96,9 @@ export class PauseOverlay implements Scene {
     this.menu.draw(r, k);
 
     // ---- right: run card
-    const rx = 290;
+    const rx = ox + 290;
     const ry = 24 + (1 - k) * 10;
-    const rw = UI_W - 30 - rx;
+    const rw = UI_W_BASE - 30 - 290;
     frame(r, rx, ry, rw, 196, 'panel', { alpha: k });
     const ch = p.character;
     frame(r, rx + 14, ry + 14, 64, 64, 'slot', { alpha: k });
@@ -146,7 +147,7 @@ export class PauseOverlay implements Scene {
     const pad = input.aimMode === 'pad';
     const colW = (rw - 28) / 2;
     if (touchUiActive()) {
-      TOUCH_CONTROL_ROWS.forEach(([icon, label, desc], i) => {
+      touchControlRows().forEach(([icon, label, desc], i) => {
         const cx = rx + 14 + (i % 2) * colW;
         const cyy = cy0 + 34 + Math.floor(i / 2) * 26;
         if (icon) r.uiSprite(icon, cx + 8, cyy, fitScale(icon, 15, 1.5), { alpha: k });

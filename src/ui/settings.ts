@@ -14,10 +14,10 @@ import { audio, sfx } from '../audio/audio';
 import { C } from './theme';
 import { fitScale, frame, keycap } from './frame';
 import { appear } from './anim';
-import { CONTROL_ROWS, PAD_NAMES, TOUCH_CONTROL_ROWS, controlKeys } from './keys';
+import { CONTROL_ROWS, PAD_NAMES, controlKeys, touchControlRows } from './keys';
 import { touchUiActive } from './touch-mode';
 import { applyGraphics } from './quality';
-import { QUALITY_LABEL, QUALITY_ORDER } from './touch-logic';
+import { QUALITY_LABEL, QUALITY_ORDER, TOUCH_SCHEMES, TOUCH_SCHEME_LABEL, touchScheme } from './touch-logic';
 import { isFullscreen, toggleFullscreen, fullscreenSupported } from './fullscreen';
 import type { TouchControlsMode } from '../engine/save';
 
@@ -96,6 +96,8 @@ export class SettingsOverlay implements Scene {
       { label: '조작', header: true },
       choice('터치 조작', TOUCH_ORDER, () => s.touchControls ?? 'auto', (v) => { s.touchControls = v; }, (v) => TOUCH_LABEL[v],
         '화면 조이스틱과 버튼. 자동: 터치하면 나타나고 키보드·마우스를 쓰면 숨깁니다.'),
+      choice('터치 조작 방식', TOUCH_SCHEMES, () => touchScheme(s.touchScheme), (v) => { s.touchScheme = v; }, (v) => TOUCH_SCHEME_LABEL[v],
+        '자동 조준: 공격 버튼을 누르면 가까운 적을 자동으로 노리고, 끌면 직접 조준합니다. 듀얼 스틱: 오른쪽 스틱으로 조준·사격.'),
       ...(fullscreenSupported() ? [{
         label: '전체 화면', toggle: () => isFullscreen(), action: () => toggleFullscreen(), adjust: () => toggleFullscreen(),
         hint: '브라우저 주소창을 숨기고 화면 전체를 씁니다.',
@@ -177,7 +179,7 @@ export class SettingsOverlay implements Scene {
     frame(r, cx, cy, W - 384, 270, 'inset', { alpha: k });
     if (this.touch) {
       r.uiText('터치 조작', cx + 14, cy + 10, { size: 12, bold: true, color: C.goldHi, alpha: k });
-      TOUCH_CONTROL_ROWS.forEach(([icon, label, desc], i) => {
+      touchControlRows().forEach(([icon, label, desc], i) => {
         const ry = cy + 38 + i * 25;
         if (icon) r.uiSprite(icon, cx + 24, ry, fitScale(icon, 18, 2), { alpha: k });
         else r.uiRect(cx + 18, ry - 6, 12, 12, C.rim, k * 0.6);

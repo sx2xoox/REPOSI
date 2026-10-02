@@ -33,6 +33,8 @@ const IDLE_BUDGET_MS = 2.5;
 const DESCEND_FALL = 0.62;
 /** Max particle lights per frame (beyond that every k-th particle emits). */
 const PARTICLE_LIGHT_CAP = 90;
+/** seconds the world must run after a hit-stop before per-hit feedback may stop it again */
+export const HITSTOP_GAP = 0.25;
 /** Max stereo pan for positional sounds (subtle). */
 const MAX_PAN = 0.6;
 
@@ -100,6 +102,8 @@ export class World {
   roomTime = 0;
   private pausedFlag = false;
   private hitstopT = 0;
+  /** free-running time left before per-hit feedback may hit-stop again (see hitstop()) */
+  private hitstopGap = 0;
   /** enemies & enemy projectiles time scale (time-slow items) */
   enemyTimeScale = 1;
   /** global slow motion (boss death) */
@@ -453,8 +457,10 @@ export class World {
     if (this.paused) return;
     if (this.hitstopT > 0) {
       this.hitstopT -= dt;
+      if (this.hitstopT <= 0) this.hitstopGap = HITSTOP_GAP;
       return;
     }
+    if (this.hitstopGap > 0) this.hitstopGap -= dt;
     if (this.slowmoT > 0) {
       this.slowmoT -= dt;
       if (this.slowmoT <= 0) this.slowmo = 1;
@@ -708,7 +714,7 @@ export class World {
       this.hitShake = shake;
     }
     if (save.settings.hitStop && (heavy || rel >= 2)) {
-      this.hitstop(Math.min(0.075, (hit.kind === 'melee' ? 0.03 : 0.012) + 0.008 * rel + (hit.crit ? 0.015 : 0)));
+      this.hitstop(Math.min(0.075, (hit.kind === 'melee' ? 0.03 : 0.012) + 0.008 * rel + (hit.crit ? 0.015 : 0)), true);
     }
   }
 
@@ -776,7 +782,7 @@ export class World {
     if (e.isBoss) this.bossKilled(e);
     else {
       const big = e.r > 10;
-      if (save.settings.hitStop) this.hitstop(big ? 0.045 : 0.022);
+      if (save.settings.hitStop) this.hitstop(big ? 0.045 : 0.022, true);
       if (big) this.shake(0.15);
     }
   }
@@ -825,7 +831,7 @@ export class World {
     this.sfx('explosion', { vol: Math.min(1, 0.6 + radius / 100), x });
     this.shake(Math.min(1, 0.35 + radius / 90));
     this.renderer.screenFlash('#fff2c0', Math.min(0.22, 0.08 + radius / 500));
-    if (save.settings.hitStop) this.hitstop(Math.min(0.06, 0.018 + radius / 1600));
+    if (save.settings.hitStop) this.hitstop(Math.min(0.06, 0.018 + radius / 1600), true);
     const col = o.color ?? '#ff9a2a';
     this.particles.burst(x, y, { count: 34, speed: [60, 220], life: [0.25, 0.6], colors: ['#ffffff', '#fff0a0', col, '#a03010', '#402020'], size: [2, 4], sizeEnd: 0.5, additive: true, light: 8 });
     this.particles.burst(x, y, { count: 22, speed: [10, 60], life: [0.6, 1.4], colors: ['#706060', '#504848', '#302828'], size: [3, 6], sizeEnd: 8, drag: 3, fade: true });
@@ -844,7 +850,8 @@ export class World {
     }
     for (const h of [...this.hittables]) if (dist(x, y, h.x, h.y) < radius + h.r) h.takeHit(this, { damage, kind: 'explosion', attacker: p });
     if ((o.hurtsPlayer ?? true) && !p.flags.has('bombImmune') && dist(x, y, p.x, p.y) < radius + p.r - 4) {
-      if (p.hurt(this, 2, '폭발')) {
+      // enemy blasts (e.g. bursting bloaters) name their owner on the death screen
+      if (p.hurt(this, 2, o.source instanceof Enemy ? o.source.def.name : '폭발')) {
         const d = dist(x, y, p.x, p.y) || 1;
         p.knock((p.x - x) / d, (p.y - y) / d, 240);
       }
@@ -1125,6 +1132,7 @@ export class World {
 
   /** Take a snapshot of the current frame and slide/fade to the next room. */
   beginTransition(dir: Dir | 'fade', dur = dir === 'fade' ? 0.6 : 0.28): void {
+    if (this.snapCanvas.width !== VIEW_W) this.snapCanvas.width = VIEW_W; // adaptive view width
     const sc = this.snapCanvas.getContext('2d')!;
     sc.clearRect(0, 0, VIEW_W, VIEW_H);
     sc.drawImage(this.renderer.world, 0, 0);
@@ -1375,7 +1383,15 @@ export class World {
     this.renderer.shake(amount);
   }
 
-  hitstop(t: number): void {
+  /**
+   * Freeze the simulation for `t` seconds. `fromHit`: per-hit feedback (hits,
+   * kills, explosions). A stream of those (release volleys, rapid multi-hits)
+   * would freeze the game most of the time, which reads as a severe frame drop,
+   * so they need a short free-running gap after the previous stop; explicit
+   * stops (player hurt, finishers, boss phases) always apply.
+   */
+  hitstop(t: number, fromHit = false): void {
+    if (fromHit && this.hitstopGap > 0) return;
     this.hitstopT = Math.min(0.12, Math.max(this.hitstopT, t));
   }
 
@@ -1513,7 +1529,7 @@ export class World {
 
   private vignette: HTMLCanvasElement | null = null;
   private drawVignette(): void {
-    if (!this.vignette) {
+    if (!this.vignette || this.vignette.width !== VIEW_W) {
       const c = document.createElement('canvas');
       c.width = VIEW_W;
       c.height = VIEW_H;
@@ -1547,7 +1563,7 @@ export class World {
 
   private hurtVig: HTMLCanvasElement | null = null;
   private hurtVignette(): HTMLCanvasElement {
-    if (!this.hurtVig) {
+    if (!this.hurtVig || this.hurtVig.width !== VIEW_W) {
       const c = document.createElement('canvas');
       c.width = VIEW_W;
       c.height = VIEW_H;
@@ -1584,7 +1600,7 @@ export class World {
     const v = DIR_VEC[tr.dir];
     const e = 1 - Math.pow(1 - t, 3);
     // new frame is already drawn: move it, then draw the old one sliding out
-    if (!this.transCanvas) {
+    if (!this.transCanvas || this.transCanvas.width !== VIEW_W) {
       this.transCanvas = document.createElement('canvas');
       this.transCanvas.width = VIEW_W;
       this.transCanvas.height = VIEW_H;

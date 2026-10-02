@@ -5,7 +5,7 @@
 import type { Scene, TouchButtonSpec } from './scene';
 import { touchUiActive } from './touch-mode';
 import type { Renderer } from '../engine/renderer';
-import { UI_H, UI_W } from '../engine/renderer';
+import { UI_H, UI_W, UI_W_BASE, uiCenterX } from '../engine/renderer';
 import { app } from '../game/app';
 import { input } from '../engine/input';
 import { sfx } from '../audio/audio';
@@ -114,6 +114,7 @@ export class CharacterSelectScene implements Scene {
     if (input.pressed('confirm')) this.start();
     // mouse: click a side character to select it, click the center one to start
     const m = app.renderer.displayToUI(input.mouseX, input.mouseY);
+    m.x -= uiCenterX();
     if (input.pressed('fire')) {
       for (let i = 0; i < this.chars.length; i++) {
         const { x, s } = this.slotPos(i);
@@ -129,10 +130,11 @@ export class CharacterSelectScene implements Scene {
   touchButtons(): TouchButtonSpec[] {
     if (this.starting >= 0) return [];
     const y = 360;
+    const ox = uiCenterX();
     return [
-      { x: 196, y, w: 64, h: 40, icon: 'tc_arrow_l', tap: 'uiLeft' },
-      { x: 274, y, w: 220, h: 40, label: '하강 시작', tap: 'confirm', primary: true },
-      { x: 508, y, w: 64, h: 40, icon: 'tc_arrow_r', tap: 'uiRight' },
+      { x: ox + 196, y, w: 64, h: 40, icon: 'tc_arrow_l', tap: 'uiLeft' },
+      { x: ox + 274, y, w: 220, h: 40, label: '하강 시작', tap: 'confirm', primary: true },
+      { x: ox + 508, y, w: 64, h: 40, icon: 'tc_arrow_r', tap: 'uiRight' },
     ];
   }
 
@@ -144,7 +146,7 @@ export class CharacterSelectScene implements Scene {
     if (d > n / 2) d -= n;
     if (d < -n / 2) d += n;
     const ad = Math.abs(d);
-    const x = UI_W / 2 + Math.sign(d) * (ad <= 1 ? ad * 104 : 104 + (ad - 1) * 64);
+    const x = UI_W_BASE / 2 + Math.sign(d) * (ad <= 1 ? ad * 104 : 104 + (ad - 1) * 64);
     const s = 6 - Math.min(1, ad) * 3 - Math.max(0, ad - 1) * 0.8;
     const a = clamp(1.2 - ad * 0.45, 0, 1);
     return { x, s: Math.max(2, s), a, d };
@@ -155,6 +157,7 @@ export class CharacterSelectScene implements Scene {
     backdrop().draw(r);
     r.presentWorld();
     r.beginUI();
+    r.dctx.translate(uiCenterX(), 0); // 768-wide layout centered on wide screens
     const intro = appear(this.t, 0.5);
     const out = this.starting >= 0 ? clamp(this.starting / 0.8, 0, 1) : 0;
     const A = intro * (1 - out * 0.85);
@@ -163,10 +166,10 @@ export class CharacterSelectScene implements Scene {
     const open = this.open(cur);
 
     // header
-    r.uiText('등불지기 선택', UI_W / 2, 16, { size: 24, bold: true, align: 'center', color: C.text, outline: C.ink, alpha: A });
-    divider(r, UI_W / 2, 48, 260, C.goldDark, A);
-    if (this.seed) r.uiText(`시드  ${this.seed}`, UI_W - 16, 20, { size: 10, font: 'small', align: 'right', color: C.gold, alpha: A });
-    else r.uiText('무작위 시드', UI_W - 16, 20, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: A });
+    r.uiText('등불지기 선택', UI_W_BASE / 2, 16, { size: 24, bold: true, align: 'center', color: C.text, outline: C.ink, alpha: A });
+    divider(r, UI_W_BASE / 2, 48, 260, C.goldDark, A);
+    if (this.seed) r.uiText(`시드  ${this.seed}`, UI_W_BASE - 16, 20, { size: 10, font: 'small', align: 'right', color: C.gold, alpha: A });
+    else r.uiText('무작위 시드', UI_W_BASE - 16, 20, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: A });
 
     // carousel (back to front)
     const order = this.chars.map((c, i) => ({ c, i, p: this.slotPos(i) })).sort((a, b) => Math.abs(b.p.d) - Math.abs(a.p.d));
@@ -234,18 +237,18 @@ export class CharacterSelectScene implements Scene {
     }
     // arrows
     const bob = Math.sin(this.t * 4) * 3;
-    r.uiSprite('ui_arrow_l', UI_W / 2 - 66 - bob, 170, 3, { alpha: A * 0.9 });
-    r.uiSprite('ui_arrow_r', UI_W / 2 + 66 + bob, 170, 3, { alpha: A * 0.9 });
+    r.uiSprite('ui_arrow_l', UI_W_BASE / 2 - 66 - bob, 170, 3, { alpha: A * 0.9 });
+    r.uiSprite('ui_arrow_r', UI_W_BASE / 2 + 66 + bob, 170, 3, { alpha: A * 0.9 });
     // name plate under the selected keeper
     const k = appear(this.selT, 0.3);
-    r.uiText(open ? cur.name : '???', UI_W / 2, baseY + 12 + (1 - k) * 6, { size: 24, bold: true, align: 'center', color: open ? cur.color : C.textFaint, outline: C.ink, alpha: A * k });
-    r.uiText(open ? cur.title : '잠긴 등불지기', UI_W / 2, baseY + 42, { size: 12, align: 'center', color: C.textDim, alpha: A * k });
+    r.uiText(open ? cur.name : '???', UI_W_BASE / 2, baseY + 12 + (1 - k) * 6, { size: 24, bold: true, align: 'center', color: open ? cur.color : C.textFaint, outline: C.ink, alpha: A * k });
+    r.uiText(open ? cur.title : '잠긴 등불지기', UI_W_BASE / 2, baseY + 42, { size: 12, align: 'center', color: C.textDim, alpha: A * k });
 
     this.drawInfo(r, cur, open, A, k);
     this.drawStats(r, cur, open, A, k);
     this.drawRelease(r, cur, open, A, k);
 
-    if (!touchUiActive()) keyHintRow(r, [['←→', '선택'], ['Enter', '하강 시작'], ['Esc', '뒤로']], UI_W / 2, UI_H - 12, { alpha: A * 0.85, pad: input.aimMode === 'pad' });
+    if (!touchUiActive()) keyHintRow(r, [['←→', '선택'], ['Enter', '하강 시작'], ['Esc', '뒤로']], UI_W_BASE / 2, UI_H - 12, { alpha: A * 0.85, pad: input.aimMode === 'pad' });
     if (out > 0) r.uiRect(0, 0, UI_W, UI_H, '#000000', ease.inQuad(out) * 0.9);
   }
 
@@ -292,7 +295,7 @@ export class CharacterSelectScene implements Scene {
 
   private drawStats(r: Renderer, c: CharacterDef, open: boolean, A: number, k: number): void {
     const w = 214;
-    const x = UI_W - 18 - w;
+    const x = UI_W_BASE - 18 - w;
     const y = 66;
     const h = 222;
     frame(r, x + (1 - k) * 10, y, w, h, 'panel', { alpha: A * 0.95 });
@@ -330,7 +333,7 @@ export class CharacterSelectScene implements Scene {
   private drawRelease(r: Renderer, c: CharacterDef, open: boolean, A: number, k: number): void {
     const w = 460;
     const h = 52;
-    const x = UI_W / 2 - w / 2;
+    const x = UI_W_BASE / 2 - w / 2;
     const y = 300;
     frame(r, x, y + (1 - k) * 8, w, h, 'tooltip', { alpha: A * 0.95, color: open ? '#c8662a' : C.rim });
     const fl = 0.8 + 0.2 * Math.sin(this.t * 8);

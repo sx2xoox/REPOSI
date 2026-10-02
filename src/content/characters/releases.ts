@@ -13,8 +13,27 @@ import { orbSprite } from '../../game/projectile';
 import { MeleeSwing } from '../../game/melee';
 import { angleTo, clamp, dist, rotateToward, TAU } from '../../engine/math';
 import { fx } from '../../engine/rng';
+import { registerWarmup } from '../../engine/sprites';
+import { prewarmLight } from '../../engine/lighting';
 import { swordWaveSprite } from '../weapons/sprites';
 import { glowSprite } from '../weapons/common';
+
+// ------------------------------------------------------------------ warm caches
+// Every sprite / light gradient a release uses is created at load (the boot
+// warm-up compiles them), so pressing F never builds canvases mid-frame.
+const BLOOM_BOLT = orbSprite(7, '#ffd078');
+const BLOOM_PETAL = glowSprite(7, '#ffd078');
+const BLOOM_HALO = glowSprite(34, '#ffb040');
+const WHIRL_WAVE = swordWaveSprite('#ffe2a0');
+registerWarmup(() => {
+  prewarmLight('#ffc050', 22); // bloom bolts
+  prewarmLight('#ffc070', 50, 120); // bloom halo
+  prewarmLight('#ffe2a0', 22); // sword waves
+  prewarmLight('#b8d0ff', 90); // whirlwind
+  prewarmLight('#ffe08a', 18); // falling arrows
+  prewarmLight('#9a50ff', 110); // abyss
+  prewarmLight('#ffffff', 5, 14); // burst / spark particle lights
+});
 
 // ====================================================================== shared
 /** Erase enemy bullets (and lobbed shots / puddles) within `radius` of (x, y) with a little spark each. */
@@ -53,6 +72,10 @@ export class ReleaseShot extends Entity {
   pierce: number;
   spin: number;
   hit = new Set<number>();
+  /** color arrays / light color resolved once (no per-frame string building) */
+  private trailCols: string[];
+  private burstCols: string[];
+  private lightCol: string;
   constructor(x: number, y: number, ang: number, o: { speed: number; damage: number; homing?: number; sprite: string; color: string; life?: number; radius?: number; pierce?: number; spin?: number }) {
     super();
     this.x = x;
@@ -67,6 +90,9 @@ export class ReleaseShot extends Entity {
     this.r = o.radius ?? 4;
     this.pierce = o.pierce ?? 0;
     this.spin = o.spin ?? 0;
+    this.trailCols = [this.color, this.color + '80'];
+    this.burstCols = ['#ffffff', this.color];
+    this.lightCol = this.color.slice(0, 7);
     this.team = 'player';
     this.tileCollide = false;
     this.layer = 1;
@@ -95,7 +121,7 @@ export class ReleaseShot extends Entity {
       return;
     }
     if (fx.chance(0.6)) {
-      w.particles.spawn({ x: this.x, y: this.y - this.z, life: 0.2, colors: [this.color, this.color + '80'], size: 1.5, sizeEnd: 0.5, additive: true });
+      w.particles.spawn({ x: this.x, y: this.y - this.z, life: 0.2, colors: this.trailCols, size: 1.5, sizeEnd: 0.5, additive: true });
     }
     for (const e of w.enemies) {
       if (!e.alive || e.hidden || this.hit.has(e.id)) continue;
@@ -112,7 +138,7 @@ export class ReleaseShot extends Entity {
   vanish(w: World): void {
     if (this.dead) return;
     this.dead = true;
-    w.particles.burst(this.x, this.y - this.z, { count: 5, speed: [20, 70], life: [0.1, 0.3], colors: ['#ffffff', this.color], size: [1, 2], additive: true });
+    w.particles.burst(this.x, this.y - this.z, { count: 5, speed: [20, 70], life: [0.1, 0.3], colors: this.burstCols, size: [1, 2], additive: true });
   }
 
   override draw(r: Renderer): void {
@@ -121,9 +147,11 @@ export class ReleaseShot extends Entity {
   }
 
   override light(w: World): void {
-    w.lights.add(this.x, this.y - this.z, 22, this.color.slice(0, 7), { intensity: 0.8 });
+    w.lights.add(this.x, this.y - this.z, 22, this.lightCol, SHOT_LIGHT);
   }
 }
+
+const SHOT_LIGHT = { intensity: 0.8 };
 
 /** Entity that runs a timed callback every frame for `dur` seconds, following the player. */
 class Timeline extends Entity {
@@ -190,7 +218,7 @@ export function releaseLanternBloom(w: World, p: Player): void {
       for (let i = 0; i < 2; i++) {
         const a = (i === 0 ? base : -base * 1.15 + Math.PI) + k * 0.06;
         ww.spawn(new ReleaseShot(pl.x + Math.cos(a) * 8, pl.y - 6 + Math.sin(a) * 6, a, {
-          speed: 170, damage: dmg, homing: 5.5, sprite: orbSprite(7, '#ffd078'), color: '#ffc050', life: 1.5, radius: 4,
+          speed: 170, damage: dmg, homing: 5.5, sprite: BLOOM_BOLT, color: '#ffc050', life: 1.5, radius: 4,
         }));
       }
       if (k % 3 === 0) ww.sfx('shoot_magic', { vol: 0.35, pitch: 1.2 + fx.range(-0.1, 0.1) });
@@ -202,9 +230,9 @@ export function releaseLanternBloom(w: World, p: Player): void {
       // rotating petal halo around Ria
       for (let i = 0; i < 6; i++) {
         const an = t * 4 + (i / 6) * TAU;
-        r.sprite(glowSprite(7, '#ffd078'), pl.x + Math.cos(an) * 14, pl.y - 6 + Math.sin(an) * 10, { alpha: 0.9 * a, additive: true });
+        r.sprite(BLOOM_PETAL, pl.x + Math.cos(an) * 14, pl.y - 6 + Math.sin(an) * 10, { alpha: 0.9 * a, additive: true });
       }
-      r.sprite(glowSprite(34, '#ffb040'), pl.x, pl.y - 6, { alpha: 0.45 * a, additive: true });
+      r.sprite(BLOOM_HALO, pl.x, pl.y - 6, { alpha: 0.45 * a, additive: true });
     },
     light(ww, t) {
       ww.lights.add(ww.player.x, ww.player.y - 6, 120 * (1 - t / 2), '#ffc070', { intensity: 0.9 });
@@ -255,7 +283,7 @@ export function releaseWhirlwind(w: World, p: Player): void {
       for (let i = 0; i < 8; i++) {
         const a = (i / 8) * TAU;
         ww.spawn(new ReleaseShot(pl.x + Math.cos(a) * 10, pl.y - 6 + Math.sin(a) * 8, a, {
-          speed: 260, damage: pl.stats.damage * 1.8, sprite: swordWaveSprite('#ffe2a0'), color: '#ffe2a0', life: 0.65, radius: 7, pierce: 99,
+          speed: 260, damage: pl.stats.damage * 1.8, sprite: WHIRL_WAVE, color: '#ffe2a0', life: 0.65, radius: 7, pierce: 99,
         }));
       }
     },
@@ -313,7 +341,7 @@ class FallingArrow extends Entity {
     }
     const t = clamp((this.age - this.delay) / this.fall, 0, 1);
     const h = (1 - t) * 110;
-    r.shadow(this.x, this.y, 6 * t + 2, 2, 0.3 * t);
+    r.shadow(this.x, this.y, Math.round(6 * t + 2), 2, 0.3 * t);
     r.line(this.x + 2, this.y - h - 26, this.x, this.y - h, '#fff0c0', 1, 0.5);
     r.sprite('proj_arrow_glow', this.x, this.y - h, { rot: Math.PI / 2 + 0.08 });
   }

@@ -232,7 +232,7 @@ class VoidDark extends Entity {
 
   override draw(r: Renderer, w: World): void {
     if (this.level < 0.02) return;
-    if (!this.cv) {
+    if (!this.cv || this.cv.width !== VIEW_W) {
       this.cv = document.createElement('canvas');
       this.cv.width = VIEW_W;
       this.cv.height = VIEW_H;

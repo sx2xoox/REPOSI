@@ -213,7 +213,7 @@ export class Projectile extends Entity {
         this.trailT = 0;
         w.particles.spawn({
           x: this.x + fx.range(-1, 1), y: this.y - this.z + fx.range(-1, 1), life: 0.18,
-          colors: [this.color, this.color + '80'], size: Math.max(1, this.r * 0.6), sizeEnd: 0.5, shape: 'pixel',
+          colors: this.fxCols()[0], size: Math.max(1, this.r * 0.6), sizeEnd: 0.5, shape: 'pixel',
         });
       }
     }
@@ -262,7 +262,7 @@ export class Projectile extends Entity {
     for (const b of this.behaviors) b.onExpire?.(this, w);
     const n = impact ? 6 : 4;
     w.particles.burst(this.x, this.y - this.z * (impact ? 1 : 0.3), {
-      count: n, speed: [25, 70], life: [0.15, 0.35], colors: ['#ffffff', this.color, this.color + '90'], size: [1, 2],
+      count: n, speed: [25, 70], life: [0.15, 0.35], colors: this.fxCols()[1], size: [1, 2],
     });
     if (this.team === 'player') w.sfx('tear_splash', { vol: 0.35, pitch: fx.range(0.9, 1.15), x: this.x });
   }
@@ -320,6 +320,17 @@ export class Projectile extends Entity {
       r.sprite(name, this.x, dy, this.style === 'tear' ? { rot: this.angle, sx: 1.15, sy: 0.92 } : undefined);
     }
     for (const b of this.behaviors) b.draw?.(this, r, w);
+  }
+
+  private fxColSrc = '';
+  private fxColCache: [string[], string[]] | null = null;
+  /** [trail colors, impact colors] for the current color (rebuilt only when a behavior recolors the shot) */
+  private fxCols(): [string[], string[]] {
+    if (!this.fxColCache || this.fxColSrc !== this.color) {
+      this.fxColSrc = this.color;
+      this.fxColCache = [[this.color, this.color + '80'], ['#ffffff', this.color, this.color + '90']];
+    }
+    return this.fxColCache;
   }
 
   private orbD = -1;

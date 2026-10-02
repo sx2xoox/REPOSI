@@ -1,15 +1,88 @@
 // Renderer: a low-resolution "world" canvas (VIEW_W x VIEW_H) that is scaled up
 // with nearest-neighbour filtering, plus a high-resolution UI layer drawn directly
 // on the display canvas in a virtual UI_W x UI_H coordinate space.
+//
+// Adaptive viewport: the world is always 216 px tall (consistent pixel size) and
+// its WIDTH follows the screen's aspect ratio (VIEW_W_MIN..VIEW_W_MAX), so wide
+// phones (19.5:9, 20:9, 21:9) are filled edge to edge instead of letterboxed.
+// VIEW_W / UI_W are live ES-module bindings updated by `Renderer.resize()`; read
+// them at use time (never cache them at module load). On 16:9 they are exactly
+// 384 / 768 as before. Taller-than-16:9 screens (tablets) narrow the world down
+// to VIEW_W_MIN (a 1x1 room's interior always stays visible) while the UI keeps a
+// 768x432 band centered vertically; `uiSafe` holds the device safe-area insets
+// (rounded corners, notch, home indicator) in UI units for edge-anchored HUD.
 
 import { getFlash, getSprite, getTintCanvas, animFrame, type Sprite } from './sprites';
 import { clamp, TAU } from './math';
 import { fx } from './rng';
+import { cssViewportSize, safeInsets, type Insets } from './viewport';
 
-export const VIEW_W = 384;
 export const VIEW_H = 216;
-export const UI_W = 768;
 export const UI_H = 432;
+/** the classic 16:9 world width (and UI width) the game was laid out for */
+export const VIEW_W_BASE = 384;
+export const UI_W_BASE = 768;
+/** narrowest world view: a 1x1 room's interior (+ part of its walls) always fits */
+export const VIEW_W_MIN = 304;
+/** widest world view (~2.37:1, e.g. 2560x1080); wider screens are pillarboxed */
+export const VIEW_W_MAX = 512;
+/** current world view width in px (live binding; even, VIEW_W_MIN..VIEW_W_MAX) */
+export let VIEW_W = VIEW_W_BASE;
+/** current UI space width (live binding; max(768, 2 * VIEW_W)) */
+export let UI_W = UI_W_BASE;
+
+export interface ViewportFit {
+  viewW: number;
+  uiW: number;
+  /** display px per world px */
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+  /** display px per UI unit */
+  uiScale: number;
+  uiOffsetX: number;
+  uiOffsetY: number;
+}
+
+/**
+ * Fit the world (VIEW_H tall, adaptive width) and the UI space into a display
+ * of w x h backing pixels. Pure (unit-tested).
+ */
+export function fitViewport(w: number, h: number, pixelPerfect = false): ViewportFit {
+  w = Math.max(1, w);
+  h = Math.max(1, h);
+  let s = h / VIEW_H;
+  if (pixelPerfect && s >= 1) s = Math.floor(s);
+  const raw = w / s;
+  // fill the width (crop < 1 world px); screens within half a pixel of 16:9 stay exactly 384
+  let viewW = Math.abs(raw - VIEW_W_BASE) < 0.5 ? VIEW_W_BASE : Math.ceil(raw - 1e-6);
+  viewW += viewW & 1;
+  if (viewW > VIEW_W_MAX) viewW = VIEW_W_MAX;
+  if (viewW < VIEW_W_MIN) {
+    viewW = VIEW_W_MIN;
+    s = Math.min(s, w / VIEW_W_MIN);
+    if (pixelPerfect && s >= 1) s = Math.floor(s);
+  }
+  const offsetX = Math.round((w - viewW * s) / 2);
+  const offsetY = Math.round((h - VIEW_H * s) / 2);
+  if (viewW * 2 >= UI_W_BASE) {
+    return { viewW, uiW: viewW * 2, scale: s, offsetX, offsetY, uiScale: s / 2, uiOffsetX: offsetX, uiOffsetY: offsetY };
+  }
+  // taller than 16:9: the UI keeps its 768x432 layout in a band as wide as the world image
+  const uiScale = (viewW * s) / UI_W_BASE;
+  return { viewW, uiW: UI_W_BASE, scale: s, offsetX, offsetY, uiScale, uiOffsetX: offsetX, uiOffsetY: Math.round((h - UI_H * uiScale) / 2) };
+}
+
+/** x offset that centers a 768-wide (16:9) layout in the current UI space (full-panel overlays). */
+export function uiCenterX(): number {
+  return Math.max(0, Math.round((UI_W - UI_W_BASE) / 2));
+}
+
+/** Override the live view size (tests / tools); the renderer calls this on resize. */
+export function setViewSize(viewW: number, uiW = Math.max(UI_W_BASE, viewW * 2)): void {
+  VIEW_W = viewW;
+  UI_W = uiW;
+}
 
 export interface DrawOpts {
   flipX?: boolean;
@@ -153,8 +226,16 @@ export class Renderer {
   scale = 1;
   /** display pixels per UI unit */
   uiScale = 0.5;
+  /** display px position of the world image's top-left corner */
   offsetX = 0;
   offsetY = 0;
+  /** display px position of the UI space's (0, 0) */
+  uiOffsetX = 0;
+  uiOffsetY = 0;
+  /** device safe-area insets in UI units (inside the UI space; 0 on desktop) */
+  uiSafe: Insets = { l: 0, r: 0, t: 0, b: 0 };
+  /** bumped whenever VIEW_W changes (consumers with view-sized canvases can compare) */
+  viewVersion = 0;
   pixelPerfect = false;
   /** cap on window.devicePixelRatio for the display canvas (graphics quality); call resize() after changing */
   maxDpr = 2;
@@ -187,24 +268,50 @@ export class Renderer {
 
   resize(): void {
     const dpr = Math.min(window.devicePixelRatio || 1, Math.max(0.5, this.maxDpr));
-    const w = Math.floor(window.innerWidth * dpr);
-    const h = Math.floor(window.innerHeight * dpr);
+    const css = cssViewportSize(this.display);
+    const w = Math.max(1, Math.round(css.w * dpr));
+    const h = Math.max(1, Math.round(css.h * dpr));
     if (this.display.width !== w || this.display.height !== h) {
       this.display.width = w;
       this.display.height = h;
     }
-    let s = Math.min(w / VIEW_W, h / VIEW_H);
-    if (this.pixelPerfect && s >= 1) s = Math.floor(s);
-    this.scale = s;
-    this.uiScale = s * (VIEW_W / UI_W);
-    this.offsetX = Math.floor((w - VIEW_W * s) / 2);
-    this.offsetY = Math.floor((h - VIEW_H * s) / 2);
+    const f = fitViewport(w, h, this.pixelPerfect);
+    if (f.viewW !== VIEW_W || f.uiW !== UI_W) {
+      setViewSize(f.viewW, f.uiW);
+      this.viewVersion++;
+    }
+    if (this.world.width !== VIEW_W || this.world.height !== VIEW_H) {
+      this.world.width = VIEW_W;
+      this.world.height = VIEW_H;
+      this.ctx.imageSmoothingEnabled = false;
+    }
+    this.scale = f.scale;
+    this.offsetX = f.offsetX;
+    this.offsetY = f.offsetY;
+    this.uiScale = f.uiScale;
+    this.uiOffsetX = f.uiOffsetX;
+    this.uiOffsetY = f.uiOffsetY;
+    // safe area (CSS px from the screen edges) -> UI units inside the UI space
+    const sa = safeInsets();
+    const k = w / Math.max(1, css.w); // backing px per CSS px
+    const us = this.uiScale;
+    this.uiSafe = {
+      l: Math.max(0, (sa.l * k - this.uiOffsetX) / us),
+      r: Math.max(0, (this.uiOffsetX + UI_W * us - (w - sa.r * k)) / us),
+      t: Math.max(0, (sa.t * k - this.uiOffsetY) / us),
+      b: Math.max(0, (this.uiOffsetY + UI_H * us - (h - sa.b * k)) / us),
+    };
     this.dctx.imageSmoothingEnabled = false;
   }
 
   /** Convert display (canvas backing) coords to UI coords. */
   displayToUI(x: number, y: number): { x: number; y: number } {
-    return { x: (x - this.offsetX) / this.uiScale, y: (y - this.offsetY) / this.uiScale };
+    return { x: (x - this.uiOffsetX) / this.uiScale, y: (y - this.uiOffsetY) / this.uiScale };
+  }
+
+  /** Convert world coords (camera applied) to display (canvas backing) coords. */
+  worldToDisplay(x: number, y: number): { x: number; y: number } {
+    return { x: (x - this.viewX) * this.scale + this.offsetX, y: (y - this.viewY) * this.scale + this.offsetY };
   }
 
   /** Convert display coords to world coords (camera applied). */
@@ -419,7 +526,7 @@ export class Renderer {
   /** Set the display context transform for UI drawing (UI_W x UI_H virtual units). */
   beginUI(): CanvasRenderingContext2D {
     const d = this.dctx;
-    d.setTransform(this.uiScale, 0, 0, this.uiScale, this.offsetX, this.offsetY);
+    d.setTransform(this.uiScale, 0, 0, this.uiScale, this.uiOffsetX, this.uiOffsetY);
     d.imageSmoothingEnabled = false;
     d.globalAlpha = 1;
     d.globalCompositeOperation = 'source-over';
@@ -490,11 +597,17 @@ export class Renderer {
     return lines;
   }
 
+  /** Filled rect in UI space. A rect covering the whole UI space (overlay dims, fades) fills the entire screen. */
   uiRect(x: number, y: number, w: number, h: number, color: string, alpha = 1): void {
     const d = this.dctx;
     d.globalAlpha = alpha;
     d.fillStyle = color;
-    d.fillRect(x, y, w, h);
+    if (x <= 0 && y <= 0 && x + w >= UI_W && y + h >= UI_H) {
+      d.save();
+      d.setTransform(1, 0, 0, 1, 0, 0);
+      d.fillRect(0, 0, this.display.width, this.display.height);
+      d.restore();
+    } else d.fillRect(x, y, w, h);
     d.globalAlpha = 1;
   }
 

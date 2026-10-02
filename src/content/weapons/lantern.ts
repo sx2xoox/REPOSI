@@ -37,6 +37,9 @@ defineDrawnSprite('icon_lantern_bolt', 16, 16, (p) => {
   p.px(14, 3, '#ffe080');
 }, { outline: O });
 
+// the pulsing glass glow (16..24px, see draw) is defined up front so the boot warm-up compiles it
+for (let d = 16; d <= 24; d++) glowSprite(d, '#ffb040');
+
 defineWeapon({
   id: 'lantern_bolt',
   name: '등불 마탄',

@@ -21,6 +21,8 @@ html, body {
   padding: 0;
   width: 100%;
   height: 100%;
+  /* the dynamic viewport (iOS Safari / Android Chrome toolbars) */
+  height: 100dvh;
   overflow: hidden;
   background: #000;
   /* mobile: no scrolling, pinch / double-tap zoom, long-press callouts or selection */
@@ -37,8 +39,9 @@ body {
   inset: 0;
 }
 canvas#game {
-  /* fills the layout viewport (= window.innerWidth/innerHeight used by the renderer);
-     the game image is letterboxed inside, touch controls use the whole surface */
+  /* fills the whole screen (under the rounded corners / notch too, viewport-fit=cover);
+     the renderer sizes its backing store from this element's box and adapts the world
+     width to the aspect ratio, the HUD and touch controls stay inside the safe area */
   position: fixed;
   inset: 0;
   display: block;

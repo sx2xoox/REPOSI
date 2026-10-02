@@ -214,8 +214,27 @@ export function getTintCanvas(s: Sprite, color: string): HTMLCanvasElement {
   return c;
 }
 
+const warmups: (() => void)[] = [];
+
+/**
+ * Register extra cache warm-up work (light gradients, tint silhouettes ...) that
+ * `warmAllSprites()` runs at boot, so the first use of a big effect (a 등불 해방)
+ * never builds canvases mid-frame. Safe to call at module load (runs later, in the browser).
+ */
+export function registerWarmup(fn: () => void): void {
+  warmups.push(fn);
+}
+
 /** Pre-compile every defined sprite (call during a loading screen to avoid hitches). */
 export function warmAllSprites(): void {
+  // warm-ups first: they may define more (sized / colored) sprites compiled below
+  for (const fn of warmups.splice(0)) {
+    try {
+      fn();
+    } catch (e) {
+      console.error('[sprites] warm-up failed', e);
+    }
+  }
   for (const [name, def] of defs) {
     if (!compiled.has(name)) {
       try {

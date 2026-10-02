@@ -1,11 +1,17 @@
-// On-screen touch controls (Isaac-mobile style) and touch chrome for menus.
+// On-screen touch controls and touch chrome for menus.
 //
-// Gameplay (GameScene on top): floating left stick = move, floating right
-// stick = aim + auto-fire (fed through input.touchAim, the same path as the
-// gamepad right stick), round buttons for dash / bomb / active / potion /
-// lantern release, and pause / map / status buttons. Everything is drawn on
-// the display canvas in CSS-pixel layout (so the letterbox bars of wide phones
-// are used) with chunky pixel-art discs that match the UI theme.
+// Gameplay (GameScene on top), scheme 'auto' (default, 설정 > 터치 조작 방식):
+// floating left stick = move; a big ATTACK button bottom-right: hold to attack,
+// it auto-aims at the best target (nearest enemy in line of sight, preferring
+// the move / facing direction, sticky so it does not flicker; a reticle marks
+// it), dragging it past a dead zone aims manually in the drag direction, with no
+// enemies the aim follows the movement. Scheme 'twin': floating right stick =
+// aim + auto-fire. Either way the aim is fed through input.touchAim (the same
+// path as the gamepad right stick), so gameplay code has no touch special cases;
+// targeting only reads the world. Round buttons for dash / bomb / active /
+// potion / lantern release sit in an arc around the attack button, plus pause /
+// map / status buttons. Everything is drawn on the display canvas in CSS-pixel
+// layout inside the device safe area, with chunky pixel-art discs.
 //
 // Menus: a short tap = left click at that point (Menu widgets select +
 // confirm), a vertical drag = mouse wheel (lists scroll), plus per-scene
@@ -13,22 +19,25 @@
 
 import { app } from '../game/app';
 import { input, type Action } from '../engine/input';
-import { isTouchDevice } from '../engine/save';
+import { isTouchDevice, save } from '../engine/save';
 import type { Renderer } from '../engine/renderer';
-import { UI_W, UI_H } from '../engine/renderer';
+import { UI_W, UI_H, VIEW_W, VIEW_H } from '../engine/renderer';
+import { safeInsets } from '../engine/viewport';
 import { animFrame, definePixelSprite, getSprite } from '../engine/sprites';
 import { clamp } from '../engine/math';
-import { Actives } from '../game/defs';
+import { Actives, Weapons } from '../game/defs';
+import type { Enemy } from '../game/enemy';
 import { EMBER_MAX } from '../game/player';
 import { potionSpriteFor } from '../game/pickups';
 import type { World } from '../game/world';
 import { GameScene } from './game-scene';
+import { minimapBlockRect } from './hud';
 import type { Scene, TouchButtonSpec } from './scene';
 import { C } from './theme';
 import { softKeyboard, touchUiActive } from './touch-mode';
 import {
-  computeTouchLayout, knobPosition, TapTracker, TouchRouter, GAME_BUTTONS, SYSTEM_BUTTONS,
-  type Circle, type Insets, type TouchButtonId, type TouchLayout, type Vec,
+  computeTouchLayout, knobPosition, pickTarget, touchScheme, TapTracker, TouchRouter, GAME_BUTTONS, SYSTEM_BUTTONS,
+  type Circle, type Insets, type TargetCandidate, type TouchButtonId, type TouchLayout, type Vec,
 } from './touch-logic';
 
 const BUTTON_ACTION: Record<TouchButtonId, Action> = {
@@ -75,6 +84,17 @@ definePixelSprite('tc_dash', { w: '#bfe8ff', b: '#5aa8e0', d: '#2a5a8a' }, [
   'd.bwwwww',
   '...bww..',
   '....bw..',
+], { outline: O });
+definePixelSprite('tc_attack', { w: '#f4ead8', d: '#b4a8c0', g: '#e0a848', h: '#7a4e1c' }, [
+  '.......ww',
+  '......wwd',
+  '.....wwd.',
+  '....wwd..',
+  'g..wwd...',
+  '.gwwd....',
+  '..gd.....',
+  '.hhg.....',
+  'hh..g....',
 ], { outline: O });
 definePixelSprite('tc_arrow_l', { w: '#ffe09a', d: '#c08a3a' }, ['....w', '...ww', '..www', '.wwww', 'dwwww', '.dwww', '..dww', '...dw', '....d'], { outline: O });
 definePixelSprite('tc_arrow_r', { w: '#ffe09a', d: '#c08a3a' }, ['w....', 'ww...', 'www..', 'wwww.', 'wwwwd', 'wwwd.', 'wwd..', 'wd...', 'd....'], { outline: O });
@@ -166,11 +186,9 @@ interface ChromeHit {
 
 export class TouchControls {
   private canvas: HTMLCanvasElement | null = null;
-  private probe: HTMLDivElement | null = null;
   private safe: Insets = { l: 0, r: 0, t: 0, b: 0 };
-  private safeDirty = true;
   private layoutKey = '';
-  layout: TouchLayout = computeTouchLayout({ w: 800, h: 400 }, { l: 0, r: 0, t: 0, b: 0 }, { x: 0, y: 0, w: 800, h: 400 });
+  layout: TouchLayout = computeTouchLayout({ w: 800, h: 400 }, { l: 0, r: 0, t: 0, b: 0 }, { game: { x: 0, y: 0, w: 800, h: 400 }, minimap: { x: 660, y: 8, w: 130, h: 110 } });
   readonly router = new TouchRouter(this.layout);
   private taps = new Map<number, TapTracker>();
   private chromePtr = new Map<number, ChromeHit>();
@@ -179,6 +197,15 @@ export class TouchControls {
   private t = 0;
   private flash: Partial<Record<TouchButtonId, number>> = {};
   private lastFrame = 0;
+  // auto-aim ('auto' scheme)
+  private target: Enemy | null = null;
+  private targetId: number | null = null;
+  /** current auto-aim direction (target, else movement, else last aim) */
+  private aimDir: Vec = { x: 1, y: 0 };
+  private cands: TargetCandidate[] = [];
+  private candEnemy = new Map<number, Enemy>();
+  /** reticle: displayed world position (eased toward the target) and fade */
+  private ret = { x: 0, y: 0, half: 8, a: 0, id: -1 };
 
   attach(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
@@ -199,22 +226,14 @@ export class TouchControls {
       block(e);
     }, active);
     document.addEventListener('gesturestart', block as EventListener, active);
-    const dirty = () => {
-      this.safeDirty = true;
-    };
-    window.addEventListener('resize', dirty);
-    window.addEventListener('orientationchange', dirty);
-    const probe = document.createElement('div');
-    probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;'
-      + 'padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);';
-    document.body.appendChild(probe);
-    this.probe = probe;
     // automation / debugging (Playwright): layout + current mode
     (window as unknown as { __lktouch?: unknown }).__lktouch = {
       layout: () => {
         this.refreshLayout();
         return this.layout;
       },
+      target: () => (this.target ? { id: this.target.id, x: this.target.x, y: this.target.y } : null),
+      aim: () => ({ ...this.aimDir }),
       mode: () => this.mode,
       visible: () => touchUiActive(),
       scene: () => app.scenes?.top?.constructor?.name ?? '',
@@ -244,32 +263,35 @@ export class TouchControls {
     return { x: p.x * k, y: p.y * k };
   }
 
-  /** UI-space (768x432) rect -> CSS px rect. */
+  /** UI-space (UI_W x 432) rect -> CSS px rect. */
   private uiToCss(x: number, y: number, w = 0, h = 0): { x: number; y: number; w: number; h: number } {
     const r = app.renderer;
     const k = this.k;
     const s = r.uiScale / k;
-    return { x: r.offsetX / k + x * s, y: r.offsetY / k + y * s, w: w * s, h: h * s };
+    return { x: r.uiOffsetX / k + x * s, y: r.uiOffsetY / k + y * s, w: w * s, h: h * s };
   }
 
   private refreshLayout(): void {
     const c = this.canvas;
     const r = app.renderer;
     if (!c || !r) return;
-    if (this.safeDirty && this.probe) {
-      const cs = getComputedStyle(this.probe);
-      this.safe = { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
-      this.safeDirty = false;
-    }
+    this.safe = safeInsets();
     const vw = c.clientWidth || window.innerWidth;
     const vh = c.clientHeight || window.innerHeight;
-    const key = `${vw}x${vh}|${this.safe.l},${this.safe.r},${this.safe.t},${this.safe.b}|${r.offsetX},${r.offsetY},${r.scale},${c.width}`;
+    const scheme = touchScheme(save.settings.touchScheme);
+    const key = `${vw}x${vh}|${this.safe.l},${this.safe.r},${this.safe.t},${this.safe.b}|${r.offsetX},${r.offsetY},${r.scale},${r.uiOffsetX},${r.uiOffsetY},${r.uiScale},${UI_W},${c.width}|${scheme}`;
     if (key === this.layoutKey) return;
     this.layoutKey = key;
     const k = this.k;
-    const game = { x: r.offsetX / k, y: r.offsetY / k, w: (384 * r.scale) / k, h: (216 * r.scale) / k };
-    this.layout = computeTouchLayout({ w: vw, h: vh }, this.safe, game);
+    const game = { x: r.offsetX / k, y: r.offsetY / k, w: (VIEW_W * r.scale) / k, h: (VIEW_H * r.scale) / k };
+    const mm = minimapBlockRect(UI_W, r.uiSafe);
+    const schemeChanged = this.layout.scheme !== scheme;
+    this.layout = computeTouchLayout({ w: vw, h: vh }, this.safe, { game, minimap: this.uiToCss(mm.x, mm.y, mm.w, mm.h) }, scheme);
     this.router.layout = this.layout;
+    if (schemeChanged) {
+      this.router.reset();
+      this.syncSticks();
+    }
   }
 
   // ------------------------------------------------------------ scene queries
@@ -385,7 +407,7 @@ export class TouchControls {
     softKeyboard.flush();
     const owner = this.router.up(id);
     if (owner?.kind === 'button') input.touchRelease(BUTTON_ACTION[owner.id]);
-    if (owner?.kind === 'stick') this.syncSticks();
+    if (owner?.kind === 'stick' || owner?.kind === 'attack') this.syncSticks();
     const p = this.canvas ? this.cssPoint(e) : { x: 0, y: 0 };
     const chrome = this.chromePtr.get(id);
     if (chrome) {
@@ -418,7 +440,49 @@ export class TouchControls {
     const mv = this.router.moveVector();
     input.touchMove.x = mv.x;
     input.touchMove.y = mv.y;
-    input.touchAim = this.router.aimVector();
+    if (this.layout.scheme === 'twin') {
+      input.touchAim = this.router.aimVector();
+      return;
+    }
+    if (!this.router.attackHeld()) {
+      input.touchAim = null;
+      return;
+    }
+    const g = this.gameScene();
+    if (g) this.updateTarget(g.world);
+    input.touchAim = this.router.manualAim() ?? { ...this.aimDir };
+  }
+
+  // ------------------------------------------------------------ auto-aim
+  /** Pick the auto-aim target (read-only world queries) and the resulting aim direction. */
+  private updateTarget(w: World): void {
+    const p = w.player;
+    if (!p || this.layout.scheme !== 'auto') {
+      this.target = null;
+      this.targetId = null;
+      return;
+    }
+    const cands = this.cands;
+    cands.length = 0;
+    this.candEnemy.clear();
+    for (const e of w.enemies) {
+      if (e.dead || !e.alive || e.hidden || !e.vulnerable) continue;
+      cands.push({ id: e.id, x: e.x, y: e.y, visible: w.room.lineOfSight(p.x, p.y, e.x, e.y), weight: e.hasStatus('charm') ? 1.8 : 1 });
+      this.candEnemy.set(e.id, e);
+    }
+    const mv = input.touchMove;
+    const ml = Math.hypot(mv.x, mv.y);
+    const last = { x: Math.cos(p.aim), y: Math.sin(p.aim) };
+    const facing = ml > 0.25 ? { x: mv.x / ml, y: mv.y / ml } : last;
+    const t = pickTarget({ x: p.x, y: p.y }, facing, cands, this.targetId);
+    this.target = t ? this.candEnemy.get(t.id) ?? null : null;
+    this.targetId = t ? t.id : null;
+    if (t) {
+      const dx = t.x - p.x;
+      const dy = t.y - p.y;
+      const d = Math.hypot(dx, dy);
+      this.aimDir = d > 1e-6 ? { x: dx / d, y: dy / d } : last;
+    } else this.aimDir = facing;
   }
 
   private setMode(m: 'game' | 'menu'): void {
@@ -444,6 +508,15 @@ export class TouchControls {
     this.setMode(g ? 'game' : 'menu');
     this.fade = clamp(this.fade + dt * 4, 0, 1);
     this.refreshLayout();
+    if (g && this.mode === 'game' && touchUiActive() && this.layout.scheme === 'auto') {
+      this.updateTarget(g.world);
+      if (this.router.attackHeld()) this.syncSticks();
+      this.easeReticle(dt);
+    } else {
+      this.target = null;
+      this.targetId = null;
+      this.ret.a = 0;
+    }
     // turning a phone to portrait mid-run pauses the game
     if (g && !g.world.paused && touchUiActive() && this.portraitPhone()) input.touchTap('pause');
   }
@@ -549,6 +622,105 @@ export class TouchControls {
     this.disc(r, kp, L.knobR, hot ? 'knobHot' : 'knob', A * 0.95);
   }
 
+  /** Ease the reticle toward the current target (world coords). */
+  private easeReticle(dt: number): void {
+    const t = this.target;
+    const R = this.ret;
+    const want = t && !this.router.manualAim() ? (this.router.attackHeld() ? 1 : 0.5) : 0;
+    R.a += (want - R.a) * Math.min(1, dt * 12);
+    if (!t) return;
+    const tx = t.x;
+    const ty = t.y - t.z - Math.max(4, t.r * 0.8);
+    const half = Math.max(7, t.r + 5);
+    if (R.id !== t.id && R.a < 0.05) {
+      R.x = tx;
+      R.y = ty;
+      R.half = half + 4;
+    }
+    R.id = t.id;
+    const k = Math.min(1, dt * 18);
+    R.x += (tx - R.x) * k;
+    R.y += (ty - R.y) * k;
+    R.half += (half - R.half) * k;
+  }
+
+  /** Corner brackets around the auto-aim target, in world-pixel steps. */
+  private drawReticle(r: Renderer, A: number): void {
+    const R = this.ret;
+    if (R.a <= 0.03 || !this.target) return;
+    const P = r.scale;
+    const held = this.router.attackHeld();
+    const pulse = held ? 0 : Math.round(Math.sin(this.t * 5) + 1) * 0.5;
+    const half = Math.round(R.half + pulse);
+    const c = r.worldToDisplay(Math.round(R.x), Math.round(R.y));
+    const d = r.dctx;
+    const arm = 3;
+    const px = (x: number, y: number, w: number, h: number) => d.fillRect(Math.round(c.x + x * P), Math.round(c.y + y * P), Math.ceil(w * P), Math.ceil(h * P));
+    const corners: [number, number][] = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+    for (const pass of [0, 1]) {
+      d.globalAlpha = A * R.a * (pass ? 1 : 0.8);
+      d.fillStyle = pass ? (held ? '#ffe09a' : '#f4ead8') : C.ink;
+      const o = pass ? 0 : 1; // outline pass is 1px fatter
+      for (const [sx, sy] of corners) {
+        const x0 = sx * half - (sx > 0 ? 1 : 0);
+        const y0 = sy * half - (sy > 0 ? 1 : 0);
+        // horizontal arm
+        px(Math.min(x0, x0 - sx * (arm - 1)) - o, y0 - o, arm + 2 * o, 1 + 2 * o);
+        // vertical arm
+        px(x0 - o, Math.min(y0, y0 - sy * (arm - 1)) - o, 1 + 2 * o, arm + 2 * o);
+      }
+    }
+    d.globalAlpha = 1;
+  }
+
+  /** Dotted aim guide from the player while aiming manually with the attack button. */
+  private drawAimGuide(r: Renderer, w: World, A: number): void {
+    const dir = this.router.manualAim();
+    const p = w.player;
+    if (!dir || !p) return;
+    const P = Math.max(1, Math.round(r.scale));
+    const d = r.dctx;
+    for (let i = 0; i < 6; i++) {
+      const dist = 12 + i * 7;
+      const c = r.worldToDisplay(p.x + dir.x * dist, p.y - 5 + dir.y * dist * 0.8);
+      d.globalAlpha = A * (0.85 - i * 0.12);
+      d.fillStyle = C.ink;
+      d.fillRect(Math.round(c.x - P * 1.5), Math.round(c.y - P * 1.5), P * 3, P * 3);
+      d.fillStyle = '#ffe09a';
+      d.fillRect(Math.round(c.x - P * 0.5), Math.round(c.y - P * 0.5), P, P);
+    }
+    d.globalAlpha = 1;
+  }
+
+  private drawAttack(r: Renderer, w: World, A: number): void {
+    const L = this.layout;
+    const c = L.attack;
+    const p = w.player;
+    if (!c || !p) return;
+    const at = this.router.attack;
+    const on = !!at;
+    const rp = this.disc(r, c, c.r * (on ? 0.95 : 1), on ? 'pressed' : 'button', A * (on ? 0.95 : 0.8));
+    const wdef = Weapons.get(p.weaponId);
+    // charge weapons: the draw progress on the rim
+    const st = p.weapon;
+    if (wdef?.kind === 'charge' && st?.mem?.drawing) {
+      const full = st.charge >= 1;
+      this.ring(r, c, rp, clamp(st.charge, 0, 1), full ? '#fff6d0' : C.gold, A * (full ? 0.6 + 0.4 * Math.sin(this.t * 30) : 1));
+    }
+    this.icon(r, wdef?.icon ?? 'tc_attack', c, rp, A * (on ? 1 : 0.92), { fill: 0.5, dy: -2 });
+    this.text(r, '공격', c.x, c.y + c.r * 0.42, 10, on ? C.goldHi : C.text, A * 0.95);
+    if (!at) return;
+    if (at.manual) {
+      // direction pip on the button rim + the finger knob
+      const pip = { x: c.x + at.dir.x * (c.r - 5 * L.u), y: c.y + at.dir.y * (c.r - 5 * L.u) };
+      this.disc(r, pip, 7 * L.u, 'ready', A);
+      this.disc(r, knobPosition(at.base, at.finger, c.r), L.knobR * 0.8, 'knobHot', A * 0.85);
+    } else if (!at.onButton) {
+      // floating attack touch (outside the button): a small ring where the finger is
+      this.disc(r, at.base, L.knobR * 0.9, 'ghost', A * 0.9);
+    }
+  }
+
   private drawGame(r: Renderer, w: World): void {
     const p = w.player;
     if (!p) return;
@@ -557,8 +729,13 @@ export class TouchControls {
     const A = this.fade * cine;
     if (A <= 0.01) return;
     const held = this.router.heldButtons();
+    if (L.scheme === 'auto' && !w.bossIntro && !w.transitioning) {
+      this.drawReticle(r, A);
+      this.drawAimGuide(r, w, A);
+    }
     this.drawStick(r, 'left', A, false);
-    this.drawStick(r, 'right', A, !!this.router.right?.engaged);
+    if (L.scheme === 'twin') this.drawStick(r, 'right', A, !!this.router.right?.engaged);
+    else this.drawAttack(r, w, A);
 
     const btn = (id: TouchButtonId, opts: { icon: string; enabled?: boolean; ready?: boolean; frac?: number; fracColor?: string; label?: string; badge?: string; hidden?: boolean }) => {
       const c: Circle = L.buttons[id];
@@ -622,7 +799,7 @@ export class TouchControls {
     const d = r.dctx;
     d.save();
     const ui = r.uiScale;
-    d.setTransform(ui, 0, 0, ui, r.offsetX, r.offsetY);
+    d.setTransform(ui, 0, 0, ui, r.uiOffsetX, r.uiOffsetY);
     const k = on ? 0.96 : 1;
     const cx = b.x + b.w / 2;
     const cy = b.y + b.h / 2;

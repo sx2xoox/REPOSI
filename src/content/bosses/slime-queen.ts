@@ -435,7 +435,7 @@ defineBoss({
   name: NAME,
   bossTitle: '왕관을 삼킨 군체',
   bossFloors: [2],
-  hp: 880,
+  hp: 760,
   radius: 20,
   speed: 0,
   mass: 6,

@@ -389,7 +389,7 @@ function mirroredFrame(w: World): { frame: string; flip: boolean } {
   return { frame: hasAnim(name) ? animFrame(name, p.animT) : name, flip: !p.flip };
 }
 
-/** Where the mirror shade wants to stand: the player's point reflection, kept inside and at arm's length. */
+/** Where the mirror shade wants to stand: the player's point reflection, kept inside and just within melee reach. */
 export function mirrorSpot(w: World, r: number): { x: number; y: number } {
   const p = w.player;
   const room = w.room;
@@ -397,10 +397,10 @@ export function mirrorSpot(w: World, r: number): { x: number; y: number } {
   let x = clamp(m.x, room.interiorX + r + 4, room.interiorX + room.interiorW - r - 4);
   let y = clamp(m.y, room.interiorY + r + 4, room.interiorY + room.interiorH - r - 4);
   const d = Math.hypot(x - p.x, y - p.y);
-  if (d < 52) {
+  if (d < 30) {
     const a = d > 1 ? Math.atan2(y - p.y, x - p.x) : -Math.PI / 2;
-    x = clamp(p.x + Math.cos(a) * 52, room.interiorX + r + 4, room.interiorX + room.interiorW - r - 4);
-    y = clamp(p.y + Math.sin(a) * 52, room.interiorY + r + 4, room.interiorY + room.interiorH - r - 4);
+    x = clamp(p.x + Math.cos(a) * 30, room.interiorX + r + 4, room.interiorX + room.interiorW - r - 4);
+    y = clamp(p.y + Math.sin(a) * 30, room.interiorY + r + 4, room.interiorY + room.interiorH - r - 4);
   }
   return { x, y };
 }

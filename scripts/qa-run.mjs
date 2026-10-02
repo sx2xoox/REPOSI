@@ -849,6 +849,25 @@ async function runChecks(browser) {
     await page.waitForTimeout(1000);
     await shot('niel-run');
     noErr('niel run');
+    // mobile: touch UI on a landscape phone, taps through title -> character select -> run
+    const mctx = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2, serviceWorkers: 'block' });
+    const mp = await mctx.newPage();
+    const merrs = [];
+    mp.on('console', (m) => { if (m.type() === 'error') merrs.push(m.text()); });
+    mp.on('pageerror', (e) => merrs.push(`[pageerror] ${e.message}`));
+    await mp.goto(url);
+    await mp.waitForFunction(() => !!window.__lk, null, { timeout: 30000 });
+    await mp.waitForTimeout(1200);
+    await mp.screenshot({ path: join(dir, `${String(n++).padStart(2, '0')}-mobile-title.png`) });
+    await mp.evaluate(() => window.__lk.start('QA-MOBILE', 'serin'));
+    await mp.waitForTimeout(500);
+    await mp.touchscreen.tap(700, 300);
+    await mp.evaluate(botMain, { god: true, turbo: 1 });
+    await mp.waitForTimeout(8000);
+    await mp.evaluate(() => { window.__bot.stop = true; });
+    await mp.screenshot({ path: join(dir, `${String(n++).padStart(2, '0')}-mobile-game.png`) });
+    check('mobile touch UI: no console errors', merrs.length === 0, merrs.join(' | ').slice(0, 400));
+    await mctx.close();
   } catch (e) {
     check('checks crashed', false, String(e?.stack ?? e).slice(0, 500));
     try { await shot('crash'); } catch {}

@@ -5,6 +5,7 @@
 
 import { PixelPainter, bayer } from '../engine/painter';
 import type { DrawOpts, Renderer } from '../engine/renderer';
+import { UI_H, UI_W } from '../engine/renderer';
 import { getSprite } from '../engine/sprites';
 import { clamp, mixColor } from '../engine/math';
 import { C, PX } from './theme';
@@ -407,5 +408,5 @@ export function glow(r: Renderer, x: number, y: number, radius: number, color: s
 
 /** Full-screen dim layer with a soft vignette (overlays). */
 export function dimScreen(r: Renderer, alpha: number, color: string = C.void): void {
-  r.uiRect(-200, -200, 768 + 400, 432 + 400, color, clamp(alpha, 0, 1));
+  r.uiRect(0, 0, UI_W, UI_H, color, clamp(alpha, 0, 1)); // full UI space = whole screen (see Renderer.uiRect)
 }

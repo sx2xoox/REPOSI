@@ -12,8 +12,9 @@ import { VIEW_H, VIEW_W, type Renderer } from './renderer';
 const GRAD_SIZE = 128;
 /** light map resolution relative to the world canvas */
 const LIGHT_SCALE = 0.5;
-const LW = Math.ceil(VIEW_W * LIGHT_SCALE);
-const LH = Math.ceil(VIEW_H * LIGHT_SCALE);
+/** light map size (follows the adaptive VIEW_W; refreshed in `begin`) */
+let LW = Math.ceil(VIEW_W * LIGHT_SCALE);
+let LH = Math.ceil(VIEW_H * LIGHT_SCALE);
 const gradCache = new Map<string, HTMLCanvasElement>();
 
 function gradientCanvas(color: string): HTMLCanvasElement {
@@ -57,6 +58,19 @@ function sizedGradient(color: string, size: number): HTMLCanvasElement {
   return c;
 }
 
+/**
+ * Pre-build the gradient canvases a light of `color` with radii in
+ * [minRadius, maxRadius] (world px) will use, so a burst of new lights (a
+ * 등불 해방) never creates canvases mid-frame. Call at load (needs a DOM).
+ */
+export function prewarmLight(color: string, minRadius: number, maxRadius = minRadius): void {
+  if (typeof document === 'undefined') return;
+  const lo = Math.max(2, Math.round(minRadius * 2 * LIGHT_SCALE));
+  const hi = Math.round(maxRadius * 2 * LIGHT_SCALE);
+  for (let s = lo; s <= Math.min(hi, SIZED_MAX); s++) sizedGradient(color, s);
+  if (maxRadius * 2 * LIGHT_SCALE > SIZED_MAX) gradientCanvas(color);
+}
+
 export interface LightOpts {
   /** 0..1 (multiplies the light's alpha) */
   intensity?: number;
@@ -97,6 +111,12 @@ export class Lighting {
     this.glowCount = 0;
     this.count = 0;
     if (!this.enabled) return;
+    LW = Math.ceil(VIEW_W * LIGHT_SCALE);
+    LH = Math.ceil(VIEW_H * LIGHT_SCALE);
+    if (this.canvas.width !== LW || this.canvas.height !== LH) {
+      this.canvas.width = LW;
+      this.canvas.height = LH;
+    }
     const c = this.ctx;
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.globalCompositeOperation = 'source-over';
