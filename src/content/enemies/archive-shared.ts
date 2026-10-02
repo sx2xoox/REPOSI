@@ -274,7 +274,8 @@ export function flutter(amp = 1.6, rate = 9): ProjBehavior {
   return {
     id: 'flutter',
     update(p, _w, dt) {
-      if (!p.mem.ph) p.mem.ph = fx.range(0, TAU);
+      // the phase is gameplay state (it steers the shot): derive it from the id, never from `fx`
+      if (!p.mem.ph) p.mem.ph = ((p.id * 2.399963) % TAU) + 0.01;
       p.angle += Math.cos(p.age * rate + p.mem.ph) * amp * dt;
     },
   };
