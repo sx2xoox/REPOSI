@@ -6,3 +6,6 @@ playwright-report
 *.log
 .DS_Store
 /screenshots
+
+# agent worktrees
+.claude/worktrees/
