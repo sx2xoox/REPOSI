@@ -13,6 +13,7 @@ import type { Enemy, ShootOpts } from '../../game/enemy';
 import type { Renderer } from '../../engine/renderer';
 import type { PixelPainter } from '../../engine/painter';
 import type { ProjBehavior } from '../../game/projectile';
+import type { Script } from '../../engine/script';
 import { defineAnim, defineDrawnSprite, hasSprite, type SpriteOptions } from '../../engine/sprites';
 import { GroundWarning, RingFx } from '../../game/effects';
 import { fx } from '../../engine/rng';
@@ -81,6 +82,12 @@ export const BUL = {
   spirit: { color: '#ff56dc', core: '#ffe6fa', rim: '#9a1a92', outline: '#200420' },
   toxic: { color: '#a8ff3c', core: '#f6ffd6', rim: '#46940e', outline: '#0a1e04' },
   molten: { color: '#ffcf4a', core: '#fffbe4', rim: '#c8300c', outline: '#160300' },
+  // floors 4–5 (sanctum: frost shards + rose hymns; abyss: hot void pink, eldritch teal, stars)
+  frost: { color: '#8cf2ff', core: '#ffffff', rim: '#2856e8', outline: '#020820' },
+  hymn: { color: '#ff5c8e', core: '#fff0f6', rim: '#a8164c', outline: '#1e0410' },
+  void: { color: '#ff4fae', core: '#ffe6f4', rim: '#a0105e', outline: '#14000a' },
+  eldritch: { color: '#3cffc4', core: '#eafff8', rim: '#0a8a6c', outline: '#001410' },
+  star: { color: '#ffec50', core: '#ffffff', rim: '#ff8a1a', outline: '#1c0a00' },
 } satisfies Record<string, BulletPal>;
 export type BulletKind = keyof typeof BUL;
 
@@ -428,4 +435,143 @@ export function dizzy(w: World, e: Enemy): void {
       colors: ['#fff6a0'], size: 1, z: 0,
     });
   }
+}
+
+// ================================================================== floors 4–5 additions
+// Shaped enemy bullets (crystal shards that point along their flight, spinning stars),
+// small pure geometry helpers for the sanctum / abyss enemies (unit-tested in
+// tests/enemies45.test.ts) and a few shared script snippets.
+
+/** Lazily define an elongated crystal-shard bullet sprite of length `len` (points right). */
+export function shardSprite(kind: BulletKind, len: number): string {
+  len = Math.max(5, Math.min(15, Math.round(len)));
+  const name = `__eshard_${kind}_${len}`;
+  if (hasSprite(name)) return name;
+  const pal = BUL[kind];
+  const h = Math.max(3, Math.round(len * 0.42)) | 1;
+  const mid = h / 2;
+  const wide = Math.round(len * 0.38);
+  defineDrawnSprite(name, len, h, (p) => {
+    p.poly([0, mid, wide, 0, len, mid, wide, h], pal.rim);
+    p.poly([1.5, mid, wide, 1, len - 1.5, mid, wide, h - 1], pal.color);
+    p.line(wide - 1, Math.floor(mid), len - 2, Math.floor(mid), pal.core);
+    p.px(len - 2, Math.floor(mid), '#ffffff');
+    p.px(wide, Math.floor(mid) - (h >= 5 ? 1 : 0), '#ffffff');
+  }, { outline: pal.outline });
+  return name;
+}
+
+/** Lazily define a four-pointed star bullet sprite of size `d` (odd, 5..15). */
+export function starSprite(kind: BulletKind, d: number): string {
+  d = Math.max(5, Math.min(15, Math.round(d))) | 1;
+  const name = `__estar_${kind}_${d}`;
+  if (hasSprite(name)) return name;
+  const pal = BUL[kind];
+  const c = d / 2;
+  const t = Math.max(1, d * 0.16);
+  defineDrawnSprite(name, d, d, (p) => {
+    p.poly([0, c, c - t, c - t, c, 0, c + t, c - t, d, c, c + t, c + t, c, d, c - t, c + t], pal.rim);
+    p.poly([1.5, c, c - t * 0.6, c - t * 0.6, c, 1.5, c + t * 0.6, c - t * 0.6, d - 1.5, c, c + t * 0.6, c + t * 0.6, c, d - 1.5, c - t * 0.6, c + t * 0.6], pal.color);
+    p.circle(c, c, Math.max(1, d * 0.17), pal.core);
+    p.px(Math.floor(c), Math.floor(c), '#ffffff');
+  }, { outline: pal.outline });
+  return name;
+}
+
+/** Shoot options for a crystal shard of collision radius `size` that points along its flight. */
+export function shard<T extends ShootOpts>(kind: BulletKind, size = 3, extra: T = {} as T): ShootOpts & T {
+  return {
+    color: BUL[kind].color,
+    sprite: shardSprite(kind, size * 3 + 2),
+    spriteRotates: true,
+    radius: size,
+    light: 14 + size * 2,
+    ...extra,
+  };
+}
+
+/** Shoot options for a spinning star bullet of collision radius `size`. */
+export function starShot<T extends ShootOpts>(kind: BulletKind, size = 3, extra: T = {} as T): ShootOpts & T {
+  return {
+    color: BUL[kind].color,
+    radius: size,
+    light: 16 + size * 2,
+    ...extra,
+    style: 'none',
+    behaviors: [spinDraw(starSprite(kind, size * 2 + 3), 7), ...(extra.behaviors ?? [])],
+  };
+}
+
+/**
+ * Slot offsets (in slots from the wall's center) of a bullet wall of `count` slots
+ * with a hole of `gap` slots starting at slot index `gapStart`.
+ */
+export function wallSlots(count: number, gapStart: number, gap: number): number[] {
+  const out: number[] = [];
+  const c = (count - 1) / 2;
+  for (let i = 0; i < count; i++) if (i < gapStart || i >= gapStart + gap) out.push(i - c);
+  return out;
+}
+
+/** First slot of a `gap`-wide hole about `offsetSlots` from the wall's center (rounded outward), kept inside the wall. */
+export function gapStartFor(count: number, gap: number, offsetSlots: number): number {
+  const c = (count - 1) / 2;
+  const start = c + offsetSlots - (gap - 1) / 2;
+  // round away from the center so the hole never drifts back over it
+  const s = offsetSlots >= 0 ? Math.ceil(start - 1e-9) : Math.floor(start + 1e-9);
+  return clamp(s, 0, Math.max(0, count - gap));
+}
+
+/** Point reflection of (px, py) through (cx, cy). */
+export function mirrorPoint(px: number, py: number, cx: number, cy: number): { x: number; y: number } {
+  return { x: 2 * cx - px, y: 2 * cy - py };
+}
+
+/** Is (tx, ty) inside the aiming cone (`aim` ± `half` radians) seen from (fx, fy)? */
+export function inAimCone(aim: number, fx0: number, fy0: number, tx: number, ty: number, half: number): boolean {
+  const a = Math.atan2(ty - fy0, tx - fx0);
+  let d = (a - aim) % TAU;
+  if (d > Math.PI) d -= TAU;
+  if (d < -Math.PI) d += TAU;
+  return Math.abs(d) <= half;
+}
+
+/** Gravity pull speed at distance `d`: 0 outside `radius`, rising linearly from 40% at the rim to `max` at the center. */
+export function pullSpeed(d: number, radius: number, max: number): number {
+  if (d >= radius || radius <= 0) return 0;
+  return max * (0.4 + 0.6 * (1 - Math.max(0, d) / radius));
+}
+
+/** `count` points along a ray from (x0, y0), the first `start` px out, then every `spacing` px. */
+export function lineSpots(x0: number, y0: number, angle: number, count: number, spacing: number, start = spacing): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = start + i * spacing;
+    out.push({ x: x0 + Math.cos(angle) * d, y: y0 + Math.sin(angle) * d });
+  }
+  return out;
+}
+
+/** The hurt pose for a moment after a hit (after the white flash), else the current animation frame. */
+export function hurtFrame(e: Enemy, w: World, hurt: string, window = 0.24): string {
+  return w.time - e.lastHurtAt < window ? hurt : e.frame();
+}
+
+/** Script: fade an enemy's alpha to `to` over `time` seconds. */
+export function* fadeTo(e: Enemy, w: World, to: number, time: number): Script {
+  const from = e.alpha;
+  for (let el = 0; el < time; el += w.dt) {
+    e.alpha = from + (to - from) * Math.min(1, el / time);
+    yield;
+  }
+  e.alpha = to;
+}
+
+/** Rectangular lane warning from (x, y) along `angle` (`len` long, `width` wide). */
+export function laneWarning(w: World, x: number, y: number, angle: number, len: number, width: number, time: number, color = WARN_RED): GroundWarning {
+  const g = w.spawn(new GroundWarning(x, y, 4, time, undefined, color));
+  g.rw = len;
+  g.rh = width;
+  g.angle = angle;
+  return g;
 }
