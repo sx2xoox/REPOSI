@@ -51,6 +51,16 @@ describe('difficulty table', () => {
     }
   });
 
+  it('no regular enemy outruns the keeper (92 px/s) with its floor speed bonus', () => {
+    for (const e of Enemies.all()) {
+      if (e.boss) continue;
+      for (const f of e.floors ?? []) {
+        const fl = floorAt(f);
+        if (fl) expect((e.speed ?? 40) * (fl.enemySpeed ?? 1), `${e.id} on floor ${f}`).toBeLessThan(92);
+      }
+    }
+  });
+
   it('every defined floor uses its table row', () => {
     const fs = Floors.all().sort((a, b) => a.index - b.index);
     fs.forEach((f, i) => expect(f.index, f.id).toBe(i + 1));

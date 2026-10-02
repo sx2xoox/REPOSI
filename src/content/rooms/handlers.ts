@@ -148,7 +148,9 @@ registerRoomHandler('boss', {
     const item = w.loot.rollItem('boss', w.run.lootRng) ?? w.loot.rollItem('treasure', w.run.lootRng);
     if (item) w.spawn(new Pedestal(room.centerX, room.centerY - 20, item));
     w.spawn(new Trapdoor(room.centerX, room.centerY + 24));
-    w.spawn(new Pickup('heart', room.centerX - 30, room.centerY).pop());
+    // one heart per half-heart a regular hit costs on this floor (deeper floors hit harder)
+    const hearts = Math.max(1, w.floor.enemyDamage?.[0] ?? 1);
+    for (let i = 0; i < hearts; i++) w.spawn(new Pickup('heart', room.centerX - 30, room.centerY + i * 10).pop());
     if (rng.chance(0.5)) w.spawn(new Pickup('soul_heart', room.centerX + 30, room.centerY).pop());
     audio.playMusic(w.floor.music);
   },
