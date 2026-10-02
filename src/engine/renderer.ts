@@ -158,6 +158,19 @@ const GLYPHS: Record<string, string[]> = {
   'Y': ['101', '101', '010', '010', '010'],
 };
 
+// ---------------------------------------------------------------- measure cache
+const widthCache = new Map<string, number>();
+const WIDTH_CACHE_MAX = 3000;
+let fontsWatched = false;
+
+/** Widths measured before the web fonts loaded are wrong: drop the cache when fonts finish loading. */
+function watchFonts(): void {
+  if (fontsWatched || typeof document === 'undefined' || !document.fonts) return;
+  fontsWatched = true;
+  document.fonts.addEventListener?.('loadingdone', () => widthCache.clear());
+  void document.fonts.ready?.then(() => widthCache.clear());
+}
+
 // ---------------------------------------------------------------- bitmap caches
 const textCache = new Map<string, HTMLCanvasElement>();
 const TEXT_CACHE_MAX = 400;
@@ -166,8 +179,20 @@ const TEXT_CACHE_MAX = 400;
 function textBitmap(up: string, color: string, outline: string | undefined, s: number): HTMLCanvasElement {
   const key = `${s}|${color}|${outline ?? ''}|${up}`;
   let cv = textCache.get(key);
-  if (cv) return cv;
-  if (textCache.size >= TEXT_CACHE_MAX) textCache.clear();
+  if (cv) {
+    // LRU: move to the newest end
+    textCache.delete(key);
+    textCache.set(key, cv);
+    return cv;
+  }
+  if (textCache.size >= TEXT_CACHE_MAX) {
+    // evict the least recently used quarter (not the whole cache)
+    let n = 0;
+    for (const k of textCache.keys()) {
+      textCache.delete(k);
+      if (++n >= TEXT_CACHE_MAX / 4) break;
+    }
+  }
   cv = document.createElement('canvas');
   cv.width = Math.max(1, (up.length * 4 - 1) * s + 2 * s);
   cv.height = 7 * s;
@@ -574,9 +599,17 @@ export class Renderer {
     d.globalAlpha = 1;
   }
 
+  /** Text width in UI units (cached; the cache is dropped when web fonts finish loading). */
   measureText(str: string, size = 12, bold = false, font: 'main' | 'small' = 'main'): number {
+    const key = `${size}|${bold ? 1 : 0}|${font}|${str}`;
+    const hit = widthCache.get(key);
+    if (hit !== undefined) return hit;
+    watchFonts();
     this.dctx.font = this.fontString(size, bold, font);
-    return this.dctx.measureText(str).width;
+    const wdt = this.dctx.measureText(str).width;
+    if (widthCache.size >= WIDTH_CACHE_MAX) widthCache.clear();
+    widthCache.set(key, wdt);
+    return wdt;
   }
 
   /** Word-wrap text (Korean-aware: breaks on spaces, falls back to characters). */
