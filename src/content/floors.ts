@@ -1,4 +1,4 @@
-// The five floors of the descent.
+// The floors of the descent: act 1 (1–5) ends at the abyss heart, act 2 (6+) lies below it.
 
 import { defineFloor } from '../game/defs';
 
@@ -26,4 +26,13 @@ defineFloor({
   index: 5, id: 'abyss', name: '5층 · 공허의 심장', subtitle: '등불이 닿지 않는 곳.',
   theme: 'abyss', music: 'floor5', roomCount: [12, 15], hpMult: 2.6, budget: [7, 9], championChance: 0.12,
   extraRooms: { curse: 0.7, shrine: 0.4 },
+});
+
+// ---- act 2
+defineFloor({
+  index: 6, id: 'archive', name: '6층 · 수몰된 서고', subtitle: '젖은 책장마다 꺼진 이름들.',
+  theme: 'archive', music: 'floor6', roomCount: [12, 15],
+  // difficulty: reconciled with DIFFICULTY table
+  hpMult: 3.2, budget: [8, 10], championChance: 0.13,
+  extraRooms: { challenge: 0.5, shrine: 0.5, curse: 0.6 },
 });

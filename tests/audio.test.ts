@@ -259,7 +259,9 @@ describe('audio registry', () => {
     }
   });
   it('every floor track has a combat layer', () => {
-    for (const id of ['floor1', 'floor2', 'floor3', 'floor4', 'floor5'] as const) {
+    const floors = MUSIC_IDS.filter((id) => id.startsWith('floor'));
+    expect(floors.length).toBeGreaterThanOrEqual(6);
+    for (const id of floors) {
       const def = songDefs.get(id)!.def;
       expect(Object.values(def.channels).some((c) => c.layer === 'combat'), id).toBe(true);
     }

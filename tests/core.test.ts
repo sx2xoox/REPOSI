@@ -26,8 +26,11 @@ describe('rng', () => {
 });
 
 describe('content', () => {
-  it('has the five floors', () => {
-    expect(Floors.all().map((f) => f.index).sort()).toEqual([1, 2, 3, 4, 5]);
+  it('has contiguous floors starting at 1 (act 1 = 1–5, act 2 below)', () => {
+    const idx = Floors.all().map((f) => f.index).sort((a, b) => a - b);
+    expect(idx.length).toBeGreaterThanOrEqual(6);
+    expect(idx).toEqual(idx.map((_, i) => i + 1));
+    expect(idx.slice(0, 5)).toEqual([1, 2, 3, 4, 5]);
   });
   it('every character references a real weapon', () => {
     for (const c of Characters.all()) expect(Weapons.has(c.weapon)).toBe(true);

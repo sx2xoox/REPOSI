@@ -2,7 +2,7 @@
 // tests and handy in the browser console).
 
 import { app } from './game/app';
-import { Actives, Artifacts, Characters, Enemies, Weapons, Potions } from './game/defs';
+import { Actives, Artifacts, Characters, Enemies, Floors, Weapons, Potions } from './game/defs';
 import type { World } from './game/world';
 import { input } from './engine/input';
 import { Pedestal, Pickup } from './game/pickups';
@@ -28,6 +28,8 @@ export interface DebugApi {
   killAll(): void;
   gotoRoom(kind: string): boolean;
   nextFloor(): void;
+  /** jump straight to floor `index` (returns false when no such floor is defined) */
+  gotoFloor(index: number): boolean;
   step(frames: number): void;
   press(code: string, frames?: number): void;
   list(): Record<string, string[]>;
@@ -129,6 +131,12 @@ export function installDebug(): void {
     },
     nextFloor() {
       world()?.descend();
+    },
+    gotoFloor(index) {
+      const w = world();
+      if (!w || !Floors.all().some((f) => f.index === index)) return false;
+      w.startFloor(index);
+      return true;
     },
     step(frames) {
       for (let i = 0; i < frames; i++) {
