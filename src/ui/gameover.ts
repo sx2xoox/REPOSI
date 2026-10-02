@@ -163,7 +163,7 @@ export class GameOverOverlay implements Scene {
     frame(r, x, y, w, 176, 'panel', { alpha: a });
     r.uiText('하강 기록', x + w / 2, y + 12, { size: 10, font: 'small', align: 'center', color: C.gold, alpha: a });
     const rows: [string, string, number, (v: number) => string][] = [
-      ['ui_door', '도달 층', run.floor, (v) => `${v}층`],
+      ['ui_door', '도달 층', run.floor, (v) => `${Math.round(v)}층`],
       ['ui_hourglass', '시간', s.timeSec, (v) => formatTime(v)],
       ['ui_swords', '처치', s.kills, (v) => `${Math.round(v)}`],
       ['ui_chest', '획득 아이템', s.itemsTaken, (v) => `${Math.round(v)}`],

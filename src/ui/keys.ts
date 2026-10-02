@@ -106,7 +106,7 @@ export function touchControlRows(): [string, string, string][] {
   if (save.settings.touchScheme === 'twin') return TOUCH_CONTROL_ROWS;
   return [
     ['', '왼쪽 화면', '끌어서 이동'],
-    ['tc_attack', '공격 버튼', '누르면 자동 조준 · 끌면 직접 조준'],
+    ['tc_attack', '공격', '누르면 자동 조준 · 끌면 직접 조준'],
     ...TOUCH_CONTROL_ROWS.slice(2),
   ];
 }

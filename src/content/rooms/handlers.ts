@@ -36,8 +36,8 @@ const TOUCH_HINTS: typeof HINTS = [
 ];
 // default touch scheme: the attack button auto-aims
 const TOUCH_AUTO_HINTS: typeof HINTS = [
-  { keys: ['왼쪽'], label: '끌어서 이동', dx: -72, row: 0 },
-  { keys: ['공격'], label: '누르면 자동 조준', dx: 76, row: 0 },
+  { keys: ['왼쪽'], label: '끌어서 이동', dx: -80, row: 0 },
+  { keys: ['공격'], label: '누르면 자동 조준', dx: 64, row: 0 },
 ];
 
 function paintHints(room: Room): void {

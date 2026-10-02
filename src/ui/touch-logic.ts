@@ -253,7 +253,7 @@ export interface StickState {
 /** The held attack button ('auto' scheme). */
 export interface AttackState {
   pointerId: number;
-  /** where the finger landed (follows the finger past `followR`) */
+  /** where the finger landed */
   base: Vec;
   finger: Vec;
   /** dragged past the dead zone: aim in the drag direction instead of auto-aim */
@@ -317,8 +317,8 @@ export class TouchRouter {
     if (o?.kind === 'attack' && this.attack) {
       const at = this.attack;
       const AR = this.layout.attack?.r ?? this.layout.stickR;
+      // the base stays where the finger landed: sliding back onto it returns to auto-aim
       at.finger = { x, y };
-      at.base = followBase(at.base, at.finger, AR * 1.2);
       const dx = x - at.base.x;
       const dy = y - at.base.y;
       const d = Math.hypot(dx, dy);

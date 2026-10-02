@@ -705,7 +705,7 @@ export class TouchControls {
     const st = p.weapon;
     if (wdef?.kind === 'charge' && st?.mem?.drawing) {
       const full = st.charge >= 1;
-      this.ring(r, c, rp, clamp(st.charge, 0, 1), full ? '#fff6d0' : C.gold, A * (full ? 0.6 + 0.4 * Math.sin(this.t * 30) : 1));
+      this.ring(r, c, rp, clamp(st.charge, 0, 1), full ? '#ffffff' : '#7ad0ff', A * (full ? 0.6 + 0.4 * Math.sin(this.t * 30) : 1));
     }
     this.icon(r, wdef?.icon ?? 'tc_attack', c, rp, A * (on ? 1 : 0.92), { fill: 0.5, dy: -2 });
     this.text(r, '공격', c.x, c.y + c.r * 0.42, 10, on ? C.goldHi : C.text, A * 0.95);

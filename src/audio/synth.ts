@@ -747,3 +747,16 @@ export class Patch {
 export function chordFreqs(root: number, semis: number[]): number[] {
   return semis.map((s) => root * Math.pow(2, s / 12));
 }
+
+/**
+ * Build the lazily created synth caches up front (noise buffers, the sfx
+ * reverb / delay sends, pulse and built-in oscillator wave tables), so the
+ * first play of a sound — e.g. during the first 등불 해방 — never synthesizes
+ * them mid-frame. Called once, shortly after the AudioContext is unlocked.
+ */
+export function warmSynth(ctx: Ctx): void {
+  for (const c of ['white', 'pink', 'brown', 'chip', 'crackle'] as NoiseColor[]) noiseBuffer(ctx, c);
+  sfxSends(ctx);
+  for (const duty of [0.125, 0.25, 0.333]) pulseWave(ctx, duty);
+  for (const t of ['square', 'sawtooth', 'triangle'] as OscillatorType[]) ctx.createOscillator().type = t;
+}

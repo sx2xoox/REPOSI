@@ -6,7 +6,7 @@
 // Synths receive a BaseAudioContext so they can also be rendered offline
 // (OfflineAudioContext) for automated loudness checks (see src/audio/offline.ts).
 
-import { routeSfxSends } from './synth';
+import { routeSfxSends, warmSynth } from './synth';
 
 export const SFX_NAMES = [
   // player / weapons
@@ -144,6 +144,15 @@ class AudioEngine {
       this.master.connect(this.compressor);
       this.compressor.connect(this.ctx.destination);
       routeSfxSends(this.ctx, this.sfxBus);
+      // synth caches (noise, reverb impulse, wave tables) right after the gesture, not on a first sound mid-fight
+      const ctx = this.ctx;
+      setTimeout(() => {
+        try {
+          warmSynth(ctx);
+        } catch (e) {
+          console.warn('[audio] warm-up failed', e);
+        }
+      }, 30);
       this.applyVolumes();
       if (this.pendingMusic) {
         const id = this.pendingMusic;
