@@ -20,7 +20,11 @@ function run(net: MemoryNetwork, lobbies: Lobby[], ms: number): void {
 function room(n: number, link = { latencyMs: 25, jitterMs: 10 }) {
   const net = new MemoryNetwork({ seed: 3, ...link });
   const host = Lobby.host(net.hostSync('K7QM'), opts(net, '방장'));
-  const clients = Array.from({ length: n }, (_, i) => Lobby.join(net.joinSync('K7QM'), opts(net, `친구${i + 1}`)));
+  const clients: Lobby[] = [];
+  for (let i = 0; i < n; i++) {
+    clients.push(Lobby.join(net.joinSync('K7QM'), opts(net, `친구${i + 1}`)));
+    run(net, [host, ...clients], 150); // one after another: slots follow join order
+  }
   run(net, [host, ...clients], 300);
   return { net, host, clients, all: [host, ...clients] };
 }
@@ -47,7 +51,8 @@ describe('lobby protocol', () => {
     expect(fifth.state).toBe('closed');
     expect(fifth.closeReason).toBe('full');
 
-    const { net: net2, host: host2, all: all2 } = room(1);
+    const { net: net2, host: host2, clients: clients2, all: all2 } = room(1);
+    clients2[0].setReady(true);
     const old = Lobby.join(net2.joinSync('K7QM'), opts(net2, '옛날', { buildId: 'build-0' }));
     run(net2, [...all2, old], 300);
     expect(old.closeReason).toBe('version');

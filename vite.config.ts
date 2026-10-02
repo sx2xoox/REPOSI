@@ -109,5 +109,7 @@ export default defineConfig(({ mode }) => ({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // deterministic Math (engine/dmath.ts) installed for every test, as at game boot
+    setupFiles: ['tests/setup.ts'],
   },
 }));

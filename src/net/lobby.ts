@@ -337,7 +337,11 @@ export class Lobby {
         this.pings.set(id, { peer, at: now });
         this.send(peer, { t: 'ping', id });
       }
-      if (this.role === 'host' && this.peers.size) this.broadcastRoster();
+      if (this.role === 'host' && this.peers.size) {
+        this.rebuildRoster();
+        this.broadcastRoster();
+        this.changed();
+      }
     }
   }
 

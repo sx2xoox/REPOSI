@@ -1606,13 +1606,22 @@ export const DETERMINISTIC_MATH = {
   sin, cos, tan, asin, acos, atan, atan2, exp, expm1, log, log1p, log2, log10, pow, hypot, cbrt, sinh, cosh, tanh, asinh, acosh, atanh,
 } as const;
 
-/** The engine's own implementations, saved before installing (benchmarks, tests). */
-export const nativeMath: { -readonly [K in keyof typeof DETERMINISTIC_MATH]: (...a: number[]) => number } = {} as never;
-for (const k of Object.keys(DETERMINISTIC_MATH) as (keyof typeof DETERMINISTIC_MATH)[]) {
-  nativeMath[k] = (Math as unknown as Record<string, (...a: number[]) => number>)[k];
-}
+type NativeMath = { -readonly [K in keyof typeof DETERMINISTIC_MATH]: (...a: number[]) => number };
+const G = globalThis as unknown as { __lkNativeMath?: NativeMath };
 
-let installed = false;
+/**
+ * The engine's own implementations, saved before installing (benchmarks, tests).
+ * Kept on `globalThis` so a second instance of this module (test runners) still
+ * sees the originals after another instance installed the replacements.
+ */
+export const nativeMath: NativeMath = G.__lkNativeMath ?? (() => {
+  const m = {} as NativeMath;
+  for (const k of Object.keys(DETERMINISTIC_MATH) as (keyof typeof DETERMINISTIC_MATH)[]) {
+    m[k] = (Math as unknown as Record<string, (...a: number[]) => number>)[k];
+  }
+  G.__lkNativeMath = m;
+  return m;
+})();
 
 /**
  * Replace the engine's transcendental `Math` functions with the deterministic
@@ -1622,14 +1631,14 @@ let installed = false;
  * simulation code must use `Math.pow` or plain multiplication instead.
  */
 export function installDeterministicMath(): void {
-  if (installed) return;
-  installed = true;
   for (const [k, fn] of Object.entries(DETERMINISTIC_MATH)) {
+    if ((Math as unknown as Record<string, unknown>)[k] === fn) continue;
     Object.defineProperty(Math, k, { value: fn, writable: true, configurable: true, enumerable: false });
   }
 }
 
-/** True once `installDeterministicMath()` ran. */
+/** True when every replaced `Math` function is a deterministic port (from any instance of this module). */
 export function deterministicMathInstalled(): boolean {
-  return installed;
+  const M = Math as unknown as Record<string, unknown>;
+  return (Object.keys(DETERMINISTIC_MATH) as (keyof NativeMath)[]).every((k) => M[k] !== nativeMath[k]);
 }
