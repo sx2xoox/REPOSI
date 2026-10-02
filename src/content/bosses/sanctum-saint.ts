@@ -641,7 +641,7 @@ defineBoss({
   name: NAME,
   bossTitle: '얼어붙은 마지막 찬송',
   bossFloors: [4],
-  hp: 1250,
+  hp: 1020,
   radius: 13,
   speed: 52,
   mass: 6,

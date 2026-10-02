@@ -23,9 +23,9 @@ export type FloorDifficulty = Required<Pick<FloorDef, 'hpMult' | 'bossHpMult' | 
  */
 export const DIFFICULTY: Record<number, FloorDifficulty> = {
   1: { hpMult: 1.3, bossHpMult: 1.4, enemyDamage: [1, 2], enemySpeed: 1.0, shotSpeed: 1.0, budget: [3, 5], championChance: 0.03, roomCount: [8, 10] },
-  2: { hpMult: 1.75, bossHpMult: 2.2, enemyDamage: [1, 2], enemySpeed: 1.02, shotSpeed: 1.02, budget: [4, 6], championChance: 0.06, roomCount: [10, 12] },
-  3: { hpMult: 2.5, bossHpMult: 2.6, enemyDamage: [1, 2], enemySpeed: 1.03, shotSpeed: 1.04, budget: [5, 7], championChance: 0.08, roomCount: [11, 13] },
-  4: { hpMult: 3.6, bossHpMult: 4.6, enemyDamage: [1, 2], enemySpeed: 1.05, shotSpeed: 1.06, budget: [6, 8], championChance: 0.1, roomCount: [12, 14] },
+  2: { hpMult: 1.75, bossHpMult: 2.1, enemyDamage: [1, 2], enemySpeed: 1.02, shotSpeed: 1.02, budget: [4, 6], championChance: 0.06, roomCount: [10, 12] },
+  3: { hpMult: 2.35, bossHpMult: 2.55, enemyDamage: [1, 2], enemySpeed: 1.03, shotSpeed: 1.04, budget: [5, 7], championChance: 0.08, roomCount: [11, 13] },
+  4: { hpMult: 3.9, bossHpMult: 4.6, enemyDamage: [1, 2], enemySpeed: 1.05, shotSpeed: 1.06, budget: [6, 8], championChance: 0.1, roomCount: [12, 14] },
   5: { hpMult: 4.9, bossHpMult: 6.4, enemyDamage: [1, 2], enemySpeed: 1.06, shotSpeed: 1.08, budget: [7, 9], championChance: 0.12, roomCount: [12, 15] },
   6: { hpMult: 6, bossHpMult: 7.8, enemyDamage: [1, 3], enemySpeed: 1.08, shotSpeed: 1.1, budget: [7, 10], championChance: 0.14, roomCount: [13, 15] },
   7: { hpMult: 7.3, bossHpMult: 9.5, enemyDamage: [2, 3], enemySpeed: 1.09, shotSpeed: 1.12, budget: [8, 10], championChance: 0.16, roomCount: [13, 16] },

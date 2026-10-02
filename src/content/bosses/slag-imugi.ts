@@ -713,7 +713,7 @@ defineBoss({
   name: NAME,
   bossTitle: '용이 되지 못한 쇳물',
   bossFloors: [3],
-  hp: 1050,
+  hp: 880,
   radius: 11,
   speed: 0,
   mass: Infinity,

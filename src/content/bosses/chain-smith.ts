@@ -718,7 +718,7 @@ defineBoss({
   name: NAME,
   bossTitle: '식지 않는 모루',
   bossFloors: [3],
-  hp: 1150,
+  hp: 950,
   radius: 16,
   speed: 32,
   mass: 10,

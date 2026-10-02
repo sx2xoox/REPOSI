@@ -697,7 +697,7 @@ defineBoss({
   name: NAME,
   bossTitle: '맹세에 얼어붙은 검',
   bossFloors: [4],
-  hp: 1350,
+  hp: 1100,
   radius: 15,
   speed: 36,
   mass: 8,

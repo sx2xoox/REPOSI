@@ -1072,20 +1072,22 @@ async function runSweep(browser) {
   // enemies & bosses on their own floors
   const defs = await page.evaluate((ids) => ids.map((id) => { const w = window.__world; const e = w.spawnEnemy(id, w.room.centerX, w.room.centerY - 40); const d = e ? { id, boss: !!e.def.boss, floors: e.def.bossFloors ?? e.def.floors ?? [1] } : { id, floors: [1] }; if (e) w.killEnemy(e); return d; }), list.enemies);
   await page.evaluate(() => { window.__lk.step(30); });
-  for (let f = 1; f <= 5; f++) {
+  // the deepest floor any enemy / boss is listed for (the last floor's boss ends the run)
+  const lastFloor = Math.max(...defs.flatMap((d) => d.floors));
+  for (let f = 1; f <= lastFloor; f++) {
     if (f > 1) { tag = `descend ${f}`; await page.evaluate(() => { window.__lk.nextFloor(); window.__lk.step(90); }); }
-    // regular enemies first: the floor-5 boss ends the run (victory)
+    // regular enemies first: the last floor's boss ends the run (victory)
     for (const d of defs.filter((d) => (d.floors[0] ?? 1) === f || (f === 1 && !d.floors.length)).sort((a, b) => +a.boss - +b.boss)) {
-      await run(`${d.boss ? 'boss' : 'enemy'}:${d.id}@f${f}`, ({ id, boss }) => {
+      await run(`${d.boss ? 'boss' : 'enemy'}:${d.id}@f${f}`, ({ id, boss, last }) => {
         window.__home();
         const w = window.__world;
         if (boss) { const n = w.map.nodes.find((x) => x.kind === 'boss'); w.teleportTo(n); window.__lk.step(60); window.__lk.killAll(); window.__lk.step(30); }
         for (let k = 0; k < (boss ? 1 : 3); k++) window.__lk.spawn(id, w.room.centerX + (k - 1) * 50, w.room.centerY - 40);
         const before = w.run.floor;
         const nan = window.__fight(boss ? 1500 : 420);
-        if (w.run.floor !== before || (w.gameOver && !(boss && w.gameOver.won && before === 5))) console.error(`sweep: ${id} changed floor ${before} -> ${w.run.floor} (gameOver=${!!w.gameOver})`);
+        if (w.run.floor !== before || (w.gameOver && !(boss && w.gameOver.won && before === last))) console.error(`sweep: ${id} changed floor ${before} -> ${w.run.floor} (gameOver=${!!w.gameOver})`);
         return nan;
-      }, d);
+      }, { ...d, last: lastFloor });
       if (d.boss) await page.screenshot({ path: join(dir, `boss-${d.id}.png`) });
     }
   }
