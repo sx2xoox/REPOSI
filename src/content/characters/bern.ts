@@ -1,6 +1,8 @@
 // 베른, 검을 든 파수꾼 — a melee fighter. Sturdy (4 hearts) but slower; weapon
 // 파수꾼의 장검 (3-hit combo that deflects bullets). Release: 등불 회전베기.
 
+// roster order on character select: 리아, 베른, 세린, 니엘 (registration order)
+import './ria';
 import { defineCharacter } from '../../game/defs';
 import { defineCharacter2D, type CharSpec } from './look';
 import { releaseWhirlwind } from './releases';

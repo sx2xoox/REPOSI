@@ -8,7 +8,7 @@ import { RingFx } from '../../game/effects';
 import { Projectile } from '../../game/projectile';
 import { fx } from '../../engine/rng';
 import {
-  O, addHitStatus, boomerangBehavior, enemiesNear, grantPerCopy, inflict, isAttack, isMelee, orbitBehavior, roll, rollHit, shout,
+  O, addHitStatus, boomerangBehavior, cooldown, enemiesNear, grantPerCopy, inflict, isAttack, isMelee, orbitBehavior, roll, rollHit, shout,
   syncFamiliars, tickTimeStop, timeStop, timeStopped, watch,
 } from './lib';
 import { GearTurret } from './familiars';
@@ -401,7 +401,7 @@ defineArtifact({
     m.addStat('fireRate', 0.5);
   },
   onHurt(w) {
-    if (!w.player.alive) return;
+    if (!w.player.alive || !cooldown(w, 'abyssal_hourglass', 6)) return;
     timeStop(w, 3);
     shout(w, '시간 정지', '#d0b8ff');
   },

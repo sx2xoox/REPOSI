@@ -101,7 +101,21 @@ export class StatusOverlay implements Scene {
     const rx = 420;
     r.uiText('등불 공명', rx, 64, { size: 14, bold: true, color: '#ffd080' });
     let ry = 88;
-    for (const s of comp?.sets ?? []) {
+    const sets = comp?.sets ?? [];
+    if (sets.length > 3) {
+      // compact: one header + the most relevant tier per set (active first)
+      const sorted = [...sets].sort((a, b) => b.active.length - a.active.length || b.count - a.count);
+      for (const s of sorted) {
+        const top = s.active[s.active.length - 1];
+        r.uiSprite(s.def.icon, rx + 10, ry + 7, 1.5);
+        r.uiText(`${s.def.name}  ${s.count}${s.next ? `/${s.next.count}` : ''}`, rx + 24, ry, { size: 11, color: s.active.length ? s.def.color : '#8a7f9a' });
+        const t = top ?? s.next;
+        if (t) r.uiText(`(${t.count}) ${t.desc}`, rx + 24, ry + 13, { size: 9, color: top ? '#e8e0d0' : '#5a5068', font: 'small' });
+        ry += 26;
+        if (ry > UI_H - 150) break;
+      }
+    }
+    for (const s of sets.length > 3 ? [] : sets) {
       r.uiSprite(s.def.icon, rx + 10, ry + 8, 2);
       r.uiText(`${s.def.name}  ${s.count}${s.next ? `/${s.next.count}` : ''}`, rx + 26, ry, { size: 12, color: s.active.length ? s.def.color : '#8a7f9a' });
       ry += 18;

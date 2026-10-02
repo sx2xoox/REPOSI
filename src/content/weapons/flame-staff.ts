@@ -32,7 +32,7 @@ defineDrawnSprite('icon_flame_staff', 16, 16, (p) => {
   p.px(15, 6, '#c04010');
 }, { outline: O });
 
-const FLAME_COLS = ['#ffffff', '#fff0a0', '#ffc040', '#ff7a20', '#d03810', '#5a3030'];
+const FLAME_COLS = ['#fff4b0', '#ffd050', '#ff9a28', '#f06018', '#b83010', '#4a2420'];
 
 /** Flame puff visuals: grows and cools down as it travels. */
 const flameDraw: ProjBehavior = {
@@ -42,8 +42,12 @@ const flameDraw: ProjBehavior = {
     const ci = Math.min(FLAME_COLS.length - 1, Math.floor(k * FLAME_COLS.length));
     const size = 4 + k * 9 + pr.r;
     const flick = 1 + 0.15 * Math.sin(pr.age * 50 + pr.id);
-    r.sprite(glowSprite(size * 1.6 * flick, FLAME_COLS[Math.min(ci + 1, FLAME_COLS.length - 1)]), pr.x, pr.y - pr.z, { alpha: 0.5 * (1 - k * 0.6), additive: true });
-    r.sprite(glowSprite(size * flick, FLAME_COLS[ci]), pr.x, pr.y - pr.z, { alpha: 0.95 - k * 0.5, additive: k < 0.75 });
+    r.sprite(glowSprite(size * 1.5 * flick, FLAME_COLS[Math.min(ci + 1, FLAME_COLS.length - 1)]), pr.x, pr.y - pr.z, { alpha: 0.3 * (1 - k * 0.6), additive: true });
+    r.sprite(glowSprite(size * flick, FLAME_COLS[ci]), pr.x, pr.y - pr.z, { alpha: 0.85 - k * 0.45 });
+  },
+  onHit(_pr, _w, target) {
+    // many tiny hits: keep the white hit-flash to a flicker
+    target.flash = Math.min(target.flash, 0.03);
   },
   update(pr, w) {
     if (fx.chance(0.15)) w.particles.spawn({ x: pr.x, y: pr.y - pr.z, vy: -25, life: 0.35, colors: ['#ffb040', '#a03010', '#40303080'], size: 1, additive: true });

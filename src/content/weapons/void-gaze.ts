@@ -107,7 +107,9 @@ defineWeapon({
       if (!e.alive || e.hidden || e.z > 28) continue;
       const sd = segDist(e.x, e.y - e.z * 0.3, o.x, o.y, ex, ey);
       if (sd.d > e.r + width / 2) continue;
-      w.applyHit(e, { damage: s.damage * beamTickMult(focus), kind: 'laser', attacker: p, dirX: c, dirY: sn, knockback: 18 + focus * 14, light: true });
+      if (w.applyHit(e, { damage: s.damage * beamTickMult(focus), kind: 'laser', attacker: p, dirX: c, dirY: sn, knockback: 18 + focus * 14, light: true })) {
+        e.flash = Math.min(e.flash, 0.035); // flicker instead of a solid white silhouette
+      }
     }
     for (const h of [...w.hittables]) {
       if (segDist(h.x, h.y, o.x, o.y, ex, ey).d < h.r + width / 2) h.takeHit(w, { damage: s.damage * 0.5, kind: 'laser', attacker: p });

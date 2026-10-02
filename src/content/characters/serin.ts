@@ -1,6 +1,8 @@
 // 세린, 잿빛 숲의 사냥꾼 — fragile (2 hearts) but fast. Weapon 사냥꾼의 장궁:
 // hold to draw, release a piercing arrow. Release: 별똥 화살비.
 
+// roster order on character select: 리아, 베른, 세린, 니엘 (registration order)
+import './bern';
 import { defineCharacter } from '../../game/defs';
 import { defineCharacter2D, type CharSpec } from './look';
 import { releaseArrowRain } from './releases';

@@ -1,6 +1,8 @@
 // 니엘, 공허를 삼킨 아이 — unlockable. Floats instead of walking; channels a
 // void beam (공허의 눈) and releases 심연 개방, a collapsing black hole.
 
+// roster order on character select: 리아, 베른, 세린, 니엘 (registration order)
+import './serin';
 import { defineCharacter } from '../../game/defs';
 import { defineCharacter2D, type CharSpec } from './look';
 import { releaseAbyss } from './releases';
