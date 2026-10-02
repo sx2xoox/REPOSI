@@ -25,7 +25,8 @@ const RIA: Scenario = {
   maxSteps: 14000, cycle: true, extraEnemies: 2,
 };
 const NIEL: Scenario = {
-  name: 'niel: floor 1', seed: 'DET-NIEL-4', character: 'niel', floors: [1], exploreSteps: 1500, bossSteps: 1500, giftsPerFloor: 4,
+  // (the seed is re-tuned whenever the gift pool grows: a longer enemy list reshuffles the whole trajectory)
+  name: 'niel: floor 1', seed: 'DET-NIEL-10', character: 'niel', floors: [1], exploreSteps: 1500, bossSteps: 1500, giftsPerFloor: 4,
   maxSteps: 3600, cycle: true, extraEnemies: 2,
 };
 

@@ -67,3 +67,8 @@ defineFloor({
   theme: 'archive', music: 'floor6', ...DIFFICULTY[6],
   extraRooms: { challenge: 0.5, shrine: 0.5, curse: 0.6 },
 });
+defineFloor({
+  index: 7, id: 'clock', name: '7층 · 멈춘 태엽탑', subtitle: '등불이 꺼진 순간, 바늘도 멈췄다.',
+  theme: 'clock', music: 'floor7', ...DIFFICULTY[7],
+  extraRooms: { challenge: 0.6, shrine: 0.5, curse: 0.5 },
+});

@@ -91,6 +91,9 @@ export const BUL = {
   // floor 6 (drowned archive): glowing ink glyphs, old parchment pages
   glyph: { color: '#56e8ff', core: '#f0ffff', rim: '#1a3a9a', outline: '#040a18' },
   page: { color: '#ffd978', core: '#fff8e0', rim: '#a0601a', outline: '#1a0e02' },
+  // floor 7 (stopped clockwork spire): hot brass cogs, pale verdigris "second hand" ticks
+  cog: { color: '#ffa63a', core: '#fff6e0', rim: '#8a3410', outline: '#1c0a06' },
+  tick: { color: '#6af0d4', core: '#f4fffb', rim: '#126a5c', outline: '#04201a' },
 } satisfies Record<string, BulletPal>;
 export type BulletKind = keyof typeof BUL;
 
