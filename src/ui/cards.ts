@@ -85,6 +85,17 @@ export function drawRibbon(r: Renderer, b: Banner, y: number): void {
   r.uiText(b.desc, tx, yy + 20, { size: 10, font: 'small', color: C.textDim, alpha: a });
 }
 
+/** Bottom (UI y) of the banner stack drawn by drawBanners(), or 0 when no banner shows. */
+export function bannersBottom(r: Renderer, w: World): number {
+  if (!w.banners.length) return 0;
+  let y = 58;
+  for (const b of w.banners) {
+    if (!b.small && b.icon) y += 36 + r.wrapText(b.desc, 300, 12).length * 15 + (b.quote ? 17 : 0) + 12;
+    else y += 44;
+  }
+  return y - 6;
+}
+
 /** Draw the world's banner queue: the first non-small one as a plaque, others as ribbons. */
 export function drawBanners(r: Renderer, w: World): void {
   let y = 58;

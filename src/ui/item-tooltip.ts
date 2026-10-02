@@ -19,6 +19,7 @@ import { C } from './theme';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
 import { UiLayer } from './layer-cache';
+import { bannersBottom } from './cards';
 
 const CARD_W = 214;
 const PAD = 9;
@@ -104,10 +105,8 @@ export function weaponCompare(newId: string, heldId: string): Seg[] {
 export function buildCard(w: World, e: Entity): ItemCard | null {
   const p = w.player;
   const pad = input.aimMode === 'pad';
-  const keyOf = () => {
-    const k = actionLabel(input.bindings, 'interact', pad);
-    return k || (touchUiActive() ? '줍기' : 'G');
-  };
+  // '' on touch screens: the card then shows the hand of the on-screen "줍기" button
+  const keyOf = () => actionLabel(input.bindings, 'interact', pad);
   if (e instanceof Pedestal && e.item) {
     const it = e.item;
     const info = itemInfo(it);
@@ -225,10 +224,16 @@ export class ItemTooltip {
   private a = 0;
   private t = 0;
   private pr: Renderer | null = null;
+  /** smoothed card offset from the anchor; reset when a new card appears */
+  private offX = 0;
+  private offY = 0;
+  private fresh = true;
+  private lastDraw = 0;
   private readonly paint = () => this.paintCard(this.pr!);
 
   update(w: World, dt: number): void {
     this.t += dt;
+    const prev = this.cur;
     const hidden = !!w.bossIntro || w.transitioning || !!w.descending || !w.player?.alive;
     const f = hidden ? null : w.focus;
     if (f && f.dead) this.cur = null;
@@ -239,6 +244,7 @@ export class ItemTooltip {
       if (this.a <= 0) this.cur = f;
     } else this.cur = f;
     if (this.cur?.dead) this.cur = null;
+    if (this.cur !== prev || this.a <= 0) this.fresh = true;
   }
 
   /** True while a card is (partly) visible. */
@@ -270,7 +276,6 @@ export class ItemTooltip {
     const ab = r.displayToUI(...xy(r.worldToDisplay(e.x, bottom)));
     const W = CARD_W;
     const H = this.h;
-    const minY = sa.t + HUD_TOP;
     const maxY = UI_H - sa.b - 6 - H;
     const minX = sa.l + 6;
     const maxX = UI_W - sa.r - 6 - W;
@@ -278,6 +283,10 @@ export class ItemTooltip {
     let side: 'up' | 'left' | 'right' | 'down' = 'up';
     let x = at.x - W / 2;
     let y = at.y - 8 - H;
+    // stay below the top HUD rows, and below item banners when they are over the card
+    let minY = sa.t + HUD_TOP;
+    const bb = bannersBottom(r, w);
+    if (bb > 0 && clamp(x, minX, maxX) < UI_W / 2 + 215 && clamp(x, minX, maxX) + W > UI_W / 2 - 215) minY = Math.max(minY, bb);
     if (y < minY) {
       const mid = (at.y + ab.y) / 2;
       y = clamp(mid - H / 2, minY, maxY);
@@ -293,8 +302,21 @@ export class ItemTooltip {
         y = ab.y + 8;
       }
     }
-    x = clamp(x, minX, maxX);
-    y = clamp(y, sa.t + 6, maxY);
+    // glide between placements (relative to the anchor, so camera motion never lags)
+    if (this.fresh) {
+      this.lastDraw = typeof performance !== 'undefined' ? performance.now() : 0;
+      this.offX = x - at.x;
+      this.offY = y - at.y;
+      this.fresh = false;
+    } else {
+      const now = typeof performance !== 'undefined' ? performance.now() : 0;
+      const f = 1 - Math.exp(-Math.min(0.1, Math.max(0, now - this.lastDraw) / 1000) * 16);
+      this.offX += (x - at.x - this.offX) * f;
+      this.offY += (y - at.y - this.offY) * f;
+    }
+    this.lastDraw = typeof performance !== 'undefined' ? performance.now() : 0;
+    x = clamp(at.x + this.offX, minX, maxX);
+    y = clamp(at.y + this.offY, sa.t + 6, maxY);
     const off = (1 - k) * 6;
     const sx = side === 'right' ? -off : side === 'left' ? off : 0;
     const sy = side === 'up' ? off : side === 'down' ? -off : 0;
@@ -348,7 +370,13 @@ export class ItemTooltip {
       const a = c.action;
       const lw = r.measureText(a.label, 10, false, 'small');
       r.uiText(a.label, right, subY, { size: 10, font: 'small', align: 'right', color: a.ok ? C.goldHi : C.textFaint });
-      const kw = keycap(r, a.key, right - lw - 4, subY + 6, { align: 'right', pad: a.pad });
+      let kw = 0;
+      if (a.key) kw = keycap(r, a.key, right - lw - 4, subY + 6, { align: 'right', pad: a.pad });
+      else {
+        // touch: the hand icon of the contextual button
+        kw = 14;
+        r.uiSprite('tc_pick', right - lw - 4 - 7, subY + 6, 1.5, { alpha: a.ok ? 1 : 0.5 });
+      }
       right -= lw + 4 + kw + 6;
     } else if (c.note) {
       r.uiText(c.note, right, subY, { size: 10, font: 'small', align: 'right', color: C.textFaint });

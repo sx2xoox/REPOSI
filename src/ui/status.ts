@@ -35,8 +35,8 @@ const GY = 90;
 /** detail card height (below the grid) */
 const DETAIL_H = 136;
 const TABS = [
-  { label: '유물', icon: 'hud_power' },
-  { label: '축복', icon: 'ui_rarity_legendary' },
+  { label: '유물', icon: 'ui_gem' },
+  { label: '축복', icon: 'ui_flame' },
 ] as const;
 /** seconds the discard stays armed ("한 번 더 눌러 버리기") */
 const ARM_TIME = 3;
@@ -260,7 +260,7 @@ export class StatusOverlay implements Scene {
       const on = i === this.tab;
       const count = all.filter((a) => !!a.def.blessing === (i === 1)).length;
       frame(r, q.x, q.y + oy, q.w, q.h, on ? 'buttonHi' : 'button', { alpha: k });
-      r.uiSprite(tb.icon, q.x + 14, q.y + 13 + oy, tb.icon === 'hud_power' ? 1.5 : 2, { alpha: k * (on ? 1 : 0.55) });
+      spriteCentered(r, tb.icon, q.x + 15, q.y + 13 + oy, fitScale(tb.icon, 16, 2), { alpha: k * (on ? 1 : 0.55) });
       r.uiText(tb.label, q.x + 26, q.y + 6 + oy, { size: 12, bold: on, color: on ? C.goldHi : C.textDim, alpha: k });
       r.uiText(`${count}`, q.x + q.w - 10, q.y + 8 + oy, { size: 10, font: 'small', align: 'right', color: on ? C.text : C.textFaint, alpha: k });
     });
