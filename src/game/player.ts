@@ -369,21 +369,52 @@ export class Player extends Actor {
     }
   }
 
-  /** Start a dash toward the move input (or the aim). Returns false while on cooldown. */
+  /**
+   * Start a dash toward the move input (or the aim). Returns false while on
+   * cooldown. The character's `dash` (DashDef) adds i-frames, a blink and its
+   * start / update / end hooks on top of the plain rush.
+   */
   tryDash(w: World, mv: { x: number; y: number }): boolean {
     if (this.dashCD > 0 || this.dashing) return false;
     let d = norm(mv.x, mv.y);
     if (d.x === 0 && d.y === 0) d = fromAngle(this.aim);
+    const dd = this.character.dash;
     this.dashDX = d.x;
     this.dashDY = d.y;
+    this.dashX0 = this.x;
+    this.dashY0 = this.y;
     this.dashT = this.stats.dashTime;
     this.dashCD = this.stats.dashCooldown;
-    this.invuln = Math.max(this.invuln, this.stats.dashTime + 0.06);
+    this.invuln = Math.max(this.invuln, this.stats.dashTime + (dd?.iframes ?? 0.06));
     this.squash(1.3, 0.75);
-    w.sfx('dash');
+    w.sfx(dd?.sfx ?? 'dash');
     w.particles.burst(this.x, this.y + 3, { count: 8, speed: [20, 60], angle: Math.atan2(-d.y, -d.x), spread: 1.2, life: [0.2, 0.4], colors: ['#d0c8c0', '#908070'], size: [1, 2] });
+    if (dd?.blink) this.blink(w, d.x, d.y, this.stats.dashSpeed * this.stats.dashTime);
+    dd?.start?.(w, this);
     w.items.onDash();
     return true;
+  }
+
+  /**
+   * Blink dash: jump to the farthest point along (dx, dy) within `len` px that
+   * the keeper can stand on; the path may cross pits and enemies but stops at
+   * walls and rocks. Leaves an after-image at the origin.
+   */
+  private blink(w: World, dx: number, dy: number, len: number): void {
+    let bx = this.x;
+    let by = this.y;
+    for (let s = 4; s <= len; s += 4) {
+      const nx = this.x + dx * s;
+      const ny = this.y + dy * s;
+      if (w.room.boxBlocked(nx, ny, this.r, true, this.phasing)) break;
+      if (!w.room.boxBlocked(nx, ny, this.r, this.flying, this.phasing)) {
+        bx = nx;
+        by = ny;
+      }
+    }
+    w.spawn(new Afterimage(this.frameName(), this.x, this.y, this.flip, this.character.dash?.color ?? this.character.lightColor ?? '#7ad0ff', 0.35));
+    this.x = bx;
+    this.y = by;
   }
 
   placeBomb(w: World): void {
@@ -635,7 +666,7 @@ export class Player extends Actor {
 
   override light(w: World): void {
     const fl = (1 + Math.sin(this.age * 9) * 0.03 + Math.sin(this.age * 23) * 0.02) * (1 - this.fall * 0.6);
-    w.lights.add(this.x, this.y - 6, 95 * fl, this.character.lightColor ?? '#ffd8a0', { intensity: 0.95 });
+    w.lights.add(this.x, this.y - 6, (this.character.lightRadius ?? 95) * fl, this.character.lightColor ?? '#ffd8a0', { intensity: 0.95 });
     w.lights.add(this.x, this.y - 6, 30, '#ffffff', { intensity: 0.35 });
   }
 }

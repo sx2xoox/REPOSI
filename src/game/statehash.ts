@@ -198,7 +198,7 @@ function hashPlayer(h: StateHasher, p: Player): void {
   hashActor(h, p);
   h.num(p.red).num(p.soul).num(p.shields).num(p.baseHearts).num(p.ember).num(p.releaseT);
   h.int(p.coins).int(p.bombs).int(p.keys);
-  h.num(p.aim).bool(p.firing).str(p.facing).bool(p.moving).num(p.dashT).num(p.dashCD).num(p.dashDX).num(p.dashDY);
+  h.num(p.aim).bool(p.firing).str(p.facing).bool(p.moving).num(p.dashT).num(p.dashCD).num(p.dashDX).num(p.dashDY).num(p.dashX0).num(p.dashY0);
   h.num((p as unknown as { dashBuffer: number }).dashBuffer).num(p.holdT).bool(p.frozen).num(p.fall).bool(p.god);
   h.num(p.spikeCD).num(p.lastAttackAt).num(p.swapAt);
   hashWeapon(h, p.weaponId, p.weapon);
