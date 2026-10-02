@@ -7,7 +7,6 @@ import type { Renderer } from '../engine/renderer';
 import { Actives, Potions, Weapons, type CharacterDef, type WeaponState } from './defs';
 import { Inventory } from './inventory';
 import { BASE_STATS, type Stats } from './stats';
-import { input } from '../engine/input';
 import { angleOf, clamp, fromAngle, norm } from '../engine/math';
 import { animFrame, hasAnim, hasSprite } from '../engine/sprites';
 import { Projectile, fanAngles, type ProjectileOpts } from './projectile';
@@ -18,6 +17,7 @@ import { Tile } from './tiles';
 import { fx } from '../engine/rng';
 import { DIR_VEC } from './constants';
 import { drawBackWeapon, equipWeapon, swapWeapons, tickHolstered, withSwapPop } from './weaponslots';
+import { emptyInput, HELD, PRESS, readLocalInput, type PlayerInput } from './seam';
 
 export type Facing = 'down' | 'up' | 'side';
 
@@ -106,6 +106,12 @@ export class Player extends Actor {
   spikeCD = 0;
   /** world time of the last attack */
   lastAttackAt = -99;
+  /**
+   * This step's input (move / aim / buttons), filled by `World.inputSource` at
+   * the start of every update: the only way input reaches the simulation
+   * (lockstep seam, see game/seam.ts).
+   */
+  readonly input: PlayerInput = emptyInput();
 
   constructor(character: CharacterDef) {
     super();
@@ -173,37 +179,34 @@ export class Player extends Actor {
     if (!this.alive) return;
 
     const s = this.stats;
+    const inp = this.input;
+    (w.inputSource ?? readLocalInput)(w, this, inp);
     let mv = { x: 0, y: 0 };
     let wantFire = false;
     if (!this.frozen && !w.paused) {
-      mv = input.moveVector();
-      // aiming: arrow keys > gamepad stick > mouse
-      const ka = input.keyAim();
-      const pa = input.padAimVector();
-      if (ka) {
-        this.aim = angleOf(ka.x, ka.y);
+      mv = { x: inp.mx, y: inp.my };
+      // aiming: arrow keys / aim stick (aim + fire) > mouse cursor
+      if (inp.ax !== 0 || inp.ay !== 0) {
+        this.aim = angleOf(inp.ax, inp.ay);
         wantFire = true;
-      } else if (pa) {
-        this.aim = angleOf(pa.x, pa.y);
-        wantFire = true;
-      } else if (input.aimMode === 'mouse') {
-        const m = w.mouseWorld();
-        this.aim = Math.atan2(m.y - (this.y - 6), m.x - this.x);
-        wantFire = input.held('fire');
+      } else if (inp.held & HELD.cursorAim) {
+        this.aim = Math.atan2(inp.cy - (this.y - 6), inp.cx - this.x);
+        wantFire = (inp.held & HELD.fire) !== 0;
       } else {
-        wantFire = input.held('fire');
+        wantFire = (inp.held & HELD.fire) !== 0;
       }
-      if (input.pressed('dash')) this.dashBuffer = 0.14;
+      const pressed = inp.pressed;
+      if (pressed & PRESS.dash) this.dashBuffer = 0.14;
       if (this.dashBuffer > 0) {
         if (this.tryDash(w, mv)) this.dashBuffer = 0;
         else this.dashBuffer -= dt;
       }
-      if (input.pressed('bomb')) this.placeBomb(w);
-      if (input.pressed('active')) this.useActive(w);
-      if (input.pressed('consumable')) this.usePotion(w);
-      if (input.pressed('special')) this.release(w);
-      if (input.pressed('swap')) this.swapWeapon(w);
-      if (input.pressed('interact')) w.interact();
+      if (pressed & PRESS.bomb) this.placeBomb(w);
+      if (pressed & PRESS.active) this.useActive(w);
+      if (pressed & PRESS.potion) this.usePotion(w);
+      if (pressed & PRESS.release) this.release(w);
+      if (pressed & PRESS.swap) this.swapWeapon(w);
+      if (pressed & PRESS.interact) w.interact();
     }
     this.firing = wantFire && this.holdT <= 0;
 
@@ -255,7 +258,7 @@ export class Player extends Actor {
     }
 
     // facing
-    const lookA = this.dashing ? Math.atan2(this.dashDY, this.dashDX) : this.firing || input.aimMode === 'mouse' ? this.aim : this.moving ? Math.atan2(this.vy, this.vx) : null;
+    const lookA = this.dashing ? Math.atan2(this.dashDY, this.dashDX) : this.firing || (inp.held & HELD.cursorAim) !== 0 ? this.aim : this.moving ? Math.atan2(this.vy, this.vx) : null;
     if (lookA !== null) {
       const cx = Math.cos(lookA);
       const cy = Math.sin(lookA);

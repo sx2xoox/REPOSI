@@ -1,5 +1,7 @@
 // Entry point: load fonts & content, start the fixed-timestep loop.
 
+// first: deterministic Math.sin/pow/... for every mode (must precede all game modules)
+import './engine/dmath-boot';
 import './style.css';
 import { app } from './game/app';
 import { input } from './engine/input';

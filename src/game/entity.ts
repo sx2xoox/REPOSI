@@ -54,10 +54,33 @@ export interface HitInfo {
   noProc?: boolean;
 }
 
+// Entity ids are simulation state (hit lists, per-shot wobble phases ...): every
+// lockstep peer must hand out the same ids in the same order. A run starts from
+// id 1 (`resetEntityIds`), and purely visual entities (`static cosmetic`) count
+// down from -1 on their own, so spawning them conditionally (settings, `fx`
+// chances, unlock banners) never shifts the ids of gameplay entities.
 let nextEntityId = 1;
+let nextCosmeticId = -1;
+
+/** Restart entity ids (called when a run's World is created). */
+export function resetEntityIds(): void {
+  nextEntityId = 1;
+  nextCosmeticId = -1;
+}
+
+function allocId(e: Entity): number {
+  return (e.constructor as typeof Entity).cosmetic ? nextCosmeticId-- : nextEntityId++;
+}
 
 export abstract class Entity {
-  readonly id = nextEntityId++;
+  /**
+   * Purely visual entity (effects, ambient props, speech bubbles ...): gameplay
+   * never reads it, it may depend on `fx` randomness or settings, gets a
+   * negative id and is left out of the state hash. Set on the class
+   * (`static override readonly cosmetic = true`); subclasses inherit it.
+   */
+  static readonly cosmetic: boolean = false;
+  readonly id = allocId(this);
   x = 0;
   y = 0;
   /** height above the floor (for jumps, arcs); drawn as y - z */

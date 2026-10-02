@@ -22,6 +22,8 @@ export interface Settings {
    * (120, or 60 at graphics quality 낮음); see `effectiveMaxFps`.
    */
   maxFps?: FrameCap;
+  /** online co-op nickname (set on the first visit to 함께하기) */
+  nickname?: string;
 }
 
 export type GraphicsQuality = 'high' | 'medium' | 'low';

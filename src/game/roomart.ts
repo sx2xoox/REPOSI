@@ -1190,7 +1190,19 @@ function inOpening(x: number, y: number): boolean {
   return cx * cx + dy * dy <= OPEN_R * OPEN_R;
 }
 
-function doorSprites(room: Room, kind: DoorKind): { back: string; front: string; leaf: string } {
+interface DoorSprites { back: string; front: string; leaf: string }
+/** door sprite names per theme and kind (drawn every frame: no string building per draw) */
+const doorSpriteCache = new Map<string, Map<DoorKind, DoorSprites>>();
+
+function doorSprites(room: Room, kind: DoorKind): DoorSprites {
+  let byKind = doorSpriteCache.get(room.theme.id);
+  if (!byKind) doorSpriteCache.set(room.theme.id, (byKind = new Map()));
+  let ds = byKind.get(kind);
+  if (!ds) byKind.set(kind, (ds = buildDoorSprites(room, kind)));
+  return ds;
+}
+
+function buildDoorSprites(room: Room, kind: DoorKind): DoorSprites {
   const look = doorLook(room, kind);
   const key = SPECIAL_DOOR[kind] ? kind : `${kind}_${room.theme.id}`;
   const back = `__door_${key}_back`;
@@ -1404,28 +1416,32 @@ function paintDoorOrnament(p: PixelPainter, kind: DoorKind, look: DoorLook): voi
   }
 }
 
+/** reused draw options (doors are drawn every frame) */
+const DOOR_OPTS: DrawOpts = { rot: 0 };
+const LEAF_OPTS: DrawOpts = { rot: 0, sx: 1, flipX: false };
+
 export function drawDoor(r: Renderer, room: Room, d: Door, _time: number): void {
   if (d.state === 'hidden') return;
   const sp = doorSprites(room, d.kind);
   const rot = d.dir === 'N' ? 0 : d.dir === 'S' ? Math.PI : d.dir === 'E' ? Math.PI / 2 : -Math.PI / 2;
-  r.sprite(sp.back, d.x, d.y, { rot });
+  DOOR_OPTS.rot = rot;
+  r.sprite(sp.back, d.x, d.y, DOOR_OPTS);
   const closed = 1 - d.open;
   if (closed > 0.02) {
     const c = Math.cos(rot);
     const s = Math.sin(rot);
     // local (lx, ly) -> world; panels fold in from the jambs
-    const at = (lx: number, ly: number) => ({ x: d.x + lx * c - ly * s, y: d.y + lx * s + ly * c });
-    const L = at(-OPEN_R, 1);
-    const R = at(OPEN_R, 1);
     const k = Math.min(1, closed);
-    r.sprite(sp.leaf, L.x, L.y, { rot, sx: k });
-    r.sprite(sp.leaf, R.x, R.y, { rot, sx: k, flipX: true });
-    if (d.state === 'locked') {
-      const lp = at(0, -10);
-      r.sprite('__door_lock', lp.x, lp.y);
-    }
+    const lo = LEAF_OPTS;
+    lo.rot = rot;
+    lo.sx = k;
+    lo.flipX = false;
+    r.sprite(sp.leaf, d.x - OPEN_R * c - s, d.y - OPEN_R * s + c, lo);
+    lo.flipX = true;
+    r.sprite(sp.leaf, d.x + OPEN_R * c - s, d.y + OPEN_R * s + c, lo);
+    if (d.state === 'locked') r.sprite('__door_lock', d.x + 10 * s, d.y - 10 * c);
   }
-  r.sprite(sp.front, d.x, d.y, { rot });
+  r.sprite(sp.front, d.x, d.y, DOOR_OPTS);
 }
 
 defineDrawnSprite('__door_lock', 9, 11, (p) => {

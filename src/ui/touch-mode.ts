@@ -16,6 +16,16 @@ export function touchUiActive(): boolean {
 let el: HTMLInputElement | null = null;
 let onChange: ((v: string) => void) | null = null;
 let pendingFocus = false;
+let sanitize: (v: string) => string = sanitizeSeed;
+
+/** Per-field settings (defaults: the seed box). */
+export interface SoftKeyboardOptions {
+  sanitize?: (v: string) => string;
+  maxLength?: number;
+  label?: string;
+  /** 'characters' (codes, seeds) or 'off' (names) */
+  capitalize?: 'characters' | 'off';
+}
 
 function ensureEl(): HTMLInputElement | null {
   if (typeof document === 'undefined') return null;
@@ -32,7 +42,7 @@ function ensureEl(): HTMLInputElement | null {
   el.maxLength = 32;
   el.addEventListener('input', () => {
     if (!el) return;
-    const v = sanitizeSeed(el.value);
+    const v = sanitize(el.value);
     if (el.value !== v) el.value = v;
     onChange?.(v);
   });
@@ -42,9 +52,13 @@ function ensureEl(): HTMLInputElement | null {
 
 export const softKeyboard = {
   /** Start editing: the keyboard opens now if allowed, else on the next touch release. */
-  open(initial: string, cb: (v: string) => void): void {
+  open(initial: string, cb: (v: string) => void, o: SoftKeyboardOptions = {}): void {
     const e = ensureEl();
     if (!e) return;
+    sanitize = o.sanitize ?? sanitizeSeed;
+    e.maxLength = o.maxLength ?? 32;
+    e.setAttribute('aria-label', o.label ?? '시드 입력');
+    e.setAttribute('autocapitalize', o.capitalize ?? 'characters');
     e.value = initial;
     onChange = cb;
     pendingFocus = true;

@@ -6,7 +6,6 @@ import { VIEW_H, VIEW_W } from '../engine/renderer';
 import { Lighting } from '../engine/lighting';
 import { Particles } from '../engine/particles';
 import { RNG, fx } from '../engine/rng';
-import { input } from '../engine/input';
 import { clamp, damp, dist, dist2 } from '../engine/math';
 import { save } from '../engine/save';
 import { audio, sfx as playSfx, type SfxName, type SfxPlayOpts } from '../audio/audio';
@@ -14,7 +13,7 @@ import { TILE, WALL, CELL_W, CELL_H, DIR_VEC, type Dir } from './constants';
 import { Characters, Enemies, Floors, RoomTemplates, Themes, Actives, Weapons, Potions, type FloorDef } from './defs';
 import { generateFloor, matchingDoor, type FloorMap, type NodeDoor, type RoomNode } from './dungeon';
 import { Room, type Door, type DoorKind } from './room';
-import { Entity, Actor, type HitInfo, type StatusKind } from './entity';
+import { Entity, Actor, resetEntityIds, type HitInfo, type StatusKind } from './entity';
 import { Enemy } from './enemy';
 import { Player } from './player';
 import { Projectile } from './projectile';
@@ -27,6 +26,7 @@ import { Bomb, Chest, FirePlace, Pedestal, Pickup, Trapdoor, itemInfo, type Pede
 import { Tile } from './tiles';
 import { findFocus } from './interact';
 import { roomBaseJob } from './roomart';
+import { localRules, readLocalInput, type InputSource, type SimRules } from './seam';
 import { Interpolator } from './interp';
 
 /** Max wall-clock ms per 1/60 s spent pre-rendering neighbour rooms (split over the frames drawn in it). */
@@ -131,6 +131,13 @@ export class World {
   /** free-form per-run flags for content (e.g. "devilDealTaken") */
   flags = new Set<string>();
   vars: Record<string, number> = {};
+  /**
+   * Fills the keeper's per-step input (`Player.input`): the local devices by
+   * default; scripted in tests, the network frame in lockstep multiplayer.
+   */
+  inputSource: InputSource = readLocalInput;
+  /** simulation-changing options: live settings in single-player, fixed per run in multiplayer */
+  rules: SimRules = localRules;
   /** the item the keeper is next to (preview card / interact target; see game/interact.ts) */
   focus: Entity | null = null;
   /** entity whose update() is running: default position of sounds played via `sfx()` */
@@ -156,6 +163,8 @@ export class World {
   private drawMid: Entity[] = [];
 
   constructor(renderer: Renderer, run: RunState, host: WorldHost) {
+    // entity ids are part of the simulation state: every run starts from 1
+    resetEntityIds();
     this.renderer = renderer;
     this.run = run;
     this.host = host;
@@ -723,7 +732,7 @@ export class World {
       this.shake(shake - this.hitShake);
       this.hitShake = shake;
     }
-    if (save.settings.hitStop && (heavy || rel >= 2)) {
+    if (this.rules.hitStop && (heavy || rel >= 2)) {
       this.hitstop(Math.min(0.075, (hit.kind === 'melee' ? 0.03 : 0.012) + 0.008 * rel + (hit.crit ? 0.015 : 0)), true);
     }
   }
@@ -792,7 +801,7 @@ export class World {
     if (e.isBoss) this.bossKilled(e);
     else {
       const big = e.r > 10;
-      if (save.settings.hitStop) this.hitstop(big ? 0.045 : 0.022, true);
+      if (this.rules.hitStop) this.hitstop(big ? 0.045 : 0.022, true);
       if (big) this.shake(0.15);
     }
   }
@@ -841,7 +850,7 @@ export class World {
     this.sfx('explosion', { vol: Math.min(1, 0.6 + radius / 100), x });
     this.shake(Math.min(1, 0.35 + radius / 90));
     this.renderer.screenFlash('#fff2c0', Math.min(0.22, 0.08 + radius / 500));
-    if (save.settings.hitStop) this.hitstop(Math.min(0.06, 0.018 + radius / 1600), true);
+    if (this.rules.hitStop) this.hitstop(Math.min(0.06, 0.018 + radius / 1600), true);
     const col = o.color ?? '#ff9a2a';
     this.particles.burst(x, y, { count: 34, speed: [60, 220], life: [0.25, 0.6], colors: ['#ffffff', '#fff0a0', col, '#a03010', '#402020'], size: [2, 4], sizeEnd: 0.5, additive: true, light: 8 });
     this.particles.burst(x, y, { count: 22, speed: [10, 60], life: [0.6, 1.4], colors: ['#706060', '#504848', '#302828'], size: [3, 6], sizeEnd: 8, drag: 3, fade: true });
@@ -1340,8 +1349,10 @@ export class World {
     return this.enemies.filter((e) => e.isBoss && e.alive && !e.isMinion);
   }
 
+  /** The keeper's cursor in world px, from this step's input (aimed actives / launchers). */
   mouseWorld(): { x: number; y: number } {
-    return this.renderer.displayToWorld(input.mouseX, input.mouseY);
+    const i = this.player.input;
+    return { x: i.cx, y: i.cy };
   }
 
   // ================================================================== feedback helpers

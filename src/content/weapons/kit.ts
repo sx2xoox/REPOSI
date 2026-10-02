@@ -13,7 +13,7 @@ import { Entity } from '../../game/entity';
 import type { Enemy } from '../../game/enemy';
 import { Projectile, type ProjBehavior, type ProjectileOpts } from '../../game/projectile';
 import { RingFx } from '../../game/effects';
-import { input } from '../../engine/input';
+import { HELD } from '../../game/seam';
 import { clamp, dist } from '../../engine/math';
 import { fx } from '../../engine/rng';
 import { drawHeld, glowSprite, handPos, pixLine, segDist } from './common';
@@ -49,10 +49,8 @@ export function beginAttack(w: World, p: Player, st: WeaponState, aim: number): 
  * mouse mode (clamped), else `fallback` (keys / pad / touch aim).
  */
 export function aimDistance(w: World, p: Player, min: number, max: number, fallback: number): number {
-  if (input.aimMode === 'mouse' && typeof w.mouseWorld === 'function') {
-    const m = w.mouseWorld();
-    return clamp(Math.hypot(m.x - p.x, m.y - (p.y - 6)), min, max);
-  }
+  const inp = p.input;
+  if (inp && inp.held & HELD.cursorAim) return clamp(Math.hypot(inp.cx - p.x, inp.cy - (p.y - 6)), min, max);
   return clamp(fallback, min, max);
 }
 
