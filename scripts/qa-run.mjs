@@ -228,6 +228,26 @@ function botMain(opts) {
     if (c.stage === 0) { B.wcheck = null; B.wkey = `${p.weaponId}|${p.weapon2Id}`; }
   }
 
+  /**
+   * Melee or not, learned per weapon from what attacking spawns (swings owned by the
+   * keeper vs weapon shots): the 40-odd weapons are not listed here one by one.
+   */
+  function learnWeapon(w, p) {
+    const k = (B.wk ??= {})[p.weaponId] ??= { sw: 0, pr: 0 };
+    let top = B.seenId ?? 0;
+    for (const e of w.entities) {
+      if (e.id <= (B.seenId ?? 0)) continue;
+      if (e.id > top) top = e.id;
+      if (e.owner === p && e.o && 'reach' in e.o) k.sw++;
+      else if (e.team === 'player' && e.fromWeapon) k.pr++;
+    }
+    B.seenId = top;
+  }
+  function isMelee(p) {
+    const k = B.wk?.[p.weaponId];
+    return MELEE.has(p.weaponId) || (!!k && k.sw >= 2 && k.sw > k.pr);
+  }
+
   function hostiles(w) {
     return w.enemies.filter((e) => !e.dead && !e.ignoreForClear);
   }
@@ -324,7 +344,7 @@ function botMain(opts) {
       const v = navTo(w, tgt.x, tgt.y, !opts.god);
       if (v) return { move: v, aim: tgt, danger: 0 };
     }
-    const melee = MELEE.has(p.weaponId);
+    const melee = isMelee(p);
     const pref = melee ? 18 : Math.max(55, Math.min(95, (p.stats?.range ?? 185) * 0.45));
     const bullets = w.projectiles.filter((b) => b.team === 'enemy' && !b.dead);
     const hazards = w.entities.filter((e) => e.enemyHazard && !e.dead && hyp(e.x - p.x, e.y - p.y) < 90);
@@ -463,7 +483,7 @@ function botMain(opts) {
     if (aim) {
       const a = Math.atan2(aim.y - (aim.z ?? 0) - (p.y - 4), aim.x - p.x);
       let fire = true;
-      if (CHARGE.has(p.weaponId)) {
+      if (CHARGE.has(p.weaponId) || p.weaponSlowsMove?.()) {
         B.chargeT += 1;
         if (B.chargeT > 14) { B.chargeT = 0; fire = false; }
       }
@@ -641,6 +661,7 @@ function botMain(opts) {
     if (w.transitioning || w.descending || p.frozen || w.paused) { setInput({ x: 0, y: 0 }, null, p); B.progressT = Math.max(B.progressT, w.time - 15); return; }
     if (opts.god && !p.god) p.god = true;
     weaponCheck(w, p);
+    learnWeapon(w, p);
 
     const hs = hostiles(w);
     let move = { x: 0, y: 0 }, aim = null;

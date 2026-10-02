@@ -8,7 +8,8 @@
 //     heavy (knockback resistance).
 //   dash 몸통 밀치기: a short, heavy shove; a shield wall in front blocks bullets
 //     and shoves enemies for ~0.3 s
-//   affinity 묵직한 무기: +1♥ max and +10% damage with heavy weapons
+//   affinity 묵직한 무기: +10% damage, +30% knockback and double room-clear
+//     barrel charges with heavy weapons
 //   release 구조의 울음 (releaseRescueHowl): a howl that stuns and knocks every
 //     enemy around, heals, then a lantern beacon pulses for 2.4 s
 //
@@ -258,7 +259,7 @@ export const BORI_PASSIVE: PassiveDef = {
     if (overflow > 0) addBarrel(w, overflow / 2);
   },
   onRoomClear(w) {
-    addBarrel(w, BORI_ROOM_CHARGE, true);
+    addBarrel(w, BORI_ROOM_CHARGE * (w.player.flags.has('affinity') ? 2 : 1), true);
   },
   onHurt(w) {
     // the barrel tips over when she is hit: a puddle to stand in
@@ -405,12 +406,12 @@ export const BORI_DASH: DashDef = {
 // ------------------------------------------------------------------ affinity
 export const BORI_AFFINITY: AffinityDef = {
   name: '묵직한 무기',
-  desc: '무거운 무기를 들면 최대 체력 +1♥, 피해 +10%.',
+  desc: '무거운 무기를 들면 피해 +10%, 넉백 +30%, 방을 치울 때 통이 두 배로 찬다.',
   tags: ['heavy'],
   ids: ['great_hammer', 'titan_greatsword', 'quake_mace', 'reaper_scythe', 'lantern_flail'],
   stats(m) {
-    m.addStat('maxHearts', 1);
     m.mulStat('damage', 1.1);
+    m.mulStat('knockback', 1.3);
   },
 };
 

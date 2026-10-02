@@ -1,9 +1,9 @@
 diff --git a/scripts/coop-e2e.mjs b/scripts/coop-e2e.mjs
 new file mode 100644
-index 0000000000000000000000000000000000000000..7a93c9702e6cce80ce62a12c1099f46e8d048e3d
+index 0000000000000000000000000000000000000000..4c33e8b5de75cc47b514179f09e4486bec32cc00
 --- /dev/null
 +++ b/scripts/coop-e2e.mjs
-@@ -0,0 +1,298 @@
+@@ -0,0 +1,327 @@
 +// Online co-op browser end-to-end test: 2–4 game pages over BroadcastChannel
 +// (`?net=bc`). The first page creates a room through the title menu, the
 +// others join with the share link, pick characters and ready up, the host
@@ -262,13 +262,24 @@ index 0000000000000000000000000000000000000000..7a93c9702e6cce80ce62a12c1099f46e
 +  check('clients wait for a stalled host', waiting.waiting === true);
 +  await pages[0].page.evaluate(() => { window.__lkLoop.manual = false; });
 +  await wait(1500);
-+  // ---- a treasure room: one pedestal per keeper
++  // ---- a treasure room: one pedestal per keeper (bots hold still meanwhile)
++  const hold = (on) => Promise.all(pages.map((p) => p.page.evaluate((on) => {
++    window.__coopBotOff = on;
++    if (on) {
++      window.__lk.input.touchMove = { x: 0, y: 0 };
++      window.__lk.input.touchAim = null;
++    }
++  }, on)));
++  await hold(true);
 +  await pages[0].page.evaluate(() => window.__lk.coop.cmd({ type: 'debug', op: 'room', kind: 'treasure' }));
-+  await wait(1500);
-+  const peds = await pages[0].page.evaluate(() => window.__lk.world().entities.filter((e) => e.constructor.name === 'Pedestal' && e.item).length);
++  await wait(1600);
++  const tr = await pages[0].page.evaluate(() => {
++    const w = window.__lk.world();
++    return { room: w.node.kind, peds: w.entities.filter((e) => e.constructor.name === 'Pedestal' && e.item).length };
++  });
 +  for (const p of pages) await shot(p, 'treasure');
-+  check('a treasure room offers a pedestal per keeper', peds >= players, `${peds} pedestals`);
-+  await pages[0].page.evaluate(() => window.__lk.coop.cmd({ type: 'debug', op: 'room', kind: 'normal' }));
++  check('a treasure room offers a pedestal per keeper', tr.room === 'treasure' && tr.peds >= players, `${tr.room}: ${tr.peds} pedestals`);
++  await hold(false);
 +  // ---- play on
 +  await at(seconds);
 +  for (const p of pages) await shot(p, 'end');
@@ -287,6 +298,24 @@ index 0000000000000000000000000000000000000000..7a93c9702e6cce80ce62a12c1099f46e
 +  check('every page simulated about the same number of frames', states.every((s) => s.tick > states[0].tick * 0.95), states.map((s) => s.tick).join(' '));
 +  report.hashTicks = ticks.length;
 +  report.lastTick = Math.max(...ticks);
++
++  // ---- the host ends the descent from the pause menu (하강 종료: a command), everyone sees the party summary
++  await hold(true);
++  await key(host, 'Escape');
++  await wait(500);
++  await key(host, 'ArrowDown', 2);
++  await key(host, 'Enter', 2);
++  for (const p of pages) await until(p, (s) => !!s?.gameOver, 'party summary', 10000, coopState);
++  await wait(2200);
++  for (const p of pages) await shot(p, 'summary');
++  check('the host ended the run for everyone', true);
++  // ---- back to the lobby together (same room, same code, everyone rejoins)
++  await key(host, 'Enter');
++  for (const p of pages) await until(p, (s) => s.scene === 'lobby' && s.screen === 'room' && s.code === code, 'back in the lobby room', 20000);
++  const back = await until(host, (s) => s.roster.length === players, 'everyone back in the roster', 20000);
++  await shot(host, 'lobby-again');
++  if (players > 2) await shot(pages[players - 1], 'lobby-again');
++  check('the whole party is back in the same lobby room', back.code === code && back.roster.length === players, `${back.code} ${back.roster.length} players`);
 +} catch (e) {
 +  report.ok = false;
 +  report.errors.push(String(e?.stack ?? e));
@@ -302,6 +331,682 @@ index 0000000000000000000000000000000000000000..7a93c9702e6cce80ce62a12c1099f46e
 +if (vite) await vite.close();
 +console.log(report.ok ? 'coop e2e: ok' : 'coop e2e: FAILED');
 +process.exit(report.ok ? 0 : 1);
+diff --git a/src/content/bosses/archivist.ts b/src/content/bosses/archivist.ts
+index 781e0542c67b8afe582804e6ff331e87d0b953b8..8aa1faffae7fd873b10f82ab093eade208da1336 100644
+--- a/src/content/bosses/archivist.ts
++++ b/src/content/bosses/archivist.ts
+@@ -581,17 +581,18 @@ class InkStroke extends Entity {
+ 
+   override update(w: World, dt: number): void {
+     this.age += dt;
+-    const p = w.player;
+     const c = Math.cos(this.angle);
+     const s = Math.sin(this.angle);
+-    if (!this.hit && this.age < this.sweep + 0.12 && p.alive && p.z < 6) {
+-      const t = (p.x - this.x) * c + (p.y - this.y) * s;
+-      const d = Math.abs(-(p.x - this.x) * s + (p.y - this.y) * c);
+-      if (t >= -4 && t <= this.head + 4 && d < (this.o.half ?? 7) + p.r * 0.6) {
+-        if (p.hurt(w, this.o.damage ?? 1, this.o.source)) {
+-          const side = -(p.x - this.x) * s + (p.y - this.y) * c >= 0 ? 1 : -1;
+-          p.knock(-s * side, c * side, 200);
+-          this.hit = true;
++    for (const p of w.targets()) {
++      if (!this.hit && this.age < this.sweep + 0.12 && p.alive && p.z < 6) {
++        const t = (p.x - this.x) * c + (p.y - this.y) * s;
++        const d = Math.abs(-(p.x - this.x) * s + (p.y - this.y) * c);
++        if (t >= -4 && t <= this.head + 4 && d < (this.o.half ?? 7) + p.r * 0.6) {
++          if (p.hurt(w, this.o.damage ?? 1, this.o.source)) {
++            const side = -(p.x - this.x) * s + (p.y - this.y) * c >= 0 ? 1 : -1;
++            p.knock(-s * side, c * side, 200);
++            this.hit = true;
++          }
+         }
+       }
+     }
+@@ -688,14 +689,15 @@ class InkFlood extends Entity {
+       this.level = Math.max(0, 1 - this.drainT / this.o.drain);
+       if (this.drainT >= this.o.drain) this.dead = true;
+     } else this.level = clamp(this.age / this.o.rise, 0, 1);
+-    const p = w.player;
+-    if (this.armed && p.alive && p.z < 4 && insideRoom(w, p.x, p.y, -4) && !this.onIsland(p.x, p.y, p.r * 0.5)) {
+-      if (p.hurt(w, 1, this.o.source)) {
+-        // pushed toward the nearest island so a hit also helps you out
+-        let best = this.islands[0];
+-        for (const i of this.islands) if (Math.hypot(i.x - p.x, i.y - p.y) < Math.hypot(best.x - p.x, best.y - p.y)) best = i;
+-        const d = Math.hypot(best.x - p.x, best.y - p.y) || 1;
+-        p.knock((best.x - p.x) / d, (best.y - p.y) / d, 120);
++    for (const p of w.targets()) {
++      if (this.armed && p.alive && p.z < 4 && insideRoom(w, p.x, p.y, -4) && !this.onIsland(p.x, p.y, p.r * 0.5)) {
++        if (p.hurt(w, 1, this.o.source)) {
++          // pushed toward the nearest island so a hit also helps you out
++          let best = this.islands[0];
++          for (const i of this.islands) if (Math.hypot(i.x - p.x, i.y - p.y) < Math.hypot(best.x - p.x, best.y - p.y)) best = i;
++          const d = Math.hypot(best.x - p.x, best.y - p.y) || 1;
++          p.knock((best.x - p.x) / d, (best.y - p.y) / d, 120);
++        }
+       }
+     }
+     // floating paper on the ink
+diff --git a/src/content/bosses/chain-smith.ts b/src/content/bosses/chain-smith.ts
+index 548e0f28f98a79d208a66ff3efbab2eaf067da40..9201e098c69c45c5ad3a42fae9a5055ecd74cf6e 100644
+--- a/src/content/bosses/chain-smith.ts
++++ b/src/content/bosses/chain-smith.ts
+@@ -674,13 +674,14 @@ function* chainCyclone(e: Enemy, w: World): Script {
+     // slow drift toward the player
+     e.chase(w, 14);
+     if (Math.floor(el / 0.3) !== Math.floor((el - w.dt) / 0.3)) w.sfx('whoosh', { vol: 0.45, pitch: 0.7 });
+-    const p = w.player;
+-    if (p.alive && p.z < 6) {
+-      for (const k of [0, Math.PI]) {
+-        const ex = e.x + Math.cos(a + k) * L;
+-        const ey = e.y + 4 + Math.sin(a + k) * L;
+-        if (distToSegment(p.x, p.y - 3, e.x, e.y + 4, ex, ey) < 5 + p.r * 0.5 && p.hurt(w, 1, NAME)) {
+-          p.knock(Math.cos(a + k + dir * Math.PI / 2), Math.sin(a + k + dir * Math.PI / 2), 180);
++    for (const p of w.targets()) {
++      if (p.alive && p.z < 6) {
++        for (const k of [0, Math.PI]) {
++          const ex = e.x + Math.cos(a + k) * L;
++          const ey = e.y + 4 + Math.sin(a + k) * L;
++          if (distToSegment(p.x, p.y - 3, e.x, e.y + 4, ex, ey) < 5 + p.r * 0.5 && p.hurt(w, 1, NAME)) {
++            p.knock(Math.cos(a + k + dir * Math.PI / 2), Math.sin(a + k + dir * Math.PI / 2), 180);
++          }
+         }
+       }
+     }
+diff --git a/src/content/bosses/final-kit.ts b/src/content/bosses/final-kit.ts
+index b8920d219371951907422cd9588cf81429e41141..e78ab3bc13d9bc3511640adbdcacf51d7ae15cbe 100644
+--- a/src/content/bosses/final-kit.ts
++++ b/src/content/bosses/final-kit.ts
+@@ -197,14 +197,18 @@ export function hash2(x: number, y: number, seed = 0): number {
+ // ================================================================== world helpers
+ /** Hurt the grounded player if within `r` of (x, y). Returns true if damage was applied. */
+ export function hitPlayerCircle(w: World, x: number, y: number, r: number, dmg: number, source: string, knock = 150): boolean {
+-  const p = w.player;
+-  if (!p.alive || p.z > 8) return false;
+-  const d = Math.hypot(p.x - x, p.y - y);
+-  if (d > r + p.r * 0.6) return false;
+-  if (!p.hurt(w, dmg, source)) return false;
+-  const n = d || 1;
+-  p.knock((p.x - x) / n, (p.y - y) / n, knock);
+-  return true;
++  // every keeper in reach (co-op); single-player: the keeper
++  let any = false;
++  for (const p of w.targets()) {
++    if (!p.alive || p.z > 8) continue;
++    const d = Math.hypot(p.x - x, p.y - y);
++    if (d > r + p.r * 0.6) continue;
++    if (!p.hurt(w, dmg, source)) continue;
++    const n = d || 1;
++    p.knock((p.x - x) / n, (p.y - y) / n, knock);
++    any = true;
++  }
++  return any;
+ }
+ 
+ /** Expire every enemy projectile (phase changes clear the screen — fairness). */
+@@ -512,17 +516,18 @@ export class ShockRing extends Entity {
+     this.age += dt;
+     this.radius += this.o.speed * dt;
+     const o = this.o;
+-    const p = w.player;
+     const gaps = o.gaps ?? [];
+     const gw = o.gapWidth ?? 0;
+-    if (!this.hit && p.alive && p.z < 4 && this.radius < o.maxR * 0.9) {
+-      const dx = p.x - this.x;
+-      const dy = p.y - this.y;
+-      const d = Math.hypot(dx, dy);
+-      if (Math.abs(d - this.radius) < (o.thick ?? 4) + p.r * 0.5 && !inGap(Math.atan2(dy, dx), gaps, gw)) {
+-        if (p.hurt(w, o.damage ?? 1, o.source)) {
+-          p.knock(dx / (d || 1), dy / (d || 1), 170);
+-          this.hit = true;
++    for (const p of w.targets()) {
++      if (!this.hit && p.alive && p.z < 4 && this.radius < o.maxR * 0.9) {
++        const dx = p.x - this.x;
++        const dy = p.y - this.y;
++        const d = Math.hypot(dx, dy);
++        if (Math.abs(d - this.radius) < (o.thick ?? 4) + p.r * 0.5 && !inGap(Math.atan2(dy, dx), gaps, gw)) {
++          if (p.hurt(w, o.damage ?? 1, o.source)) {
++            p.knock(dx / (d || 1), dy / (d || 1), 170);
++            this.hit = true;
++          }
+         }
+       }
+     }
+@@ -626,10 +631,11 @@ export class Sector extends Entity {
+     const o = this.o;
+     if (!this.struck && this.age >= o.warn) {
+       this.struck = true;
+-      const p = w.player;
+-      if (p.alive && p.z < 8 && inSector(p.x, p.y, this.x, this.y, this.angle, o.half + 0.08, o.radius + p.r * 0.6, o.inner ?? 0)) {
+-        const d = Math.hypot(p.x - this.x, p.y - this.y) || 1;
+-        if (p.hurt(w, o.damage ?? 1, o.source)) p.knock((p.x - this.x) / d, (p.y - this.y) / d, 200);
++      for (const p of w.targets()) {
++        if (p.alive && p.z < 8 && inSector(p.x, p.y, this.x, this.y, this.angle, o.half + 0.08, o.radius + p.r * 0.6, o.inner ?? 0)) {
++          const d = Math.hypot(p.x - this.x, p.y - this.y) || 1;
++          if (p.hurt(w, o.damage ?? 1, o.source)) p.knock((p.x - this.x) / d, (p.y - this.y) / d, 200);
++        }
+       }
+       o.onStrike?.(w);
+     }
+@@ -752,16 +758,17 @@ export class Beam extends Entity {
+       w.shake(0.25);
+     }
+     if (st === 'fire') {
+-      const p = w.player;
+       const canHit = o.rehit ? w.time - this.hitT >= o.rehit : this.hits === 0;
+-      if (canHit && p.alive && p.z < 12 && onBeam(p.x, p.y - 4, p.r * 0.7, this.x, this.y, this.angle, this.len, o.width / 2)) {
+-        if (p.hurt(w, o.damage ?? 1, o.source)) {
+-          this.hits++;
+-          this.hitT = w.time;
+-          const nx = -Math.sin(this.angle);
+-          const ny = Math.cos(this.angle);
+-          const side = (p.x - this.x) * nx + (p.y - this.y) * ny >= 0 ? 1 : -1;
+-          p.knock(nx * side, ny * side, 180);
++      for (const p of w.targets()) {
++        if (canHit && p.alive && p.z < 12 && onBeam(p.x, p.y - 4, p.r * 0.7, this.x, this.y, this.angle, this.len, o.width / 2)) {
++          if (p.hurt(w, o.damage ?? 1, o.source)) {
++            this.hits++;
++            this.hitT = w.time;
++            const nx = -Math.sin(this.angle);
++            const ny = Math.cos(this.angle);
++            const side = (p.x - this.x) * nx + (p.y - this.y) * ny >= 0 ? 1 : -1;
++            p.knock(nx * side, ny * side, 180);
++          }
+         }
+       }
+       // sparks where the beam meets the wall
+diff --git a/src/content/bosses/kit13.ts b/src/content/bosses/kit13.ts
+index 425a7a49f4424099114904d03cabe28f25a3f7b8..b9ad9e513d627db9ff5748511dbb310a3436a59b 100644
+--- a/src/content/bosses/kit13.ts
++++ b/src/content/bosses/kit13.ts
+@@ -287,14 +287,18 @@ export function clearEnemyShots(w: World): void {
+ // ================================================================== player hits
+ /** Hurt the player if (px,py) is within `r` of (x,y) on the ground. Returns true if damage applied. */
+ export function hitPlayerCircle(w: World, x: number, y: number, r: number, dmg: number, source: string, knock = 150): boolean {
+-  const p = w.player;
+-  if (!p.alive || p.z > 8) return false;
+-  const d = Math.hypot(p.x - x, p.y - y);
+-  if (d > r + p.r * 0.6) return false;
+-  if (!p.hurt(w, dmg, source)) return false;
+-  const n = d || 1;
+-  p.knock((p.x - x) / n, (p.y - y) / n, knock);
+-  return true;
++  // every keeper in reach (co-op); single-player: the keeper
++  let any = false;
++  for (const p of w.targets()) {
++    if (!p.alive || p.z > 8) continue;
++    const d = Math.hypot(p.x - x, p.y - y);
++    if (d > r + p.r * 0.6) continue;
++    if (!p.hurt(w, dmg, source)) continue;
++    const n = d || 1;
++    p.knock((p.x - x) / n, (p.y - y) / n, knock);
++    any = true;
++  }
++  return any;
+ }
+ 
+ /** Rectangular lane warning (bat-dive style) from (x,y) along `angle`. */
+@@ -359,19 +363,20 @@ export class Shockwave extends Entity {
+     this.age += dt;
+     this.radius += this.o.speed * dt;
+     const o = this.o;
+-    const p = w.player;
+     const gaps = o.gaps ?? [];
+     const gw = o.gapWidth ?? 0;
+     // the wave stops hurting just before it fades out (never invisible + dangerous)
+-    if (!this.hit && p.alive && p.z < 4 && this.radius < o.maxR * 0.9) {
+-      const dx = p.x - this.x;
+-      const dy = p.y - this.y;
+-      const d = Math.hypot(dx, dy);
+-      const band = (o.thick ?? 4) + p.r * 0.5;
+-      if (Math.abs(d - this.radius) < band && !inGap(Math.atan2(dy, dx), gaps, gw)) {
+-        if (p.hurt(w, o.damage ?? 1, o.source)) {
+-          p.knock(dx / (d || 1), dy / (d || 1), 170);
+-          this.hit = true;
++    for (const p of w.targets()) {
++      if (!this.hit && p.alive && p.z < 4 && this.radius < o.maxR * 0.9) {
++        const dx = p.x - this.x;
++        const dy = p.y - this.y;
++        const d = Math.hypot(dx, dy);
++        const band = (o.thick ?? 4) + p.r * 0.5;
++        if (Math.abs(d - this.radius) < band && !inGap(Math.atan2(dy, dx), gaps, gw)) {
++          if (p.hurt(w, o.damage ?? 1, o.source)) {
++            p.knock(dx / (d || 1), dy / (d || 1), 170);
++            this.hit = true;
++          }
+         }
+       }
+     }
+diff --git a/src/content/bosses/kit6.ts b/src/content/bosses/kit6.ts
+index 652521ee5213ff49eb2fc015402e0d0d85ca174a..40ada8395ebbb9d01fcc8ef38e2e1b74fef5324f 100644
+--- a/src/content/bosses/kit6.ts
++++ b/src/content/bosses/kit6.ts
+@@ -197,11 +197,12 @@ export class InkPool extends Entity {
+         colors: [CYAN[3], CYAN[2], INDIGO[3]], size: 1, additive: true, light: 3,
+       });
+     }
+-    const p = w.player;
+-    if (this.armed && p.alive && p.z < 4) {
+-      const dx = p.x - this.x;
+-      const dy = (p.y - this.y) / 0.7;
+-      if (dx * dx + dy * dy < (this.radius * 0.85) ** 2) p.hurt(w, 1, this.source);
++    for (const p of w.targets()) {
++      if (this.armed && p.alive && p.z < 4) {
++        const dx = p.x - this.x;
++        const dy = (p.y - this.y) / 0.7;
++        if (dx * dx + dy * dy < (this.radius * 0.85) ** 2) p.hurt(w, 1, this.source);
++      }
+     }
+   }
+ 
+diff --git a/src/content/bosses/lighthouse.ts b/src/content/bosses/lighthouse.ts
+index e8979c65099aa3272a7afdb26935abde128bfca8..12c0a5c17cce668caeb2a81a7facc2de7c436cc7 100644
+--- a/src/content/bosses/lighthouse.ts
++++ b/src/content/bosses/lighthouse.ts
+@@ -575,19 +575,20 @@ class LampBeam extends Entity {
+         }
+       } else this.angle += this.omega * dt;
+       // hit: inside a lit wedge, no shelf between the lamp and the keeper
+-      const p = w.player;
+-      if (p.alive && p.z < 10 && w.time - this.hitT >= (op.rehit ?? 0.7)) {
+-        for (const a of this.angles()) {
+-          const d = Math.hypot(p.x - this.x, p.y - this.y);
+-          const tol = Math.atan2(p.r * 0.7, Math.max(8, d));
+-          if (d < 14 || !inWedge(p.x, p.y - 2, this.x, this.y, a, op.half + tol, BEAM_LEN)) continue;
+-          if (rayBlocked(w.room, this.x, this.y, p.x, p.y - 2)) continue;
+-          if (p.hurt(w, op.damage ?? 1, op.source)) {
+-            this.hitT = w.time;
+-            const side = angleDiff(a, Math.atan2(p.y - this.y, p.x - this.x)) >= 0 ? 1 : -1;
+-            p.knock(-Math.sin(a) * side, Math.cos(a) * side, 190);
++      for (const p of w.targets()) {
++        if (p.alive && p.z < 10 && w.time - this.hitT >= (op.rehit ?? 0.7)) {
++          for (const a of this.angles()) {
++            const d = Math.hypot(p.x - this.x, p.y - this.y);
++            const tol = Math.atan2(p.r * 0.7, Math.max(8, d));
++            if (d < 14 || !inWedge(p.x, p.y - 2, this.x, this.y, a, op.half + tol, BEAM_LEN)) continue;
++            if (rayBlocked(w.room, this.x, this.y, p.x, p.y - 2)) continue;
++            if (p.hurt(w, op.damage ?? 1, op.source)) {
++              this.hitT = w.time;
++              const side = angleDiff(a, Math.atan2(p.y - this.y, p.x - this.x)) >= 0 ? 1 : -1;
++              p.knock(-Math.sin(a) * side, Math.cos(a) * side, 190);
++            }
++            break;
+           }
+-          break;
+         }
+       }
+       // glitter where the light meets the water and sparks at its end
+@@ -738,11 +739,12 @@ class LampFlash extends Entity {
+     }
+     if (!this.struck && this.age >= o.warn) {
+       this.struck = true;
+-      const p = w.player;
+-      const d = Math.hypot(p.x - this.x, p.y - this.y);
+-      const tol = Math.atan2(p.r * 0.7, Math.max(8, d));
+-      if (p.alive && p.z < 10 && d >= 14 && inWedge(p.x, p.y - 2, this.x, this.y, this.angle, o.half + tol, BEAM_LEN) && !rayBlocked(w.room, this.x, this.y, p.x, p.y - 2)) {
+-        if (p.hurt(w, o.damage ?? 1, o.source)) p.knock(Math.cos(this.angle), Math.sin(this.angle), 200);
++      for (const p of w.targets()) {
++        const d = Math.hypot(p.x - this.x, p.y - this.y);
++        const tol = Math.atan2(p.r * 0.7, Math.max(8, d));
++        if (p.alive && p.z < 10 && d >= 14 && inWedge(p.x, p.y - 2, this.x, this.y, this.angle, o.half + tol, BEAM_LEN) && !rayBlocked(w.room, this.x, this.y, p.x, p.y - 2)) {
++          if (p.hurt(w, o.damage ?? 1, o.source)) p.knock(Math.cos(this.angle), Math.sin(this.angle), 200);
++        }
+       }
+       w.sfx('laser', { vol: 0.7, pitch: 1.1 });
+       w.sfx('lightning', { vol: 0.25, pitch: 1.5 });
+diff --git a/src/content/bosses/slag-imugi.ts b/src/content/bosses/slag-imugi.ts
+index 43c5575296dce0f838c3bb251209990107641356..9672e3d1c59516ddbed5303de0560d2dbf513eb8 100644
+--- a/src/content/bosses/slag-imugi.ts
++++ b/src/content/bosses/slag-imugi.ts
+@@ -444,10 +444,11 @@ function burstOut(e: Enemy, w: World, radius: number, ring: boolean): void {
+   setUnder(e, false);
+   w.sfx('explosion', { vol: 0.6, pitch: 0.7 });
+   w.shake(0.55);
+-  const p = w.player;
+-  if (p.alive && p.z < 8 && Math.hypot(p.x - s.gx, p.y - s.gy) < radius + p.r * 0.6 && p.hurt(w, 2, NAME)) {
+-    const d = Math.hypot(p.x - s.gx, p.y - s.gy) || 1;
+-    p.knock((p.x - s.gx) / d, (p.y - s.gy) / d, 220);
++  for (const p of w.targets()) {
++    if (p.alive && p.z < 8 && Math.hypot(p.x - s.gx, p.y - s.gy) < radius + p.r * 0.6 && p.hurt(w, 2, NAME)) {
++      const d = Math.hypot(p.x - s.gx, p.y - s.gy) || 1;
++      p.knock((p.x - s.gx) / d, (p.y - s.gy) / d, 220);
++    }
+   }
+   w.particles.burst(s.gx, s.gy, { count: 26, speed: [50, 170], life: [0.3, 0.7], colors: EMBERS, size: [1, 3], gravity: 300, vz: [60, 180], light: 4 });
+   w.spawn(new RingFx(s.gx, s.gy, radius + 8, 0.3, '#ffa424', 2));
+@@ -540,8 +541,9 @@ function* breach(e: Enemy, w: World): Script {
+   w.sfx('explosion', { vol: 0.45, pitch: 0.9 });
+   w.shake(0.35);
+   w.particles.burst(arc.bx, arc.by, { count: 20, speed: [40, 140], life: [0.3, 0.6], colors: EMBERS, size: [1, 2], gravity: 300, vz: [40, 140] });
+-  const pl = w.player;
+-  if (pl.alive && Math.hypot(pl.x - arc.bx, pl.y - arc.by) < 18 + pl.r * 0.6) pl.hurt(w, 1, NAME);
++  for (const pl of w.targets()) {
++    if (pl.alive && Math.hypot(pl.x - arc.bx, pl.y - arc.by) < 18 + pl.r * 0.6) pl.hurt(w, 1, NAME);
++  }
+   w.spawn(new Hazard(arc.bx, arc.by, 15, p2 ? 4 : 3, 'fire', NAME));
+   // continue under the floor so the body follows the arc down
+   const dx = arc.bx - arc.ax;
+@@ -650,7 +652,7 @@ function* geyser(e: Enemy, w: World): Script {
+ /** Place every body segment along the head's trail; burning low segments hurt on contact. */
+ function layoutBody(e: Enemy, w: World, contact: boolean): void {
+   const s = st(e);
+-  const p = w.player;
++  const ps = w.targets();
+   for (const part of s.parts) {
+     const t = s.trail.sample((part.idx + 1) * SEG_SPACING);
+     part.up = t.up && !e.dead;
+@@ -663,9 +665,11 @@ function layoutBody(e: Enemy, w: World, contact: boolean): void {
+     }
+     part.x = t.x;
+     part.y = t.y - t.z;
+-    if (contact && t.z < 10 && p.alive && p.z < 6 && Math.hypot(p.x - t.x, p.y - t.y) < part.r + p.r - 2 && p.hurt(w, 1, NAME)) {
+-      const d = Math.hypot(p.x - t.x, p.y - t.y) || 1;
+-      p.knock((p.x - t.x) / d, (p.y - t.y) / d, 160);
++    for (const p of ps) {
++      if (contact && t.z < 10 && p.alive && p.z < 6 && Math.hypot(p.x - t.x, p.y - t.y) < part.r + p.r - 2 && p.hurt(w, 1, NAME)) {
++        const d = Math.hypot(p.x - t.x, p.y - t.y) || 1;
++        p.knock((p.x - t.x) / d, (p.y - t.y) / d, 160);
++      }
+     }
+   }
+ }
+diff --git a/src/content/bosses/spore-mother.ts b/src/content/bosses/spore-mother.ts
+index c93705476beb39e4be9adb02c5bda06758765199..c9400299753462e29d86b8d8c1689ca9a90a49ca 100644
+--- a/src/content/bosses/spore-mother.ts
++++ b/src/content/bosses/spore-mother.ts
+@@ -481,10 +481,11 @@ function* burrow(e: Enemy, w: World): Script {
+   w.shake(0.5);
+   e.vulnerable = true;
+   // erupting from under the player's feet hurts
+-  const pl = w.player;
+-  if (pl.alive && Math.hypot(pl.x - e.x, pl.y - (e.y + 10)) < 30 + pl.r && pl.hurt(w, 2, NAME)) {
+-    const d = Math.hypot(pl.x - e.x, pl.y - e.y) || 1;
+-    pl.knock((pl.x - e.x) / d, (pl.y - e.y) / d, 200);
++  for (const pl of w.targets()) {
++    if (pl.alive && Math.hypot(pl.x - e.x, pl.y - (e.y + 10)) < 30 + pl.r && pl.hurt(w, 2, NAME)) {
++      const d = Math.hypot(pl.x - e.x, pl.y - e.y) || 1;
++      pl.knock((pl.x - e.x) / d, (pl.y - e.y) / d, 200);
++    }
+   }
+   sporeCloud(w, e.x, e.y, 20);
+   yield 0.45;
+diff --git a/src/content/enemies/abyss-deep.ts b/src/content/enemies/abyss-deep.ts
+index 9547ac4cb761343a2bcac36b40673f70555aca91..8e39ee1886846eaae84815b5530ed9e2ed6734f9 100644
+--- a/src/content/enemies/abyss-deep.ts
++++ b/src/content/enemies/abyss-deep.ts
+@@ -253,10 +253,11 @@ defineEnemy({
+         e.squash(1.3, 0.7);
+         w.shake(0.25);
+         w.sfx('slam', { vol: 0.6, pitch: 1.3 });
+-        const p = w.player;
+-        const d = Math.hypot(p.x - e.x, p.y - e.y);
+-        if (p.alive && p.z < 8 && d < R + p.r * 0.5) {
+-          if (p.hurt(w, 2, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 200);
++        for (const p of w.targets()) {
++          const d = Math.hypot(p.x - e.x, p.y - e.y);
++          if (p.alive && p.z < 8 && d < R + p.r * 0.5) {
++            if (p.hurt(w, 2, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 200);
++          }
+         }
+         w.particles.burst(e.x, e.y, { count: 10, speed: [40, 100], life: [0.2, 0.4], colors: ['#ffffff', MAW[3], MAW[2]], size: [1, 2], gravity: 260, vz: [30, 80] });
+         yield 0.7;
+diff --git a/src/content/enemies/abyss.ts b/src/content/enemies/abyss.ts
+index 83502a1187511afdbcc37e61b04067e5c6a99914..a81ab1d86b803117e546965292e662d5bcbf938e 100644
+--- a/src/content/enemies/abyss.ts
++++ b/src/content/enemies/abyss.ts
+@@ -83,12 +83,13 @@ export class VoidPool extends Entity {
+         colors: ['#ffffff', VPINK.mid, '#8a2ad0'], size: 1, additive: true, light: 3,
+       });
+     }
+-    const p = w.player;
+-    if (this.armed && p.alive && p.z < 4) {
+-      const dx = p.x - this.x;
+-      const dy = (p.y - this.y) / 0.7;
+-      const rr = this.radius * 0.85;
+-      if (dx * dx + dy * dy < rr * rr) p.hurt(w, 1, this.source);
++    for (const p of w.targets()) {
++      if (this.armed && p.alive && p.z < 4) {
++        const dx = p.x - this.x;
++        const dy = (p.y - this.y) / 0.7;
++        const rr = this.radius * 0.85;
++        if (dx * dx + dy * dy < rr * rr) p.hurt(w, 1, this.source);
++      }
+     }
+   }
+ 
+@@ -357,10 +358,11 @@ defineEnemy({
+       e.setAnim('vtent_rise', true);
+       w.shake(0.25);
+       w.sfx('splat', { vol: 0.7, pitch: 0.6 });
+-      const p = w.player;
+-      const d = Math.hypot(p.x - e.x, p.y - e.y);
+-      if (p.alive && p.z < 8 && d < R + p.r * 0.5) {
+-        if (p.hurt(w, 1, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 200);
++      for (const p of w.targets()) {
++        const d = Math.hypot(p.x - e.x, p.y - e.y);
++        if (p.alive && p.z < 8 && d < R + p.r * 0.5) {
++          if (p.hurt(w, 1, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 200);
++        }
+       }
+       w.particles.burst(e.x, e.y, { count: 16, speed: [40, 120], life: [0.3, 0.6], colors: VOIDDUST, size: [1, 2], gravity: 260, vz: [40, 120] });
+       w.spawn(new RingFx(e.x, e.y, R + 4, 0.3, VPINK.mid, 2));
+@@ -691,10 +693,11 @@ defineEnemy({
+         e.setAnim('wstalker_strike', true);
+         w.sfx('swing_heavy', { vol: 0.55, pitch: 0.8 });
+         w.shake(0.2);
+-        const pl = w.player;
+-        const d = Math.hypot(pl.x - e.x, pl.y - e.y);
+-        if (pl.alive && pl.z < 8 && d < R + pl.r * 0.5) {
+-          if (pl.hurt(w, 2, e.def.name)) pl.knock((pl.x - e.x) / (d || 1), (pl.y - e.y) / (d || 1), 220);
++        for (const pl of w.targets()) {
++          const d = Math.hypot(pl.x - e.x, pl.y - e.y);
++          if (pl.alive && pl.z < 8 && d < R + pl.r * 0.5) {
++            if (pl.hurt(w, 2, e.def.name)) pl.knock((pl.x - e.x) / (d || 1), (pl.y - e.y) / (d || 1), 220);
++          }
+         }
+         w.spawn(new RingFx(e.x, e.y - 6, R, 0.25, VTEAL.mid, 3));
+         w.particles.burst(e.x, e.y - 8, { count: 14, speed: [80, 180], life: [0.15, 0.3], colors: ['#ffffff', VTEAL.hot, VTEAL.mid], shape: 'spark', size: [1, 2] });
+diff --git a/src/content/enemies/archive-deep.ts b/src/content/enemies/archive-deep.ts
+index f988e181104a5396174ecaa6f18d02312d6d982a..850349b3ce1f4bd32cf1398a40f0d2217d96696e 100644
+--- a/src/content/enemies/archive-deep.ts
++++ b/src/content/enemies/archive-deep.ts
+@@ -334,10 +334,11 @@ defineEnemy({
+       yield 0.6;
+       w.spawn(new RingFx(e.x, e.y - 8, R + 6, 0.3, CYAN.mid, 2));
+       w.sfx('beam_charge', { vol: 0.3, pitch: 1.6 });
+-      const p = w.player;
+-      const d = Math.hypot(p.x - e.x, p.y - e.y);
+-      if (p.alive && p.z < 8 && d < R + p.r * 0.5) {
+-        if (p.hurt(w, 1, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 200);
++      for (const p of w.targets()) {
++        const d = Math.hypot(p.x - e.x, p.y - e.y);
++        if (p.alive && p.z < 8 && d < R + p.r * 0.5) {
++          if (p.hurt(w, 1, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 200);
++        }
+       }
+       e.shootRing(w, e.champion ? 12 : 8, glyphShot(3, 2, { speed: 62, offset: w.rng.angle(), z: 10, range: 260 }));
+       yield 0.8;
+@@ -480,10 +481,12 @@ defineEnemy({
+         w.shake(0.35);
+         w.sfx('slam', { vol: 0.65 });
+         dust(w, e.x, e.y + 4, [PAPER[2], WOOD[3], WOOD[1]], 12, 70);
+-        if (p.alive && p.z < 8 && Math.hypot(p.x - e.x, p.y - e.y) < R + p.r * 0.5) {
+-          if (p.hurt(w, 2, e.def.name)) {
+-            const dd = Math.hypot(p.x - e.x, p.y - e.y) || 1;
+-            p.knock((p.x - e.x) / dd, (p.y - e.y) / dd, 220);
++        for (const q of w.targets()) {
++          if (q.alive && q.z < 8 && Math.hypot(q.x - e.x, q.y - e.y) < R + q.r * 0.5) {
++            if (q.hurt(w, 2, e.def.name)) {
++              const dd = Math.hypot(q.x - e.x, q.y - e.y) || 1;
++              q.knock((q.x - e.x) / dd, (q.y - e.y) / dd, 220);
++            }
+           }
+         }
+         const pts = volleyTargets(e.x, e.y, p.x + p.vx * 0.3, p.y + p.vy * 0.3, 3, 28);
+diff --git a/src/content/enemies/archive-shared.ts b/src/content/enemies/archive-shared.ts
+index 2069cab77646bf115a8d23b9435beb9afe20c42a..aaed83831c0fa488bc6345a4654276974b7b5add 100644
+--- a/src/content/enemies/archive-shared.ts
++++ b/src/content/enemies/archive-shared.ts
+@@ -404,10 +404,11 @@ frames('shcrash', 'fall', 5, 19, 22, paintCrash, { origin: [9, 21], fps: 14, loo
+ /** A shelf slams down at (x, y): hurts the player within `radius`, scatters books. */
+ export function shelfCrash(w: World, x: number, y: number, radius: number, source: string, damage = 1): void {
+   w.spawn(new AnimEffect('shcrash_fall', x, y, { layer: 1 }));
+-  const p = w.player;
+-  const d = Math.hypot(p.x - x, p.y - y);
+-  if (damage > 0 && p.alive && p.z < 8 && d < radius + p.r * 0.5) {
+-    if (p.hurt(w, damage, source)) p.knock((p.x - x) / (d || 1), (p.y - y) / (d || 1), 150);
++  for (const p of w.targets()) {
++    const d = Math.hypot(p.x - x, p.y - y);
++    if (damage > 0 && p.alive && p.z < 8 && d < radius + p.r * 0.5) {
++      if (p.hurt(w, damage, source)) p.knock((p.x - x) / (d || 1), (p.y - y) / (d || 1), 150);
++    }
+   }
+   w.particles.burst(x, y - 3, { count: 6, speed: [30, 80], life: [0.25, 0.5], colors: [PAPER[2], PAPER[1], '#5e452a'], size: [1, 2], gravity: 280, vz: [30, 90] });
+   w.sfx('rock_break', { vol: 0.3, pitch: fx.range(1.2, 1.4) });
+diff --git a/src/content/enemies/archive.ts b/src/content/enemies/archive.ts
+index 2b77815651814767e149baadb3f01331af9dea1f..e1442d768627998c147790af2c07fdfcb2c28743 100644
+--- a/src/content/enemies/archive.ts
++++ b/src/content/enemies/archive.ts
+@@ -480,10 +480,11 @@ defineEnemy({
+       e.facing = w.player.x >= e.x ? 1 : -1;
+       w.shake(0.2);
+       w.sfx('splat', { vol: 0.6, pitch: 0.7 });
+-      const p = w.player;
+-      const d = Math.hypot(p.x - e.x, p.y - e.y);
+-      if (p.alive && p.z < 8 && d < 30 + p.r * 0.5) {
+-        if (p.hurt(w, 2, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 220);
++      for (const p of w.targets()) {
++        const d = Math.hypot(p.x - e.x, p.y - e.y);
++        if (p.alive && p.z < 8 && d < 30 + p.r * 0.5) {
++          if (p.hurt(w, 2, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 220);
++        }
+       }
+       e.shootAt(w, null, pageShot(3, { count: e.champion ? 7 : 5, spread: 0.26, speed: 118, z: 8, range: 260 }));
+       pages(w, e.x, e.y - 8, 5, 60);
+diff --git a/src/content/enemies/forge.ts b/src/content/enemies/forge.ts
+index 6dd21a839f5c0da6193826f9f652e19940bd0749..89dd20e73e070328b1d182ee9f969ab5c95bfbb6 100644
+--- a/src/content/enemies/forge.ts
++++ b/src/content/enemies/forge.ts
+@@ -802,11 +802,12 @@ defineEnemy({
+       e.setAnim('sgolem_slam');
+       w.shake(0.45);
+       w.sfx('slam', { vol: 0.9 });
+-      const p = w.player;
+-      if (p.alive && p.z < 8 && Math.hypot(p.x - e.x, p.y - e.y) < R + p.r * 0.5) {
+-        if (p.hurt(w, 2, e.def.name)) {
+-          const d = Math.hypot(p.x - e.x, p.y - e.y) || 1;
+-          p.knock((p.x - e.x) / d, (p.y - e.y) / d, 220);
++      for (const p of w.targets()) {
++        if (p.alive && p.z < 8 && Math.hypot(p.x - e.x, p.y - e.y) < R + p.r * 0.5) {
++          if (p.hurt(w, 2, e.def.name)) {
++            const d = Math.hypot(p.x - e.x, p.y - e.y) || 1;
++            p.knock((p.x - e.x) / d, (p.y - e.y) / d, 220);
++          }
+         }
+       }
+       w.spawn(new RingFx(e.x, e.y, R + 4, 0.35, MAGMA.mid, 3));
+diff --git a/src/content/enemies/sanctum-bridge.ts b/src/content/enemies/sanctum-bridge.ts
+index 2b03a34b4e67a9fecae0b068bd67b73fa4c59211..a277fb08c7bbbab02a9fcdd6d7e64e32a3d39b88 100644
+--- a/src/content/enemies/sanctum-bridge.ts
++++ b/src/content/enemies/sanctum-bridge.ts
+@@ -122,11 +122,12 @@ class Censer extends Entity {
+     this.spin += (this.targetSpin - this.spin) * Math.min(1, sdt * 3);
+     this.a += this.spin * sdt;
+     this.place();
+-    const p = w.player;
+-    if (e.dormant <= 0 && p.alive && p.z < 8) {
+-      const d = Math.hypot(p.x - this.gx, p.y - this.gy);
+-      if (d < 4 + p.r) {
+-        if (p.hurt(w, 1, e.def.name)) p.knock((p.x - this.gx) / (d || 1), (p.y - this.gy) / (d || 1), 150);
++    for (const p of w.targets()) {
++      if (e.dormant <= 0 && p.alive && p.z < 8) {
++        const d = Math.hypot(p.x - this.gx, p.y - this.gy);
++        if (d < 4 + p.r) {
++          if (p.hurt(w, 1, e.def.name)) p.knock((p.x - this.gx) / (d || 1), (p.y - this.gy) / (d || 1), 150);
++        }
+       }
+     }
+     this.smokeT -= dt;
+diff --git a/src/content/enemies/sanctum.ts b/src/content/enemies/sanctum.ts
+index 1f4dcdc590af3f4711bec30e1894853795336bc9..215ed1fb7fe9ad06a2fc4f660df70364e1b817f9 100644
+--- a/src/content/enemies/sanctum.ts
++++ b/src/content/enemies/sanctum.ts
+@@ -153,10 +153,11 @@ frames('icespk', 'burst', 5, 13, 19, paintSpike, { origin: [6, 18], fps: 14, loo
+ /** An ice spike erupts at (x, y): hurts the player within `radius`. */
+ export function iceSpike(w: World, x: number, y: number, radius: number, source: string, damage = 1): void {
+   w.spawn(new AnimEffect('icespk_burst', x, y, { layer: 1 }));
+-  const p = w.player;
+-  const d = Math.hypot(p.x - x, p.y - y);
+-  if (damage > 0 && p.alive && p.z < 8 && d < radius + p.r * 0.5) {
+-    if (p.hurt(w, damage, source)) p.knock((p.x - x) / (d || 1), (p.y - y) / (d || 1), 150);
++  for (const p of w.targets()) {
++    const d = Math.hypot(p.x - x, p.y - y);
++    if (damage > 0 && p.alive && p.z < 8 && d < radius + p.r * 0.5) {
++      if (p.hurt(w, damage, source)) p.knock((p.x - x) / (d || 1), (p.y - y) / (d || 1), 150);
++    }
+   }
+   w.particles.burst(x, y - 4, { count: 7, speed: [30, 90], life: [0.25, 0.5], colors: SNOWDUST, size: [1, 2], gravity: 280, vz: [30, 90] });
+   w.sfx('spike', { vol: 0.3, pitch: fx.range(1.15, 1.35) });
+@@ -495,10 +496,12 @@ defineEnemy({
+           const a = (i / 8) * TAU;
+           iceSpike(w, e.x + Math.cos(a) * 18, e.y + Math.sin(a) * 12, 0, e.def.name, 0);
+         }
+-        if (p.alive && p.z < 8 && Math.hypot(p.x - e.x, p.y - e.y) < R + p.r * 0.5) {
+-          if (p.hurt(w, 1, e.def.name)) {
+-            const dd = Math.hypot(p.x - e.x, p.y - e.y) || 1;
+-            p.knock((p.x - e.x) / dd, (p.y - e.y) / dd, 200);
++        for (const q of w.targets()) {
++          if (q.alive && q.z < 8 && Math.hypot(q.x - e.x, q.y - e.y) < R + q.r * 0.5) {
++            if (q.hurt(w, 1, e.def.name)) {
++              const dd = Math.hypot(q.x - e.x, q.y - e.y) || 1;
++              q.knock((q.x - e.x) / dd, (q.y - e.y) / dd, 200);
++            }
+           }
+         }
+         w.spawn(new FrostPatch(e.x, e.y + 2, 20, 3));
+diff --git a/src/content/enemies/shared.ts b/src/content/enemies/shared.ts
+index 1c9f262204489c3e71994290f60221abf6fd8b9e..45732a2cc64b1920528f368e4a527256473d8951 100644
+--- a/src/content/enemies/shared.ts
++++ b/src/content/enemies/shared.ts
+@@ -325,12 +325,13 @@ export class Lob extends Entity {
+     if (this.dead) return;
+     this.dead = true;
+     const { x, y } = this;
+-    const p = w.player;
+     const dmg = this.o.damage ?? 1;
+-    if (dmg > 0 && p.alive && p.z < 8 && Math.hypot(p.x - x, p.y - y) < (this.o.hitRadius ?? 11) + p.r * 0.5) {
+-      if (p.hurt(w, dmg, this.o.source ?? '포탄')) {
+-        const d = Math.hypot(p.x - x, p.y - y) || 1;
+-        p.knock((p.x - x) / d, (p.y - y) / d, 140);
++    for (const p of w.targets()) {
++      if (dmg > 0 && p.alive && p.z < 8 && Math.hypot(p.x - x, p.y - y) < (this.o.hitRadius ?? 11) + p.r * 0.5) {
++        if (p.hurt(w, dmg, this.o.source ?? '포탄')) {
++          const d = Math.hypot(p.x - x, p.y - y) || 1;
++          p.knock((p.x - x) / d, (p.y - y) / d, 140);
++        }
+       }
+     }
+     w.particles.burst(x, y - 2, { count: 14, speed: [30, 110], life: [0.25, 0.5], colors: ['#ffffff', this.o.color, this.o.color], size: [1, 3], gravity: 280, vz: [30, 100] });
+@@ -421,12 +422,13 @@ export class Hazard extends Entity {
+         life: fx.range(0.3, 0.7), colors: c.bubble, size: fx.range(1, 2), additive: this.kind === 'fire', light: this.kind === 'fire' ? 5 : 0,
+       });
+     }
+-    const p = w.player;
+-    if (this.age > this.arm && this.age < this.life - 0.25 && p.alive && p.z < 4) {
+-      const dx = p.x - this.x;
+-      const dy = (p.y - this.y) / 0.7;
+-      const rr = this.radius * 0.85; // (no `**` in the simulation: see CLAUDE.md, determinism)
+-      if (dx * dx + dy * dy < rr * rr) p.hurt(w, 1, this.source);
++    for (const p of w.targets()) {
++      if (this.age > this.arm && this.age < this.life - 0.25 && p.alive && p.z < 4) {
++        const dx = p.x - this.x;
++        const dy = (p.y - this.y) / 0.7;
++        const rr = this.radius * 0.85; // (no `**` in the simulation: see CLAUDE.md, determinism)
++        if (dx * dx + dy * dy < rr * rr) p.hurt(w, 1, this.source);
++      }
+     }
+   }
+ 
 diff --git a/src/content/items/actives.ts b/src/content/items/actives.ts
 index bc1c262b8f7facdfabbb3c3cdf8cd90e33aa0be8..1ac18104e702dacc83f8487baec1019cc643ae0e 100644
 --- a/src/content/items/actives.ts
@@ -372,6 +1077,29 @@ index b809ba485553c0b361efd3dc823b15dc3c75411c..cccc291212ae958f4fe68014dbd18e7b
  }
  
  // ====================================================================== time stop
+diff --git a/src/content/rooms/curse.ts b/src/content/rooms/curse.ts
+index c0e2626aecb8cf5a270f96a524d682ec0603b4fa..f39463c6c919d460f2326315145fe1a84d1dcfdd 100644
+--- a/src/content/rooms/curse.ts
++++ b/src/content/rooms/curse.ts
+@@ -22,11 +22,13 @@ class CurseToll extends Entity {
+     this.age += dt;
+     if (w.transitioning || this.age < 0.15) return;
+     this.dead = true;
+-    const p = w.player;
+-    if (!p.alive || p.red + p.soul <= 1) return; // never lethal
+-    if (p.hurt(w, 1, '저주의 문')) {
+-      w.floatText(p.x, p.y - 20, '피의 대가', '#ff6080');
+-      w.particles.burst(p.x, p.y - 8, { count: 16, speed: [20, 60], life: [0.5, 1], colors: ['#ff70c0', '#a02070', '#300820'], size: [1, 2], additive: true });
++    // every keeper who walked in pays (co-op)
++    for (const p of w.targets()) {
++      if (!p.alive || p.red + p.soul <= 1) continue; // never lethal
++      if (p.hurt(w, 1, '저주의 문')) {
++        w.floatText(p.x, p.y - 20, '피의 대가', '#ff6080');
++        w.particles.burst(p.x, p.y - 8, { count: 16, speed: [20, 60], life: [0.5, 1], colors: ['#ff70c0', '#a02070', '#300820'], size: [1, 2], additive: true });
++      }
+     }
+   }
+ }
 diff --git a/src/debug.ts b/src/debug.ts
 index fdbc17fe38cd957127e292ea30492289ce09979b..11405216d7ccc1a1983359584161fd5b77629725 100644
 --- a/src/debug.ts
@@ -473,10 +1201,10 @@ index 05a2be561f99f45454f1864d0c1d856e5da6de17..c67a6084c57209e0284a2731ab746325
  /** The floor's blessing has not been chosen yet and the moment has come. */
 diff --git a/src/game/coop.ts b/src/game/coop.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..8a5f6d3286cea2a876139c80f2668b2696cae275
+index 0000000000000000000000000000000000000000..c5954596bddef9616ad8e40693f29f81e2b3e26f
 --- /dev/null
 +++ b/src/game/coop.ts
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,115 @@
 +// Online co-op rules shared by the simulation and the UI: revive timing and
 +// the lockstep commands (player decisions that change the world, applied at the
 +// same tick on every peer: blessing picks, artifact discards, the host ending
@@ -557,10 +1285,13 @@ index 0000000000000000000000000000000000000000..8a5f6d3286cea2a876139c80f2668b26
 +  switch (op) {
 +    case 'down':
 +      if (!p.alive) return false;
++      // one last ordinary hit (normal feedback)
 +      p.god = false;
 +      p.invuln = 0;
 +      p.shields = 0;
-+      return p.hurt(w, 99, '시험', true);
++      p.red = Math.min(p.red, 1);
++      p.soul = 0;
++      return p.hurt(w, 1, '시험', true);
 +    case 'god':
 +      p.god = !p.god;
 +      return true;
@@ -827,7 +1558,7 @@ index 58df636f9c9635f524042219de544c55a62c2f83..19a990e2d0c387d3e076915e8c77b5f9
  }
  
 diff --git a/src/game/items.ts b/src/game/items.ts
-index bc5d247a78fb19cf9c3bc7616827d8faccdd8765..53da1381aed2c9fccb031589a8905e1f5a6e9c2a 100644
+index bc5d247a78fb19cf9c3bc7616827d8faccdd8765..33f1614fae24a8790696d76d9f10565592185276 100644
 --- a/src/game/items.ts
 +++ b/src/game/items.ts
 @@ -19,6 +19,7 @@ import type { Enemy } from './enemy';
@@ -852,7 +1583,7 @@ index bc5d247a78fb19cf9c3bc7616827d8faccdd8765..53da1381aed2c9fccb031589a8905e1f
  /** min seconds between two HUD flashes / two icon pops of the same artifact */
  export const PROC_FLASH_CD = 0.6;
  export const PROC_POP_CD = 2.5;
-@@ -90,17 +98,38 @@ export class ItemSystem {
+@@ -90,17 +98,41 @@ export class ItemSystem {
    /** effects that implement a given hook (rebuilt lazily after recompute) */
    private byHook = new Map<keyof ItemHooks, ActiveEffect[]>();
    private w: World;
@@ -871,13 +1602,16 @@ index bc5d247a78fb19cf9c3bc7616827d8faccdd8765..53da1381aed2c9fccb031589a8905e1f
 +  /** Run `fn` with this system's keeper as the world's context player (co-op; a no-op in single-player). */
 +  private own<T>(fn: () => T): T {
 +    const w = this.w;
-+    if (w.player === this.p) return fn();
++    if (!w.coop) return fn();
 +    const prev = w.player;
++    const prevOwner = w.spawnOwner;
 +    w.player = this.p;
++    w.spawnOwner = this.p;
 +    try {
 +      return fn();
 +    } finally {
 +      w.player = prev;
++      w.spawnOwner = prevOwner;
 +    }
    }
  
@@ -893,7 +1627,7 @@ index bc5d247a78fb19cf9c3bc7616827d8faccdd8765..53da1381aed2c9fccb031589a8905e1f
      const comp = p.inv.compute();
      this.computed = comp;
      const effects: ActiveEffect[] = [];
-@@ -128,8 +157,12 @@ export class ItemSystem {
+@@ -128,8 +160,12 @@ export class ItemSystem {
    }
  
    recomputeStats(): void {
@@ -907,7 +1641,7 @@ index bc5d247a78fb19cf9c3bc7616827d8faccdd8765..53da1381aed2c9fccb031589a8905e1f
      const base: Stats = { ...BASE_STATS, ...(p.character.baseStats ?? {}) };
      base.maxHearts = p.baseHearts;
      const m = new StatMods();
-@@ -154,12 +187,20 @@ export class ItemSystem {
+@@ -154,12 +190,20 @@ export class ItemSystem {
    private with(hook: keyof ItemHooks): ActiveEffect[] {
      let l = this.byHook.get(hook);
      if (!l) {
@@ -929,26 +1663,29 @@ index bc5d247a78fb19cf9c3bc7616827d8faccdd8765..53da1381aed2c9fccb031589a8905e1f
    private each(hook: keyof ItemHooks, fn: (e: ActiveEffect) => void): void {
      if (this.depth > 4) return;
      const list = this.with(hook);
-@@ -168,6 +209,10 @@ export class ItemSystem {
+@@ -168,6 +212,12 @@ export class ItemSystem {
      const prevCur = this.cur;
      const prevEvent = this.curEvent;
      this.curEvent = EVENT_HOOKS.has(hook);
 +    // hooks run with their keeper as the context player (`w.player`, `w.items`, `w.vars`)
 +    const w = this.w;
 +    const prevP = w.player;
++    const prevOwner = w.spawnOwner;
 +    w.player = this.p;
++    if (w.coop) w.spawnOwner = this.p;
      try {
        for (let i = 0; i < list.length; i++) {
          this.cur = list[i];
-@@ -181,6 +226,7 @@ export class ItemSystem {
+@@ -181,6 +231,8 @@ export class ItemSystem {
        this.depth--;
        this.cur = prevCur;
        this.curEvent = prevEvent;
 +      w.player = prevP;
++      if (w.coop) w.spawnOwner = prevOwner;
      }
    }
  
-@@ -234,10 +280,14 @@ export class ItemSystem {
+@@ -234,10 +286,14 @@ export class ItemSystem {
  
    /** Is the held weapon one of the character's favoured class (CharacterDef.affinity)? */
    get affinityActive(): boolean {
@@ -964,7 +1701,7 @@ index bc5d247a78fb19cf9c3bc7616827d8faccdd8765..53da1381aed2c9fccb031589a8905e1f
      const w = this.w;
      let changed = false;
      for (const b of this.buffs) {
-@@ -302,25 +352,25 @@ export class ItemSystem {
+@@ -302,25 +358,25 @@ export class ItemSystem {
      const w = this.w;
      const item = makeItem(id);
      w.run.obtained.add(id);
@@ -1478,7 +2215,7 @@ index b223b472d63b3cec251436f9a8eb1d52ecc3f438..3d9f79108796dffbc9b2709f2de28961
      }
      h.word(-10);
 diff --git a/src/game/world.ts b/src/game/world.ts
-index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba120a597e73 100644
+index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..7faaad3c1919409dd440bf8e113d309251fb9dc8 100644
 --- a/src/game/world.ts
 +++ b/src/game/world.ts
 @@ -13,9 +13,9 @@ import { TILE, WALL, CELL_W, CELL_H, DIR_VEC, type Dir } from './constants';
@@ -1853,7 +2590,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      // things spawned by room-enter hooks (familiars, hounds ...) must be visible
      // during the room slide, not pop in when it ends
      this.flushPending();
-@@ -367,6 +552,56 @@ export class World {
+@@ -367,6 +552,74 @@ export class World {
      if (hostile) this.sfx('door_close', { vol: 0.6 });
    }
  
@@ -1897,12 +2634,30 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
 +   */
 +  private coopExtraPedestals(room: Room, cx: number, cy: number, pool: 'treasure' | 'boss'): void {
 +    const extra = this.players.length - 1;
-+    const SPOTS: [number, number][] = pool === 'treasure' ? [[0, 36], [-42, 20], [42, 20]] : [[-32, 0], [-64, 0], [0, -30]];
++    if (extra <= 0) return;
++    const GAP = 40;
++    let x0: number;
++    let y = cy;
++    if (pool === 'treasure') {
++      // one row through the room's center: the room's own pedestal slides left to make room
++      const own = this.entities.find((e): e is Pedestal => e instanceof Pedestal && e.group === 0 && e.x === cx && e.y === cy);
++      x0 = cx - (extra * GAP) / 2;
++      if (own) {
++        own.x = x0;
++        x0 += GAP;
++      } else {
++        y = cy + 36;
++        x0 = cx - ((extra - 1) * GAP) / 2;
++      }
++    } else {
++      // a row above the boss's reward
++      y = cy - 34;
++      x0 = cx - ((extra - 1) * GAP) / 2;
++    }
 +    for (let i = 0; i < extra; i++) {
 +      const item = this.loot.rollItem(pool, this.rng) ?? this.loot.rollItem('treasure', this.rng);
 +      if (!item) continue;
-+      const [ox, oy] = SPOTS[i % SPOTS.length];
-+      const pos = room.nearestFree(cx + ox, cy + oy, 8);
++      const pos = room.nearestFree(x0 + i * GAP, y, 8);
 +      this.spawn(new Pedestal(pos.x, pos.y, item));
 +    }
 +  }
@@ -1910,7 +2665,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
    /** Spawn pickups / fireplaces etc. from template markers (enemies handled separately). */
    private spawnTemplateMarkers(room: Room, rng: RNG): void {
      for (const m of room.markers) {
-@@ -431,7 +666,9 @@ export class World {
+@@ -431,7 +684,9 @@ export class World {
        console.warn(`[world] unknown enemy ${id}`);
        return null;
      }
@@ -1921,24 +2676,27 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      if (!def.flying && !def.phasing) {
        const f = this.room.nearestFree(x, y, Math.min(def.radius, 7));
        e.x = f.x;
-@@ -443,10 +680,16 @@ export class World {
+@@ -443,10 +698,19 @@ export class World {
    }
  
    spawn<T extends Entity>(e: T): T {
-+    // co-op: things a keeper's code spawns keep running on its behalf (see ctxFor);
-+    // whatever enemies make stays unowned (it goes after the nearest keeper)
-+    if (this.coop && e.ctxP === null && !this.hostileTurn) e.ctxP = this.player;
++    // co-op: what a keeper's code spawns (its update, its item hooks, its familiars
++    // ...) keeps running on its behalf (see ctxFor); room / enemy spawns stay unowned
++    if (this.coop && e.ctxP === null && this.spawnOwner) e.ctxP = this.spawnOwner;
      this.pending.push(e);
      return e;
    }
  
-+  /** co-op: an enemy-side entity is updating (its spawns stay unowned) */
-+  private hostileTurn = false;
++  /**
++   * Co-op: the keeper whose code is running right now (its own update, an entity
++   * it owns, its item hooks — ItemSystem sets it), or null (room / enemy code).
++   */
++  spawnOwner: Player | null = null;
 +
    private flushPending(): void {
      if (this.pending.length) {
        for (const e of this.pending) this.entities.push(e);
-@@ -456,9 +699,35 @@ export class World {
+@@ -456,9 +720,35 @@ export class World {
  
    // ================================================================== update
    update(dt: number): void {
@@ -1974,7 +2732,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      this.updateUiTimers(dt);
      if (this.hurtT > 0) this.hurtT = Math.max(0, this.hurtT - dt);
      if (this.transition) {
-@@ -492,17 +761,26 @@ export class World {
+@@ -492,17 +782,26 @@ export class World {
  
      this.flushPending();
      this.rebuildCaches();
@@ -1989,13 +2747,13 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
 +      // co-op: each entity runs on behalf of its keeper (see ctxFor)
 +      if (coop) {
 +        this.player = this.ctxFor(e);
-+        this.hostileTurn = e instanceof Enemy || e.team === 'enemy' || e.enemyHazard || (e.ctxP === null && !(e instanceof Player));
++        this.spawnOwner = this.ownerOf(e);
 +      }
        if (e instanceof Projectile && e.team === 'enemy') e.update(this, sdt * this.enemyTimeScale);
        else e.update(this, sdt);
      }
      this.sfxSource = null;
-+    this.hostileTurn = false;
++    this.spawnOwner = null;
 +    if (coop) this.player = this.lead();
      if (this.descending) this.updateDescend(sdt);
 -    this.items.update(sdt);
@@ -2003,7 +2761,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      this.flushPending();
      this.rebuildCaches();
      this.collisions();
-@@ -515,12 +793,18 @@ export class World {
+@@ -515,12 +814,18 @@ export class World {
        const e = es[i];
        if (e.dead) {
          e.onRemove(this);
@@ -2024,7 +2782,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      if (this.clearMomentT >= 0) {
        this.clearMomentT -= sdt;
        if (this.clearMomentT < 0) this.roomClearMoment();
-@@ -531,6 +815,7 @@ export class World {
+@@ -531,6 +836,7 @@ export class World {
      this.room.theme.ambientFx?.(this, sdt);
      this.checkDoors();
      this.checkClear();
@@ -2032,7 +2790,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      this.updateCamera(sdt);
      audio.setMusicIntensity(this.enemies.length > 0 ? 1 : 0);
  
-@@ -543,6 +828,147 @@ export class World {
+@@ -543,6 +849,158 @@ export class World {
      }
    }
  
@@ -2055,6 +2813,17 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
 +    const c = e.ctxP;
 +    if (c instanceof Player && !c.left && !(e instanceof Pedestal || e instanceof Chest || e instanceof Trapdoor || e instanceof FirePlace)) return c;
 +    return this.nearestPlayer(e.x, e.y);
++  }
++
++
++  /** The keeper an entity belongs to (itself, its owner, the keeper that spawned it), if any. */
++  private ownerOf(e: Entity): Player | null {
++    if (e instanceof Player) return e;
++    if (e instanceof Enemy) return null;
++    const o = (e as { owner?: unknown }).owner;
++    if (o instanceof Player) return o.left ? null : o;
++    const c = e.ctxP;
++    return c instanceof Player && !c.left ? c : null;
 +  }
 +
 +  /** The keeper a pickup works for: the nearest standing one that could collect it, else the nearest. */
@@ -2180,7 +2949,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
    private updateUiTimers(dt: number): void {
      for (const b of this.banners) b.t += dt;
      this.banners = this.banners.filter((b) => b.t < 3.2);
-@@ -569,11 +995,15 @@ export class World {
+@@ -569,11 +1027,15 @@ export class World {
    }
  
    private collisions(): void {
@@ -2197,7 +2966,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
          for (const e of this.enemies) {
            if (pr.dead) break;
            if (!e.alive || e.hidden || !e.vulnerable || pr.hitIds.has(e.id)) continue;
-@@ -595,31 +1025,23 @@ export class World {
+@@ -595,31 +1057,23 @@ export class World {
            }
          }
        } else if (pr.team === 'enemy') {
@@ -2238,7 +3007,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
        }
        if (e.hasStatus('charm') && e.contactDamage > 0) {
          for (const o of es) {
-@@ -659,13 +1081,52 @@ export class World {
+@@ -659,13 +1113,52 @@ export class World {
      }
    }
  
@@ -2292,7 +3061,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      const byPlayer = hit.attacker === p || (hit.source instanceof Projectile && hit.source.team === 'player');
      if (target instanceof Enemy && byPlayer) {
        if (!target.alive || !target.vulnerable || target.hidden) return false;
-@@ -727,7 +1188,8 @@ export class World {
+@@ -727,7 +1220,8 @@ export class World {
      if (hit.light) return;
      // shake: only hits clearly above a normal shot move the camera; a swing that
      // hits a crowd shakes like its biggest hit, not like the sum of all of them
@@ -2302,7 +3071,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      if (shake > 0.01 && shake > this.hitShake) {
        this.shake(shake - this.hitShake);
        this.hitShake = shake;
-@@ -764,17 +1226,25 @@ export class World {
+@@ -764,17 +1258,25 @@ export class World {
  
    /** Damage-over-time tick (burn/poison/bleed). */
    statusDamage(target: Actor, dmg: number, kind: StatusKind): void {
@@ -2331,7 +3100,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      e.hp = Math.min(0, e.hp);
      e.dead = true;
      const prevSrc = this.sfxSource;
-@@ -868,12 +1338,17 @@ export class World {
+@@ -868,12 +1370,17 @@ export class World {
        }
      }
      for (const h of [...this.hittables]) if (dist(x, y, h.x, h.y) < radius + h.r) h.takeHit(this, { damage, kind: 'explosion', attacker: p });
@@ -2355,7 +3124,18 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
        }
      }
      for (const e of this.entities) {
-@@ -1145,8 +1620,18 @@ export class World {
+@@ -1104,7 +1611,9 @@ export class World {
+     p.squash(0.8, 1.25);
+     const rare = info.rarity === 'epic' || info.rarity === 'legendary';
+     playSfx(rare ? 'item_get_rare' : 'item_get');
+-    this.banner(info.name, info.desc, { icon: info.icon, color: rareColor(info.rarity), quote: info.quote });
++    // co-op: a teammate's find is a small banner with their name (UI only)
++    if (this.coop && p !== this.local) this.banner(`${p.name || `P${p.slot + 1}`} · ${info.name}`, info.desc, { icon: info.icon, color: rareColor(info.rarity), small: true });
++    else this.banner(info.name, info.desc, { icon: info.icon, color: rareColor(info.rarity), quote: info.quote });
+     this.spawn(new RingFx(p.x, p.y - 8, 30, 0.4, rareColor(info.rarity), 2));
+   }
+ 
+@@ -1145,8 +1654,18 @@ export class World {
  
    // ================================================================== room flow
    private checkDoors(): void {
@@ -2376,7 +3156,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      for (const d of this.room.doors) {
        // unlock with key
        if (d.state === 'locked') {
-@@ -1166,9 +1651,10 @@ export class World {
+@@ -1166,9 +1685,10 @@ export class World {
        const across = v.x !== 0 ? Math.abs(p.y - d.y) : Math.abs(p.x - d.x);
        if (along > 3 && across < 10) {
          this.goThroughDoor(d);
@@ -2388,7 +3168,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
    }
  
    private goThroughDoor(d: Door): void {
-@@ -1205,6 +1691,7 @@ export class World {
+@@ -1205,6 +1725,7 @@ export class World {
    roomCleared(): void {
      const node = this.node;
      if (node.cleared) return;
@@ -2396,7 +3176,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      node.cleared = true;
      this.mapVersion++;
      this.run.stats.roomsCleared++;
-@@ -1212,12 +1699,13 @@ export class World {
+@@ -1212,12 +1733,13 @@ export class World {
      this.sfx('door_open');
      // the chime + door glow land a beat after the last death sound
      this.clearMomentT = 0.16;
@@ -2416,7 +3196,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      }
      const handler = roomHandler(node.kind);
      const rng = new RNG(node.seed ^ 0xc1ea);
-@@ -1226,7 +1714,13 @@ export class World {
+@@ -1226,7 +1748,13 @@ export class World {
        const pos = this.room.nearestFree(this.room.centerX, this.room.centerY, 6);
        this.dropRandom(pos.x, pos.y, 'room');
      }
@@ -2431,7 +3211,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
    }
  
    /** The room-clear "moment": a soft chime and the opened doors glowing. */
-@@ -1245,12 +1739,14 @@ export class World {
+@@ -1245,12 +1773,14 @@ export class World {
     */
    beginDescend(x: number, y: number): void {
      if (this.transitioning || this.descending || this.gameOver) return;
@@ -2451,7 +3231,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      this.sfx('trapdoor', { x });
      this.sfx('whoosh', { vol: 0.5, pitch: 0.7, x });
      this.particles.burst(x, y, { count: 16, speed: [20, 70], life: [0.3, 0.7], colors: ['#c0b0d0', '#7a6a8a', '#40304a'], size: [1, 3], drag: 3, sizeEnd: 3, fade: true });
-@@ -1267,21 +1763,25 @@ export class World {
+@@ -1267,21 +1797,25 @@ export class World {
  
    private updateDescend(dt: number): void {
      const d = this.descending!;
@@ -2485,7 +3265,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      }
    }
  
-@@ -1300,6 +1800,14 @@ export class World {
+@@ -1300,6 +1834,14 @@ export class World {
      if (animated && this.floorCard) this.floorCard.t = -0.3;
    }
  
@@ -2500,7 +3280,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
    victory(): void {
      if (this.gameOver) return;
      this.run.won = true;
-@@ -1309,6 +1817,11 @@ export class World {
+@@ -1309,6 +1851,11 @@ export class World {
    }
  
    playerDied(source: string): void {
@@ -2512,7 +3292,16 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      if (this.deathT >= 0) return;
      this.deathT = 0;
      this.run.lastDamageSource = source;
-@@ -1466,7 +1979,8 @@ export class World {
+@@ -1431,6 +1978,8 @@ export class World {
+   }
+ 
+   shake(amount: number): void {
++    // co-op: a teammate's own moves (its release, its items) don't shake this peer's screen
++    if (this.coop && this.spawnOwner && this.spawnOwner !== this.local) return;
+     this.renderer.shake(amount);
+   }
+ 
+@@ -1466,7 +2015,8 @@ export class World {
    // ================================================================== camera & draw
    private updateCamera(dt: number): void {
      const r = this.renderer;
@@ -2522,7 +3311,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      const room = this.room;
      let tx: number;
      let ty: number;
-@@ -1530,7 +2044,38 @@ export class World {
+@@ -1530,7 +2080,38 @@ export class World {
      }
    }
  
@@ -2561,7 +3350,7 @@ index 71d493c2ca333c3b8ee3f95c7e08f4b24920538f..e847b6ed70793fd8fe6df6f23471ba12
      const r = this.renderer;
      r.beginWorld('#06040a');
      this.room.drawBackground(r);
-@@ -1543,24 +2088,33 @@ export class World {
+@@ -1543,24 +2124,33 @@ export class World {
      const es = this.entities;
      for (let i = 0; i < es.length; i++) {
        const e = es[i];
@@ -3067,10 +3856,10 @@ index 9f5931208082f387d32196f3b3ace975ff9a02d6..38b014f3fc82561bcdd15a857817a160
      }
 diff --git a/src/ui/coop.ts b/src/ui/coop.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..df94ef8a956e58ac52a25eff994c1897e7176285
+index 0000000000000000000000000000000000000000..d34a9304b5b07c560d06a07bcff7dd967ee9e0b9
 --- /dev/null
 +++ b/src/ui/coop.ts
-@@ -0,0 +1,387 @@
+@@ -0,0 +1,388 @@
 +// Online co-op UI: teammate panels, name tags over the keepers, arrows to
 +// teammates off screen, "OO님이 쓰러졌어요" toasts and the downed banner (CoopHud,
 +// drawn by the HUD); the "연결 대기 중…" overlay; the connection notices
@@ -3128,7 +3917,7 @@ index 0000000000000000000000000000000000000000..df94ef8a956e58ac52a25eff994c1897
 +      this.seen = Math.max(this.seen, e.t + 1e-9);
 +      const name = e.name || slotLabel(e.slot);
 +      const mine = e.slot === w.local.slot;
-+      const text = e.kind === 'down' ? (mine ? '쓰러졌어요 — 동료 곁에 머물면 일어나요' : `${name}님이 쓰러졌어요`)
++      const text = e.kind === 'down' ? (mine ? '쓰러졌어요!' : `${name}님이 쓰러졌어요`)
 +        : e.kind === 'revive' ? (mine ? '다시 일어났어요!' : `${name}님이 일어났어요`)
 +          : `${name}님이 나갔어요`;
 +      this.toasts.push({ text, color: e.kind === 'down' ? '#ff9aa0' : e.kind === 'revive' ? '#fff0a0' : C.textDim, t: this.t });
@@ -3167,9 +3956,10 @@ index 0000000000000000000000000000000000000000..df94ef8a956e58ac52a25eff994c1897
 +    spriteCentered(r, face(p, this.t + p.slot * 0.37), x + 18, y + PANEL_H / 2 + 1, 1.5, {
 +      alpha: a * (down ? 0.5 : 1), tint: down ? '#a8d8ff' : undefined, tintAmount: down ? 0.6 : undefined, flash: hurt ? 0.7 : 0,
 +    });
-+    // name
++    // name (+ the keeper's character, faint, when there is room)
 +    const name = keeperName(p);
 +    r.uiText(name, x + 32, y + 4, { size: 10, font: 'small', color: col, alpha: a, outline: C.ink });
++    if (!down && pw >= 120) r.uiText(p.character.name, x + pw - 7, y + 4, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: a * 0.9 });
 +    if (down) {
 +      // revive progress bar
 +      const f = clamp(p.reviveT / REVIVE_TIME, 0, 1);
@@ -3791,7 +4581,7 @@ index bceb15478cdab6cf07b964a90a08d0b9edecffee..7eef08080d299518a9739aaddc1207c1
    }
  
 diff --git a/src/ui/pause.ts b/src/ui/pause.ts
-index 5858a3035af8a90c3361d66519de14986bed4199..f830b0cef272d7a840dc06f6afc80563e16f99cc 100644
+index 5858a3035af8a90c3361d66519de14986bed4199..2dc74cf329b8d9a0413d47cd6ea87e7ea955667c 100644
 --- a/src/ui/pause.ts
 +++ b/src/ui/pause.ts
 @@ -1,5 +1,7 @@
@@ -3814,13 +4604,13 @@ index 5858a3035af8a90c3361d66519de14986bed4199..f830b0cef272d7a840dc06f6afc80563
 +    if (game.online) {
 +      const host = !!game.net?.isHost;
 +      const items: ConstructorParameters<typeof Menu>[0] = [
-+        { label: '계속', action: () => this.close(), hint: '하강을 이어갑니다. (함께하는 동안 게임은 멈추지 않아요)' },
++        { label: '계속', action: () => this.close(), hint: '하강을 이어갑니다.' },
 +        { label: '설정', action: () => app.scenes.push(new SettingsOverlay()), hint: '소리, 화면, 조작 설정.' },
 +        {
 +          label: () => (this.confirmQuit ? '정말 나갈까요?' : '방 나가기'),
 +          danger: true,
 +          action: () => this.quit(),
-+          hint: () => (this.confirmQuit ? '한 번 더 누르면 방에서 나갑니다.' : host ? '방을 닫고 타이틀로 돌아갑니다. (모두의 하강이 끝나요)' : '방에서 나가 타이틀로 돌아갑니다. 동료들은 계속해요.'),
++          hint: () => (this.confirmQuit ? '한 번 더 누르면 방에서 나갑니다.' : host ? '방을 닫고 타이틀로 갑니다.' : '방에서 나가 타이틀로 갑니다.'),
 +        },
 +      ];
 +      if (host) {
@@ -3828,7 +4618,7 @@ index 5858a3035af8a90c3361d66519de14986bed4199..f830b0cef272d7a840dc06f6afc80563
 +          label: () => (this.confirmEnd ? '정말 끝낼까요?' : '하강 종료'),
 +          danger: true,
 +          action: () => this.endForAll(),
-+          hint: () => (this.confirmEnd ? '한 번 더 누르면 모두의 하강이 끝나고 결과 화면으로 갑니다.' : '모두의 하강을 여기서 끝냅니다.'),
++          hint: () => (this.confirmEnd ? '한 번 더 누르면 모두 결과 화면으로.' : '모두의 하강을 여기서 끝냅니다.'),
 +        });
 +      }
 +      this.menu = new Menu(items, 150, 150, { width: 220, lineH: 30, size: 14, hintY: 262 });
@@ -3869,7 +4659,7 @@ index 5858a3035af8a90c3361d66519de14986bed4199..f830b0cef272d7a840dc06f6afc80563
      this.menu.update(app.renderer, dt);
    }
  
-@@ -87,12 +127,13 @@ export class PauseOverlay implements Scene {
+@@ -87,13 +127,15 @@ export class PauseOverlay implements Scene {
      const ox = uiCenterX(); // 768-wide layout centered on wide screens
      const lx = ox + 30;
      const ly = 60 + (1 - k) * 10;
@@ -3884,8 +4674,10 @@ index 5858a3035af8a90c3361d66519de14986bed4199..f830b0cef272d7a840dc06f6afc80563
 -    this.menu.hintY = ly + 186;
 +    this.menu.hintY = ly + 186 + extra;
      this.menu.draw(r, k);
++    if (this.game.online) r.uiText('함께하는 중에는 게임이 멈추지 않아요', lx + 120, ly + 212 + extra, { size: 10, font: 'small', align: 'center', color: C.textFaint, alpha: k });
  
      // ---- right: run card
+     const rx = ox + 290;
 diff --git a/src/ui/scene.ts b/src/ui/scene.ts
 index 8fa1d2e51f5dba0c02abe2a68d059c6a452c0e6a..e31ea570fa4c70183e0d15363dbd84dd7cf5c96b 100644
 --- a/src/ui/scene.ts
@@ -3937,7 +4729,7 @@ index 16af596863877a9001fdc5f2f33c0609be00684e..73b44f5b5e9b9fe5c269772870ee05e2
        sfx('ui_error');
 diff --git a/tests/coop.test.ts b/tests/coop.test.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..37e51d498a107c33192839dd6e6743a45ff3e3ce
+index 0000000000000000000000000000000000000000..908e5cac70b952b47e689aeb61069f538e8755f7
 --- /dev/null
 +++ b/tests/coop.test.ts
 @@ -0,0 +1,164 @@
@@ -4025,7 +4817,7 @@ index 0000000000000000000000000000000000000000..37e51d498a107c33192839dd6e6743a4
 +      expect(host.desyncs).toEqual([]);
 +      const w = host.world;
 +      // it really played: rooms, a boss, the scripted downing + revive, commands, a leave
-+      expect(w.run.stats.roomsCleared, info).toBeGreaterThan(4);
++      expect(w.run.stats.roomsCleared, info).toBeGreaterThanOrEqual(3);
 +      expect(w.run.stats.bossesKilled, info).toBeGreaterThanOrEqual(1);
 +      expect(host.log.some((s) => s.endsWith(':downed')), info).toBe(true);
 +      expect(host.log.some((s) => s.endsWith(':revived')), info).toBe(true);

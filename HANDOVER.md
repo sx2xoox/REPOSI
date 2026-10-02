@@ -1,6 +1,6 @@
 # 등불지기 (Lanternkeeper) — 인수인계 문서
 
-작성: 2026-10-02 (UTC). 이 문서 하나로 다른 작업 공간에서 이어서 개발할 수 있도록 정리했다.
+작성: 2026-10-02 (UTC), 최종 갱신: 모든 작업 중단 시점. 이 문서 하나로 다른 작업 공간에서 이어서 개발할 수 있도록 정리했다.
 기술 규칙의 원본은 **`CLAUDE.md`** (구조·규칙·난이도 표·결정성 규칙)이고, 이 문서는 "지금 어디까지 왔고 무엇을 이어서 하면 되는지"를 다룬다.
 
 ---
@@ -14,7 +14,8 @@
 | 배포 | GitHub Pages, `gh-pages` 브랜치 → https://sx2xoox.github.io/REPOSI/ |
 | 마지막 배포 | `a3464d3` (아이템 미리보기·버리기·Tab 분리까지). **그 이후 작업은 아직 배포 전** |
 | 기술 | TypeScript(strict) + Vite + Canvas2D, 외부 에셋 없음(픽셀아트·사운드 전부 코드로 생성), Galmuri 폰트 |
-| 규모 | 층 7개 정의(1–7층), 적 정의 65개(보스·소환체 포함), 보스 13종, 무기 42종, 액티브 11종, 축복 22종, 캐릭터 4명(+3명 작업 중), 테스트 파일 33개 |
+| 규모 | 층 7개 정의(1–7층), 적 정의 65개(보스·소환체 포함), 보스 13종, 무기 42종, 액티브 11종, 축복 22종, 캐릭터 7명(신규 3명은 마무리 전), 테스트 파일 35개 |
+| 테스트 현황 (중단 시점) | `tsc` 통과. `vitest` 606 통과 / 2 실패 / 1 파일 로드 오류 — 아래 "중단 시점 상태" 참고 |
 
 ### 배포되지 않은 채 브랜치에 쌓여 있는 것 (다음 배포 때 한꺼번에 나감)
 - 120fps 보간 렌더링 + "최대 프레임" 설정, 프레임 할당 감소
@@ -91,12 +92,18 @@
 - 캐릭터 개성 패스, 무기 압축
 - 6층·7층 콘텐츠 + 보스 4종
 
-### 진행 중 (이 문서 작성 시점)
+### 중단 시점 상태 (사용자 요청으로 모든 에이전트 중단, 전부 커밋·푸시됨)
 | 작업 | 위치 | 상태 |
 |---|---|---|
-| 층 구조·난이도 표·해방 너프·적 체력 | 메인 작업 트리 (커밋됨, 마무리 중) | 거의 완료. 남은 것 5.1 |
-| 새 캐릭터 3명 (보리/백구/모리) | 메인 작업 트리 (부분 커밋) | 진행 중. 5.2 |
-| 멀티플레이 월드 + lockstep 연결 | 별도 worktree → `handover/multiplayer-wip.patch`로 보존 | 초반~중반. 5.3 |
+| 층 구조·난이도 표·해방 너프·적 체력 | 브랜치에 커밋됨 | 구현 완료, **최종 검증(밸런스 봇 측정·테스트 정리) 직전에 중단**. 5.1 |
+| 새 캐릭터 3명 (보리/백구/모리) | 브랜치에 커밋됨 | 정의·키트·무기·사운드 파일 모두 존재, **테스트 2건 실패 상태로 중단**. 5.2 |
+| 멀티플레이 월드 + lockstep 연결 | `handover/multiplayer-wip.patch` (기준 `f23efb9`) | **핵심 구현 완료**(별도 브랜치에서 tsc 통과, 2·3·4인 동기화 테스트 통과), **최신 브랜치와 병합 전**. 5.3 |
+| 8층 | 지시서만 | 착수 직후 중단(산출물 없음). 5.4 |
+
+중단 시점 테스트 실패 3건 (모두 진행 중이던 작업의 미완 부분):
+1. `tests/presence.test.ts` "enemy hp grows gently per floor" — 1층 hpMult=1을 기대하나 새 난이도 표는 1.3. 테스트를 새 곡선 기준으로 갱신하면 됨.
+2. `tests/weapons2.test.ts` 파일 로드 오류 `Cannot read properties of undefined (reading '__bgCounterUntil')` — 백구 키트(`kit-baekgu.ts`)나 새 무기 파일이 모듈 로드 시점에 `w.vars`류를 읽는 것으로 보임. 해당 접근을 훅 안으로 옮기면 됨.
+3. `tests/determinism-chars.test.ts` "mori: floor 1" — **0번째 스텝부터** fx 시드/화면 폭/품질에 따라 해시가 달라짐 → 모리 동료(영혼 양) 생성이나 초기 상태에 `fx`/화면 의존 값이 들어감. 결정성 규칙(CLAUDE.md) 위반이니 동료 엔티티 생성 경로 점검.
 
 ---
 
@@ -104,6 +111,7 @@
 
 ### 5.1 난이도·해방 마무리
 - 구현됨: `DIFFICULTY` 표(1–10층: hpMult, bossHpMult, enemyDamage[regular,heavy], enemySpeed, shotSpeed, budget, championChance, roomCount), `Player.hurt`에서 층별 피해 변환(`enemyHitDamage()`), 층 수 자동 확장, CLAUDE.md 표 갱신, 해방 기준(10–15× 단일 대상).
+- 에이전트는 "밸런스 봇으로 최종 빌드 측정 → 해방 측정 → 테스트·스모크" 단계 직전에 중단됨. 아래를 이어서 하면 된다.
 - 확인할 것:
   - `tests/presence.test.ts` "enemy hp grows gently per floor"가 1층 hpMult=1을 기대하는데 표는 1.3 → 테스트를 새 곡선 기준으로 갱신.
   - `tests/floors.test.ts` 보스 시간 검사(가라앉은 등대 62초 등) 기준 조정 여부.
@@ -116,8 +124,9 @@
   - **보리 (세인트버나드)** 구조견 탱커/서포터 — 고체력·느림, 목의 구조 술통으로 회복/보호막, 대시는 짧고 무거운 몸통 밀치기(전방 탄 차단). 협동용 데이터 필드 `coop: { reviveSpeed, reviveHearts }` (멀티 코드가 읽을 예정).
   - **백구 (흰 진돗개)** 반격의 달인 — 피격 직전 대시 = 완벽 회피 "간파!" → 주변 적탄 반사 + 강한 반격. 저체력, 고수용.
   - **모리 (보더콜리)** 몰이꾼 — 영혼 동료 2–3마리, 적을 한데 몰수록 추가 피해, 위치 선정형.
-- 이미 생긴 파일(부분): `src/content/characters/{bori.ts, kit-bori.ts, kit-baekgu.ts, kit-mori.ts, kit-common.ts}`, 무기 `src/content/weapons/{lantern-flail.ts, fang-blade.ts, shepherd-crook.ts}`, `src/content/audio/sfx-characters2.ts`, `unlocks.ts` 수정, `SFX_NAMES`에 `bori_* / baekgu_* / mori_*`.
-- 남은 것: `baekgu.ts`, `mori.ts` 정의/스프라이트(파일이 없으면 `kit-mori` import 오류로 typecheck 실패 — 가장 먼저 확인), 해방 연출, 해금 조건, 캐릭터 선택·로비·Tab 표시, `tests/characters-new.test.ts`, 결정성 테스트 통과, 스크린샷 검수.
+- 이미 있는 파일: `src/content/characters/{bori.ts, baekgu.ts, mori.ts, kit-bori.ts, kit-baekgu.ts, kit-mori.ts, kit-common.ts}`, 시작 무기 `src/content/weapons/{lantern-flail.ts (보리), fang-blade.ts (백구), shepherd-crook.ts (모리)}`, `src/content/audio/sfx-characters2.ts`, `unlocks.ts` 수정, `SFX_NAMES`에 `bori_* / baekgu_* / mori_*`, 테스트 `tests/characters-new.test.ts`, `tests/determinism-chars.test.ts`. typecheck 통과.
+- 에이전트는 "사운드와 세 캐릭터 정의 파일(스프라이트+정의) 작성" 단계에서 중단 → 스프라이트 완성도·해방 연출·캐릭터 선택/로비/Tab 표시는 **스크린샷으로 직접 검수 필요**.
+- 남은 것: 위 테스트 실패 2건(weapons2 로드 오류, 모리 결정성) 수정, 해방 피해량 기준(10–15×) 확인, 시작 무기 DPS 0.9–1.3배 확인(`DPS_MATRIX=1 npx vitest run tests/dps-matrix`), 해금 조건 확인, QA 봇(`--char bori,baekgu,mori`), 7명 캐릭터 시트 스크린샷으로 기존 4명과 화풍 비교.
 - 원 지시서: `handover/briefs/new-characters.md`
 
 ### 5.3 멀티플레이 (2–4인, 방 코드, 무료 P2P)
@@ -128,7 +137,10 @@
   - `src/net/session.ts` — `startNetRun(session, start)` **← 여기를 실제 멀티 시작으로 교체해야 함** (지금은 각자 싱글 런 시작).
   - `src/game/seam.ts` — `PlayerInput`(17바이트 인코딩), `World.inputSource`; `w.rules`/`fixedRules()`; `src/game/statehash.ts`.
   - 로비 UI(코드 4글자, 공유 링크 `?room=CODE`, 캐릭터 선택, 준비, 시작), 빌드 ID 검사, 서비스워커 자동 갱신.
-- **진행 중이던 작업의 보존본**: `handover/multiplayer-wip.patch` (커밋 `f23efb9` 기준 diff, 36개 파일 — `w.players`/맥락 전환 일부, `tests/coop.test.ts`, `tests/coopsim.ts` 등). 적용 방법: `git switch -c mp-wip f23efb9 && git apply handover/multiplayer-wip.patch` 로 기준 시점에 그대로 복원한 뒤, 최신 `claude/isaac-seperia-game-12hrqr`를 merge해서 충돌을 정리하며 이어가는 것을 권장 (또는 최신 브랜치에서 `git apply --3way`). `tests/zz-sp-baseline.test.ts`는 싱글 해시 기준값 확인용 임시 파일. 작업 공간이 바뀌면 원래 worktree는 사라지므로 이 패치가 유일한 사본.
+- **구현 보존본**: `handover/multiplayer-wip.patch` — 커밋 `f23efb9` 기준 전체 diff (54개 파일, +3182/−364). 이 작업 공간(worktree)은 GitHub에 없으므로 **이 패치가 유일한 사본**.
+  - 포함된 것(에이전트 커밋 메시지 요약): World에 `players`/`local`/맥락 플레이어(엔티티·훅·피격·줍기마다 `w.player` 전환, `w.items`/`w.vars`/`w.flow`/`w.focus`도 따라감), 공용 지갑, 쓰러짐 유령·부활, 인원수 체력 보정, 추가 받침대, 파티 문 이동, 월드별 엔티티 id(싱글 해시 불변), `NetRun`(입력·명령·해시·동기화 오류·호스트 끊김), 협동 HUD(동료 패널·이름표·화살표·토스트), 일시정지 메뉴, 대기 오버레이, 파티 결과 화면 후 같은 로비로 복귀, `tests/coop.test.ts`, `tests/coopsim.ts`, `scripts/coop-e2e.mjs`. 마지막 미커밋분은 콘텐츠(보스·적 파일 21개)의 조준 대상을 맥락 플레이어 기준으로 바꾸던 작업.
+  - 중단 시점 검증: 그 브랜치에서 `tsc` 통과, `tests/coop.test.ts` 7개 통과(2·3·4인, 퇴장 포함 — 모든 피어 stateHash 동일), `tests/determinism.test.ts` 통과.
+  - 적용 방법: `git switch -c mp-wip f23efb9 && git apply handover/multiplayer-wip.patch` → 테스트 확인 → 최신 `claude/isaac-seperia-game-12hrqr`를 merge. 충돌 예상 지점: `src/game/player.ts`·`items.ts`·`defs.ts`(캐릭터 키트 패스와 겹침), `src/audio/audio.ts`, 6·7층 콘텐츠 파일. 병합 후 새 캐릭터 고유 능력·대시가 플레이어별로 동작하는지, 보리의 `coop.reviveSpeed` 연결, `scripts/coop-e2e.mjs`(2–4페이지 브라우저 테스트)와 스크린샷 검수까지 하면 완료. `tests/zz-sp-baseline.test.ts`는 싱글 해시 기준값 확인용 임시 파일(정리 대상).
 - **남은 설계(사용자와 합의된 규칙)**
   - `w.players[]` + `w.local`, **`w.player`는 "현재 맥락의 플레이어"**: 플레이어 업데이트=본인, 적 업데이트=가장 가까운 생존 플레이어, 아이템 훅=소유자, 투사체=발사자, 줍기=수집자, UI=로컬. 콘텐츠의 `w.player` 300여 곳을 고치지 않기 위한 핵심 아이디어.
   - 체력·불씨·무기·유물·축복은 개인, **동전·열쇠·폭탄은 공용**.

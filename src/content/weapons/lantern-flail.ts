@@ -67,7 +67,7 @@ defineWeapon({
   tags: ['heavy'],
   pools: ['treasure', 'boss'],
   stats(m) {
-    m.mulStat('damage', 1.5);
+    m.mulStat('damage', 1.42);
     m.mulStat('fireRate', 0.62);
     m.addStat('knockback', 30);
   },

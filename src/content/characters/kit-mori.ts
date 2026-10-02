@@ -29,7 +29,7 @@ import { EnemyOverlay, O, ensureOverlay } from './kit';
 export const MORI_SHEEP = 2;
 export const MORI_SHEEP_AFFINITY = 3;
 /** headbutt: damage (x player damage), cooldown (s; x0.8 with the affinity), nudge toward the herd point */
-export const MORI_HEADBUTT_DMG = 0.45;
+export const MORI_HEADBUTT_DMG = 0.38;
 export const MORI_HEADBUTT_CD = 0.75;
 export const MORI_HEADBUTT_KNOCK = 110;
 /** sheep only work enemies this close to the herd point */
@@ -394,9 +394,9 @@ export function releaseStampede(w: World, p: Player): void {
       const base = angleTo(pl.x, pl.y, cx, cy);
       const off = (i - (MORI_STAMPEDE_SHEEP - 1) / 2) * 0.14;
       const back = 14 + (i % 3) * 7;
-      const sx = pl.x - Math.cos(base) * back + Math.cos(base + Math.PI / 2) * off * 60;
-      const sy = pl.y - Math.sin(base) * back + Math.sin(base + Math.PI / 2) * off * 60;
-      const ang = angleTo(sx, sy, cx + Math.cos(base + Math.PI / 2) * off * 50, cy + Math.sin(base + Math.PI / 2) * off * 50);
+      const sx = pl.x - Math.cos(base) * back + Math.cos(base + Math.PI / 2) * off * 30;
+      const sy = pl.y - Math.sin(base) * back + Math.sin(base + Math.PI / 2) * off * 30;
+      const ang = angleTo(sx, sy, cx + Math.cos(base + Math.PI / 2) * off * 24, cy + Math.sin(base + Math.PI / 2) * off * 24);
       ww.spawn(new StampedeSheep(sx, sy, ang, dmg, falloff));
       ww.sfx('mori_baa', { vol: 0.5, pitch: 0.8 + (i % 3) * 0.1 });
     }
