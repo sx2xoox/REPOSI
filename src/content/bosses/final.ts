@@ -1004,7 +1004,7 @@ defineBoss({
   bossTitle: '등불을 삼킨 어둠',
   bossFloors: [5],
   bossMusic: 'boss_final',
-  hp: 1000,
+  hp: 1150,
   radius: 22,
   speed: 40,
   mass: 30,

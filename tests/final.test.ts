@@ -27,7 +27,7 @@ describe('final boss 무명', () => {
     expect(MUSIC_IDS).toContain('boss_final');
     expect(d.deathFx).toBe('void');
     expect(d.hp).toBeGreaterThanOrEqual(900);
-    expect(d.hp).toBeLessThanOrEqual(1100);
+    expect(d.hp).toBeLessThanOrEqual(1250);
     expect(d.script).toBeTypeOf('function');
     expect(d.draw).toBeTypeOf('function');
     expect(d.portrait && hasSprite(d.portrait)).toBe(true);
