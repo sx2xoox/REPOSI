@@ -132,9 +132,13 @@ export class World {
   private bgWarm = new Set<number>();
   /** trapdoor fall animation in progress */
   descending: { x: number; y: number; t: number } | null = null;
+  /** next floor's layout, generated while the player falls through the trapdoor */
+  private preparedFloor: { index: number; map: FloorMap } | null = null;
   /** red edge flash after the player got hurt (seconds left) */
   private hurtT = 0;
   private hurtPower = 0;
+  /** strongest hit shake applied this frame */
+  private hitShake = 0;
   /** delayed room-clear "moment" (chime + door glow) */
   private clearMomentT = -1;
   /** reusable per-frame draw lists */
@@ -202,9 +206,12 @@ export class World {
     const floor = Floors.all().find((f) => f.index === index);
     if (!floor) throw new Error(`no floor ${index}`);
     this.floor = floor;
-    this.map = generateFloor(floor, this.run.floorRng(index));
+    // the layout is a pure function of (seed, floor): the trapdoor may have generated it already
+    const prepared = this.preparedFloor?.index === index ? this.preparedFloor.map : null;
+    this.preparedFloor = null;
+    this.map = prepared ?? generateFloor(floor, this.run.floorRng(index));
     this.roomCache.clear();
-    this.bgJob = null;
+    if (this.bgJob && !this.map.nodes.includes(this.bgJob.node)) this.bgJob = null;
     this.bgWarm.clear();
     this.mapVersion++;
     const start = this.map.nodes[this.map.startId];
@@ -223,12 +230,12 @@ export class World {
   }
 
   // ================================================================== rooms
-  private buildRoom(node: RoomNode): Room {
-    const theme = Themes.get(this.floor.theme) ?? Themes.all()[0];
+  private buildRoom(node: RoomNode, floor: FloorDef = this.floor, map: FloorMap = this.map): Room {
+    const theme = Themes.get(floor.theme) ?? Themes.all()[0];
     const template = RoomTemplates.get(node.templateId);
     const room = new Room(node, theme, template);
     for (const d of node.doors) {
-      const target = this.map.nodes[d.to];
+      const target = map.nodes[d.to];
       const kind = doorKindFor(node, target);
       const hidden = d.secret && node.kind !== 'secret' && !(d as NodeDoor & { revealed?: boolean }).revealed;
       const door = room.addDoor(d.dir, d.cx - node.gx, d.cy - node.gy, d.to, kind, hidden);
@@ -448,6 +455,7 @@ export class World {
     }
     const sdt = dt * this.slowmo;
     this.dt = sdt;
+    this.hitShake = 0;
     this.time += sdt;
     this.roomTime += sdt;
     this.run.stats.timeSec += dt;
@@ -686,9 +694,13 @@ export class World {
       this.sfx(e.def.hurtSfx ?? 'hit', { vol: Math.min(0.7, 0.4 + 0.05 * rel), pitch: fx.range(0.9, 1.15) / (1 + Math.max(0, rel - 2) * 0.04), x: e.x });
     }
     if (hit.light) return;
-    // shake: only hits clearly above a normal shot move the camera
-    const shake = (heavy ? 0.04 : 0) + Math.max(0, rel - 1.2) * 0.035 + (hit.crit ? 0.07 : 0);
-    if (shake > 0.01) this.shake(Math.min(0.4, shake));
+    // shake: only hits clearly above a normal shot move the camera; a swing that
+    // hits a crowd shakes like its biggest hit, not like the sum of all of them
+    const shake = Math.min(0.4, (heavy ? 0.04 : 0) + Math.max(0, rel - 1.2) * 0.035 + (hit.crit ? 0.07 : 0));
+    if (shake > 0.01 && shake > this.hitShake) {
+      this.shake(shake - this.hitShake);
+      this.hitShake = shake;
+    }
     if (save.settings.hitStop && (heavy || rel >= 2)) {
       this.hitstop(Math.min(0.075, (hit.kind === 'melee' ? 0.03 : 0.012) + 0.008 * rel + (hit.crit ? 0.015 : 0)));
     }
@@ -1174,6 +1186,14 @@ export class World {
     this.sfx('whoosh', { vol: 0.5, pitch: 0.7, x });
     this.particles.burst(x, y, { count: 16, speed: [20, 70], life: [0.3, 0.7], colors: ['#c0b0d0', '#7a6a8a', '#40304a'], size: [1, 3], drag: 3, sizeEnd: 3, fade: true });
     this.spawn(new RingFx(x, y, 22, 0.4, '#b080ff', 2));
+    // while falling: lay out the next floor and pre-render its first room
+    const next = Floors.all().find((f) => f.index === this.run.floor + 1);
+    if (next) {
+      const map = generateFloor(next, this.run.floorRng(next.index));
+      this.preparedFloor = { index: next.index, map };
+      const start = map.nodes[map.startId];
+      this.bgJob = { node: start, gen: roomBaseJob(this.buildRoom(start, next, map)) };
+    }
   }
 
   private updateDescend(dt: number): void {
@@ -1427,10 +1447,13 @@ export class World {
    * room-seeded RNGs, never the gameplay RNG.
    */
   private idleWork(): void {
-    if (this.transition || this.descending || this.roomTime < 0.2 || !this.map) return;
+    if (this.transition || this.roomTime < 0.2 || !this.map) return;
+    // while falling only the next floor's first room is pre-rendered
+    if (this.descending && !this.bgJob) return;
     const t0 = performance.now();
     do {
       if (!this.bgJob) {
+        if (this.descending) return;
         const next = this.nextPrerender();
         if (!next) return;
         this.bgWarm.add(next.id);
