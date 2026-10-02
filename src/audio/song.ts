@@ -18,7 +18,7 @@
 // `calm` channels duck a little in combat.
 
 import { RNG } from '../engine/rng';
-import { createSends, isOffline, type Ctx, type Sends } from './synth';
+import { collectPatches, createSends, isOffline, type Ctx, type Patch, type Sends } from './synth';
 import { arpTone, bassTone, noteToMidi, parseChord, transposeChord, voiceChord, type Chord } from './theory';
 import type { Instrument, Kit } from './instruments';
 import { registerTrack, type MusicId, type TrackHandle } from './audio';
@@ -91,6 +91,8 @@ export interface SongDef {
   combatOut?: number;
   /** combat layer level when intensity is 0 (default 0) */
   combatFloor?: number;
+  /** mix-bus tone: low shelf (200 Hz) and high shelf (3.2 kHz) gains in dB */
+  eq?: { low?: number; high?: number };
 }
 
 export interface Ev {
@@ -342,6 +344,8 @@ export class SongPlayer implements TrackHandle {
   private pass = 0;
   private bar = 0;
   private intensity = 0;
+  /** note patches that may still be sounding (halted on dispose) */
+  private notes: Patch[] = [];
   readonly rng: RNG;
 
   constructor(ctx: Ctx, out: AudioNode, song: CompiledSong, seed?: number) {
@@ -361,7 +365,24 @@ export class SongPlayer implements TrackHandle {
     const level = def.master ?? 0.8;
     this.master.gain.setValueAtTime(0, now);
     this.master.gain.linearRampToValueAtTime(level, now + (def.fadeIn ?? 0.35));
-    this.master.connect(out);
+    // mix-bus EQ: remove inaudible rumble, tame the low-mids, add some air so
+    // the tracks translate to small speakers
+    const hp = keep(ctx.createBiquadFilter());
+    hp.type = 'highpass';
+    hp.frequency.value = 32;
+    hp.Q.value = 0.7;
+    const lowShelf = keep(ctx.createBiquadFilter());
+    lowShelf.type = 'lowshelf';
+    lowShelf.frequency.value = 200;
+    lowShelf.gain.value = def.eq?.low ?? -4;
+    const highShelf = keep(ctx.createBiquadFilter());
+    highShelf.type = 'highshelf';
+    highShelf.frequency.value = 3200;
+    highShelf.gain.value = def.eq?.high ?? 3;
+    this.master.connect(hp);
+    hp.connect(lowShelf);
+    lowShelf.connect(highShelf);
+    highShelf.connect(out);
     this.layers = {
       base: keep(ctx.createGain()),
       combat: keep(ctx.createGain()),
@@ -470,6 +491,7 @@ export class SongPlayer implements TrackHandle {
       return;
     }
     const now = this.ctx.currentTime;
+    if (this.notes.length > 64) this.notes = this.notes.filter((p) => !p.isDisposed);
     // fell behind (tab hidden, long GC...): re-anchor instead of a burst of late notes
     if (this.nextTime < now - 0.05) this.nextTime = now + 0.05;
     const hidden = typeof document !== 'undefined' && document.hidden;
@@ -478,7 +500,7 @@ export class SongPlayer implements TrackHandle {
 
   private scheduleUntil(horizon: number): void {
     let guard = 0;
-    while (this.nextTime < horizon && !this.finished && !this.stopped && guard++ < 4096) {
+    while (this.nextTime < horizon && !this.finished && !this.stopped && guard++ < 200000) {
       this.scheduleStep(this.nextTime);
       this.nextTime += this.stepDur();
       this.advance();
@@ -517,8 +539,10 @@ export class SongPlayer implements TrackHandle {
     const jitter = h > 0 ? this.rng.range(0, 0.006) : 0;
     try {
       const inst = strip.def.inst;
-      if (typeof inst === 'function') inst(this.ctx, strip.input, t + jitter, midi, dur, v);
-      else inst[voice ?? '']?.(this.ctx, strip.input, t + jitter, midi, dur, v);
+      collectPatches(this.notes, () => {
+        if (typeof inst === 'function') inst(this.ctx, strip.input, t + jitter, midi, dur, v);
+        else inst[voice ?? '']?.(this.ctx, strip.input, t + jitter, midi, dur, v);
+      });
     } catch (e) {
       strip.broken = true;
       console.error(`[audio] channel "${ch}" failed`, e);
@@ -583,6 +607,10 @@ export class SongPlayer implements TrackHandle {
       clearTimeout(this.disposeTimer);
       this.disposeTimer = null;
     }
+    // the master is already silent here: cut whatever is still ringing
+    const at = this.ctx.currentTime + 0.01;
+    for (const p of this.notes) p.halt(at);
+    this.notes = [];
     for (const n of this.nodes) {
       try {
         n.disconnect();

@@ -20,7 +20,7 @@ defineSong('title', {
     counter: { inst: lead({ wave: 'pulse12', gain: 0.12, cutoff: 2000, vib: 10, a: 0.05 }), vol: 0.55, reverb: 0.45, pan: -0.25 },
     pad: { inst: pad({ gain: 0.055, cutoff: 950, a: 1.2, r: 2, wobble: 220, wobbleRate: 0.18 }), vol: 0.9, reverb: 0.6 },
     choir: { inst: choir({ gain: 0.1, vowel: 'o', a: 1.3, r: 2 }), vol: 0.7, reverb: 0.7 },
-    bass: { inst: triBass({ gain: 0.26 }), vol: 0.75 },
+    bass: { inst: triBass({ gain: 0.26 }), vol: 0.55 },
     air: { inst: wind, vol: 0.55, reverb: 0.5 },
   },
   sections: {

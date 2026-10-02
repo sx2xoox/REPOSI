@@ -23,7 +23,8 @@ const DRUMS = {
 
 defineSong('floor2', {
   bpm: 96,
-  master: 0.85,
+  master: 1.0,
+  eq: { high: 4.5 },
   reverb: { seconds: 3.2, decay: 2.2, gain: 0.65, tone: 0.55 },
   delay: { beats: 0.75, feedback: 0.45, gain: 0.5, tone: 2200 },
   channels: {
@@ -31,7 +32,7 @@ defineSong('floor2', {
     reed: { inst: lead({ wave: 'pulse12', gain: 0.2, cutoff: 1300, a: 0.03, vib: 12, vibRate: 4.5 }), vol: 0.75, reverb: 0.35, delay: 0.15 },
     glass: { inst: lead({ wave: 'triangle', gain: 0.3, cutoff: 6000, vib: 28, vibRate: 3.8, vibDelay: 0.12, scoop: 1.5, a: 0.02 }), vol: 0.75, reverb: 0.45, delay: 0.3, pan: -0.15 },
     pad: { inst: pad({ wave: 'triangle', voices: 2, detune: 14, gain: 0.08, cutoff: 1800, a: 1.2, r: 1.8, wobble: 500, wobbleRate: 0.15 }), vol: 0.8, reverb: 0.55 },
-    sub: { inst: subBass({ gain: 0.3 }), vol: 0.6 },
+    sub: { inst: subBass({ gain: 0.3 }), vol: 0.45 },
     bass: { inst: sawBass({ gain: 0.17, cutoff: 380, env: 3, drive: 1.6, q: 6 }), vol: 0.8, layer: 'combat' },
     drums: { inst: drums, vol: 0.8, layer: 'combat', reverb: 0.15 },
     drip: { inst: drip, vol: 0.9, reverb: 0.5, delay: 0.4, layer: 'calm' },

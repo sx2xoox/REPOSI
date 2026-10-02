@@ -471,6 +471,21 @@ export interface FmOpts {
   to?: AudioNode;
 }
 
+// While set, every new Patch registers itself here (lets a song player halt
+// the notes it scheduled when it is disposed).
+let patchCollector: Patch[] | null = null;
+
+/** Run `fn`, collecting every Patch it creates into `into`. */
+export function collectPatches(into: Patch[], fn: () => void): void {
+  const prev = patchCollector;
+  patchCollector = into;
+  try {
+    fn();
+  } finally {
+    patchCollector = prev;
+  }
+}
+
 export class Patch {
   readonly ctx: Ctx;
   readonly t: number;
@@ -478,6 +493,7 @@ export class Patch {
   readonly ts: number;
   readonly out: GainNode;
   private nodes: AudioNode[] = [];
+  private sources: AudioScheduledSourceNode[] = [];
   private pending = 0;
   private disposed = false;
 
@@ -488,6 +504,7 @@ export class Patch {
     this.ts = o.stretch ?? Math.min(1.8, Math.max(0.5, Math.pow(this.pitch, -0.35)));
     audioStats.livePatches++;
     audioStats.createdPatches++;
+    if (patchCollector) patchCollector.push(this);
     this.out = this.gain(o.vol ?? 1);
     this.out.connect(dest);
     if (o.sends) {
@@ -552,6 +569,7 @@ export class Patch {
   /** Start a source; the patch disposes itself when all its sources ended. */
   run(src: AudioScheduledSourceNode, start: number, stop: number, offset?: number): void {
     this.pending++;
+    this.sources.push(src);
     src.onended = () => {
       src.onended = null;
       if (--this.pending <= 0) this.dispose();
@@ -561,9 +579,26 @@ export class Patch {
     src.stop(Math.max(start + 0.001, stop));
   }
 
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
+
+  /** Cut every source at `at` (used when a track is torn down). */
+  halt(at: number): void {
+    if (this.disposed) return;
+    for (const s of this.sources) {
+      try {
+        s.stop(at);
+      } catch {
+        /* not started / already stopped */
+      }
+    }
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.sources = [];
     for (const n of this.nodes) {
       try {
         n.disconnect();
@@ -599,7 +634,6 @@ export class Patch {
     const osc = this.osc(o.wave ?? 'sine', fs[0]);
     if (fs.length > 1) sweep(osc.frequency, t, fs, this.T(o.sweep ?? o.dur), !o.lin);
     if (o.detune) osc.detune.value = o.detune;
-    if (o.vib) this.vibrato(osc.detune, t, o.vib[0], o.vib[1], this.T(o.vib[2] ?? 0), t + dur + this.T(o.rel ?? 0.05));
     let node: AudioNode = osc;
     if (o.filter) node = this.applyFilter(node, o.filter, t, o.dur);
     if (o.crush) {
@@ -617,6 +651,7 @@ export class Patch {
     let end: number;
     if (o.sus !== undefined) end = envADSR(env.gain, t, a, dur * 0.3, o.sus, dur, this.T(o.rel ?? 0.08), o.gain);
     else end = envAD(env.gain, t, a, dur, o.gain);
+    if (o.vib) this.vibrato(osc.detune, t, o.vib[0], o.vib[1], this.T(o.vib[2] ?? 0), end + 0.01);
     this.run(osc, t, end + 0.01);
     return env;
   }
@@ -668,7 +703,6 @@ export class Patch {
     );
     mod.connect(depth);
     depth.connect(car.frequency);
-    if (o.vib) this.vibrato(car.detune, t, o.vib[0], o.vib[1], this.T(o.vib[2] ?? 0), t + dur + 0.5);
     let node: AudioNode = car;
     if (o.filter) node = this.applyFilter(node, o.filter, t, o.dur);
     const env = this.gain(0, o.to ?? this.out);
@@ -676,6 +710,7 @@ export class Patch {
     let end: number;
     if (o.sus !== undefined) end = envADSR(env.gain, t, a, dur * 0.3, o.sus, dur, this.T(o.rel ?? 0.1), o.gain);
     else end = envAD(env.gain, t, a, dur, o.gain);
+    if (o.vib) this.vibrato(car.detune, t, o.vib[0], o.vib[1], this.T(o.vib[2] ?? 0), end + 0.01);
     this.run(car, t, end + 0.01);
     this.run(mod, t, end + 0.01);
     return env;

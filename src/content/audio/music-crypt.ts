@@ -23,7 +23,8 @@ const COMBAT_A = {
 
 defineSong('floor1', {
   bpm: 84,
-  master: 0.85,
+  master: 0.93,
+  eq: { high: 5 },
   reverb: { seconds: 3, decay: 2.6, gain: 0.6, tone: 0.35 },
   delay: { beats: 0.75, feedback: 0.3, gain: 0.3 },
   channels: {
@@ -33,8 +34,8 @@ defineSong('floor1', {
     bell: { inst: bell({ ratio: 1.41, index: 2.5, decay: 3.2, gain: 0.18, partial: 2.76, partialGain: 0.2 }), vol: 0.75, reverb: 0.65 },
     flute: { inst: flute({ gain: 0.23 }), vol: 0.8, reverb: 0.4, delay: 0.15 },
     counter: { inst: lead({ wave: 'pulse12', gain: 0.11, cutoff: 1800, a: 0.04, vib: 10 }), vol: 0.6, reverb: 0.35, pan: 0.25 },
-    bass: { inst: triBass({ gain: 0.3 }), vol: 0.8, layer: 'combat' },
-    drums: { inst: drums, vol: 0.85, layer: 'combat', reverb: 0.18 },
+    bass: { inst: triBass({ gain: 0.3 }), vol: 0.6, layer: 'combat' },
+    drums: { inst: drums, vol: 0.7, layer: 'combat', reverb: 0.18 },
     air: { inst: wind, vol: 0.5, reverb: 0.5, layer: 'calm' },
     amb: { inst: amb, vol: 0.5, reverb: 0.5, layer: 'calm' },
   },

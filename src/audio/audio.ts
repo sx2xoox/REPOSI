@@ -89,6 +89,17 @@ export function getTrackFactory(id: string): TrackFactory | undefined {
   return trackRegistry.get(id);
 }
 
+/** Music ducking per sfx: [depth 0..1, hold seconds]. */
+const duckRegistry = new Map<string, [number, number]>();
+
+/**
+ * Duck the music while an important sound plays (item jingles, deaths...),
+ * so the moment reads clearly. Depth 0..1 (fraction removed), hold in seconds.
+ */
+export function setSfxDuck(name: SfxName, depth: number, hold: number): void {
+  duckRegistry.set(name, [Math.max(0, Math.min(1, depth)), Math.max(0, hold)]);
+}
+
 /** Longest a one-shot sfx may ring (used to release per-sound panners). */
 const SFX_MAX_SECONDS = 4;
 
@@ -97,6 +108,9 @@ class AudioEngine {
   master: GainNode | null = null;
   sfxBus: GainNode | null = null;
   musicBus: GainNode | null = null;
+  /** separate stage after the music bus for ducking (user volume stays on musicBus) */
+  private duckGain: GainNode | null = null;
+  private duckUntil = 0;
   private compressor: DynamicsCompressorNode | null = null;
   private noise: AudioBuffer | null = null;
 
@@ -124,7 +138,9 @@ class AudioEngine {
       this.sfxBus = this.ctx.createGain();
       this.musicBus = this.ctx.createGain();
       this.sfxBus.connect(this.master);
-      this.musicBus.connect(this.master);
+      this.duckGain = this.ctx.createGain();
+      this.musicBus.connect(this.duckGain);
+      this.duckGain.connect(this.master);
       this.master.connect(this.compressor);
       this.compressor.connect(this.ctx.destination);
       routeSfxSends(this.ctx, this.sfxBus);
@@ -179,6 +195,8 @@ class AudioEngine {
     } catch (e) {
       console.error(`[audio] sfx "${name}" failed`, e);
     }
+    const duck = duckRegistry.get(name);
+    if (duck && (o.vol ?? 1) > 0.25) this.duck(duck[0], duck[1]);
     // the synth's own nodes clean themselves up; release the shared panner too
     if (panner) {
       const p = panner;
@@ -211,6 +229,29 @@ class AudioEngine {
       try { this.current.handle.stop(fade); } catch (e) { console.error(e); }
       this.current = null;
     }
+  }
+
+  /** Temporarily lower the music (depth 0..1) for `hold` seconds, then recover. */
+  duck(depth: number, hold: number): void {
+    const ctx = this.ctx;
+    const g = this.duckGain?.gain;
+    if (!ctx || !g || depth <= 0) return;
+    const now = ctx.currentTime;
+    const target = 1 - depth;
+    // a weaker duck never shortens / weakens a stronger one in progress
+    if (now < this.duckUntil && g.value <= target + 0.01) {
+      this.duckUntil = Math.max(this.duckUntil, now + hold);
+    } else {
+      this.duckUntil = now + hold;
+    }
+    if (typeof g.cancelAndHoldAtTime === 'function') g.cancelAndHoldAtTime(now);
+    else {
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(g.value, now);
+    }
+    g.linearRampToValueAtTime(Math.min(g.value, target), now + 0.08);
+    g.setValueAtTime(Math.min(g.value, target), this.duckUntil);
+    g.linearRampToValueAtTime(1, this.duckUntil + 0.9);
   }
 
   setMusicIntensity(v: number): void {

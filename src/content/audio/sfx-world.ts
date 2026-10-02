@@ -9,7 +9,7 @@ import { blast, chime, click, debris, sp, sparkle, thump } from '../../audio/sfx
 
 registerSfx('explosion', (ctx, out, t, o) => {
   const p = sp(ctx, out, t, o, { reverb: 0.3 });
-  blast(p, 0, 1.1, 0.55);
+  blast(p, 0, 1.1, 0.5);
 });
 
 registerSfx('bomb_place', (ctx, out, t, o) => {
@@ -115,11 +115,14 @@ registerSfx('teleport', (ctx, out, t, o) => {
 // --- pickups / economy --------------------------------------------------------
 
 registerSfx('coin', (ctx, out, t, o) => {
-  const p = sp(ctx, out, t, o, { reverb: 0.18 });
-  p.tone({ wave: 'pulse25', f: 988, dur: 0.06, sus: 1, rel: 0.01, gain: 0.17, filter: { type: 'lowpass', f: 5000 } });
-  p.tone({ wave: 'pulse25', f: 1319, at: 0.06, dur: 0.22, gain: 0.17, filter: { type: 'lowpass', f: 5000 } });
-  p.fm({ f: 2637, ratio: 3.5, index: [1.5, 0.1], at: 0.06, dur: 0.3, gain: 0.09 });
-  click(p, 0, 0.18, 6000, 0.012);
+  // tarnished copper: an inharmonic clink, then a rising-fifth glint (A5 -> E6)
+  const p = sp(ctx, out, t, o, { reverb: 0.2 });
+  const d = rnd(0.98, 1.02);
+  p.fm({ f: 2350 * d, ratio: 1.47, index: [3, 0.2], dur: 0.07, gain: 0.13 });
+  click(p, 0, 0.16, 6000, 0.01);
+  p.tone({ wave: 'triangle', f: mtof(81) * d, at: 0.035, dur: 0.07, gain: 0.2 });
+  p.tone({ wave: 'triangle', f: mtof(88) * d, at: 0.09, dur: 0.24, gain: 0.2 });
+  chime(p, 0.09, 100, 0.07, 0.35, 2.0, 1.4);
 });
 
 registerSfx('heart', (ctx, out, t, o) => {

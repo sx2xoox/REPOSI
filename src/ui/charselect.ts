@@ -65,6 +65,11 @@ export class CharacterSelectScene implements Scene {
     }
   }
 
+  /** Unlocked later in the save and never looked at yet? */
+  private isNew(c: CharacterDef): boolean {
+    return !c.unlocked && this.open(c) && !save.hasFlag(`seenchar:${c.id}`);
+  }
+
   private start(): void {
     const c = this.chars[this.idx];
     if (!c) return;
@@ -94,6 +99,8 @@ export class CharacterSelectScene implements Scene {
       }
       return;
     }
+    const curC = this.chars[this.idx];
+    if (curC && this.isNew(curC) && this.selT > 1.2) save.setFlag(`seenchar:${curC.id}`);
     if (this.rr.update(input.held('uiRight'), dt)) this.choose(this.idx + 1);
     if (this.rl.update(input.held('uiLeft'), dt)) this.choose(this.idx - 1);
     if (input.pressed('cancel')) {
@@ -202,6 +209,11 @@ export class CharacterSelectScene implements Scene {
       });
       if (!unlocked) {
         r.uiSprite('ui_lock', x, baseY - 10 * p.s - 6, Math.max(2, p.s * 0.5), { alpha: A * p.a });
+      } else if (this.isNew(c)) {
+        const bob2 = Math.sin(this.t * 5) * 2;
+        const ny = baseY - 21 * p.s - 10 + bob2;
+        frame(r, x - 26, ny - 9, 52, 18, 'ribbon', { color: C.goldHi, alpha: A * p.a });
+        r.uiText('새로운!', x, ny - 6, { size: 10, font: 'small', align: 'center', color: C.goldHi, alpha: A * p.a });
       }
       if (!isSel && focus < 0.5) {
         r.uiText(unlocked ? c.name : '???', x, baseY + 12, { size: 10, font: 'small', align: 'center', color: unlocked ? C.textDim : C.textMute, alpha: A * p.a });

@@ -20,12 +20,13 @@ const shopKit = kit({ gain: 0.75 });
 defineSong('shop', {
   bpm: 104,
   swing8: 0.33,
-  master: 0.85,
+  master: 0.95,
+  eq: { high: 4 },
   reverb: { seconds: 1.8, decay: 3, gain: 0.45, tone: 0.5 },
   delay: { beats: 0.75, feedback: 0.25, gain: 0.25 },
   channels: {
     lute: { inst: pluck({ gain: 0.13, decay: 0.45, bright: 7 }), vol: 0.75, reverb: 0.25, pan: -0.2 },
-    bass: { inst: triBass({ gain: 0.28 }), vol: 0.75 },
+    bass: { inst: triBass({ gain: 0.28 }), vol: 0.62 },
     melody: { inst: flute({ gain: 0.22, vib: 14 }), vol: 0.8, reverb: 0.3, delay: 0.1 },
     box: { inst: bell({ ratio: 3.5, index: 1.4, decay: 1.1, gain: 0.12 }), vol: 0.7, reverb: 0.35, delay: 0.2, pan: 0.25 },
     pad: { inst: pad({ gain: 0.04, cutoff: 1000, a: 0.3, r: 0.8 }), vol: 0.8, reverb: 0.4 },
@@ -81,7 +82,7 @@ const secretKit = kit({ gain: 0.8 });
 
 defineSong('secret', {
   bpm: 72,
-  master: 0.9,
+  master: 1.25,
   fadeIn: 1,
   reverb: { seconds: 4.5, decay: 2, gain: 0.75, tone: 0.6 },
   delay: { beats: 0.75, feedback: 0.5, gain: 0.45, tone: 2800 },
@@ -90,7 +91,7 @@ defineSong('secret', {
     glass: { inst: bell({ ratio: 7, index: 0.9, decay: 2, gain: 0.15 }), vol: 0.75, reverb: 0.6, delay: 0.3, pan: -0.15 },
     flute: { inst: flute({ gain: 0.2, vib: 20, breath: 0.22 }), vol: 0.75, reverb: 0.55, delay: 0.25 },
     choir: { inst: choir({ gain: 0.09, vowel: 'o', a: 1.5, r: 2.2 }), vol: 0.75, reverb: 0.7 },
-    sub: { inst: subBass({ gain: 0.26 }), vol: 0.75 },
+    sub: { inst: subBass({ gain: 0.26 }), vol: 0.5 },
     whisper: { inst: whisper, vol: 0.6, reverb: 0.6, delay: 0.3 },
     amb: { inst: secretKit, vol: 0.5, reverb: 0.6 },
   },
@@ -129,7 +130,7 @@ const vicKit = kit({ gain: 0.9 });
 
 defineSong('victory', {
   bpm: 112,
-  master: 0.82,
+  master: 1.0,
   fadeIn: 0.1,
   reverb: { seconds: 2.6, decay: 2.6, gain: 0.55 },
   delay: { beats: 0.75, feedback: 0.25, gain: 0.25 },
@@ -141,7 +142,7 @@ defineSong('victory', {
     box: { inst: bell({ ratio: 3.5, index: 1.4, decay: 1.4, gain: 0.12 }), vol: 0.7, reverb: 0.45, delay: 0.2, pan: 0.2 },
     pad: { inst: pad({ gain: 0.05, cutoff: 1200, a: 0.8, r: 1.6 }), vol: 0.8, reverb: 0.5 },
     choir: { inst: choir({ gain: 0.09, vowel: 'a', a: 0.6, r: 1.6 }), vol: 0.75, reverb: 0.6 },
-    bass: { inst: triBass({ gain: 0.26 }), vol: 0.75 },
+    bass: { inst: triBass({ gain: 0.26 }), vol: 0.6 },
     drums: { inst: vicKit, vol: 0.85, reverb: 0.25 },
   },
   sections: {
@@ -194,7 +195,7 @@ defineSong('victory', {
 
 defineSong('gameover', {
   bpm: 88,
-  master: 0.9,
+  master: 1.15,
   fadeIn: 0.05,
   loop: false,
   reverb: { seconds: 3.5, decay: 2.2, gain: 0.7 },
@@ -204,7 +205,7 @@ defineSong('gameover', {
     bell: { inst: bell({ ratio: 1.41, index: 2.5, decay: 4, gain: 0.2, partial: 2.76, partialGain: 0.2 }), vol: 0.75, reverb: 0.7 },
     pad: { inst: pad({ gain: 0.06, cutoff: 900, a: 0.4, r: 2.5 }), vol: 0.8, reverb: 0.6 },
     choir: { inst: choir({ gain: 0.08, vowel: 'o', a: 0.8, r: 2.5 }), vol: 0.7, reverb: 0.7 },
-    bass: { inst: triBass({ gain: 0.26, r: 0.8 }), vol: 0.75 },
+    bass: { inst: triBass({ gain: 0.26, r: 0.8 }), vol: 0.55 },
   },
   sections: {
     S: {

@@ -235,7 +235,7 @@ export function organ(o: { gain?: number; bright?: number; a?: number; r?: numbe
     const sub = p.osc('sine', f / 2);
     const env = p.gain(0, p.out);
     osc.connect(env);
-    sub.connect(p.gain(0.35, env));
+    sub.connect(p.gain(f < 220 ? 0.08 : 0.3, env));
     const end = envADSR(env.gain, t, o.a ?? 0.04, 0.2, 0.9, dur, o.r ?? 0.25, 1);
     p.tremolo(env.gain, t, 5.5, 0.06, end);
     p.run(osc, t, end);
@@ -322,9 +322,13 @@ export function sawBass(o: { gain?: number; cutoff?: number; drive?: number; env
     lp.connect(sh).connect(env);
     const end = envADSR(env.gain, t, 0.003, 0.15, 0.7, dur * 0.9, 0.05, 1);
     const s = p.osc('sawtooth', f);
-    const q = p.osc('pulse25', f / 2);
-    s.connect(p.gain(0.6, lp));
-    q.connect(p.gain(0.45, lp));
+    const q = p.osc('pulse25', f);
+    q.detune.value = 7;
+    const sub = p.osc('sine', f / 2);
+    s.connect(p.gain(0.55, lp));
+    q.connect(p.gain(0.35, lp));
+    sub.connect(p.gain(0.25, env));
+    p.run(sub, t, end);
     p.run(s, t, end);
     p.run(q, t, end);
   };

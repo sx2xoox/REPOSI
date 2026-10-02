@@ -16,21 +16,21 @@ registerSfx('enemy_hurt', (ctx, out, t, o) => {
 registerSfx('enemy_die', (ctx, out, t, o) => {
   // crunchy pop: crack + crushed square drop + bone rattle
   const p = sp(ctx, out, t, o, { reverb: 0.14 });
-  click(p, 0, 0.45, 2000, 0.02);
-  p.tone({ wave: 'square', f: [430, 55], sweep: 0.22, dur: 0.26, gain: 0.17, crush: 4, filter: { type: 'lowpass', f: 2500 } });
-  thump(p, 0, 155, 40, 0.24, 0.42);
-  p.noise({ dur: 0.18, gain: 0.26, filter: { type: 'bandpass', f: [2000, 300], q: 1.2 }, drive: 3 });
-  debris(p, 0.02, 0.34, 0.45, 2200, 1);
+  click(p, 0, 0.38, 2000, 0.02);
+  p.tone({ wave: 'square', f: [430, 55], sweep: 0.22, dur: 0.26, gain: 0.16, crush: 4, filter: { type: 'lowpass', f: 2500 } });
+  thump(p, 0, 155, 40, 0.24, 0.36);
+  p.noise({ dur: 0.18, gain: 0.24, filter: { type: 'bandpass', f: [2000, 300], q: 1.2 }, drive: 3 });
+  debris(p, 0.02, 0.34, 0.38, 2200, 1);
 });
 
 registerSfx('enemy_die_big', (ctx, out, t, o) => {
   const p = sp(ctx, out, t, o, { reverb: 0.24 });
-  click(p, 0, 0.5, 1500, 0.03);
-  thump(p, 0, 115, 26, 0.65, 0.45);
+  click(p, 0, 0.4, 1500, 0.03);
+  thump(p, 0, 115, 26, 0.65, 0.33);
   p.tone({ wave: 'sawtooth', f: [230, 40], sweep: 0.45, dur: 0.5, gain: 0.15, filter: { type: 'lowpass', f: [1800, 200] }, drive: 3 });
   p.noise({ color: 'brown', dur: 0.5, gain: 0.3, filter: { type: 'lowpass', f: [1500, 200] } });
-  debris(p, 0.04, 0.65, 0.45, 1800, 0.9);
-  growl(p, { at: 0, dur: 0.45, f: [140, 70], gain: 0.12, rough: 0.6 });
+  debris(p, 0.04, 0.65, 0.38, 1800, 0.9);
+  growl(p, { at: 0, dur: 0.45, f: [140, 70], gain: 0.09, rough: 0.6 });
 });
 
 registerSfx('enemy_shoot', (ctx, out, t, o) => {
@@ -93,8 +93,8 @@ registerSfx('summon', (ctx, out, t, o) => {
 registerSfx('slam', (ctx, out, t, o) => {
   const p = sp(ctx, out, t, o, { reverb: 0.2 });
   p.noise({ dur: 0.03, gain: 0.45, filter: { type: 'lowpass', f: 3000 } });
-  thump(p, 0, 85, 26, 0.5, 0.5);
-  p.noise({ color: 'brown', dur: 0.4, gain: 0.4, filter: { type: 'lowpass', f: [1600, 120] }, drive: 2 });
+  thump(p, 0, 85, 26, 0.5, 0.4);
+  p.noise({ color: 'brown', dur: 0.4, gain: 0.34, filter: { type: 'lowpass', f: [1600, 120] }, drive: 2 });
   debris(p, 0.05, 0.5, 0.35, 1200, 0.8);
 });
 
@@ -180,7 +180,7 @@ registerSfx('boss_roar', (ctx, out, t, o) => {
 
 registerSfx('boss_die', (ctx, out, t, o) => {
   const p = sp(ctx, out, t, o, { reverb: 0.55, delay: 0.1, stretch: 1 });
-  blast(p, 0, 1.4, 0.55);
+  blast(p, 0, 1.4, 0.48);
   growl(p, { at: 0.05, dur: 1.4, f: [110, 70, 30], gain: 0.18, rough: 0.7 });
   // death knell + rising soul shimmer
   p.fm({ f: 98, ratio: 1.4, index: [3, 0.2], at: 0.25, dur: 2.2, gain: 0.18 });

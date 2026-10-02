@@ -28,13 +28,13 @@ const DRIVE = {
 
 defineSong('boss', {
   bpm: 144,
-  master: 0.78,
+  master: 1.0,
   fadeIn: 0.2,
   combatFloor: 1,
   reverb: { seconds: 2, decay: 3, gain: 0.45 },
   delay: { beats: 0.75, feedback: 0.25, gain: 0.25 },
   channels: {
-    bass: { inst: sawBass({ gain: 0.19, cutoff: 650, drive: 3, env: 3 }), vol: 0.85 },
+    bass: { inst: sawBass({ gain: 0.19, cutoff: 650, drive: 3, env: 3 }), vol: 0.72 },
     strings: { inst: strings({ gain: 0.075, a: 0.005, r: 0.06, cutoff: 3200 }), vol: 0.75, reverb: 0.25, pan: 0.2 },
     lead: { inst: lead({ wave: 'pulse25', detune: 11, gain: 0.17, cutoff: 3400, vib: 18 }), vol: 0.8, reverb: 0.25, delay: 0.15 },
     counter: { inst: lead({ wave: 'pulse12', gain: 0.12, cutoff: 2600, vib: 12 }), vol: 0.6, reverb: 0.25, pan: -0.25 },
@@ -124,13 +124,13 @@ const HERO_CHORDS = 'A | B | G#m | C#m | F#m | B | E | G#7';
 
 const finalDef: SongDef = {
   bpm: 150,
-  master: 0.76,
+  master: 0.95,
   fadeIn: 0.2,
   combatFloor: 1,
   reverb: { seconds: 2.8, decay: 2.6, gain: 0.5 },
   delay: { beats: 0.75, feedback: 0.25, gain: 0.22 },
   channels: {
-    bass: { inst: sawBass({ gain: 0.19, cutoff: 600, drive: 3.2, env: 3 }), vol: 0.85 },
+    bass: { inst: sawBass({ gain: 0.19, cutoff: 600, drive: 3.2, env: 3 }), vol: 0.72 },
     strings: { inst: strings({ gain: 0.075, a: 0.005, r: 0.06, cutoff: 3400 }), vol: 0.7, reverb: 0.3, pan: 0.2 },
     hold: { inst: strings({ gain: 0.06, a: 0.4, r: 0.8, cutoff: 2200 }), vol: 0.75, reverb: 0.5, pan: -0.15 },
     lead: { inst: lead({ wave: 'pulse25', detune: 10, gain: 0.17, cutoff: 3600, vib: 18 }), vol: 0.8, reverb: 0.3, delay: 0.12 },

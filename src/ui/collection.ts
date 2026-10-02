@@ -247,7 +247,7 @@ export class CollectionScene implements Scene {
       const spr = animFrame(e.sprite, this.t);
       iconSlot(r, null, cx, cy, CELL - 2, { selected: isSel, alpha: stagger });
       const s = fitScale(spr, CELL - 10, 2);
-      spriteCentered(r, spr, cx, cy, s, { alpha: stagger * (e.seen ? 1 : 0.85), tint: e.seen ? undefined : '#1a1424', tintAmount: e.seen ? 0 : 1 });
+      spriteCentered(r, spr, cx, cy, s, { alpha: stagger * (e.seen ? 1 : 0.85), tint: e.seen ? undefined : '#2c2440', tintAmount: e.seen ? 0 : 1 });
       if (e.seen && e.rarity) r.uiSprite(`ui_rarity_${e.rarity}`, p.x + CELL - 9, p.y + 7, 1.5, { alpha: stagger });
       if (e.boss) r.uiSprite('ui_crown', p.x + 8, p.y + 6, 1, { alpha: stagger * (e.seen ? 1 : 0.4) });
     }
@@ -272,7 +272,7 @@ export class CollectionScene implements Scene {
     const spr = animFrame(e.sprite, this.t);
     const big = fitScale(spr, 64, 4);
     frame(r, x + 14, y + 14, 76, 76, 'slot', { alpha: k });
-    spriteCentered(r, spr, x + 52, y + 52, big, { alpha: k, tint: e.seen ? undefined : '#1a1424', tintAmount: e.seen ? 0 : 1 });
+    spriteCentered(r, spr, x + 52, y + 52, big, { alpha: k, tint: e.seen ? undefined : '#2c2440', tintAmount: e.seen ? 0 : 1 });
     if (!e.seen) {
       r.uiText('???', x + 102, y + 22, { size: 16, bold: true, color: C.textFaint, alpha: k });
       r.uiText('아직 발견하지 못했다.', x + 102, y + 46, { size: 12, color: C.textMute, alpha: k });

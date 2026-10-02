@@ -27,7 +27,7 @@ const COMBAT = {
 
 defineSong('floor5', {
   bpm: 100,
-  master: 0.85,
+  master: 1.15,
   reverb: { seconds: 4.5, decay: 1.8, gain: 0.7, tone: 0.3 },
   delay: { beats: 0.75, feedback: 0.55, gain: 0.5, tone: 1600 },
   channels: {
@@ -35,9 +35,9 @@ defineSong('floor5', {
     choir: { inst: choir({ gain: 0.08, vowel: 'u', a: 1.5, r: 2.5 }), vol: 0.75, reverb: 0.7 },
     lead: { inst: lead({ wave: 'pulse12', gain: 0.16, cutoff: 1900, vib: 30, vibRate: 3.3, a: 0.02 }), vol: 0.7, reverb: 0.4, delay: 0.5, pan: -0.2 },
     bell: { inst: bell({ ratio: 1.41, index: 3, decay: 3.5, gain: 0.17, partial: 2.92, partialGain: 0.3 }), vol: 0.7, reverb: 0.75, delay: 0.2 },
-    heart: { inst: subBass({ gain: 0.34, glide: 3, r: 0.1 }), vol: 0.75 },
+    heart: { inst: subBass({ gain: 0.34, glide: 3, r: 0.1 }), vol: 0.6 },
     bass: { inst: sawBass({ gain: 0.17, cutoff: 330, drive: 4, env: 4, q: 4 }), vol: 0.8, layer: 'combat' },
-    drums: { inst: drums, vol: 0.85, layer: 'combat', reverb: 0.3 },
+    drums: { inst: drums, vol: 0.72, layer: 'combat', reverb: 0.3 },
     amb: { inst: amb, vol: 0.55, reverb: 0.6, delay: 0.3 },
     whisper: { inst: whisper, vol: 0.7, reverb: 0.6, delay: 0.3, layer: 'calm' },
   },

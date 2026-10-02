@@ -64,6 +64,7 @@ export class Hud {
   private activeFlash = 0;
   private activeId: string | null = null;
   private activePop = 0;
+  private activeUse = 0;
   private weaponId = '';
   private weaponPop = 0;
   private potionId: string | null = null;
@@ -147,7 +148,9 @@ export class Hud {
     const act = p.activeId ? Actives.get(p.activeId) : undefined;
     const ready = !!act && p.activeCharge >= act.charge;
     if (ready && !this.activeReady) this.activeFlash = 1;
+    if (!ready && this.activeReady && p.activeId === this.activeId) this.activeUse = 1;
     this.activeReady = ready;
+    this.activeUse = Math.max(0, this.activeUse - dt * 2.2);
     this.activeFlash = Math.max(0, this.activeFlash - dt * 2);
     if (p.weaponId !== this.weaponId) {
       if (this.weaponId) this.weaponPop = 1;
@@ -285,6 +288,18 @@ export class Hud {
       for (let i = 1; i < def.charge; i++) r.uiRect(bx + 2, y + 4 + Math.round(((bh - 4) * i) / def.charge) - 1, 4, 2, C.ink, A);
     }
     if (this.activeFlash > 0) r.uiRect(x + 2, y + 2, s - 4, s - 4, '#fff4c0', this.activeFlash * 0.4 * A);
+    if (this.activeUse > 0) {
+      // used: a ring bursts out of the box
+      const k = 1 - this.activeUse;
+      const d = r.dctx;
+      d.save();
+      d.globalAlpha = this.activeUse * A;
+      d.strokeStyle = '#ffe080';
+      d.lineWidth = 3 * this.activeUse + 1;
+      d.strokeRect(x - k * 14, y - k * 14, s + k * 28, s + k * 28);
+      d.restore();
+      glow(r, x + s / 2, y + s / 2, 30 + k * 40, '#ffd060', 0.4 * this.activeUse * A);
+    }
     keycap(r, actionLabel(input.bindings, 'active', input.aimMode === 'pad'), x + 1, y + s - 2, { align: 'left', alpha: A * 0.95, pad: input.aimMode === 'pad' });
   }
 
@@ -328,23 +343,23 @@ export class Hud {
       const seen = this.buffSeen.get(b.key) ?? this.t;
       const age = this.t - seen;
       const sc = popScale(clamp(1 - age * 2.5, 0, 1), 0.5);
-      frame(r, x, y, 22, 22, 'slot', { alpha: A });
+      frame(r, x, y, 24, 24, 'slot', { alpha: A });
       const icon = b.icon ?? 'ui_flame';
-      spriteCentered(r, icon, x + 11, y + 11, fitScale(icon, 16, 1) * sc, { alpha: A });
+      spriteCentered(r, icon, x + 12, y + 12, fitScale(icon, 20, 1) * sc, { alpha: A });
       if (b.time !== Infinity) {
         const max = this.buffMax.get(b.key) ?? b.time;
         const f = clamp(b.time / Math.max(0.01, max), 0, 1);
-        r.uiRect(x + 2, y + 23, 18, 3, C.ink, A);
-        r.uiRect(x + 3, y + 24, 16 * f, 1, f < 0.25 && Math.sin(this.t * 14) > 0 ? '#ffffff' : C.emberHi, A);
+        r.uiRect(x + 2, y + 25, 20, 4, C.ink, A);
+        r.uiRect(x + 3, y + 26, 18 * f, 2, f < 0.25 && Math.sin(this.t * 14) > 0 ? '#ffffff' : C.emberHi, A);
       } else if (b.until) {
-        r.uiText(b.until === 'room' ? '방' : '층', x + 21, y + 13, { size: 10, font: 'small', align: 'right', color: C.goldHi, alpha: A });
+        r.uiText(b.until === 'room' ? '방' : '층', x + 12, y + 24, { size: 10, font: 'small', align: 'center', color: C.goldHi, alpha: A, outline: C.ink });
       }
       if (b.label && (!newest || seen > newest.t)) newest = { label: b.label, t: seen };
-      x += 25;
+      x += 27;
     }
     if (newest && this.t - newest.t < 2.6) {
       const a = envelope(this.t - newest.t, 2.6, 0.15, 0.5) * A;
-      r.uiText(newest.label, x + 4, y + 5, { size: 12, bold: true, color: C.emberHi, alpha: a, outline: C.ink });
+      r.uiText(newest.label, x + 4, y + 6, { size: 12, bold: true, color: C.emberHi, alpha: a, outline: C.ink });
     }
   }
 
@@ -455,7 +470,7 @@ export class Hud {
   private drawBoss(r: Renderer, A: number): void {
     if (this.bossShown <= 0.01 || A <= 0.01) return;
     const k = ease.outCubic(this.bossShown) * A;
-    const bw = 300;
+    const bw = 280;
     const bx = (UI_W - bw) / 2;
     const by = UI_H - 24 + (1 - k) * 30;
     const a = k;

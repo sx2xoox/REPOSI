@@ -342,9 +342,9 @@ describe('music sequencer', () => {
       run(ctx, 24, (t) => handle.setIntensity?.(Math.floor(t / 4) % 2));
       const srcs = ctx.sources.length;
       expect(srcs, `${id} scheduled nothing`).toBeGreaterThan(id === 'gameover' ? 8 : 60);
-      // nothing scheduled too far ahead
+      // nothing scheduled too far ahead (lookahead + at most one bar of onBar ambience)
       const latest = Math.max(...ctx.sources.map((s) => s.startT ?? 0));
-      expect(latest, id).toBeLessThan(ctx.currentTime + 1.5);
+      expect(latest, id).toBeLessThan(ctx.currentTime + 0.4 + 3.5);
       handle.stop(0.5);
       run(ctx, 8);
       expect(songStats.timers, `${id} timers`).toBe(timers);
@@ -366,6 +366,17 @@ describe('music sequencer', () => {
     h.stop(0);
     run(ctx, 6);
     expect(songStats.timers).toBe(timers);
+    expect(ctx.nodes.filter((n) => !n.disconnected).length).toBe(0);
+  });
+
+  it('halts long ringing notes once a stopped track is disposed', () => {
+    const ctx = new MockCtx();
+    const h = getTrackFactory('floor4')!(asCtx(ctx), asNode(ctx.destination)); // long bells + pads
+    run(ctx, 6);
+    h.stop(0.2);
+    run(ctx, 2.2); // dispose happens ~fade + 1.6s after stop
+    const ringing = ctx.sources.filter((s) => !s.ended);
+    expect(ringing.length).toBe(0);
     expect(ctx.nodes.filter((n) => !n.disconnected).length).toBe(0);
   });
 

@@ -169,14 +169,14 @@ const STYLES: Record<FrameStyle, Paint> = {
   key(p, w, h) {
     roundBox(p, w, h, C.ink, '#d8d0e4');
     p.rect(2, 1, w - 4, 1, '#ffffff');
-    p.rect(2, h - 3, w - 4, 2, '#8a7ea0');
-    p.rect(1, h - 4, 1, 1, '#b0a6c4');
-    p.rect(w - 2, h - 4, 1, 1, '#b0a6c4');
+    p.rect(2, h - 2, w - 4, 1, '#8a7ea0');
+    p.px(1, h - 3, '#b0a6c4');
+    p.px(w - 2, h - 3, '#b0a6c4');
   },
   keyDown(p, w, h) {
     roundBox(p, w, h, C.ink, '#ffe8a8');
     p.rect(2, 1, w - 4, 1, '#ffffff');
-    p.rect(2, h - 3, w - 4, 2, '#c08a3a');
+    p.rect(2, h - 2, w - 4, 1, '#c08a3a');
   },
 };
 
@@ -286,8 +286,8 @@ export function keycap(r: Renderer, label: string, x: number, y: number, o: { al
   const a = o.alpha ?? 1;
   const isPadFace = !!o.pad && PAD_COLORS[label] !== undefined;
   const tw = r.measureText(label, 10, false, 'small');
-  const w = isPadFace ? 16 : Math.max(16, Math.ceil((tw + 10) / PX) * PX);
-  const h = 16;
+  const w = isPadFace ? 18 : Math.max(18, Math.ceil((tw + 10) / PX) * PX);
+  const h = 18;
   let lx = x;
   if (o.align === 'center' || o.align === undefined) lx = x - w / 2;
   else if (o.align === 'right') lx = x - w;
@@ -297,17 +297,17 @@ export function keycap(r: Renderer, label: string, x: number, y: number, o: { al
     d.globalAlpha = a;
     d.fillStyle = C.ink;
     d.beginPath();
-    d.arc(lx + w / 2, ty + h / 2, 8, 0, Math.PI * 2);
+    d.arc(lx + w / 2, ty + h / 2, 9, 0, Math.PI * 2);
     d.fill();
     d.fillStyle = PAD_COLORS[label];
     d.beginPath();
-    d.arc(lx + w / 2, ty + h / 2 - 0.5, 6.5, 0, Math.PI * 2);
+    d.arc(lx + w / 2, ty + h / 2 - 0.5, 7.5, 0, Math.PI * 2);
     d.fill();
     d.globalAlpha = 1;
-    r.uiText(label, lx + w / 2, ty + 3, { size: 10, font: 'small', align: 'center', color: '#ffffff', alpha: a, shadow: C.ink });
+    r.uiText(label, lx + w / 2, ty + 4, { size: 10, font: 'small', align: 'center', color: '#ffffff', alpha: a, shadow: C.ink });
   } else {
     frame(r, lx, ty, w, h, o.down ? 'keyDown' : 'key', { alpha: a });
-    r.uiText(label, lx + w / 2, ty + 2, { size: 10, font: 'small', align: 'center', color: '#1a1424', alpha: a, shadow: false });
+    r.uiText(label, lx + w / 2, ty + 3, { size: 10, font: 'small', align: 'center', color: '#140c1c', alpha: a, shadow: false });
   }
   return w;
 }
@@ -322,7 +322,7 @@ export function keyHint(r: Renderer, key: string, label: string, x: number, y: n
 /** Measure what keyHint() would use without drawing. */
 export function keyHintWidth(r: Renderer, key: string, label: string, pad = false): number {
   const tw = r.measureText(key, 10, false, 'small');
-  const kw = pad && PAD_COLORS[key] !== undefined ? 16 : Math.max(16, Math.ceil((tw + 10) / PX) * PX);
+  const kw = pad && PAD_COLORS[key] !== undefined ? 18 : Math.max(18, Math.ceil((tw + 10) / PX) * PX);
   return kw + 4 + r.measureText(label, 10, false, 'small');
 }
 

@@ -177,12 +177,12 @@ definePixelSprite('st_heart', { r: '#e8283c', w: '#ffb0b8', d: '#8a1020' }, [
   '..rrd..',
   '...d...',
 ], { outline: O });
-definePixelSprite('st_shield', { b: '#7a9af8', w: '#e0ecff', d: '#3a4ab0' }, [
+definePixelSprite('st_shield', { b: '#c8d0e0', w: '#ffffff', d: '#7a8098', y: '#ffd060' }, [
   'bbbbbbb',
-  'bwwbbbd',
-  'bwbbbbd',
-  'bbbbbbd',
-  '.bbbbd.',
+  'bwwybbd',
+  'bwyyybd',
+  'bbbybbd',
+  '.bbybd.',
   '..bbd..',
   '...d...',
 ], { outline: O });

@@ -6,7 +6,7 @@ import type { Renderer } from '../engine/renderer';
 import { UI_H, UI_W } from '../engine/renderer';
 import type { World, Banner } from '../game/world';
 import type { Enemy } from '../game/enemy';
-import { clamp, ease, mixColor } from '../engine/math';
+import { clamp, ease } from '../engine/math';
 import { animFrame, getSprite, hasAnim } from '../engine/sprites';
 import { C, splitFloorName } from './theme';
 import { divider, fitScale, frame, glow, spriteCentered } from './frame';
@@ -14,11 +14,6 @@ import { envelope } from './anim';
 
 // ---------------------------------------------------------------- item plaque
 const BANNER_LIFE = 3.2;
-
-function inkFor(color: string): string {
-  // darken a (light) rarity color so it reads on parchment
-  return mixColor(color, '#2a1206', 0.45);
-}
 
 function roller(r: Renderer, x: number, y: number, h: number, a: number): void {
   r.uiRect(x - 5, y - 6, 10, h + 12, C.ink, a);

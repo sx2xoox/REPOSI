@@ -78,11 +78,11 @@ registerSfx('step', (ctx, out, t, o) => {
 
 registerSfx('player_hurt', (ctx, out, t, o) => {
   const p = sp(ctx, out, t, o, { reverb: 0.18 });
-  click(p, 0, 0.3, 1800, 0.02);
-  p.tone({ wave: 'square', f: [540, 140], sweep: 0.17, dur: 0.22, gain: 0.2, filter: { type: 'lowpass', f: 2400 }, drive: 2 });
-  p.tone({ wave: 'sawtooth', f: [270, 80], sweep: 0.2, dur: 0.24, gain: 0.13, filter: { type: 'lowpass', f: 1200 } });
-  p.noise({ dur: 0.12, gain: 0.3, filter: { type: 'bandpass', f: [2500, 600], q: 1 }, drive: 3 });
-  thump(p, 0, 150, 45, 0.25, 0.42);
+  click(p, 0, 0.24, 1800, 0.02);
+  p.tone({ wave: 'square', f: [540, 140], sweep: 0.17, dur: 0.22, gain: 0.17, filter: { type: 'lowpass', f: 2400 }, drive: 2 });
+  p.tone({ wave: 'sawtooth', f: [270, 80], sweep: 0.2, dur: 0.24, gain: 0.12, filter: { type: 'lowpass', f: 1200 } });
+  p.noise({ dur: 0.12, gain: 0.24, filter: { type: 'bandpass', f: [2500, 600], q: 1 }, drive: 3 });
+  thump(p, 0, 150, 45, 0.25, 0.34);
 });
 
 registerSfx('player_die', (ctx, out, t, o) => {
@@ -99,10 +99,10 @@ registerSfx('player_die', (ctx, out, t, o) => {
 
 registerSfx('shield_block', (ctx, out, t, o) => {
   const p = sp(ctx, out, t, o, { reverb: 0.18 });
-  click(p, 0, 0.4, 2000, 0.025);
-  p.fm({ f: 520, ratio: 1.41, index: [5, 0.5], dur: 0.3, gain: 0.26 });
-  p.fm({ f: 1250, ratio: 2.76, index: [4, 0.2], dur: 0.22, gain: 0.15 });
-  thump(p, 0, 180, 90, 0.12, 0.3);
+  click(p, 0, 0.32, 2000, 0.025);
+  p.fm({ f: 520, ratio: 1.41, index: [5, 0.5], dur: 0.3, gain: 0.22 });
+  p.fm({ f: 1250, ratio: 2.76, index: [4, 0.2], dur: 0.22, gain: 0.14 });
+  thump(p, 0, 180, 90, 0.12, 0.26);
 });
 
 registerSfx('parry', (ctx, out, t, o) => {
@@ -135,16 +135,16 @@ registerSfx('hit', (ctx, out, t, o) => {
   // transient + body + crunch
   const p = sp(ctx, out, t, o, { reverb: 0.06 });
   const d = rnd(0.95, 1.05);
-  click(p, 0, 0.45, 2500, 0.016);
-  thump(p, 0, 190 * d, 70 * d, 0.1, 0.5);
+  click(p, 0, 0.34, 2500, 0.016);
+  thump(p, 0, 190 * d, 70 * d, 0.1, 0.4);
   p.noise({ dur: 0.07, gain: 0.32, filter: { type: 'bandpass', f: [1400 * d, 500], q: 1.4 }, drive: 2.5 });
 });
 
 registerSfx('hit_crit', (ctx, out, t, o) => {
   const p = sp(ctx, out, t, o, { reverb: 0.14 });
-  click(p, 0, 0.42, 2000, 0.02);
-  thump(p, 0, 210, 55, 0.16, 0.5);
-  p.noise({ dur: 0.1, gain: 0.38, filter: { type: 'bandpass', f: [2200, 600], q: 1.2 }, drive: 4 });
+  click(p, 0, 0.34, 2000, 0.02);
+  thump(p, 0, 210, 55, 0.16, 0.38);
+  p.noise({ dur: 0.1, gain: 0.32, filter: { type: 'bandpass', f: [2200, 600], q: 1.2 }, drive: 4 });
   p.tone({ wave: 'square', f: [1500, 980], dur: 0.12, gain: 0.1, filter: { type: 'bandpass', f: 1800, q: 2 } });
   p.fm({ f: 2100, ratio: 2.76, index: [3, 0.1], at: 0.01, dur: 0.18, gain: 0.07 });
 });

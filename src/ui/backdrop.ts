@@ -132,8 +132,6 @@ export class StairwellBackdrop {
   }
 
   private paintLevel(l: Level): void {
-    const prev = l.depth === 1 ? { rx: RX0, ry: RX0 * SQ } : { rx: l.rx / SHRINK, ry: (l.rx / SHRINK) * SQ };
-    void prev;
     const wallRx = l.rx;
     const wallRy = l.ry;
     const x0 = Math.floor(CX - wallRx - 2);
@@ -199,7 +197,6 @@ export class StairwellBackdrop {
         p.px(x - x0, y - y0, shade(c, dark + desc + near));
       }
     }
-    // lip shadow (1px under the inner edge)
     l.canvas = p.toCanvas();
     l.ox = x0;
     l.oy = y0;

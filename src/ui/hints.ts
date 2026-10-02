@@ -127,7 +127,8 @@ export class HintSystem {
       const kw = Math.max(16, r.measureText(key, 10, false, 'small') + 10);
       const width = tw + kw + 34;
       const x = UI_W / 2 - width / 2;
-      const y = bottomY - 30 + slide;
+      const menuKeys = this.menuKeysT >= 0 && !this.menuKeysDone;
+      const y = bottomY - 30 + slide - (menuKeys ? 30 : 0);
       frame(r, x, y, width, 28, 'ribbon', { color: C.gold, alpha: a * 0.95 });
       keycap(r, key, x + 12, y + 14, { align: 'left', alpha: a, pad });
       r.uiText(this.cur.def.text, x + 18 + kw, y + 8, { size: 12, color: C.text, alpha: a });

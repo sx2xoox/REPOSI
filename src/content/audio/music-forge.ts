@@ -29,16 +29,16 @@ const LEAD_B =
 
 defineSong('floor3', {
   bpm: 112,
-  master: 0.8,
+  master: 1.08,
   reverb: { seconds: 2.2, decay: 3, gain: 0.5, tone: 0.4 },
   delay: { beats: 0.75, feedback: 0.3, gain: 0.3 },
   channels: {
-    anvil: { inst: forge, vol: 0.75, reverb: 0.4, pan: 0.2 },
+    anvil: { inst: forge, vol: 0.65, reverb: 0.4, pan: 0.2 },
     pad: { inst: pad({ wave: 'sawtooth', voices: 2, detune: 12, gain: 0.06, cutoff: 750, q: 1.2, a: 0.5, r: 1 }), vol: 0.85, reverb: 0.4 },
     lead: { inst: lead({ wave: 'pulse25', detune: 9, gain: 0.19, cutoff: 2600, vib: 16, a: 0.01 }), vol: 0.75, reverb: 0.3, delay: 0.15 },
     sparks: { inst: lead({ wave: 'pulse12', gain: 0.1, cutoff: 4000, a: 0.002, d: 0.06, s: 0.25, r: 0.04, vib: 0 }), vol: 0.6, delay: 0.25, pan: -0.25, layer: 'combat' },
-    drone: { inst: subBass({ gain: 0.3 }), vol: 0.65, layer: 'calm' },
-    riff: { inst: sawBass({ gain: 0.19, cutoff: 520, drive: 3, env: 3.5 }), vol: 0.8, layer: 'combat' },
+    drone: { inst: subBass({ gain: 0.3 }), vol: 0.5, layer: 'calm' },
+    riff: { inst: sawBass({ gain: 0.19, cutoff: 520, drive: 3, env: 3.5 }), vol: 0.7, layer: 'combat' },
     drums: { inst: drums, vol: 0.85, layer: 'combat', reverb: 0.12 },
     embers: { inst: crackle, vol: 0.7, reverb: 0.3 },
     bellows: { inst: wind, vol: 0.45, reverb: 0.3, layer: 'calm' },
