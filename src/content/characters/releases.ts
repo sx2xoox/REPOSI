@@ -74,7 +74,7 @@ export class HitFalloff {
 }
 
 /** 리아's bloom bolts / 세린's falling arrows on one target: see HitFalloff. */
-export const BLOOM_FALLOFF = 0.87;
+export const BLOOM_FALLOFF = 0.85;
 export const ARROW_FALLOFF = 0.9;
 
 function flareOpen(w: World, p: Player, color: string, radius: number): void {

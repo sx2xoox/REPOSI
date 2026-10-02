@@ -72,7 +72,7 @@ describe('floor 1–3 boss definitions', () => {
   it('boss hp scales so fights last ~30–60 s on their floor', () => {
     // median boss dps of the QA bot on each floor (scripts/qa-run.mjs --suite balance: blessings,
     // items, releases and dodging included; a human is ~1.3x slower), see BOT_BOSS_DPS in floors.test
-    const dps: Record<number, number> = { 1: 30, 2: 44, 3: 69 };
+    const dps: Record<number, number> = { 1: 31, 2: 44, 3: 71 };
     for (const [id, b] of Object.entries(BOSSES)) {
       const d = Enemies.must(id);
       const f = Floors.all().find((x) => x.index === b.floor);

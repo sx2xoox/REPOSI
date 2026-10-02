@@ -73,8 +73,9 @@ describe('discarding artifacts', () => {
   it('blessings and innate traits cannot be discarded', () => {
     const bless = Artifacts.all().find((a) => a.blessing)!;
     expect(discardBlock(bless)).toMatch(/축복/);
-    const trait = Artifacts.all().find((a) => a.hidden && !a.blessing)!;
-    expect(discardBlock(trait)).toBeTruthy();
+    // hidden (innate) artifacts are blocked too; character kits are passives now, so there may be none
+    const trait = Artifacts.all().find((a) => a.hidden && !a.blessing);
+    if (trait) expect(discardBlock(trait)).toBeTruthy();
     const art = anyArtifact();
     expect(discardBlock(art)).toBe(null);
     expect(discardBlock(art, [art.id])).toBeTruthy();

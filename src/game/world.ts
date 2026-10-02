@@ -687,7 +687,8 @@ export class World {
         if (!applied) return false;
         const dealt = Math.max(0, before - Math.max(0, target.hp));
         this.run.stats.damageDealt += dealt;
-        if (hit.kind !== 'status' && !hit.noProc) p.addEmber(Math.min(6, 1.2 + dealt / Math.max(1, p.stats.damage) * 1.3) * (target.isBoss ? 0.6 : 1));
+        // bosses fill the gauge at half rate: a release is a burst, not the main boss-killing tool
+        if (hit.kind !== 'status' && !hit.noProc) p.addEmber(Math.min(6, 1.2 + dealt / Math.max(1, p.stats.damage) * 1.3) * (target.isBoss ? 0.5 : 1));
         this.hitFeedback(target, hit, dealt);
         this.items.onHit(target, hit);
         if (target.hp <= 0) this.killEnemy(target);

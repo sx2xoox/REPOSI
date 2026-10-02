@@ -16,7 +16,7 @@ import { Entity } from '../src/game/entity';
 loadContent();
 
 /** QA bot median boss dps per floor (measured; re-measure when weapons / items change). */
-const BOT_BOSS_DPS: Record<number, number> = { 1: 30, 2: 44, 3: 69, 4: 92, 5: 143, 6: 217 };
+const BOT_BOSS_DPS: Record<number, number> = { 1: 31, 2: 44, 3: 71, 4: 87, 5: 141, 6: 156 };
 
 const KNOBS = ['hpMult', 'bossHpMult', 'enemyDamage', 'enemySpeed', 'shotSpeed', 'budget', 'championChance', 'roomCount'] as const;
 
