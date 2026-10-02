@@ -12,7 +12,7 @@ import { Entity } from './entity';
 import type { World } from './world';
 import type { Projectile } from './projectile';
 import type { ArtifactDef, Rarity } from './defs';
-import type { Renderer } from '../engine/renderer';
+import type { DrawOpts, Renderer } from '../engine/renderer';
 import type { HitInfo, Actor } from './entity';
 import { defineDrawnSprite, hasSprite } from '../engine/sprites';
 import { lighten, ramp, type PixelPainter } from '../engine/painter';
@@ -296,6 +296,12 @@ export function shotTrail(p: Projectile, w: World, look: ShotLook): void {
 }
 
 /** Draw a shot with the composed look (style orb / tear / sprite). */
+/** reused draw options for shots (drawn every frame, many at once) */
+const SHOT_GLOW: DrawOpts = { additive: true, alpha: 0.5 };
+const SHOT_ROT: DrawOpts = { rot: 0 };
+/** shot sprite name -> its glow sprite name */
+const shotGlow = new Map<string, string>();
+
 export function drawShot(p: Projectile, r: Renderer, look: ShotLook, dy: number): void {
   if (p.style === 'sprite' && p.sprite) {
     if (look.glow) r.sprite(lookGlow(14, look.body ?? p.color.slice(0, 7)), p.x, dy, { additive: true, alpha: 0.45 });
@@ -308,9 +314,15 @@ export function drawShot(p: Projectile, r: Renderer, look: ShotLook, dy: number)
       p.lookBody = body;
       p.lookName = look.sprite(d, body);
     }
-    if (look.glow) r.sprite(lookGlow(d * 2 + 4, body), p.x, dy, { additive: true, alpha: 0.5 });
+    if (look.glow) {
+      // glow sprite per shot sprite (same size & body): no name building per draw
+      let gn = shotGlow.get(p.lookName);
+      if (!gn) shotGlow.set(p.lookName, (gn = lookGlow(d * 2 + 4, body)));
+      r.sprite(gn, p.x, dy, SHOT_GLOW);
+    }
     const rot = look.mode === 'aim' ? p.angle : look.mode === 'spin' ? p.age * 10 : p.style === 'tear' ? p.angle : 0;
-    r.sprite(p.lookName, p.x, dy, rot ? { rot } : undefined);
+    if (rot) SHOT_ROT.rot = rot;
+    r.sprite(p.lookName, p.x, dy, rot ? SHOT_ROT : undefined);
   }
   const orb = look.orbits;
   if (orb.length) {

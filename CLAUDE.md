@@ -113,5 +113,5 @@ handlers, dungeon generation) must be **bit-identical on every browser** (V8 / J
 - Check: `npx vitest run tests/determinism` drives the real World headless with a scripted bot
   through floors 1–5 and asserts identical per-step `stateHash(w)` (game/statehash.ts) across fx
   seeds, view widths, quality / settings, drawing and cache warm-up. On failure it prints the first
-  diverging step, the per-part hashes and the differing entities. Add new content to its coverage
-  by playing it there (the harness cycles every weapon / artifact / active / enemy over its scenarios).
+  diverging step, the per-part hashes and the differing entities (harness: tests/detsim.ts; it
+  cycles through weapons / artifacts / actives / extra enemies, so new content gets exercised).
