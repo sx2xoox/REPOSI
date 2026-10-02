@@ -15,6 +15,7 @@ import { clamp, mixColor, TAU } from '../engine/math';
 import { fx } from '../engine/rng';
 import { animFrame, hasAnim } from '../engine/sprites';
 import { input } from '../engine/input';
+import { app } from '../game/app';
 
 const CX = 192;
 const CY0 = 78;
@@ -281,8 +282,10 @@ export class StairwellBackdrop {
     this.t += dt;
     this.dim += (this.dimTarget - this.dim) * Math.min(1, dt * 4);
     // parallax camera: slow drift + a hint of mouse
-    const mx = input.mouseX && typeof window !== 'undefined' ? (input.mouseX / Math.max(1, window.innerWidth * (window.devicePixelRatio || 1))) - 0.5 : 0;
-    const my = input.mouseY && typeof window !== 'undefined' ? (input.mouseY / Math.max(1, window.innerHeight * (window.devicePixelRatio || 1))) - 0.5 : 0;
+    // mouse coords are display-canvas pixels (its size follows the capped DPR)
+    const disp = app.renderer?.display;
+    const mx = input.mouseX && disp ? input.mouseX / Math.max(1, disp.width) - 0.5 : 0;
+    const my = input.mouseY && disp ? input.mouseY / Math.max(1, disp.height) - 0.5 : 0;
     const tx = Math.sin(this.t * 0.13) * 5 + clamp(mx, -0.5, 0.5) * 8;
     const ty = Math.sin(this.t * 0.09 + 1) * 3 + clamp(my, -0.5, 0.5) * 5;
     const k = Math.min(1, dt * 2.5);
