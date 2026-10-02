@@ -17,6 +17,8 @@ export class ScriptRunner {
   private gen: Script | null;
   private wait = 0;
   done = false;
+  /** generator resumptions so far (script progress, for state hashes) */
+  steps = 0;
 
   constructor(gen: Script | null) {
     this.gen = gen;
@@ -32,6 +34,7 @@ export class ScriptRunner {
     }
     // Run until the script yields a wait (guard against runaway loops)
     for (let guard = 0; guard < 64; guard++) {
+      this.steps++;
       const r = this.gen.next();
       if (r.done) {
         this.done = true;
@@ -46,6 +49,11 @@ export class ScriptRunner {
       return true;
     }
     return true;
+  }
+
+  /** Seconds left in the current `yield n` wait. */
+  get waiting(): number {
+    return this.wait;
   }
 
   /** Replace the running script (e.g. boss phase change). */

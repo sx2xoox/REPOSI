@@ -12,7 +12,7 @@ import { TILE } from './constants';
 import { Tile } from './tiles';
 import type { Room, Door, DoorKind } from './room';
 import type { ThemeDef, ThemePalette } from './defs';
-import type { Renderer } from '../engine/renderer';
+import type { DrawOpts, Renderer } from '../engine/renderer';
 import { RNG } from '../engine/rng';
 import { PixelPainter, bayer, darken, lighten, packColor, ramp } from '../engine/painter';
 import { defineDrawnSprite, hasSprite } from '../engine/sprites';

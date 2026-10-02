@@ -1539,25 +1539,27 @@ export class World {
     const mid = this.drawMid;
     all.length = 0;
     mid.length = 0;
-    for (const e of this.entities) {
+    const es = this.entities;
+    for (let i = 0; i < es.length; i++) {
+      const e = es[i];
       if (e.dead && e !== this.player) continue;
       all.push(e);
       if (e.layer === 1) mid.push(e);
     }
-    for (const e of all) if (e.layer === 0) e.draw(r, this);
+    for (let i = 0; i < all.length; i++) if (all[i].layer === 0) all[i].draw(r, this);
     this.room.drawDoors(r, this.time);
-    mid.sort(bySortY);
-    for (const e of mid) e.draw(r, this);
+    this.sortMid(mid);
+    for (let i = 0; i < mid.length; i++) mid[i].draw(r, this);
     this.particles.draw(r, false);
-    for (const e of all) if (e.layer === 2) e.draw(r, this);
+    for (let i = 0; i < all.length; i++) if (all[i].layer === 2) all[i].draw(r, this);
 
     // lighting
     this.lights.begin(r, this.room.theme.ambient);
-    for (const e of all) e.light(this);
+    for (let i = 0; i < all.length; i++) all[i].light(this);
     if (this.lights.enabled) this.drawParticleLights();
     this.lights.apply();
 
-    for (const e of all) if (e.layer === 3) e.draw(r, this);
+    for (let i = 0; i < all.length; i++) if (all[i].layer === 3) all[i].draw(r, this);
     this.drawVignette();
 
     if (this.transition) this.drawTransition(alpha);
@@ -1637,6 +1639,33 @@ export class World {
   }
 
   private lightOpts = { intensity: 1 };
+
+  private sortKeys = new Float64Array(64);
+  /**
+   * Stable y-sort of the mid layer: each entity's `sortY` is read once into a
+   * typed array (a comparator calling the getter on every comparison boxes a
+   * number per call) and an insertion sort runs on it — the order barely
+   * changes between frames, so it is ~linear. Same result as a stable sort by sortY.
+   */
+  private sortMid(mid: Entity[]): void {
+    const n = mid.length;
+    if (this.sortKeys.length < n) this.sortKeys = new Float64Array(n * 2);
+    const keys = this.sortKeys;
+    for (let i = 0; i < n; i++) keys[i] = mid[i].sortY;
+    for (let i = 1; i < n; i++) {
+      const k = keys[i];
+      if (!(k < keys[i - 1])) continue;
+      const e = mid[i];
+      let j = i - 1;
+      while (j >= 0 && k < keys[j]) {
+        keys[j + 1] = keys[j];
+        mid[j + 1] = mid[j];
+        j--;
+      }
+      keys[j + 1] = k;
+      mid[j + 1] = e;
+    }
+  }
 
   private vignette: HTMLCanvasElement | null = null;
   private drawVignette(): void {

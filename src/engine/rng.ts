@@ -113,6 +113,18 @@ export class RNG {
     return arr;
   }
 
+  /** The generator's internal state (four uint32), e.g. for state hashes / snapshots. */
+  getState(): [number, number, number, number] {
+    return [this.a >>> 0, this.b >>> 0, this.c >>> 0, this.d >>> 0];
+  }
+
+  setState(s: readonly number[]): void {
+    this.a = s[0] >>> 0;
+    this.b = s[1] >>> 0;
+    this.c = s[2] >>> 0;
+    this.d = s[3] >>> 0;
+  }
+
   /** Derive an independent generator. Same parent state + same label => same child. */
   fork(label: string | number = ''): RNG {
     return new RNG((this.nextU32() ^ hashString(String(label))) >>> 0);
