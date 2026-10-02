@@ -153,7 +153,7 @@ defineWeapon({
     best.angle = aim;
     best.speed = s.shotSpeed * 1.45;
     best.syncVel();
-    best.damage = s.damage * 1.75;
+    best.damage = s.damage * 1.5;
     best.pierce = s.pierce + 1;
     best.homing = s.homing + 1.2;
     best.bounce = s.bounce;
