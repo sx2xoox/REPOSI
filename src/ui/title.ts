@@ -4,7 +4,7 @@
 
 import type { Scene, TouchButtonSpec } from './scene';
 import { softKeyboard, touchUiActive } from './touch-mode';
-import { fullscreenSupported, isFullscreen, toggleFullscreen } from './fullscreen';
+import { fullscreenSupported, iosBrowserTab, isFullscreen, toggleFullscreen } from './fullscreen';
 import type { Renderer } from '../engine/renderer';
 import { UI_H, UI_W } from '../engine/renderer';
 import { Menu, applyTyped } from './widgets';
@@ -165,6 +165,8 @@ export class TitleScene implements Scene {
     const sa = r.uiSafe;
     r.uiText(rec, 12 + sa.l, UI_H - 16 - sa.b, { size: 10, font: 'small', color: C.textFaint, alpha: mA });
     r.uiText(VERSION, UI_W - 12 - sa.r, UI_H - 16 - sa.b, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: mA });
+    // iPhone Safari has no fullscreen API: point to the home-screen app (fullscreen, no browser bars)
+    if (iosBrowserTab()) r.uiText('공유 버튼 → 홈 화면에 추가하면 주소창 없이 전체 화면으로 즐길 수 있어요', UI_W / 2, 6 + sa.t, { size: 10, font: 'small', align: 'center', color: C.textFaint, alpha: mA * 0.9 });
     if (!this.seedOpen && !touchUiActive()) keyHintRow(r, [['↑↓', '선택'], ['Enter', '결정']], UI_W / 2, UI_H - 10, { alpha: mA * 0.8, pad: input.aimMode === 'pad' });
 
     if (this.seedOpen) this.drawSeed(r);

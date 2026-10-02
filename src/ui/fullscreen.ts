@@ -37,3 +37,15 @@ export function toggleFullscreen(): void {
     }).catch(() => undefined);
   }
 }
+
+/** iPhone / iPad Safari in a browser tab (no Fullscreen API on iPhone): "Add to Home Screen" gives true fullscreen. */
+export function iosBrowserTab(): boolean {
+  try {
+    if (typeof navigator === 'undefined' || isStandalone()) return false;
+    const ua = navigator.userAgent || '';
+    const ios = /iPhone|iPod|iPad/.test(ua) || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints ?? 0) > 1);
+    return ios && !(typeof document !== 'undefined' && document.fullscreenEnabled);
+  } catch {
+    return false;
+  }
+}
