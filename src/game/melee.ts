@@ -12,6 +12,7 @@ import { Projectile } from './projectile';
 import { TILE } from './constants';
 import { tileProps } from './tiles';
 import { defineDrawnSprite, hasSprite } from '../engine/sprites';
+import { bayer } from '../engine/painter';
 import { fx } from '../engine/rng';
 
 export interface SwingOpts {
@@ -307,9 +308,11 @@ export function smearSprite(reach: number, arc: number, color: string, frame: nu
         if (d < inner) continue;
         const edge = R - d;
         let c: string;
+        const k = edge / thick + (bayer(x, y) - 0.5) * 0.2; // dithered band edges
         if (edge < 1.1 && u > 0.15) c = dim ? color : '#ffffff';
-        else if (edge < thick * 0.45) c = color;
-        else c = dark + (u > 0.5 ? 'cc' : '88');
+        else if (k < 0.4) c = color;
+        else if (k < 0.7) c = color + (u > 0.5 ? 'a0' : '70');
+        else c = dark + (u > 0.5 ? '70' : '40');
         if (u < 0.12 && edge >= 1.1) continue;
         p.px(x, y, c);
       }

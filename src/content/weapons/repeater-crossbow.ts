@@ -5,7 +5,7 @@ import { defineWeapon, type WeaponState } from '../../game/defs';
 import type { World } from '../../game/world';
 import type { Player } from '../../game/player';
 import { defineDrawnSprite } from '../../engine/sprites';
-import { O, attackInterval, drawHeld, handPos, kick, muzzle } from './common';
+import { O, attackInterval, drawHeld, handPos, kick, muzzle, attackInput, consumeAttack } from './common';
 
 defineDrawnSprite('w_crossbow', 15, 13, (p) => {
   // stock
@@ -25,14 +25,24 @@ defineDrawnSprite('w_crossbow', 15, 13, (p) => {
 }, { outline: O, origin: [3, 6] });
 
 defineDrawnSprite('icon_repeater', 16, 16, (p) => {
-  p.line(2, 13, 10, 5, '#6a4026');
-  p.line(3, 13, 11, 5, '#9a6a40');
-  p.line(4, 3, 13, 12, '#8a92ac');
-  p.line(4, 4, 12, 12, '#c8d0e4');
-  p.rect(6, 5, 3, 3, '#4a5068');
-  p.line(10, 5, 14, 1, '#e8e0d0');
-  p.px(14, 1, '#ffffff');
-  p.px(12, 1, '#ffd060'); p.px(14, 3, '#ffd060'); p.px(13, 2, '#ffd060');
+  // classic crossbow silhouette pointing right
+  p.rect(0, 8, 11, 3, '#6a4026');
+  p.rect(0, 8, 11, 1, '#9a6a40');
+  p.rect(1, 11, 2, 2, '#4a2a18');
+  // magazine with three bolts
+  p.rect(5, 5, 4, 3, '#4a5068');
+  p.rect(5, 5, 4, 1, '#8a92ac');
+  p.px(6, 4, '#ffd060'); p.px(7, 4, '#ffd060'); p.px(8, 4, '#ffd060');
+  // curved prod + string
+  for (let y = 1; y < 16; y++) {
+    const k = (y - 8.5) / 7.5;
+    p.px(Math.round(12.5 - 2.6 * k * k), y, y < 3 || y > 13 ? '#e8ecf8' : '#8a92ac');
+  }
+  p.line(10, 1, 7, 9, '#f0e8d8');
+  p.line(10, 15, 7, 9, '#f0e8d8');
+  // bolt on the rail
+  p.line(6, 9, 13, 9, '#c8a070');
+  p.poly([13, 7.5, 16, 9.5, 13, 11.5], '#e8f0ff');
 }, { outline: O });
 
 function bolt(w: World, p: Player, st: WeaponState): void {
@@ -64,6 +74,7 @@ defineWeapon({
     m.mulStat('range', 1.15);
   },
   update(w, p, st, dt, firing, aim) {
+    const want = attackInput(st, w, firing, 0.15);
     if ((st.mem.burst ?? 0) > 0) {
       st.mem.bt = (st.mem.bt ?? 0) - dt;
       if (st.mem.bt <= 0) {
@@ -73,7 +84,8 @@ defineWeapon({
       }
       return;
     }
-    if (!firing || st.cooldown > 0) return;
+    if (!want || st.cooldown > 0) return;
+    consumeAttack(st);
     st.sinceAttack = 0;
     w.items.onAttack(aim);
     st.mem.burst = 3;

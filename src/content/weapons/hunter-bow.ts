@@ -4,6 +4,7 @@
 // arrow that pierces several enemies.
 
 import { defineWeapon, type WeaponState } from '../../game/defs';
+import type { ProjBehavior } from '../../game/projectile';
 import type { World } from '../../game/world';
 import type { Player } from '../../game/player';
 import { defineDrawnSprite } from '../../engine/sprites';
@@ -24,18 +25,37 @@ defineDrawnSprite('w_hunter_bow', 7, 19, (p) => {
 }, { outline: O, origin: [5, 9] });
 
 defineDrawnSprite('icon_hunter_bow', 16, 16, (p) => {
-  for (let i = 0; i < 15; i++) {
-    const t = i / 14;
-    const x = 2 + t * 11 + Math.sin(t * Math.PI) * 2.6;
-    const y = 13 - t * 11 + Math.sin(t * Math.PI) * 2.6;
-    p.px(x, y, i < 2 || i > 12 ? '#d8a868' : '#8a5530');
+  // thick recurve limb from bottom-left to top-right, bulging toward the top-left
+  for (let i = 0; i <= 20; i++) {
+    const t = i / 20;
+    const bx = 2 + t * 11;
+    const by = 14 - t * 11;
+    const bulge = Math.sin(t * Math.PI) * 3.6;
+    const x = bx - bulge * 0.7;
+    const y = by - bulge * 0.7;
+    const tip = t < 0.1 || t > 0.9;
+    p.px(x, y, tip ? '#e8c080' : '#a06a38');
+    p.px(x + 1, y, tip ? '#c08a50' : '#6a3c1c');
   }
-  p.line(2, 13, 13, 2, '#e8e0d0');
-  p.line(4, 11, 11, 4, '#c8a070');
-  p.poly([10, 3, 14, 1, 12, 5], '#d8e0f0');
-  p.px(3, 12, '#e03c2c');
-  p.px(4, 13, '#e03c2c');
+  p.rect(4, 6, 2, 3, '#3a2418');
+  p.px(4, 6, '#e03c2c');
+  // string + nocked arrow
+  p.line(3, 14, 14, 3, '#f0e8d8');
+  p.line(6, 13, 13, 6, '#c8a070');
+  p.poly([12, 7, 15, 4, 14, 8], '#e8f0ff');
+  p.px(5, 14, '#e03c2c');
+  p.px(6, 15, '#e03c2c');
 }, { outline: O });
+
+/** Fully drawn arrows hit hard: a beat of hit-stop, a kick and splinters on every enemy struck. */
+const heavyArrow: ProjBehavior = {
+  id: 'heavy_arrow',
+  onHit(pr, w, target) {
+    w.hitstop(0.035);
+    w.renderer.kick(Math.cos(pr.angle) * 1.6, Math.sin(pr.angle) * 1.6);
+    w.particles.burst(target.x, target.y - 4, { count: 8, speed: [60, 160], angle: pr.angle, spread: 0.6, life: [0.1, 0.25], colors: ['#ffffff', '#ffe08a', '#c8a070'], shape: 'spark', size: [1, 2] });
+  },
+};
 
 /** Damage multiplier of an arrow drawn to `c` (0..1). Exported for tests. */
 export function bowDamageMult(c: number): number {
@@ -55,6 +75,7 @@ function loose(w: World, p: Player, st: WeaponState, aim: number): void {
     radius: s.projSize * (full ? 1.15 : 0.85), pierce: s.pierce + (full ? 3 : c > 0.6 ? 1 : 0),
     knockback: s.knockback * (0.6 + c), light: full ? 30 : 10, color: full ? '#ffe08a' : '#e8d0a0',
     x: h.x + Math.cos(aim) * 4, y: h.y + Math.sin(aim) * 3, spreadMult: 0.6,
+    behaviors: full ? [heavyArrow] : [],
   });
   st.cooldown = attackInterval(p, full ? 0.55 : 0.75);
   st.sinceAttack = 0;

@@ -4,7 +4,7 @@
 
 import { defineWeapon } from '../../game/defs';
 import { defineDrawnSprite } from '../../engine/sprites';
-import { O, attackInterval, drawHeld, kick, meleeRest, startSwingPose, swingPose } from './common';
+import { O, attackInterval, drawHeld, kick, meleeRest, startSwingPose, swingPose, attackInput, consumeAttack } from './common';
 import { swordWaveSprite } from './sprites';
 
 defineDrawnSprite('w_sentinel_blade', 23, 7, (p) => {
@@ -47,7 +47,8 @@ defineWeapon({
     m.mulStat('fireRate', 0.95);
   },
   update(w, p, st, _dt, firing, aim) {
-    if (!firing || st.cooldown > 0) return;
+    if (!attackInput(st, w, firing) || st.cooldown > 0) return;
+    consumeAttack(st);
     const s = p.stats;
     const step = st.combo % 3;
     const iv = attackInterval(p);
@@ -97,7 +98,9 @@ defineWeapon({
   draw(w, p, r, st) {
     const rest = meleeRest(st, p.aim);
     const pose = swingPose(st, w, rest);
-    const dist = pose.phase === 1 || pose.phase === 2 ? 5 : 3;
-    drawHeld(r, p, 'w_sentinel_blade', pose.angle, dist, { flash: pose.phase === 1 ? 0.5 : 0 });
+    const active = pose.phase === 1 || pose.phase === 2;
+    // at rest the blade is carried lower and a little smaller; it extends to full size when swung
+    const sc = active ? 1 : pose.phase === 3 ? 1 - 0.18 * pose.t : 0.82;
+    drawHeld(r, p, 'w_sentinel_blade', pose.angle, active ? 5 : 2, { flash: pose.phase === 1 ? 0.5 : 0, sx: sc, sy: sc });
   },
 });

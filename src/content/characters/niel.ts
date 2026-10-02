@@ -132,6 +132,7 @@ defineCharacter({
   baseStats: {
     moveSpeed: 90,
     range: 150,
+    dashCooldown: 0.75,
   },
   unlocked: false,
   unlockHint: '3층의 보스를 쓰러뜨리면 심연 속에서 누군가 깨어난다.',

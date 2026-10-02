@@ -11,7 +11,7 @@ import { defineDrawnSprite } from '../../engine/sprites';
 import { TILE } from '../../game/constants';
 import { tileProps } from '../../game/tiles';
 import { clamp, dist } from '../../engine/math';
-import { O, attackInterval, drawHeld, kick, meleeRest, startSwingPose, swingPose } from './common';
+import { O, attackInterval, drawHeld, kick, meleeRest, startSwingPose, swingPose, attackInput, consumeAttack } from './common';
 
 defineDrawnSprite('w_hammer', 20, 11, (p) => {
   p.rect(0, 5, 13, 2, '#8a5a30');
@@ -126,12 +126,14 @@ defineWeapon({
     m.addStat('knockback', 40);
   },
   update(w, p, st, dt, firing, aim) {
+    const want = attackInput(st, w, firing);
     if ((st.mem.wind ?? 0) > 0) {
       st.mem.wind -= dt;
       if (st.mem.wind <= 0) slam(w, p, st);
       return;
     }
-    if (!firing || st.cooldown > 0) return;
+    if (!want || st.cooldown > 0) return;
+    consumeAttack(st);
     st.sinceAttack = 0;
     w.items.onAttack(aim);
     const wind = 0.13;

@@ -3,7 +3,7 @@
 
 import { defineWeapon } from '../../game/defs';
 import { defineDrawnSprite } from '../../engine/sprites';
-import { O, attackInterval, drawHeld, kick } from './common';
+import { O, attackInterval, drawHeld, kick, attackInput, consumeAttack } from './common';
 
 defineDrawnSprite('w_dagger', 11, 5, (p) => {
   p.rect(0, 2, 3, 1, '#4a2a1a');
@@ -44,7 +44,8 @@ defineWeapon({
     m.mulStat('fireRate', 2.1);
   },
   update(w, p, st, _dt, firing, aim) {
-    if (!firing || st.cooldown > 0) return;
+    if (!attackInput(st, w, firing) || st.cooldown > 0) return;
+    consumeAttack(st);
     const s = p.stats;
     const hand = st.combo % 2;
     st.sinceAttack = 0;

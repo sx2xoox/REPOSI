@@ -3,7 +3,7 @@
 
 import { defineWeapon } from '../../game/defs';
 import { defineDrawnSprite } from '../../engine/sprites';
-import { O, attackInterval, drawHeld, kick } from './common';
+import { O, attackInterval, drawHeld, kick, attackInput, consumeAttack } from './common';
 
 defineDrawnSprite('w_spear', 32, 7, (p) => {
   p.rect(0, 3, 22, 1, '#8a5a30');
@@ -42,7 +42,8 @@ defineWeapon({
     m.mulStat('fireRate', 0.72);
   },
   update(w, p, st, _dt, firing, aim) {
-    if (!firing || st.cooldown > 0) return;
+    if (!attackInput(st, w, firing) || st.cooldown > 0) return;
+    consumeAttack(st);
     const s = p.stats;
     st.sinceAttack = 0;
     w.items.onAttack(aim);

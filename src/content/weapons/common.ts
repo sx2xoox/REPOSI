@@ -185,3 +185,20 @@ function mixWhite(c: string): string {
   const f = (v: number) => Math.round(v + (255 - v) * 0.55).toString(16).padStart(2, '0');
   return `#${f((n >> 16) & 255)}${f((n >> 8) & 255)}${f(n & 255)}`;
 }
+
+/**
+ * Attack input with buffering: true while the attack is held, or for a short
+ * window after a press that happened during the cooldown (so quick clicks
+ * between combo hits are never lost). Call every frame; call `consumeAttack`
+ * when an attack is performed.
+ */
+export function attackInput(st: WeaponState, w: World, firing: boolean, buffer = 0.2): boolean {
+  const prev = st.mem.prevFire ?? 0;
+  st.mem.prevFire = firing ? 1 : 0;
+  if (firing && !prev) st.mem.pressAt = w.time;
+  return firing || w.time - (st.mem.pressAt ?? -99) < buffer;
+}
+
+export function consumeAttack(st: WeaponState): void {
+  st.mem.pressAt = -99;
+}

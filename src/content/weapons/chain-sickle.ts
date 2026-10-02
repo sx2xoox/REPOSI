@@ -3,7 +3,7 @@
 
 import { defineWeapon } from '../../game/defs';
 import { defineDrawnSprite } from '../../engine/sprites';
-import { O, attackInterval, handPos, kick, meleeRest, pixLine, startSwingPose, swingPose } from './common';
+import { O, attackInterval, handPos, kick, meleeRest, pixLine, startSwingPose, swingPose, attackInput, consumeAttack } from './common';
 
 // sickle blade pointing right (pivot at the chain ring on the left)
 defineDrawnSprite('w_sickle', 13, 12, (p) => {
@@ -47,7 +47,8 @@ defineWeapon({
     m.mulStat('fireRate', 0.62);
   },
   update(w, p, st, _dt, firing, aim) {
-    if (!firing || st.cooldown > 0) return;
+    if (!attackInput(st, w, firing) || st.cooldown > 0) return;
+    consumeAttack(st);
     const s = p.stats;
     const dir = st.combo % 2 ? -1 : 1;
     st.sinceAttack = 0;

@@ -61,7 +61,7 @@ defineWeapon({
     const h = handPos(p, aim, 8);
     const gx = h.x;
     const gy = h.y + 6;
-    p.fireProjectiles(w, aim, { style: 'orb', color: '#ffd078', light: 22, x: gx + Math.cos(aim) * 3, y: gy + Math.sin(aim) * 2 });
+    p.fireProjectiles(w, aim, { style: 'tear', color: '#ffd078', light: 22, x: gx + Math.cos(aim) * 3, y: gy + Math.sin(aim) * 2 });
     muzzle(w, gx + Math.cos(aim) * 4, gy + Math.sin(aim) * 3, aim, ['#ffffff', '#ffd078', '#ff9a30']);
     st.mem.swayV = (st.mem.swayV ?? 0) - Math.cos(aim) * 3.5;
     st.anim = 1;

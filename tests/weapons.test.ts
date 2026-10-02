@@ -58,6 +58,11 @@ describe('characters', () => {
     expect(serin.baseStats?.moveSpeed ?? 92).toBeGreaterThan(92);
   });
 
+  it('roster order on character select is 리아, 베른, 세린, 니엘', () => {
+    expect(Characters.all().map((c) => c.id).filter((id) => PLAYABLE.includes(id))).toEqual(PLAYABLE);
+    expect(Characters.all()[0].id).toBe('ria');
+  });
+
   it('only 니엘 is locked, with an unlock hint', () => {
     expect(Characters.must('niel').unlocked).toBe(false);
     expect(Characters.must('niel').unlockHint?.length ?? 0).toBeGreaterThan(5);
@@ -253,6 +258,19 @@ describe('weapon behaviour (headless)', () => {
     expect(swings.every((sw) => sw.o.reflect)).toBe(true);
     // the finisher also throws a sword wave
     expect(s.spawned.some((e) => e instanceof Projectile)).toBe(true);
+  });
+
+  it('melee input is buffered: a click during the cooldown still attacks', () => {
+    const def = Weapons.must('sentinel_blade');
+    const s = sim(def, 'bern');
+    run(s, def, 1 / 60, () => true); // first swing
+    expect(s.events.filter((e) => e === 'attack').length).toBe(1);
+    const cd = s.st.cooldown;
+    expect(cd).toBeGreaterThan(0.12);
+    run(s, def, cd - 0.1, () => false);
+    run(s, def, 2 / 60, () => true); // quick click while still cooling down
+    run(s, def, 0.25, () => false);
+    expect(s.events.filter((e) => e === 'attack').length).toBe(2);
   });
 
   it('hunter bow: full draw is far stronger and pierces', () => {
