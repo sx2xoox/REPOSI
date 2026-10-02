@@ -211,6 +211,26 @@ class Brazier extends Entity {
   }
 }
 
+const holeCache = new Map<number, HTMLCanvasElement>();
+/** Soft hole for VoidDark (alpha `k` inside 0.3 r, fading to 0 at r), cached per whole radius and k. */
+function holeSprite(rad: number, k: number): HTMLCanvasElement {
+  const R = Math.max(1, Math.ceil(rad));
+  const key = R * 1000 + Math.round(k * 100);
+  let c = holeCache.get(key);
+  if (!c) {
+    c = document.createElement('canvas');
+    c.width = c.height = R * 2;
+    const g = c.getContext('2d')!;
+    const grd = g.createRadialGradient(R, R, R * 0.3, R, R, R);
+    grd.addColorStop(0, `rgba(0,0,0,${k})`);
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, R * 2, R * 2);
+    holeCache.set(key, c);
+  }
+  return c;
+}
+
 /** Darkness that rises as the braziers go out; holes keep the keeper, lights and every threat visible. */
 class VoidDark extends Entity {
   owner: Enemy;
@@ -249,11 +269,8 @@ class VoidDark extends Entity {
       const sx = x - vx;
       const sy = y - vy;
       if (sx < -rad || sy < -rad || sx > VIEW_W + rad || sy > VIEW_H + rad) return;
-      const grd = g.createRadialGradient(sx, sy, rad * 0.3, sx, sy, rad);
-      grd.addColorStop(0, `rgba(0,0,0,${k})`);
-      grd.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = grd;
-      g.fillRect(sx - rad, sy - rad, rad * 2, rad * 2);
+      // pre-rendered gradient disc (a gradient per hole per frame is slow, on Safari especially)
+      g.drawImage(holeSprite(rad, k), sx - rad, sy - rad, rad * 2, rad * 2);
     };
     const p = w.player;
     hole(p.x, p.y - 6, 62, 1);

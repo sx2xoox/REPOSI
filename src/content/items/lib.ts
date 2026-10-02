@@ -324,7 +324,7 @@ export interface ShardOpts extends Partial<ProjectileOpts> {
 export function spawnShards(w: World, x: number, y: number, o: ShardOpts): Projectile[] {
   procHere(w);
   const out: Projectile[] = [];
-  const base = o.angle ?? fx.angle();
+  const base = o.angle ?? w.rng.angle();
   const arc = o.arc ?? TAU;
   // performance cap on secondary projectiles alive at once
   let alive = 0;
@@ -349,8 +349,8 @@ export function spawnShards(w: World, x: number, y: number, o: ShardOpts): Proje
 export function sineBehavior(amp = 0.9, freq = 11): ProjBehavior {
   return {
     id: 'sine',
-    update(p, _w, dt) {
-      if (p.mem.sinePh === undefined) p.mem.sinePh = fx.chance(0.5) ? 0 : Math.PI;
+    update(p, w, dt) {
+      if (p.mem.sinePh === undefined) p.mem.sinePh = w.rng.chance(0.5) ? 0 : Math.PI;
       const t0 = p.age - dt;
       const d = amp * (Math.sin(p.age * freq + p.mem.sinePh) - Math.sin(t0 * freq + p.mem.sinePh));
       p.angle += d;

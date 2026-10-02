@@ -55,6 +55,28 @@ export function releaseHit(w: World, e: Enemy, damage: number, fromX: number, fr
   });
 }
 
+/**
+ * Per-target diminishing returns for a release that lands many hits: the n-th
+ * hit on the same enemy deals `decay^n` of the base (never below `min`). A crowd
+ * still takes the whole storm at full strength; a lone target (a boss) can't
+ * soak every bolt, so single-target burst stays in line across characters.
+ */
+export class HitFalloff {
+  private hits = new Map<number, number>();
+  constructor(readonly decay: number, readonly min = 0.1) {}
+
+  /** Damage multiplier for the next hit on `e` (counts that hit). */
+  next(e: Enemy): number {
+    const n = this.hits.get(e.id) ?? 0;
+    this.hits.set(e.id, n + 1);
+    return Math.max(this.min, Math.pow(this.decay, n));
+  }
+}
+
+/** 리아's bloom bolts / 세린's falling arrows on one target: see HitFalloff. */
+export const BLOOM_FALLOFF = 0.87;
+export const ARROW_FALLOFF = 0.9;
+
 function flareOpen(w: World, p: Player, color: string, radius: number): void {
   w.renderer.screenFlash(color, 0.3);
   w.shake(0.35);
@@ -77,12 +99,13 @@ export class ReleaseShot extends Entity {
   life: number;
   pierce: number;
   spin: number;
+  falloff: HitFalloff | null;
   hit = new Set<number>();
   /** color arrays / light color resolved once (no per-frame string building) */
   private trailCols: string[];
   private burstCols: string[];
   private lightCol: string;
-  constructor(x: number, y: number, ang: number, o: { speed: number; damage: number; homing?: number; sprite: string; color: string; life?: number; radius?: number; pierce?: number; spin?: number }) {
+  constructor(x: number, y: number, ang: number, o: { speed: number; damage: number; homing?: number; sprite: string; color: string; life?: number; radius?: number; pierce?: number; spin?: number; falloff?: HitFalloff }) {
     super();
     this.x = x;
     this.y = y;
@@ -96,6 +119,7 @@ export class ReleaseShot extends Entity {
     this.r = o.radius ?? 4;
     this.pierce = o.pierce ?? 0;
     this.spin = o.spin ?? 0;
+    this.falloff = o.falloff ?? null;
     this.trailCols = [this.color, this.color + '80'];
     this.burstCols = ['#ffffff', this.color];
     this.lightCol = this.color.slice(0, 7);
@@ -133,7 +157,7 @@ export class ReleaseShot extends Entity {
       if (!e.alive || e.hidden || this.hit.has(e.id)) continue;
       if (dist(this.x, this.y, e.x, e.y - e.z * 0.3) > this.r + e.r) continue;
       this.hit.add(e.id);
-      releaseHit(w, e, this.damage, this.x - Math.cos(this.ang) * 8, this.y - Math.sin(this.ang) * 8, 90);
+      releaseHit(w, e, this.damage * (this.falloff?.next(e) ?? 1), this.x - Math.cos(this.ang) * 8, this.y - Math.sin(this.ang) * 8, 90);
       if (this.pierce-- <= 0) {
         this.vanish(w);
         return;
@@ -212,6 +236,7 @@ export function releaseLanternBloom(w: World, p: Player): void {
     releaseHit(w, e, p.stats.damage * 2.5, p.x, p.y, 260, [{ kind: 'burn', duration: 3, power: p.stats.damage * 0.5 }]);
   }
   const dmg = p.stats.damage * 0.95;
+  const falloff = new HitFalloff(BLOOM_FALLOFF);
   let acc = 0;
   let k = 0;
   w.spawn(new Timeline(1.4, (ww, t, dt) => {
@@ -224,7 +249,7 @@ export function releaseLanternBloom(w: World, p: Player): void {
       for (let i = 0; i < 2; i++) {
         const a = (i === 0 ? base : -base * 1.15 + Math.PI) + k * 0.06;
         ww.spawn(new ReleaseShot(pl.x + Math.cos(a) * 8, pl.y - 6 + Math.sin(a) * 6, a, {
-          speed: 170, damage: dmg, homing: 5.5, sprite: BLOOM_BOLT, color: '#ffc050', life: 1.5, radius: 4,
+          speed: 170, damage: dmg, homing: 5.5, sprite: BLOOM_BOLT, color: '#ffc050', life: 1.5, radius: 4, falloff,
         }));
       }
       if (k % 3 === 0) ww.sfx('shoot_magic', { vol: 0.35, pitch: 1.2 + fx.range(-0.1, 0.1) });
@@ -313,12 +338,14 @@ class FallingArrow extends Entity {
   delay: number;
   fall = 0.2;
   damage: number;
-  constructor(x: number, y: number, delay: number, damage: number) {
+  falloff: HitFalloff | null;
+  constructor(x: number, y: number, delay: number, damage: number, falloff: HitFalloff | null = null) {
     super();
     this.x = x;
     this.y = y;
     this.delay = delay;
     this.damage = damage;
+    this.falloff = falloff;
     this.layer = 1;
     this.tileCollide = false;
   }
@@ -331,7 +358,7 @@ class FallingArrow extends Entity {
     w.particles.burst(this.x, this.y, { count: 4, speed: [10, 40], life: [0.3, 0.6], colors: ['#8a7a6a', '#5a4a3a'], size: [1, 2], gravity: 200, vz: [30, 70] });
     w.decal(this.x, this.y, '#1a1410', 1.5, 0.4);
     w.sfx('hit', { vol: 0.25, pitch: 1.4 + fx.range(-0.1, 0.1) });
-    for (const e of w.enemiesInRadius(this.x, this.y, 11)) releaseHit(w, e, this.damage, this.x, this.y - 10, 50);
+    for (const e of w.enemiesInRadius(this.x, this.y, 11)) releaseHit(w, e, this.damage * (this.falloff?.next(e) ?? 1), this.x, this.y - 10, 50);
   }
 
   override get sortY(): number {
@@ -367,6 +394,7 @@ export function releaseArrowRain(w: World, p: Player): void {
   w.sfx('whoosh', { vol: 0.6, pitch: 0.7 });
   const sx = p.x;
   const sy = p.y;
+  const falloff = new HitFalloff(ARROW_FALLOFF);
   let acc = 0;
   let idx = 0;
   w.spawn(new Timeline(2.0, (ww, t, dt) => {
@@ -385,14 +413,14 @@ export function releaseArrowRain(w: World, p: Player): void {
       let ty: number;
       if (foes.length && idx % 4 !== 0) {
         const e = foes[idx % foes.length];
-        tx = e.x + fx.range(-7, 7) + e.vx * 0.2;
-        ty = e.y + fx.range(-5, 5) + e.vy * 0.2;
+        tx = e.x + ww.rng.range(-7, 7) + e.vx * 0.2;
+        ty = e.y + ww.rng.range(-5, 5) + e.vy * 0.2;
       } else {
-        const pos = ww.room.randomFreePos(fx, 6);
+        const pos = ww.room.randomFreePos(ww.rng, 6);
         tx = pos.x;
         ty = pos.y;
       }
-      ww.spawn(new FallingArrow(tx, ty, 0.12, ww.player.stats.damage * 1.25));
+      ww.spawn(new FallingArrow(tx, ty, 0.12, ww.player.stats.damage * 1.25, falloff));
     }
   }, {
     draw(r, _ww, t) {

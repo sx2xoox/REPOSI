@@ -227,7 +227,7 @@ function shatterOil(w: World, x: number, y: number): void {
   const tick = Math.max(3, dmg * 0.45);
   HazardZone.add(w, new HazardZone(w, x, y, 'fire', { radius: 24, life: 6, tick: 0.35, damage: tick, statuses: burn }), 8);
   for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * TAU + fx.range(-0.4, 0.4);
+    const a = (i / 3) * TAU + w.rng.range(-0.4, 0.4);
     HazardZone.add(w, new HazardZone(w, x + Math.cos(a) * 13, y + Math.sin(a) * 8, 'fire', { radius: 12, life: 5.5 + i * 0.3, tick: 0.35, damage: tick, statuses: burn }), 8);
   }
 }
@@ -405,8 +405,8 @@ class WispHound extends Familiar {
   constructor(w: World) {
     super(w);
     this.z = 0;
-    this.x += fx.range(-10, 10);
-    this.y += fx.range(4, 10);
+    this.x += w.rng.range(-10, 10);
+    this.y += w.rng.range(4, 10);
   }
 
   override update(w: World, dt: number): void {

@@ -164,7 +164,8 @@ function dimAll(r: Renderer, color: string, alpha: number): void {
 }
 
 function pingColor(ms: number): string {
-  if (ms <= 0) return C.textFaint;
+  if (ms < 0) return C.bad;
+  if (ms === 0) return C.textFaint;
   if (ms < 90) return C.good;
   if (ms < 180) return '#ffd060';
   return C.bad;
@@ -216,6 +217,8 @@ export class LobbyScene implements Scene {
       save.saveSettings();
     }
     this.name = nick;
+    // a finished co-op run left its session open (the default startNetRun keeps it for debugging)
+    activeSession()?.close();
     this.menu = new Menu([
       { label: '방 만들기', action: () => void this.createRoom(), hint: '새 방을 열고 코드를 친구에게 알려 주세요.' },
       { label: '코드로 참가', action: () => this.openCode(''), hint: '친구에게 받은 4자리 방 코드를 입력합니다.' },
@@ -1011,7 +1014,9 @@ export class LobbyScene implements Scene {
       if (host) status = others.length === 0 ? '친구를 기다리는 중… 혼자서도 시작할 수 있어요' : readyN === others.length ? '모두 준비됐어요!' : `친구들이 준비하기를 기다리는 중… (${readyN}/${others.length})`;
       else status = l.me?.ready ? '방장이 시작하기를 기다리는 중…' : '캐릭터를 고르고 준비 완료를 눌러 주세요';
     }
-    if (status && this.toastT <= 0) r.uiText(status, UI_W_BASE / 2, 322, { size: 12, align: 'center', color: C.textDim, alpha: A });
+    if (this.screen === 'starting') status = '하강을 시작합니다!';
+    if (status && this.toastT <= 0) r.uiText(status, UI_W_BASE / 2, 322, { size: 12, align: 'center', color: this.screen === 'starting' ? C.goldHi : C.textDim, alpha: A });
+    if (this.screen === 'starting') return;
     // buttons
     for (const b of this.roomButtons()) {
       if (b.id === 'prev' || b.id === 'next') continue;
@@ -1101,7 +1106,8 @@ export class LobbyScene implements Scene {
       const col = pingColor(ping);
       const bars = ping <= 0 ? 0 : ping < 90 ? 3 : ping < 180 ? 2 : 1;
       for (let i = 0; i < 3; i++) r.uiRect(x + w - 40 + i * 6, fy + 12 - i * 4, 4, 4 + i * 4, i < bars ? col : C.rimDark, a);
-      r.uiText(ping > 0 ? `${ping}ms` : '–', x + w - 46, fy + 3, { size: 10, font: 'small', align: 'right', color: col, alpha: a });
+      const label = ping > 0 ? `${ping}ms` : ping < 0 ? '응답 없음' : '–';
+      r.uiText(label, x + w - 46, fy + 3, { size: 10, font: 'small', align: 'right', color: col, alpha: a });
     }
   }
 }

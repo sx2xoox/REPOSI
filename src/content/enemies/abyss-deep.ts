@@ -289,9 +289,11 @@ defineEnemy({
     }
   },
   draw(e, r, w) {
+    const facing0 = e.facing;
     e.facing = 1;
     r.shadow(e.x, e.y + 2, 26, 9, 0.4);
     e.drawDefault(r, hurtFrame(e, w, 'amaw_hurt_0'));
+    e.facing = facing0;
   },
 });
 

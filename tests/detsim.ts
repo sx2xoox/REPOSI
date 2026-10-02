@@ -11,7 +11,7 @@ import { Renderer } from '../src/engine/renderer';
 import { RNG, fx } from '../src/engine/rng';
 import { save } from '../src/engine/save';
 import { warmAllSprites } from '../src/engine/sprites';
-import { Actives, Artifacts, Weapons, Potions } from '../src/game/defs';
+import { Actives, Artifacts, Enemies, Weapons, Potions } from '../src/game/defs';
 import { World, type WorldHost } from '../src/game/world';
 import { RunState } from '../src/game/run';
 import { FIXED_DT, TILE } from '../src/game/constants';
@@ -68,8 +68,22 @@ export interface Scenario {
   giftsPerFloor: number;
   /** hard cap on total steps */
   maxSteps: number;
+  /** extra enemies (cycling through every regular enemy) spawned into each new hostile room */
+  extraEnemies?: number;
+  /** weapons / actives / artifacts / potions come from shuffled full lists (coverage) */
+  cycle?: boolean;
   /** test only: corrupt the state at this step (desync detection check) */
   injectAt?: number;
+}
+
+/** What a run exercised (coverage report). */
+export interface Coverage {
+  enemies: Set<string>;
+  bosses: Set<string>;
+  rooms: Set<string>;
+  weapons: Set<string>;
+  artifacts: Set<string>;
+  actives: Set<string>;
 }
 
 export interface RunResult {
@@ -81,6 +95,7 @@ export interface RunResult {
   parts?: Record<string, number>;
   dump?: string[];
   stats: { rooms: number; kills: number; bosses: number; floors: number; releases: number; items: number };
+  coverage: Coverage;
 }
 
 const host: WorldHost = { openInventory() {}, onGameOver() {} };
@@ -273,13 +288,21 @@ function botInput(w: World, b: BotState, out: PlayerInput): void {
 }
 
 // ------------------------------------------------------------------ driver
-function giftPool(): { artifacts: string[]; actives: string[]; weapons: string[]; potions: string[] } {
+function giftPool(): { artifacts: string[]; actives: string[]; weapons: string[]; potions: string[]; enemies: string[] } {
   return {
     artifacts: Artifacts.all().filter((a) => !a.hidden && !a.blessing).map((a) => a.id),
     actives: Actives.all().map((a) => a.id),
     weapons: Weapons.all().map((x) => x.id),
     potions: Potions.all().map((x) => x.id),
+    enemies: Enemies.all().filter((e) => !e.boss && !!e.floors?.length).map((e) => e.id),
   };
+}
+
+/** Endless shuffled cycle over a list (coverage) or plain random picks. */
+function picker(rng: RNG, list: string[], cycle: boolean): () => string {
+  const order = rng.shuffle([...list]);
+  let i = 0;
+  return () => (cycle ? order[i++ % order.length] : rng.pick(list));
 }
 
 /** Run a scenario under a variant; returns the per-step state hashes. */
@@ -310,13 +333,21 @@ export function runScenario(sc: Scenario, v: Variant, partsAt = -1): RunResult {
   const first = sc.floors[0];
   const last = sc.floors[sc.floors.length - 1];
 
+  const cyc = !!sc.cycle;
+  const nextArtifact = picker(cmd, pool.artifacts, cyc);
+  const nextActive = picker(cmd, pool.actives, cyc);
+  const nextWeapon = picker(cmd, pool.weapons, cyc);
+  const nextPotion = picker(cmd, pool.potions, cyc);
+  const nextEnemy = picker(cmd, pool.enemies, true);
+  const coverage: Coverage = { enemies: new Set(), bosses: new Set(), rooms: new Set(), weapons: new Set(), artifacts: new Set(), actives: new Set() };
+
   const startFloor = () => {
     stats.floors++;
     const p = w.player;
-    for (let i = 0; i < sc.giftsPerFloor; i++) w.items.give(cmd.pick(pool.artifacts));
-    if (cmd.chance(0.7)) p.setActive(cmd.pick(pool.actives), w);
-    if (cmd.chance(0.6)) p.equipWeapon(w, cmd.pick(pool.weapons));
-    if (cmd.chance(0.5)) p.potionId = cmd.pick(pool.potions);
+    for (let i = 0; i < sc.giftsPerFloor; i++) w.items.give(nextArtifact());
+    if (cyc || cmd.chance(0.7)) p.setActive(nextActive(), w);
+    if (cyc || cmd.chance(0.6)) p.equipWeapon(w, nextWeapon());
+    if (cyc || cmd.chance(0.5)) p.potionId = nextPotion();
     p.bombs = Math.max(p.bombs, 3);
     p.keys = Math.max(p.keys, 2);
     p.coins = Math.max(p.coins, 15);
@@ -352,7 +383,19 @@ export function runScenario(sc: Scenario, v: Variant, partsAt = -1): RunResult {
       bot.roomSteps = 0;
       bot.clearSteps = 0;
       stats.rooms++;
+      coverage.rooms.add(w.node.kind);
+      if (!w.node.cleared && w.node.kind !== 'boss') {
+        const room = w.room;
+        for (let i = 0; i < (sc.extraEnemies ?? 0); i++) {
+          const pos = room.randomFreePos(cmd, 8, { x: p.x, y: p.y, dist: 80 });
+          w.spawnEnemy(nextEnemy(), pos.x, pos.y);
+        }
+        if (cyc && cmd.chance(0.5)) p.equipWeapon(w, nextWeapon());
+      }
     }
+    for (const e of w.enemies) (e.isBoss ? coverage.bosses : coverage.enemies).add(e.def.id);
+    coverage.weapons.add(p.weaponId);
+    if (p.activeId) coverage.actives.add(p.activeId);
     bot.roomSteps++;
     if (w.node.cleared) bot.clearSteps++;
     phaseSteps++;
@@ -360,8 +403,10 @@ export function runScenario(sc: Scenario, v: Variant, partsAt = -1): RunResult {
       if (phase === 'explore') {
         // stuck in a fight or wandering: move on
         if (!w.node.cleared && bot.roomSteps > 2400) for (const e of [...w.enemies]) w.killEnemy(e);
-        if (w.node.cleared && bot.clearSteps > 900) {
-          const next = w.map.nodes.find((n) => !n.visited && n.kind !== 'secret' && n.kind !== 'boss');
+        if (w.node.cleared && bot.clearSteps > 480) {
+          // walked around long enough: jump to an unvisited room (room kinds not seen yet first)
+          const open = w.map.nodes.filter((n) => !n.visited && n.kind !== 'boss');
+          const next = open.find((n) => !coverage.rooms.has(n.kind)) ?? open[0];
           if (next) w.teleportTo(next);
         }
         if (phaseSteps > sc.exploreSteps) {
@@ -404,7 +449,8 @@ export function runScenario(sc: Scenario, v: Variant, partsAt = -1): RunResult {
   stats.kills = w.run.stats.kills;
   stats.releases = w.run.stats.releases;
   stats.items = w.player.inv.items.length;
-  return { hashes, where, world: w, parts, dump, stats };
+  for (const it of w.player.inv.items) coverage.artifacts.add(it.id);
+  return { hashes, where, world: w, parts, dump, stats, coverage };
 }
 
 /** Readable per-entity state (diagnostics for a mismatch). */
@@ -417,7 +463,14 @@ export function dumpState(w: World): string[] {
   for (const e of [...w.entities, ...pend]) {
     if ((e.constructor as typeof Entity).cosmetic || e === p) continue;
     const m = (e as unknown as { mem?: unknown }).mem;
-    const extra = 'def' in e ? (e as unknown as Enemy).def.id + ' hp=' + (e as unknown as Enemy).hp + ' steps=' + (e as unknown as Enemy).script.steps : '';
+    let extra = '';
+    if ('def' in e) {
+      const en = e as unknown as Enemy;
+      extra = `${en.def.id} hp=${en.hp} steps=${en.script.steps} wait=${en.script.waiting} face=${en.facing} anim=${en.anim} want=${en.wantVX},${en.wantVY} tel=${en.telegraphT} dorm=${en.dormant} hid=${en.hidden} st=${JSON.stringify([...en.statuses])} kb=${en.kbx},${en.kby}`;
+    } else if ('angle' in e && 'speed' in e) {
+      const pr = e as unknown as { angle: number; speed: number; life: number; traveled: number; damage: number; pierce: number; hitIds: Set<number> };
+      extra = `ang=${pr.angle} sp=${pr.speed} life=${pr.life} trav=${pr.traveled} dmg=${pr.damage} pierce=${pr.pierce} hits=${[...pr.hitIds]}`;
+    }
     out.push(`${e.constructor.name}#${e.id} ${extra} x=${e.x} y=${e.y} z=${e.z} vx=${e.vx} vy=${e.vy} age=${e.age} dead=${e.dead} mem=${JSON.stringify(m, (_k, v) => (typeof v === 'object' && v && !Array.isArray(v) && v.constructor !== Object ? '[obj]' : v))}`);
   }
   return out;

@@ -422,7 +422,7 @@ function* swimTo(e: Enemy, w: World, x: number, y: number, speed = 175): Script 
     const sp = Math.min(d, speed * w.dt);
     place(e, s.gx + ((x - s.gx) / d) * sp, s.gy + ((y - s.gy) / d) * sp, 0);
     if (fx.chance(0.5)) w.particles.spawn({ x: s.gx + fx.range(-6, 6), y: s.gy + fx.range(-2, 2), vy: -fx.range(10, 30), life: fx.range(0.3, 0.5), colors: EMBERS, size: 1, additive: true, light: 3 });
-    if (e.mem.p2 && fx.chance(0.06)) w.spawn(new Hazard(s.gx, s.gy, 9, 1.6, 'fire', NAME));
+    if (e.mem.p2 && w.rng.chance(0.06)) w.spawn(new Hazard(s.gx, s.gy, 9, 1.6, 'fire', NAME));
     yield;
   }
 }

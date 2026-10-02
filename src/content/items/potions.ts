@@ -10,7 +10,6 @@ import type { World } from '../../game/world';
 import { Pickup, potionSpriteFor, type PickupKind } from '../../game/pickups';
 import { EMBER_MAX } from '../../game/player';
 import { RingFx } from '../../game/effects';
-import { fx } from '../../engine/rng';
 import { shout } from './lib';
 import { revealFloorMap } from './actives';
 
@@ -36,8 +35,8 @@ function potionBuff(w: World, id: string, label: string, scope: 'floor' | number
 function popPickups(w: World, kinds: PickupKind[]): void {
   const p = w.player;
   kinds.forEach((k, i) => {
-    const a = (i / kinds.length) * Math.PI * 2 + fx.range(-0.3, 0.3);
-    w.spawn(new Pickup(k, p.x, p.y).pop(a, fx.range(50, 90)));
+    const a = (i / kinds.length) * Math.PI * 2 + w.rng.range(-0.3, 0.3);
+    w.spawn(new Pickup(k, p.x, p.y).pop(a, w.rng.range(50, 90)));
   });
 }
 

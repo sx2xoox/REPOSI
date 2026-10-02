@@ -271,8 +271,8 @@ resonance('star', '별빛', '#b8a8ff', 'res_star', [
       const targets = [...w.enemies].filter((e) => e.alive && !e.hidden);
       for (let i = 0; i < 4; i++) {
         const e = targets.length ? targets[i % targets.length] : null;
-        const x = e ? e.x + fx.range(-6, 6) : w.room.centerX + fx.range(-80, 80);
-        const y = e ? e.y + fx.range(-4, 4) : w.room.centerY + fx.range(-40, 40);
+        const x = e ? e.x + w.rng.range(-6, 6) : w.room.centerX + w.rng.range(-80, 80);
+        const y = e ? e.y + w.rng.range(-4, 4) : w.room.centerY + w.rng.range(-40, 40);
         const s = new Starfall(x, y, { damage: dmg(w) * 2.5, fall: 0.7 + i * 0.18 });
         w.spawn(s);
       }

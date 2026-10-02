@@ -116,8 +116,10 @@ defineEnemy({
     }
   },
   draw(e, r, w) {
+    const facing0 = e.facing;
     e.facing = 1;
     e.drawDefault(r, hurtFrame(e, w, 'fcrystal_hurt_0'));
+    e.facing = facing0;
   },
 });
 

@@ -1,5 +1,5 @@
 // Soul Knight-style weapon economy (content-side, via global hooks):
-//  - cleared normal rooms (floors 1-5) sometimes leave a weapon chest; opening
+//  - cleared normal rooms (every floor) sometimes leave a weapon chest; opening
 //    it raises the weapon on a pedestal
 //  - every shop sells one weapon on a rack below the counter (priced by rarity)
 //  - treasure rooms: on top of the base 10% roll (items/loot_rules.ts), another
@@ -20,7 +20,7 @@ import { glowSprite } from './common';
 
 const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legendary'];
 
-/** Weapon rarity weights per floor (1-5); deeper floors favor stronger weapons. */
+/** Weapon rarity weights per floor (1-5; deeper floors use floor 5's); deeper floors favor stronger weapons. */
 export const WEAPON_RARITY_BY_FLOOR: Record<number, Record<Rarity, number>> = {
   1: { common: 60, rare: 32, epic: 7, legendary: 1 },
   2: { common: 44, rare: 38, epic: 15, legendary: 3 },
@@ -180,7 +180,7 @@ defineGlobalHooks({
   id: 'weapon_drops',
   onRoomClear(w) {
     const node = w.node;
-    if (!node || node.kind !== 'normal' || w.run.floor > 5) return;
+    if (!node || node.kind !== 'normal') return;
     const rng = new RNG((node.seed ^ 0x5eaf00d ^ (w.run.floor * 7919)) >>> 0);
     if (!rng.chance(WEAPON_CHEST_CHANCE + Math.max(0, w.player.stats.luck) * 0.01)) return;
     const id = rollWeapon(w, rng);

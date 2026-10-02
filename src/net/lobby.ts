@@ -24,7 +24,7 @@ export interface LobbyPlayer {
   name: string;
   characterId: string;
   ready: boolean;
-  /** round-trip time to the host in ms (0 for the host) */
+  /** round-trip time to the host in ms (0 for the host / not measured yet, -1 = not responding) */
   ping: number;
   host: boolean;
 }
@@ -52,7 +52,10 @@ export interface LobbyOptions {
   pingIntervalMs?: number;
   /** host: a connection that does not say hello in time is dropped */
   helloTimeoutMs?: number;
-  /** a peer silent this long is gone */
+  /**
+   * a peer silent this long is gone (generous: on phones the page freezes while
+   * the player switches to a messenger to share the code)
+   */
   silenceTimeoutMs?: number;
   /** client: no welcome / reject within this time → 'timeout' */
   joinTimeoutMs?: number;
@@ -126,7 +129,7 @@ export class Lobby {
       maxPlayers: Math.min(MAX_PLAYERS, o.maxPlayers ?? MAX_PLAYERS),
       pingIntervalMs: o.pingIntervalMs ?? 1000,
       helloTimeoutMs: o.helloTimeoutMs ?? 5000,
-      silenceTimeoutMs: o.silenceTimeoutMs ?? 6000,
+      silenceTimeoutMs: o.silenceTimeoutMs ?? 20000,
       joinTimeoutMs: o.joinTimeoutMs ?? 10000,
       closeDelayMs: o.closeDelayMs ?? 250,
       stepMs: o.stepMs ?? 1000 / 60,
@@ -362,8 +365,9 @@ export class Lobby {
     const host: LobbyPlayer = {
       slot: 0, peer: this.transport.localId, name: this.o.name, characterId: this.o.characterId, ready: true, ping: 0, host: true,
     };
+    const now = this.o.now();
     const rest = [...this.peers.entries()].map(([peer, p]): LobbyPlayer => ({
-      slot: p.slot, peer, name: p.name, characterId: p.ch, ready: p.ready, ping: Math.round(p.ping), host: false,
+      slot: p.slot, peer, name: p.name, characterId: p.ch, ready: p.ready, ping: now - p.lastRecv > 3000 ? -1 : Math.round(p.ping), host: false,
     }));
     this.roster = [host, ...rest].sort((a, b) => a.slot - b.slot);
   }

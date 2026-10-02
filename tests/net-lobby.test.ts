@@ -139,10 +139,15 @@ describe('lobby protocol', () => {
   it('notices a vanished host or client', () => {
     const { net, host, clients, all } = room(2);
     net.cut(clients[0].transport.localId);
-    run(net, all, 7000);
+    run(net, all, 5000);
+    expect(host.roster.find((p) => p.slot === 1)?.ping).toBe(-1); // shown as not responding
+    expect(clients[1].roster.find((p) => p.slot === 1)?.ping).toBe(-1);
+    run(net, all, 16000);
     expect(host.roster.map((p) => p.slot)).toEqual([0, 2]);
     net.cut(host.transport.localId);
-    run(net, all, 7000);
+    run(net, all, 15000);
+    expect(clients[1].state).toBe('open'); // a frozen host page gets a grace period
+    run(net, all, 6000);
     expect(clients[1].closeReason).toBe('host-lost');
   });
 

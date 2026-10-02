@@ -3,7 +3,7 @@
 // own files in this folder.
 
 import { registerRoomHandler } from '../../game/roomkinds';
-import { Enemies } from '../../game/defs';
+import { Enemies, isLastFloor } from '../../game/defs';
 import { Pedestal, Pickup, Trapdoor, type PickupKind } from '../../game/pickups';
 import { TILE } from '../../game/constants';
 import type { World } from '../../game/world';
@@ -130,21 +130,22 @@ registerRoomHandler('boss', {
     if (!e) return false;
     e.dormant = 1.6;
     w.bossIntro = { enemy: e, t: 0 };
-    audio.playMusic(e.def.bossMusic ?? (w.floor.index === 5 ? 'boss_final' : 'boss'));
+    // 'boss_final' belongs to the last floor's boss only (the act-1 finale gets the regular boss theme once deeper floors exist)
+    const last = isLastFloor(w.floor.index);
+    audio.playMusic(e.def.bossMusic && (e.def.bossMusic !== 'boss_final' || last) ? e.def.bossMusic : last ? 'boss_final' : 'boss');
     w.sfx('boss_roar');
     return true;
   },
   onClear(w, room, rng) {
-    const item = w.loot.rollItem('boss', w.run.lootRng) ?? w.loot.rollItem('treasure', w.run.lootRng);
-    if (w.floor.index < 5) {
-      if (item) w.spawn(new Pedestal(room.centerX, room.centerY - 20, item));
-      w.spawn(new Trapdoor(room.centerX, room.centerY + 24));
-    } else {
+    if (isLastFloor(w.floor.index)) {
       // last floor: a short light-flood cinematic, then the victory screen
-      if (w.floor.index === 5) finalVictory(w, room.centerX, room.centerY - 24);
-      else w.victory();
+      finalVictory(w, room.centerX, room.centerY - 24);
       return;
     }
+    // any other floor (the act-1 finale too, once deeper floors exist): reward + trapdoor
+    const item = w.loot.rollItem('boss', w.run.lootRng) ?? w.loot.rollItem('treasure', w.run.lootRng);
+    if (item) w.spawn(new Pedestal(room.centerX, room.centerY - 20, item));
+    w.spawn(new Trapdoor(room.centerX, room.centerY + 24));
     w.spawn(new Pickup('heart', room.centerX - 30, room.centerY).pop());
     if (rng.chance(0.5)) w.spawn(new Pickup('soul_heart', room.centerX + 30, room.centerY).pop());
     audio.playMusic(w.floor.music);

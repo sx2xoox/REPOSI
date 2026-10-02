@@ -278,6 +278,8 @@ defineEnemy({
     const a = e.mem.shieldA ?? 0;
     const c = Math.cos(a);
     const s = Math.sin(a);
+    // draw-only facing (restored below: drawing never changes simulation state)
+    const facing0 = e.facing;
     e.facing = c >= 0 ? 1 : -1;
     const sx = e.x + c * 7;
     const sy = e.y + 4 + s * 4 - e.z;
@@ -287,6 +289,7 @@ defineEnemy({
     const opts = { flipX: c < 0, flash: e.mem.blockT > 0 ? 0.8 : e.flash > 0 ? 0.5 : 0 };
     if (s < -0.2) r.sprite(name, sx, sy, opts);
     e.drawDefault(r);
+    e.facing = facing0;
     if (s >= -0.2) r.sprite(name, sx, sy, opts);
   },
 });
@@ -399,8 +402,10 @@ defineEnemy({
     const behind = Math.sin(a) < -0.3;
     const nz = { rot: a, flipY: Math.cos(a) < 0, flash: e.flash > 0 ? 1 : 0 };
     if (behind) r.sprite('fbellows_nozzle', e.x, e.y - 10 - e.z, nz);
+    const facing0 = e.facing;
     e.facing = 1;
     e.drawDefault(r);
+    e.facing = facing0;
     if (!behind) r.sprite('fbellows_nozzle', e.x, e.y - 10 - e.z, nz);
   },
 });

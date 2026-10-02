@@ -172,28 +172,61 @@ function watchFonts(): void {
 }
 
 // ---------------------------------------------------------------- bitmap caches
-const textCache = new Map<string, HTMLCanvasElement>();
+/** one cached pixel-text bitmap: the (raw) text in a style */
+interface TextEntry {
+  s: number;
+  color: string;
+  outline: string;
+  canvas: HTMLCanvasElement;
+  /** rendered (upper-cased) length */
+  len: number;
+}
+/**
+ * Pixel-text bitmaps keyed by the raw text, then a short list of styles: a hit
+ * builds no key string and upper-cases nothing (damage numbers draw every frame).
+ */
+const textCache = new Map<string, TextEntry[]>();
+let textCount = 0;
 const TEXT_CACHE_MAX = 400;
+
+function textEntry(str: string, color: string, outline: string | undefined, s: number): TextEntry {
+  const ol = outline ?? '';
+  let list = textCache.get(str);
+  if (list) {
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i];
+      if (e.s === s && e.color === color && e.outline === ol) {
+        // LRU: move the text to the newest end (only when it is not already there)
+        if (textCache.size > 1) {
+          textCache.delete(str);
+          textCache.set(str, list);
+        }
+        return e;
+      }
+    }
+  }
+  if (textCount >= TEXT_CACHE_MAX) {
+    // evict the least recently used quarter (not the whole cache)
+    let n = 0;
+    for (const [k, l] of textCache) {
+      textCache.delete(k);
+      textCount -= l.length;
+      n += l.length;
+      if (n >= TEXT_CACHE_MAX / 4) break;
+    }
+    list = textCache.get(str);
+  }
+  if (!list) textCache.set(str, (list = []));
+  const up = str.toUpperCase();
+  const e: TextEntry = { s, color, outline: ol, canvas: textBitmap(up, color, outline, s), len: up.length };
+  list.push(e);
+  textCount++;
+  return e;
+}
 
 /** Pixel text (with optional 8-way outline) rendered once into a canvas with a `scale` px margin. */
 function textBitmap(up: string, color: string, outline: string | undefined, s: number): HTMLCanvasElement {
-  const key = `${s}|${color}|${outline ?? ''}|${up}`;
-  let cv = textCache.get(key);
-  if (cv) {
-    // LRU: move to the newest end
-    textCache.delete(key);
-    textCache.set(key, cv);
-    return cv;
-  }
-  if (textCache.size >= TEXT_CACHE_MAX) {
-    // evict the least recently used quarter (not the whole cache)
-    let n = 0;
-    for (const k of textCache.keys()) {
-      textCache.delete(k);
-      if (++n >= TEXT_CACHE_MAX / 4) break;
-    }
-  }
-  cv = document.createElement('canvas');
+  const cv = document.createElement('canvas');
   cv.width = Math.max(1, (up.length * 4 - 1) * s + 2 * s);
   cv.height = 7 * s;
   const c = cv.getContext('2d')!;
@@ -213,9 +246,10 @@ function textBitmap(up: string, color: string, outline: string | undefined, s: n
     for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) glyphs(ox * s, oy * s, outline);
   }
   glyphs(0, 0, color);
-  textCache.set(key, cv);
   return cv;
 }
+
+const NO_TEXT_OPTS = {};
 
 const shadowCache = new Map<number, { canvas: HTMLCanvasElement; cx: number; cy: number }>();
 
@@ -526,19 +560,20 @@ export class Renderer {
   }
 
   /** Tiny 3x5 bitmap text in world space (cached bitmaps). Returns width in pixels. */
-  pixelText(str: string, x: number, y: number, color: string, opts: { align?: 'left' | 'center' | 'right'; outline?: string; scale?: number; alpha?: number } = {}): number {
+  pixelText(str: string, x: number, y: number, color: string, opts: { align?: 'left' | 'center' | 'right'; outline?: string; scale?: number; alpha?: number } = NO_TEXT_OPTS): number {
     const s = Math.max(1, Math.round(opts.scale ?? 1));
     const alpha = opts.alpha ?? 1;
-    const up = str.toUpperCase();
-    const width = (up.length * 4 - 1) * s;
-    if (alpha <= 0 || !up.length) return width;
+    if (!str.length) return -s;
+    if (alpha <= 0) return (str.toUpperCase().length * 4 - 1) * s;
+    const te = textEntry(str, color, opts.outline, s);
+    const width = (te.len * 4 - 1) * s;
     let sx = Math.round(x - this.viewX);
     const sy = Math.round(y - this.viewY);
     if (opts.align === 'center') sx -= Math.floor(width / 2);
     else if (opts.align === 'right') sx -= width;
     const c = this.ctx;
     c.globalAlpha = alpha;
-    c.drawImage(textBitmap(up, color, opts.outline, s), sx - s, sy - s);
+    c.drawImage(te.canvas, sx - s, sy - s);
     c.globalAlpha = 1;
     return width;
   }

@@ -44,19 +44,45 @@ export interface ParticleSpec {
   ground?: boolean;
 }
 
-interface P extends Required<Omit<ParticleSpec, 'sprite' | 'onLand' | 'lightColor'>> {
-  sprite?: string;
-  onLand?: (x: number, y: number) => void;
-  lightColor?: string;
-  age: number;
-  landed: boolean;
+/**
+ * A pooled particle. A class with every field initialized in a fixed order, so
+ * all particles share one hidden class (monomorphic, allocation-free updates).
+ */
+class P {
+  x = 0;
+  y = 0;
+  z = 0;
+  vx = 0;
+  vy = 0;
+  vz = 0;
+  gravity = 0;
+  drag = 0;
+  life = 1;
+  size = 1;
+  sizeEnd = 1;
+  colors: string[] = NO_COLORS;
+  shape: ParticleShape = 'pixel';
+  rot = 0;
+  vrot = 0;
+  alpha = 1;
+  fade = true;
+  additive = false;
+  light = 0;
+  bounce = 0.4;
+  ground = false;
+  age = 0;
+  landed = false;
   /** position at the start of the latest simulation step (draw interpolation) */
-  px: number;
-  py: number;
-  pz: number;
+  px = 0;
+  py = 0;
+  pz = 0;
   /** spawned during the latest step: not drawn while interpolating (it does not exist yet at the drawn time) */
-  fresh: boolean;
+  fresh = true;
+  sprite: string | undefined = undefined;
+  onLand: ((x: number, y: number) => void) | undefined = undefined;
+  lightColor: string | undefined = undefined;
 }
+const NO_COLORS: string[] = ['#ffffff'];
 
 export interface BurstOpts {
   count: number;
@@ -126,7 +152,7 @@ export class Particles {
       if (this.over >= l.length) this.over = 0;
       return l[this.over++];
     }
-    const p = this.pool.pop() ?? ({} as P);
+    const p = this.pool.pop() ?? new P();
     l.push(p);
     return p;
   }

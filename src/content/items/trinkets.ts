@@ -6,7 +6,6 @@ import type { World } from '../../game/world';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { ramp } from '../../engine/painter';
 import { Bomb, Pickup } from '../../game/pickups';
-import { fx } from '../../engine/rng';
 import { TAU } from '../../engine/math';
 import { O, addHitStatus, grantPerCopy, isAttack, roll, rollHit, spawnShards, syncFamiliars, watch } from './lib';
 import { MirrorShard } from './familiars';
@@ -329,7 +328,7 @@ defineArtifact({
     if (n <= 0) return;
     p.coins -= n;
     for (let i = 0; i < n; i++) {
-      const c = new Pickup('coin', p.x, p.y - 4).pop(fx.angle(), fx.range(70, 120));
+      const c = new Pickup('coin', p.x, p.y - 4).pop(w.rng.angle(), w.rng.range(70, 120));
       c.grace = 0.8;
       w.spawn(c);
     }

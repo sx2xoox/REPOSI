@@ -11,7 +11,7 @@ import { Menu } from './widgets';
 import { app } from '../game/app';
 import { randomSeedString } from '../engine/rng';
 import { clamp, ease } from '../engine/math';
-import { Actives, Enemies, Weapons } from '../game/defs';
+import { Actives, Enemies, Weapons, lastFloorIndex } from '../game/defs';
 import { animFrame, hasAnim, hasSprite } from '../engine/sprites';
 import { sfx } from '../audio/audio';
 import { C, formatTime, splitFloorName } from './theme';
@@ -94,7 +94,7 @@ export class GameOverOverlay implements Scene {
     r.uiSprite(won ? animFrame('ui_lantern', this.t) : flick > 0.3 ? 'ui_lantern_0' : 'ui_lantern_off', lx, ty + 18, 2.5, { alpha: ta });
     r.uiText(titleText, UI_W / 2 + 10, ty, { size: 32, bold: true, align: 'center', color: col, outline: won ? '#4a2a06' : '#3a0408', alpha: ta });
     const [no, fname] = splitFloorName(w.floor.name);
-    const sub = won ? '다섯 개의 층을 모두 정화하고, 마을로 돌아간다.' : `${no} ${fname}에서 쓰러졌다.`;
+    const sub = won ? `${countWord(lastFloorIndex())} 개의 층을 모두 정화하고, 마을로 돌아간다.` : `${no} ${fname}에서 쓰러졌다.`;
     r.uiText(sub, UI_W / 2, ty + 44, { size: 12, align: 'center', color: C.textDim, alpha: ta });
     divider(r, UI_W / 2, ty + 64, 320, won ? C.gold : '#7a2a30', ta);
 
@@ -200,4 +200,10 @@ export class GameOverOverlay implements Scene {
     if (!this.items.length) r.uiText('빈손이었다.', x + w / 2, y + 80, { size: 12, align: 'center', color: C.textMute, alpha: a });
     if (this.items.length > max) r.uiText(`+${this.items.length - max}`, x + w - 14, y + 158, { size: 10, font: 'small', align: 'right', color: C.textDim, alpha: a });
   }
+}
+
+/** Native Korean count word ("다섯 개", "열 개") for small numbers; digits beyond. */
+export function countWord(n: number): string {
+  const words = ['', '한', '두', '세', '네', '다섯', '여섯', '일곱', '여덟', '아홉', '열', '열한', '열두'];
+  return (n >= 1 && words[n]) || String(n);
 }

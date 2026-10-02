@@ -8,7 +8,6 @@ import type { Room } from '../../game/room';
 import { TILE } from '../../game/constants';
 import { Tile } from '../../game/tiles';
 import { facePoint, nearDoor, wallGeo, type Face } from '../../game/roomart';
-import { fx } from '../../engine/rng';
 
 export abstract class Prop extends Entity {
   constructor(x: number, y: number, layer = 0) {
@@ -19,7 +18,9 @@ export abstract class Prop extends Entity {
     this.persistent = true;
     this.tileCollide = false;
     this.solid = false;
-    this.age = fx.range(0, 20);
+    // animation phase: varied per prop but a pure function of the position (no
+    // `fx`), so interactive props (shrines, altars, the merchant) hash the same on every peer
+    this.age = (((x * 7.31 + y * 3.17) % 20) + 20) % 20;
   }
 
   override update(_w: World, dt: number): void {

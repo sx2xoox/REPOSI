@@ -3,7 +3,7 @@
 //    (or a run reaches floor 4+ / is won). Seeded runs don't count.
 //  - After a boss fight, a weapon pedestal sometimes appears beside the reward.
 
-import { defineGlobalHooks, Characters } from '../../game/defs';
+import { defineGlobalHooks, Characters, isLastFloor } from '../../game/defs';
 import type { World } from '../../game/world';
 import { save } from '../../engine/save';
 import { RNG } from '../../engine/rng';
@@ -43,14 +43,14 @@ defineGlobalHooks({
   },
 });
 
-/** Chance that a cleared boss room also offers a weapon (floors 1-4). */
+/** Chance that a cleared boss room also offers a weapon (every floor but the last). */
 export const BOSS_WEAPON_CHANCE = 0.35;
 
 defineGlobalHooks({
   id: 'boss_weapon_drop',
   onRoomClear(w) {
     const node = w.node;
-    if (node.kind !== 'boss' || w.floor.index >= 5) return;
+    if (node.kind !== 'boss' || isLastFloor(w.floor.index)) return;
     if (!new RNG(node.seed ^ 0x3e4b).chance(BOSS_WEAPON_CHANCE)) return;
     const item = w.loot.rollItem('boss', w.run.lootRng, { kinds: ['weapon'] }) ?? w.loot.rollItem('treasure', w.run.lootRng, { kinds: ['weapon'] });
     if (!item) return;

@@ -162,12 +162,14 @@ export class GearTurret extends Familiar {
 /** Crackling ball of lightning that drifts near the player and zaps enemies. */
 export class BallLightning extends Familiar {
   cd = 0.8;
-  driftA = fx.angle();
+  /** orbit phase (drives where it zaps from: gameplay, so from w.rng) */
+  driftA: number;
   arcT = 0;
   arcs: number[] = [];
   constructor(w: World) {
     super(w);
     this.z = 12;
+    this.driftA = w.rng.angle();
   }
 
   override update(w: World, dt: number): void {

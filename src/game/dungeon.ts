@@ -259,7 +259,8 @@ function tryGenerate(floor: FloorDef, rng: RNG, opts: GenOpts): FloorMap | null 
 }
 
 function mergeBigRooms(nodes: RoomNode[], grid: Int16Array, rng: RNG, floorIndex: number): void {
-  const chance = 0.18 + floorIndex * 0.05;
+  // deeper floors have more big rooms (capped: floors 6+ like floor 5)
+  const chance = 0.18 + Math.min(5, floorIndex) * 0.05;
   const isNormal1x1 = (x: number, y: number) => {
     if (!inMap(x, y)) return false;
     const id = grid[cellIdx(x, y)];

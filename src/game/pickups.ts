@@ -23,6 +23,12 @@ export const PICKUP_SPRITE: Record<PickupKind, string> = {
   bomb: 'pk_bomb', bomb2: 'pk_bomb2', key: 'pk_key', potion: 'pk_potion',
 };
 
+const GOLDEN_ANGLE = 2.399963229728653;
+
+function frac(v: number): number {
+  return v - Math.floor(v);
+}
+
 export class Pickup extends Entity {
   kind: PickupKind;
   /** shop price (0 = free) */
@@ -45,11 +51,15 @@ export class Pickup extends Entity {
     this.layer = 1;
   }
 
-  /** Give it a little hop outward when dropped. */
-  pop(angle = fx.angle(), speed = fx.range(40, 90)): this {
+  /**
+   * Give it a little hop outward when dropped. The default direction / strength
+   * spread consecutive drops evenly (golden angle over the entity id): no RNG,
+   * so the landing spot is identical on every lockstep peer.
+   */
+  pop(angle = this.id * GOLDEN_ANGLE, speed = 40 + 50 * frac(this.id * 0.6180339887)): this {
     this.vx = Math.cos(angle) * speed;
     this.vy = Math.sin(angle) * speed;
-    this.vz = fx.range(90, 140);
+    this.vz = 90 + 50 * frac(this.id * 0.7548776662);
     this.z = 1;
     return this;
   }

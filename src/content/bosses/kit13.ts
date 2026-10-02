@@ -273,7 +273,7 @@ export function aimOnRelease(speedJitter = 0): ProjBehavior {
       if (p.mem.aimed) return;
       p.mem.aimed = 1;
       p.angle = Math.atan2(w.player.y - 4 - p.y, w.player.x - p.x);
-      if (speedJitter) p.speed *= 1 + (fx.next() - 0.5) * speedJitter;
+      if (speedJitter) p.speed *= 1 + (w.rng.next() - 0.5) * speedJitter;
       p.syncVel();
     },
   };

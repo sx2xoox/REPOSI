@@ -152,7 +152,8 @@ function botMain(opts) {
     const origHurt = p.hurt.bind(p);
     p.hurt = (ww, hh, src) => {
       const pre = p.red + p.soul;
-      if (opts.immortal && pre <= 6) { if (p.maxRed > 0) p.red = p.maxRed; else p.soul += 6; }
+      // immortal: refill only when this hit could be lethal (no floor hits for more than 4 half-hearts)
+      if (opts.immortal && pre <= 4) { if (p.maxRed > 0) p.red = p.maxRed; else p.soul += 6; }
       const mid = p.red + p.soul;
       const ok = origHurt(ww, hh, src);
       const taken = mid - (p.red + p.soul);
@@ -160,6 +161,7 @@ function botMain(opts) {
         const f = balFloor(w);
         f.taken += taken; f.hits++;
         if (taken >= pre) { f.wouldDie++; BAL.wouldDie++; }
+        f.minHp = Math.min(f.minHp ?? 99, Math.max(0, pre - taken));
         if (bal.room && !bal.room.done) bal.room.taken += taken;
         if (bal.boss) bal.boss.taken += taken;
       }
@@ -1106,6 +1108,7 @@ balanceReport(all.filter((r) => r.balance));
 function balanceReport(runs) {
   if (!runs.length) return;
   const avg = (a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN);
+  const med = (a) => { if (!a.length) return NaN; const b = [...a].sort((x, y) => x - y); return b.length % 2 ? b[(b.length - 1) / 2] : (b[b.length / 2 - 1] + b[b.length / 2]) / 2; };
   const f1 = (v) => (Number.isFinite(v) ? v.toFixed(1) : '-');
   const floors = [...new Set(runs.flatMap((r) => r.balance.floors.map((f) => f.floor)))].sort((a, b) => a - b);
   const rows = floors.map((fl) => {
@@ -1116,13 +1119,13 @@ function balanceReport(runs) {
     const rel = fs.reduce((s, f) => s + f.relDmg, 0);
     return {
       floor: fl, runs: fs.length, hpMult: fs[0]?.hpMult, dpsEst: +f1(avg(fs.map((f) => f.dps))), items: +f1(avg(fs.map((f) => f.items))),
-      hearts: +f1(avg(fs.map((f) => f.maxRed / 2))), roomSec: +f1(avg(rooms.map((x) => x.dur))), roomHp: Math.round(avg(rooms.map((x) => x.hp))),
-      roomTaken: +f1(avg(rooms.map((x) => x.taken))), bossSec: +f1(avg(bosses.map((x) => x.dur))), bossHp: Math.round(avg(bosses.map((x) => x.hp))),
+      hearts: +f1(avg(fs.map((f) => f.maxRed / 2))), roomSec: +f1(med(rooms.map((x) => x.dur))), roomHp: Math.round(avg(rooms.map((x) => x.hp))),
+      roomTaken: +f1(avg(rooms.map((x) => x.taken))), bossSec: +f1(med(bosses.map((x) => x.dur))), bossAvg: +f1(avg(bosses.map((x) => x.dur))), bossHp: Math.round(avg(bosses.map((x) => x.hp))),
       bossTaken: +f1(avg(bosses.map((x) => x.taken))), bossRelPct: Math.round((100 * bosses.reduce((s, b) => s + b.relDmg, 0)) / Math.max(1, bosses.reduce((s, b) => s + b.allDmg, 0))),
       taken: +f1(avg(fs.map((f) => f.taken))), wouldDie: +f1(avg(fs.map((f) => f.wouldDie))), relPct: Math.round((100 * rel) / Math.max(1, all)),
     };
   });
-  console.log('\n[qa] BALANCE (normal rooms / bosses without fallbacks; taken in half-hearts)');
+  console.log('\n[qa] BALANCE (median room / boss seconds, without fallbacks; taken in half-hearts)');
   console.table(rows);
   for (const r of runs) {
     const b = r.balance.bosses.map((x) => `f${x.floor} ${x.id} ${x.dur}s hp${x.hp} rel${Math.round((100 * x.relDmg) / Math.max(1, x.allDmg))}% taken${x.taken}${x.fallback ? ' (fallback)' : ''}`).join(' | ');
