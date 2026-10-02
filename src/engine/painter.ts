@@ -230,7 +230,7 @@ export class PixelPainter {
         const d2 = nx * nx + ny * ny;
         if (d2 > 1.05) continue;
         const nz = Math.sqrt(Math.max(0, 1 - Math.min(1, d2)));
-        let lum = -(nx * lx + ny * ly) * 0.75 + nz * 0.55; // ~[-0.4, 1.2]
+        let lum = (nx * lx + ny * ly) * 0.75 + nz * 0.55; // ~[-0.4, 1.2]; (lx,ly) points toward the light
         lum = clamp((lum + 0.35) / 1.35, 0, 0.9999);
         let f = lum * colors.length;
         if (dither) f += bayer(x, y) - 0.5;

@@ -56,12 +56,9 @@ export function frames(
   return defineAnim(`${prefix}_${state}`, names, o.fps ?? 8, o.loop ?? true);
 }
 
-/**
- * Sphere shading lit from the top-left. (PixelPainter.shadeSphere's default light
- * vector ends up lighting from the bottom-right, so we pass the mirrored vector.)
- */
+/** Sphere shading lit from the top-left (PixelPainter.shadeSphere default light). */
 export function sphere(p: PixelPainter, cx: number, cy: number, rx: number, ry: number, colors: string[], dither = true): void {
-  p.shadeSphere(cx, cy, rx, ry, colors, { lightX: 0.55, lightY: 0.65, dither });
+  p.shadeSphere(cx, cy, rx, ry, colors, { dither });
 }
 
 /** Two-pixel glowing eye: bright pupil + soft halo pixel. */
