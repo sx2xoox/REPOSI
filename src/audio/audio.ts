@@ -20,6 +20,8 @@ export const SFX_NAMES = [
   'beam_charge', 'laser', 'lightning', 'fire', 'freeze', 'poison', 'spike',
   // bosses
   'boss_roar', 'boss_die', 'boss_phase',
+  // floor 6 bosses (drowned archive)
+  'quill_write', 'page_rip', 'ink_splash', 'lamp_hum', 'foghorn', 'tide_slam',
   // world
   'explosion', 'bomb_place', 'fuse', 'rock_break', 'pot_break', 'door_open', 'door_close',
   'door_unlock', 'secret_found', 'trapdoor', 'floor_start', 'room_clear', 'teleport',
@@ -32,7 +34,7 @@ export const SFX_NAMES = [
 export type SfxName = (typeof SFX_NAMES)[number];
 
 export const MUSIC_IDS = [
-  'title', 'floor1', 'floor2', 'floor3', 'floor4', 'floor5', 'boss', 'boss_final',
+  'title', 'floor1', 'floor2', 'floor3', 'floor4', 'floor5', 'boss', 'boss_final', 'boss_drowned',
   'shop', 'secret', 'victory', 'gameover',
 ] as const;
 export type MusicId = (typeof MUSIC_IDS)[number];
