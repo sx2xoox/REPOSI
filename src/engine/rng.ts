@@ -56,6 +56,12 @@ export class RNG {
     return t >>> 0;
   }
 
+  snapshot(): number[] { return [this.a, this.b, this.c, this.d]; }
+  restore(state: number[]): void {
+    if (state.length !== 4 || !state.every(Number.isFinite)) throw new Error('invalid RNG state');
+    [this.a, this.b, this.c, this.d] = state;
+  }
+
   /** float in [0, 1) */
   next(): number {
     return this.nextU32() / 4294967296;

@@ -13,7 +13,7 @@ import { save } from '../engine/save';
 import { audio, sfx as playSfx, type SfxName, type SfxPlayOpts } from '../audio/audio';
 import { TILE, WALL, CELL_W, CELL_H, DIR_VEC, type Dir } from './constants';
 import { Characters, Enemies, Floors, RoomTemplates, Themes, Actives, Weapons, Potions, type FloorDef } from './defs';
-import { generateFloor, matchingDoor, type FloorMap, type NodeDoor, type RoomNode } from './dungeon';
+import { generateFloor, generateStage, matchingDoor, type FloorMap, type NodeDoor, type RoomNode } from './dungeon';
 import { Room, type Door, type DoorKind } from './room';
 import { Entity, Actor, resetEntityIds, useEntityIds, type EntityIds, type HitInfo, type StatusKind } from './entity';
 import { Enemy } from './enemy';
@@ -83,6 +83,7 @@ export interface WorldHost {
   /** open the collection / status overlay */
   openInventory(): void;
   onGameOver(info: GameOverInfo): void;
+  onCampaignPassage?(floor: number, proceed: () => void): void;
 }
 
 interface RoomCacheEntry {
@@ -388,7 +389,7 @@ export class World {
       p.red = p.maxRed;
     }
     this.player = this.lead();
-    this.startFloor(1);
+    this.startFloor(this.run.floor);
     this.player = this.local;
   }
 
@@ -411,7 +412,7 @@ export class World {
     // the layout is a pure function of (seed, floor): the trapdoor may have generated it already
     const prepared = this.preparedFloor?.index === index ? this.preparedFloor.map : null;
     this.preparedFloor = null;
-    this.map = prepared ?? generateFloor(floor, this.run.floorRng(index));
+    this.map = prepared ?? (this.run.staged ? generateStage(floor, this.run.stage, this.run.floorRng(index)) : generateFloor(floor, this.run.floorRng(index)));
     this.roomCache.clear();
     if (this.bgJob && !this.map.nodes.includes(this.bgJob.node)) this.bgJob = null;
     this.bgWarm.clear();
@@ -422,9 +423,11 @@ export class World {
     if (this.room) this.eachItems((it) => it.expire('room'));
     (this as { room?: Room }).room = undefined;
     this.enterRoom(start, null);
-    this.floorCard = { name: floor.name, subtitle: floor.subtitle, t: 0 };
-    this.eachItems((it) => it.expire('floor'));
-    this.eachItems((it) => it.onFloorStart());
+    this.floorCard = { name: this.run.staged ? `${index}-${this.run.stage} ${floor.name.replace(/^\d+층[ ·]*/, '')}` : floor.name, subtitle: this.run.staged && this.run.stage === 4 ? '이 층의 문지기가 기다리고 있다' : floor.subtitle, t: 0 };
+    if (!this.run.staged || this.run.stage === 1) {
+      this.eachItems((it) => it.expire('floor'));
+      this.eachItems((it) => it.onFloorStart());
+    }
     audio.playMusic(floor.music);
     this.sfx('floor_start');
     save.progress.bestFloor = Math.max(save.progress.bestFloor, index);
@@ -1759,6 +1762,10 @@ export class World {
       const pos = this.room.nearestFree(this.room.centerX, this.room.centerY, 6);
       this.dropRandom(pos.x, pos.y, 'room');
     }
+    if (this.run.staged && node.id === this.map.exitId) {
+      const pos = this.room.nearestFree(this.room.centerX, this.room.centerY + 24, 9);
+      this.spawn(new Trapdoor(pos.x, pos.y));
+    }
     // co-op: a boss leaves one more reward pedestal per extra keeper
     if (this.coop && node.kind === 'boss' && !this.gameOver && this.entities.concat(this.pending).some((e) => e instanceof Trapdoor)) {
       this.coopExtraPedestals(this.room, this.room.centerX, this.room.centerY - 20, 'boss');
@@ -1798,7 +1805,7 @@ export class World {
     this.spawn(new RingFx(x, y, 22, 0.4, '#b080ff', 2));
     // while falling: lay out the next floor and pre-render its first room
     const next = Floors.all().find((f) => f.index === this.run.floor + 1);
-    if (next) {
+    if (next && !this.run.staged) {
       const map = generateFloor(next, this.run.floorRng(next.index));
       this.preparedFloor = { index: next.index, map };
       const start = map.nodes[map.startId];
@@ -1833,6 +1840,21 @@ export class World {
   /** Go down the trapdoor (instant cut; the trapdoor itself uses `beginDescend`). */
   descend(animated = false): void {
     if (this.transitioning) return;
+    if (this.run.staged && this.run.stage < 4) {
+      this.run.stage++;
+      this.beginTransition('fade', 0.9);
+      this.startFloor(this.run.floor);
+      return;
+    }
+    if (this.run.campaign && this.host.onCampaignPassage) {
+      this.host.onCampaignPassage(this.run.floor, () => {
+        this.run.stage = 1;
+        this.beginTransition('fade', 0.9);
+        this.startFloor(this.run.floor + 1);
+      });
+      return;
+    }
+    this.run.stage = 1;
     if (!animated) this.sfx('trapdoor');
     const next = this.run.floor + 1;
     if (!Floors.all().some((f) => f.index === next)) {

@@ -32,6 +32,9 @@ import { emptyInput, fixedRules, readLocalInput } from '../game/seam';
 import { CoopSummaryOverlay, NetNoticeOverlay, drawWaiting } from './coop';
 import { LobbyScene } from './lobby';
 import type { CoopCommand } from '../game/coop';
+import { captureCheckpoint, restoreCheckpoint, type Checkpoint } from '../game/checkpoint';
+import { BOSS_STORIES } from '../game/story';
+import { StoryOverlay } from './story';
 
 /** What the lobby hands to a co-op game scene. */
 export interface CoopStart {
@@ -55,6 +58,8 @@ export class GameScene implements Scene, WorldHost {
   private notice: Scene | null = null;
   /** co-op: time the client has been waiting for the host (s) */
   private waitT = 0;
+  private checkpointKey = '';
+  private resume?: Checkpoint;
 
   constructor(seed: string, character: string, seeded: boolean, coop: CoopStart | null = null) {
     this.coop = coop;
@@ -64,13 +69,20 @@ export class GameScene implements Scene, WorldHost {
       seed = coop.start.seed;
       seeded = false;
     }
+    this.resume = !coop && !seeded && save.activeSlot >= 0 ? save.progress.campaign?.checkpoint : undefined;
+    if (this.resume) { seed = this.resume.seed; character = this.resume.character; }
     this.run = new RunState(seed, character);
+    this.run.staged = true;
+    this.run.campaign = !coop && !seeded && save.activeSlot >= 0;
+    this.run.targetFloor = this.run.campaign ? Math.min(7, Math.max(4, (save.progress.campaign?.cleared ?? 0) + 1)) : 7;
+    if (this.resume) this.run.targetFloor = this.resume.targetFloor;
+    if (this.resume) { this.run.floor = this.resume.floor; this.run.stage = this.resume.stage; }
     this.run.seeded = seeded;
     this.world = new World(app.renderer, this.run, this);
   }
 
   enter(): void {
-    save.progress.runs++;
+    if (!this.resume) save.progress.runs++;
     save.saveProgress();
     const c = this.coop;
     if (c) {
@@ -80,7 +92,11 @@ export class GameScene implements Scene, WorldHost {
       w.startParty(c.start.roster.map((p) => ({ slot: p.slot, characterId: p.characterId, name: p.name })), c.session.localSlot);
       this.net = new NetRun(c.session, c.start, w);
       this.alwaysUpdate = true;
-    } else this.world.start();
+    } else {
+      this.world.start();
+      if (this.resume) restoreCheckpoint(this.world, this.resume);
+      this.saveCheckpoint();
+    }
     (window as unknown as { __world?: World }).__world = this.world;
     applyGraphics(this.world);
   }
@@ -130,11 +146,39 @@ export class GameScene implements Scene, WorldHost {
   }
 
   // WorldHost
+  private saveCheckpoint(): void {
+    if (!this.run.campaign || this.world.gameOver) return;
+    save.progress.campaign!.checkpoint = captureCheckpoint(this.world);
+    this.checkpointKey = `${this.run.floor}-${this.run.stage}`;
+    save.saveProgress();
+  }
+
+  onCampaignPassage(floor: number, proceed: () => void): void {
+    const c = save.progress.campaign!;
+    const id = `boss:${floor}`;
+    const done = () => {
+      if (!c.seen.includes(id)) c.seen.push(id);
+      c.cleared = Math.max(c.cleared, floor);
+      if (floor >= this.run.targetFloor) {
+        c.pending = c.seen.includes(`return:${floor}`) ? 0 : floor;
+        c.checkpoint = undefined;
+        save.progress.wins++;
+        save.addRun({ date: new Date().toISOString(), character: this.run.characterId, seed: this.run.seed, floor, won: true, timeSec: Math.round(this.run.stats.timeSec), kills: this.run.stats.kills });
+        save.saveProgress();
+        app.goTown();
+      } else { save.saveProgress(); this.world.paused = false; proceed(); this.saveCheckpoint(); }
+    };
+    this.world.paused = true;
+    if (c.seen.includes(id)) done();
+    else app.scenes.push(new StoryOverlay(BOSS_STORIES[floor], done));
+  }
+
   openInventory(): void {
     if (!this.overlayOpen) this.openOverlay(new StatusOverlay(this));
   }
 
   onGameOver(info: GameOverInfo): void {
+    if (this.run.campaign) save.progress.campaign!.checkpoint = undefined;
     const p = save.progress;
     if (info.won) {
       p.wins++;
@@ -180,6 +224,7 @@ export class GameScene implements Scene, WorldHost {
     }
     w.update(dt);
     this.hud.update(w, dt);
+    if (this.run.campaign && !w.gameOver && this.checkpointKey !== `${this.run.floor}-${this.run.stage}`) this.saveCheckpoint();
     if (!this.overlayOpen && blessingDue(w)) this.offerBlessing();
   }
 

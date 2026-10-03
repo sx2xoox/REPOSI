@@ -139,7 +139,7 @@ registerRoomHandler('boss', {
     return true;
   },
   onClear(w, room, rng) {
-    if (isLastFloor(w.floor.index)) {
+    if (isLastFloor(w.floor.index) && !w.run.campaign) {
       // last floor: a short light-flood cinematic, then the victory screen
       finalVictory(w, room.centerX, room.centerY - 24);
       return;

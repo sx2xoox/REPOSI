@@ -21,9 +21,10 @@ import { divider, frame, glow, keyHintRow } from './frame';
 import { CharacterSelectScene } from './charselect';
 import { CollectionScene } from './collection';
 import { CreditsScene } from './credits';
-import { LobbyScene, consumeRoomLink } from './lobby';
+import { consumeRoomLink } from './lobby';
 import { Characters } from '../game/defs';
 import { appear } from './anim';
+import { SaveSlotsScene } from './save-slots';
 
 export { CharacterSelectScene } from './charselect';
 
@@ -62,8 +63,7 @@ export class TitleScene implements Scene {
 
   constructor() {
     this.menu = new Menu([
-      { label: '새 게임', action: () => app.scenes.set(new CharacterSelectScene()), hint: '무작위 시드로 새로운 하강을 시작합니다.' },
-      { label: '함께하기', action: () => app.scenes.set(new LobbyScene()), hint: '최대 4명이 같은 던전에서 함께 싸웁니다. 쓰러진 동료 곁에 서면 부활시킬 수 있어요.' },
+      { label: '새 게임 / 이어하기', action: () => app.scenes.set(new SaveSlotsScene()), hint: '네 개의 세이브 중 하나를 골라 마을로 향합니다.' },
       { label: '시드 입력', action: () => this.openSeed(), hint: '같은 시드는 같은 던전을 만듭니다. (기록에는 남지 않음)' },
       { label: '도감', action: () => app.scenes.push(new CollectionScene()), hint: '발견한 유물과 마주친 적들의 기록.' },
       { label: '설정', action: () => app.scenes.push(new SettingsOverlay({ fromTitle: true })), hint: '소리, 화면, 조작 설정.' },
@@ -107,7 +107,7 @@ export class TitleScene implements Scene {
       this.linkChecked = true;
       const code = consumeRoomLink();
       if (code) {
-        app.scenes.set(new LobbyScene({ join: code }));
+        app.scenes.set(new SaveSlotsScene(code));
         return;
       }
     }

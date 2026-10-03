@@ -26,14 +26,14 @@ export function buildLogo(textStr: string): HTMLCanvasElement {
   if (cached && cachedText === textStr) return cached;
   const src = document.createElement('canvas');
   const ctx = src.getContext('2d')!;
-  ctx.font = "bold 12px 'Galmuri11', monospace";
+  ctx.font = "12px 'Galmuri11', monospace";
   const tw = Math.ceil(ctx.measureText(textStr).width);
   const pad = 3;
   const W = tw + pad * 2;
   const H = 12 + pad * 2 + 2;
   src.width = W;
   src.height = H;
-  ctx.font = "bold 12px 'Galmuri11', monospace";
+  ctx.font = "12px 'Galmuri11', monospace";
   ctx.textBaseline = 'top';
   ctx.fillStyle = '#fff';
   ctx.fillText(textStr, pad, pad);
@@ -75,7 +75,7 @@ export function buildLogo(textStr: string): HTMLCanvasElement {
       const t = (y - top) / span;
       let c = RAMP[Math.min(RAMP.length - 1, Math.floor(t * RAMP.length))];
       if (!at(x, y - 1)) c = '#ffffff';
-      else if (!at(x, y + 1)) c = '#a8501c';
+      else if (!at(x, y + 1)) c = '#edaa54';
       px(x, y, c);
     }
   }

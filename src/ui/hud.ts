@@ -398,7 +398,7 @@ export class Hud {
     // minimap (+ floor name, seed); the current-room pulse is drawn live on top
     if (!this.minimap.settled) this.drawMinimap(r, w, A);
     else {
-      const key = `${this.minimap.signature(w)}|${w.floor.name}|${w.run.seed}|${this.W}`;
+      const key = `${this.minimap.signature(w)}|${w.floor.name}|${w.run.stage}|${w.run.seed}|${this.W}`;
       this.lyMap.draw(r, key, ox, oy, this.W - MINIMAP_W - MINIMAP_MARGIN - 40, MINIMAP_MARGIN - 2, MINIMAP_W + MINIMAP_MARGIN + 40, MINIMAP_H + 32, A, this.paintMap);
       this.minimap.drawPulse(r, w, this.W - MINIMAP_W - MINIMAP_MARGIN, MINIMAP_MARGIN, MINIMAP_W, MINIMAP_H, this.t, A);
     }
@@ -568,7 +568,7 @@ export class Hud {
     this.minimap.draw(r, w, x, y, mw, mh, this.t, A, staticOnly);
     const [no, name] = splitFloorName(w.floor.name);
     r.uiText(name, RW - 10, y + mh + 4, { size: 10, font: 'small', align: 'right', color: C.textDim, alpha: A, outline: C.ink });
-    if (no) r.uiText(no, RW - 12 - r.measureText(name, 10, false, 'small') - 6, y + mh + 4, { size: 10, font: 'small', align: 'right', color: C.gold, alpha: A, outline: C.ink });
+    if (no) r.uiText(w.run.staged ? `${w.run.floor}-${w.run.stage}` : no, RW - 12 - r.measureText(name, 10, false, 'small') - 6, y + mh + 4, { size: 10, font: 'small', align: 'right', color: C.gold, alpha: A, outline: C.ink });
     r.uiText(w.run.seed, RW - 10, y + mh + 17, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: A * 0.9, outline: C.ink });
   }
 

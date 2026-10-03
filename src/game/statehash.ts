@@ -143,7 +143,7 @@ function keepers(w: World): Player[] {
 function hashRun(h: StateHasher, w: World): void {
   const r = w.run;
   // co-op: run.characterId is each peer's own pick; the party roster is what they share
-  h.str(r.seed).str(w.coop ? w.players.map((p) => `${p.slot}:${p.character.id}`).join(',') : r.characterId).int(r.floor).rng(r.rng).rng(r.lootRng);
+  h.str(r.seed).str(w.coop ? w.players.map((p) => `${p.slot}:${p.character.id}`).join(',') : r.characterId).int(r.floor).int(r.stage).bool(r.staged).rng(r.rng).rng(r.lootRng);
   const s = r.stats;
   h.int(s.kills).num(s.timeSec).num(s.damageTaken).num(s.damageDealt).int(s.roomsCleared).int(s.itemsTaken);
   h.int(s.coinsCollected).int(s.coinsSpent).int(s.activesUsed).int(s.bossesKilled).int(s.secretsFound).int(s.releases);

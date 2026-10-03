@@ -46,12 +46,43 @@ export interface RoomNode {
 }
 
 export interface FloorMap {
+  /** Cleared normal room containing the passage to the next stage. */
+  exitId?: number;
   floor: FloorDef;
   nodes: RoomNode[];
   /** cell -> node id (-1 empty) */
   grid: Int16Array;
   startId: number;
   bossId: number;
+}
+
+/** Short expedition stages; rewards are spread across the four-stage floor. */
+export function generateStage(floor: FloorDef, stage: number, rng: RNG): FloorMap {
+  const nodes: RoomNode[] = [];
+  const grid = new Int16Array(MAP_W * MAP_H).fill(-1);
+  const flip = rng.sign();
+  const vertical = rng.chance(0.5);
+  const add = (x: number, y: number, kind: RoomKind) => {
+    const gx = 6 + (vertical ? y : x) * flip;
+    const gy = 6 + (vertical ? x : y);
+    const n: RoomNode = { id: nodes.length, gx, gy, cw: 1, ch: 1, kind, templateId: '', seed: rng.nextU32(), depth: Math.abs(x) + Math.abs(y), visited: false, cleared: false, discovered: false, locked: false, doors: [] };
+    nodes.push(n); grid[gy * MAP_W + gx] = n.id;
+    n.templateId = pickTemplate(n, floor, rng)?.id ?? '';
+    return n.id;
+  };
+  add(0, 0, 'start');
+  add(1, 0, 'normal');
+  const end = add(2, 0, stage === 4 ? 'boss' : 'normal');
+  if (stage < 4) {
+    add(1, 1, stage === 1 ? 'treasure' : stage === 2 ? 'shop' : rng.pick<RoomKind>(['shrine', 'secret', 'treasure']));
+  }
+  for (const n of nodes) for (const dir of DIRS) {
+    const to = grid[(n.gy + DIR_VEC[dir].y) * MAP_W + n.gx + DIR_VEC[dir].x];
+    if (to >= 0) n.doors.push({ dir, cx: n.gx, cy: n.gy, to, secret: false });
+  }
+  nodes[0].visited = nodes[0].cleared = nodes[0].discovered = true;
+  nodes[1].discovered = true;
+  return { floor, nodes, grid, startId: 0, bossId: stage === 4 ? end : -1, exitId: stage < 4 ? end : undefined };
 }
 
 export function shapeOf(n: RoomNode): RoomShape {

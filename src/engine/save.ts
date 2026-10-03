@@ -54,6 +54,7 @@ export function isTouchDevice(): boolean {
 }
 
 export interface Progress {
+  campaign?: CampaignProgress;
   unlockedCharacters: string[];
   /** artifact / active / weapon ids ever picked up (collection page) */
   seenItems: string[];
@@ -68,6 +69,17 @@ export interface Progress {
   /** achievements / unlock flags */
   flags: string[];
 }
+
+export interface CampaignProgress {
+  seen: string[];
+  cleared: number;
+  pending: number;
+  character: string;
+  checkpoint?: import('../game/checkpoint').Checkpoint;
+}
+export interface SaveSlot { name: string; created: string; progress: Progress; history: RunRecord[] }
+const KEY_SLOTS = 'lanternkeeper.slots.v1';
+export function newCampaign(): CampaignProgress { return { seen: [], cleared: 0, pending: 0, character: 'ria' }; }
 
 export interface RunRecord {
   date: string;
@@ -133,6 +145,15 @@ function write(key: string, value: unknown): void {
 }
 
 export const save = {
+  activeSlot: -1,
+  slots: (() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(KEY_SLOTS) : null;
+      if (!raw) return Array<SaveSlot | null>(4).fill(null);
+      const parsed = JSON.parse(raw);
+      return Array.from({ length: 4 }, (_, i) => parsed[i]?.progress && Array.isArray(parsed[i].history) ? parsed[i] as SaveSlot : null);
+    } catch { return Array<SaveSlot | null>(4).fill(null); }
+  })(),
   settings: read<Settings>(KEY_SETTINGS, DEFAULT_SETTINGS),
   progress: read<Progress>(KEY_PROGRESS, DEFAULT_PROGRESS),
   history: (() => {
@@ -149,12 +170,37 @@ export const save = {
     write(KEY_SETTINGS, this.settings);
   },
   saveProgress(): void {
-    write(KEY_PROGRESS, this.progress);
+    if (this.activeSlot >= 0 && this.slots[this.activeSlot]) {
+      this.slots[this.activeSlot]!.progress = this.progress;
+      this.slots[this.activeSlot]!.history = this.history;
+      write(KEY_SLOTS, this.slots);
+    } else write(KEY_PROGRESS, this.progress);
+  },
+  openSlot(index: number, name?: string): void {
+    if (index < 0 || index >= 4) throw new Error('invalid save slot');
+    // Preserve pre-slot progress in slot one; never overwrite the legacy keys.
+    if (this.activeSlot >= 0) this.saveProgress();
+    if (!this.slots[index]) {
+      const old = read<Progress>(KEY_PROGRESS, DEFAULT_PROGRESS);
+      const progress = index === 0 && (old.runs > 0 || old.flags.length > 0) ? old : structuredClone(DEFAULT_PROGRESS);
+      progress.campaign = newCampaign();
+      let history: RunRecord[] = [];
+      if (index === 0) {
+        try { const rows = typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem(KEY_HISTORY) ?? '[]') : []; if (Array.isArray(rows)) history = rows; } catch { /* preserve progress even when the old history is malformed */ }
+      }
+      this.slots[index] = { name: name?.trim().slice(0, 16) || `등불 ${index + 1}`, created: new Date().toISOString(), progress, history };
+    }
+    this.activeSlot = index;
+    this.progress = this.slots[index]!.progress;
+    this.history = this.slots[index]!.history;
+    this.progress.campaign ??= newCampaign();
+    this.saveProgress();
   },
   addRun(rec: RunRecord): void {
     this.history.unshift(rec);
     if (this.history.length > 30) this.history.length = 30;
-    write(KEY_HISTORY, this.history);
+    if (this.activeSlot >= 0) this.saveProgress();
+    else write(KEY_HISTORY, this.history);
   },
   markSeenItem(id: string): void {
     if (!this.progress.seenItems.includes(id)) {
@@ -178,6 +224,9 @@ export const save = {
     }
   },
   resetAll(): void {
+    this.slots = Array<SaveSlot | null>(4).fill(null);
+    this.activeSlot = -1;
+    write(KEY_SLOTS, this.slots);
     this.settings = structuredClone(DEFAULT_SETTINGS);
     this.progress = structuredClone(DEFAULT_PROGRESS);
     this.history = [];

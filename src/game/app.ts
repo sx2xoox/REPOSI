@@ -13,6 +13,7 @@ export class App {
   /** factories registered by the UI layer to avoid import cycles */
   factories: {
     title?: () => import('../ui/scene').Scene;
+    town?: () => import('../ui/scene').Scene;
     game?: (seed: string, character: string, seeded: boolean) => import('../ui/scene').Scene;
     characterSelect?: () => import('../ui/scene').Scene;
     /** online co-op run (net/session.ts startNetRun) */
@@ -42,6 +43,7 @@ export class App {
   goTitle(): void {
     if (this.factories.title) this.scenes.set(this.factories.title());
   }
+  goTown(): void { if (this.factories.town && save.activeSlot >= 0) this.scenes.set(this.factories.town()); else this.goTitle(); }
 
   goCharacterSelect(): void {
     if (this.factories.characterSelect) this.scenes.set(this.factories.characterSelect());

@@ -286,7 +286,7 @@ export class LobbyScene implements Scene {
 
   private back(): void {
     sfx('ui_back');
-    app.goTitle();
+    app.goTown();
   }
 
   private say(msg: string): void {

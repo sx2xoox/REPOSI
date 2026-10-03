@@ -25,6 +25,10 @@ export class RunState {
   readonly seed: string;
   readonly characterId: string;
   floor = 1;
+  stage = 1;
+  staged = false;
+  campaign = false;
+  targetFloor = 7;
   /** gameplay randomness (drops, crits, AI decisions) */
   readonly rng: RNG;
   /** loot rolls (pedestals, shops) */
@@ -59,6 +63,6 @@ export class RunState {
 
   /** Deterministic generator for a floor's layout. */
   floorRng(floor: number): RNG {
-    return new RNG(`${this.seed}#floor${floor}`);
+    return new RNG(`${this.seed}#floor${floor}${this.staged ? `#stage${this.stage}` : ''}`);
   }
 }

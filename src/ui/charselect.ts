@@ -40,7 +40,7 @@ export class CharacterSelectScene implements Scene {
   touchBack = 'back' as const;
   touchBackAt = 'left' as const;
 
-  constructor(seed?: string) {
+  constructor(seed?: string, private onChoose?: (id: string) => void) {
     this.seed = seed;
     this.chars = characterOrder(save.progress.flags);
     const last = save.history[0]?.character;
@@ -109,7 +109,8 @@ export class CharacterSelectScene implements Scene {
       if (this.starting > 0.85) {
         const c = this.chars[this.idx];
         const seeded = !!this.seed;
-        app.startRun(this.seed ?? randomSeedString(), c.id, seeded);
+        if (this.onChoose) this.onChoose(c.id);
+        else app.startRun(this.seed ?? randomSeedString(), c.id, seeded);
       }
       return;
     }
@@ -119,7 +120,7 @@ export class CharacterSelectScene implements Scene {
     if (this.rl.update(input.held('uiLeft'), dt)) this.choose(this.idx - 1);
     if (input.pressed('cancel')) {
       sfx('ui_back');
-      app.goTitle();
+      if (this.onChoose) app.goTown(); else app.goTitle();
       return;
     }
     if (input.pressed('confirm')) this.start();
@@ -146,7 +147,7 @@ export class CharacterSelectScene implements Scene {
     const ox = uiCenterX();
     return [
       { x: ox + 196, y, w: 64, h: 40, icon: 'tc_arrow_l', tap: 'uiLeft' },
-      { x: ox + 274, y, w: 220, h: 40, label: '하강 시작', tap: 'confirm', primary: true },
+      { x: ox + 274, y, w: 220, h: 40, label: this.onChoose ? '이 등불지기로 준비' : '하강 시작', tap: 'confirm', primary: true },
       { x: ox + 508, y, w: 64, h: 40, icon: 'tc_arrow_r', tap: 'uiRight' },
     ];
   }
@@ -263,7 +264,7 @@ export class CharacterSelectScene implements Scene {
     this.drawStats(r, cur, open, A, k, L.panelH);
     this.drawKit(r, cur, open, A, k, L.stripY, L.stripH);
 
-    if (!touchUiActive()) keyHintRow(r, [['←→', '선택'], ['Enter', '하강 시작'], ['Esc', '뒤로']], UI_W_BASE / 2, UI_H - 12, { alpha: A * 0.85, pad: input.aimMode === 'pad' });
+    if (!touchUiActive()) keyHintRow(r, [['←→', '선택'], ['Enter', this.onChoose ? '준비 완료' : '하강 시작'], ['Esc', '뒤로']], UI_W_BASE / 2, UI_H - 12, { alpha: A * 0.85, pad: input.aimMode === 'pad' });
     if (out > 0) r.uiRect(0, 0, UI_W, UI_H, '#000000', ease.inQuad(out) * 0.9);
   }
 

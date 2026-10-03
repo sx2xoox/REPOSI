@@ -182,8 +182,11 @@ const hold = (on) => Promise.all(pages.map((p) => p.page.evaluate((on) => {
   }, on)));
 try {
   const host = await newPlayer('p0', names[0], query);
-  await key(host, 'ArrowDown');
-  await key(host, 'Enter');
+  // Title -> four slots -> register -> village introduction -> cooperative pier.
+  await key(host, 'Enter', 3);
+  await wait(500);
+  await key(host, 'Enter', 4);
+  await host.page.mouse.click(560 * 1280 / 768, 320 * 720 / 432);
   await until(host, (s) => s.scene === 'lobby' && s.screen === 'main', 'lobby main');
   await wait(300);
   await key(host, 'Enter');
@@ -195,6 +198,7 @@ try {
     // the last guest plays on a phone-sized touch layout
     const phone = i === players - 1;
     const g = await newPlayer(`p${i}`, names[i], `${query}&room=${code}`, phone ? { viewport: { width: 844, height: 390 }, touch: true } : {});
+    for (let attempt = 0; attempt < 3 && (await lobbyState(g)).scene !== 'lobby'; attempt++) await key(g, 'Enter');
     await until(g, (s) => s.scene === 'lobby' && s.modal === 'code', 'prefilled code box');
     await key(g, 'Enter');
     await until(g, (s) => s.screen === 'room' && s.localSlot === i, `joined as slot ${i}`, 25000);
@@ -305,6 +309,8 @@ try {
   const hashes = await Promise.all(pages.map((p) => p.page.evaluate(() => window.__lk.coop.hashes())));
   report.pages = states;
   check('no desync on any page', states.every((s) => s.state === 'running' && !s.desync), states.map((s) => `${s.state}${s.desync ? ` @${s.desync.tick}` : ''}`).join(' '));
+  const campaign = await host.page.evaluate(() => JSON.parse(localStorage.getItem('lanternkeeper.slots.v1'))[0].progress.campaign);
+  check('co-op does not advance the solo story', campaign.cleared === 0 && campaign.pending === 0 && campaign.seen.every(id => id === 'intro'));
   const maps = hashes.map((h) => new Map(h));
   const ticks = [...maps[0].keys()].filter((t) => maps.every((m) => m.has(t)));
   const same = ticks.filter((t) => maps.every((m) => m.get(t) === maps[0].get(t)));

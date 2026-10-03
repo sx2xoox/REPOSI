@@ -131,11 +131,13 @@ export class SettingsOverlay implements Scene {
       return;
     }
     if (this.resetStage === 1) {
+      const hadSlot = save.activeSlot >= 0;
       save.resetAll();
       app.applySettings();
       audio.applyVolumes();
       this.resetStage = 2;
       sfx('explosion', { vol: 0.4 });
+      if (hadSlot) app.goTitle();
     }
   }
 

@@ -60,10 +60,10 @@ export class PauseOverlay implements Scene {
       { label: '계속하기', action: () => this.close(), hint: '하강을 이어갑니다.' },
       { label: '설정', action: () => app.scenes.push(new SettingsOverlay()), hint: '소리, 화면, 조작 설정.' },
       {
-        label: () => (this.confirmQuit ? '정말 포기할까요?' : '타이틀로 나가기'),
+        label: () => this.game.run.campaign ? '저장하고 마을로' : (this.confirmQuit ? '정말 포기할까요?' : '타이틀로 나가기'),
         danger: true,
         action: () => this.quit(),
-        hint: () => (this.confirmQuit ? '한 번 더 누르면 이번 하강의 진행이 사라집니다.' : '이번 하강을 포기하고 타이틀로 돌아갑니다.'),
+        hint: () => this.game.run.campaign ? '현재 스테이지 입구의 상태부터 다시 이어집니다.' : (this.confirmQuit ? '한 번 더 누르면 이번 하강의 진행이 사라집니다.' : '이번 하강을 포기하고 타이틀로 돌아갑니다.'),
       },
     ], 150, 150, { width: 220, lineH: 30, size: 14, hintY: 262 });
   }
@@ -79,6 +79,7 @@ export class PauseOverlay implements Scene {
   }
 
   private quit(): void {
+    if (this.game.run.campaign) { app.goTown(); return; }
     if (!this.confirmQuit) {
       this.confirmQuit = true;
       sfx('warn', { vol: 0.4 });

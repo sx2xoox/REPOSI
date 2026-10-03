@@ -17,7 +17,7 @@ try {
   for (const [id, floor] of bosses) {
     await page.evaluate(([id, floor]) => {
       const api = window.__lk;
-      api.start(`PATTERN-${id}`, 'ria'); api.god(true); api.gotoFloor(floor); api.gotoRoom('boss'); api.step(300);
+      api.start(`PATTERN-${id}`, 'ria'); api.god(true); api.world().run.stage = 4; api.gotoFloor(floor); api.gotoRoom('boss'); api.step(300);
       const w = api.world();
       for (const e of w.entities) if (e !== w.player) e.dead = true;
       w.spawnEnemy(id, w.room.centerX, w.room.centerY - 24);

@@ -42,7 +42,10 @@ export class GameOverOverlay implements Scene {
   constructor(game: GameScene, info: GameOverInfo) {
     this.game = game;
     this.info = info;
-    this.menu = new Menu([
+    this.menu = new Menu(game.run.campaign ? [
+      { label: '등불터로 귀환', action: () => app.goTown(), hint: '해금과 이야기는 남습니다. 다음 원정은 1-1부터 새 장비로 시작합니다.' },
+      { label: '타이틀로', action: () => app.goTitle() },
+    ] : [
       { label: '다시 도전', action: () => app.startRun(randomSeedString(), game.run.characterId), hint: '같은 등불지기로 새로운 시드에 도전합니다.' },
       { label: '같은 시드로 다시', action: () => app.startRun(game.run.seed, game.run.characterId, true), hint: '같은 던전을 다시 내려갑니다. (기록되지 않음)' },
       { label: '타이틀로', action: () => app.goTitle() },

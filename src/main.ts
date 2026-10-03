@@ -12,6 +12,7 @@ import { FramePacer } from './engine/pacing';
 import { loadContent } from './content';
 import { TitleScene, CharacterSelectScene } from './ui/title';
 import { GameScene } from './ui/game-scene';
+import { TownScene } from './ui/town';
 import { installDebug } from './debug';
 import { touch } from './ui/touch';
 import { applyGraphics } from './ui/quality';
@@ -27,6 +28,7 @@ async function boot(): Promise<void> {
   touch.attach(canvas);
   applyGraphics();
   app.factories.title = () => new TitleScene();
+  app.factories.town = () => new TownScene();
   app.factories.characterSelect = () => new CharacterSelectScene();
   app.factories.game = (seed, ch, seeded) => new GameScene(seed, ch, seeded);
   app.factories.coop = (session, start) => new GameScene(start.seed, '', false, { session, start });

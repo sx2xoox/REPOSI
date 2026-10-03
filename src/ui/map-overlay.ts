@@ -58,7 +58,8 @@ export class MapOverlay implements Scene {
     const x = UI_W / 2 - W / 2;
     const y = UI_H / 2 - H / 2 + (1 - k) * 12;
     frame(r, x, y, W, H, 'ornate', { alpha: k });
-    const [no, name] = splitFloorName(w.floor.name);
+    const [floorNo, name] = splitFloorName(w.floor.name);
+    const no = w.run.staged ? `${w.run.floor}-${w.run.stage}` : floorNo;
     r.uiText(no, x + 24, y + 16, { size: 12, color: C.gold, alpha: k });
     r.uiText(name, x + 24 + r.measureText(no, 12) + 8, y + 10, { size: 24, bold: true, color: C.text, outline: C.ink, alpha: k });
     r.uiText(w.floor.subtitle, x + 24, y + 40, { size: 10, font: 'small', color: C.textFaint, alpha: k });
