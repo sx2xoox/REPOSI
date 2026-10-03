@@ -1,5 +1,13 @@
+import portraitUrl from '../assets/npc/resident-portraits.png';
 import { PixelPainter } from '../engine/painter';
 
+let sheet: HTMLImageElement | null = null;
+function portraitSheet(): HTMLImageElement | null {
+  if (typeof Image === 'undefined') return null;
+  if (!sheet) { sheet = new Image(); sheet.src = portraitUrl; }
+  return sheet.complete && sheet.naturalWidth > 0 ? sheet : null;
+}
+export function preloadTownPortraits(): void { portraitSheet(); }
 const cache = new Map<string, HTMLCanvasElement>();
 export const RESIDENTS = [
   { name: '루메', role: '등불 관리인', accent: '#c6a0c8' },
@@ -9,7 +17,19 @@ export const RESIDENTS = [
 
 /** Original pixel busts using the shaded ramps and outlines of the combat art. */
 export function townPortrait(i: number, blink: boolean, talking: boolean): HTMLCanvasElement {
-  const key = `${i}:${Number(blink)}:${Number(talking)}`;
+  const atlas = portraitSheet();
+  if (atlas) {
+    const key = 'approved:'+i;
+    const old = cache.get(key); if (old) return old;
+    const art = document.createElement('canvas'); art.width=128; art.height=144;
+    const ctx=art.getContext('2d')!;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+    // Authored silhouettes do not land exactly on the atlas thirds: keep neighbouring paws out.
+    const [left,width]=[[0,640],[640,728],[1380,668]][i];
+    const scale=atlas.naturalWidth/2048;
+    ctx.drawImage(atlas,left*scale,0,width*scale,atlas.naturalHeight,0,0,128,144);
+    cache.set(key,art); return art;
+  }
+  const key = `fallback:${i}:${Number(blink)}:${Number(talking)}`;
   const old = cache.get(key); if (old) return old;
   const p = new PixelPainter(64, 72);
   const cloth = [

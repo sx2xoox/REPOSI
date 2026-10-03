@@ -8,27 +8,7 @@ import { hash2, vnoise, rampPick, themeArt, paintMasonry, shadePx, blendPx, shad
 import { rectRug } from '../content/rooms/decor';
 
 let cached: HTMLCanvasElement | null = null;
-const residents = new Map<number, HTMLCanvasElement>();
-export function residentArt(i: number): HTMLCanvasElement {
-  const old = residents.get(i); if (old) return old;
-  const p = new PixelPainter(24, 28);
-  const fur = [['#82657b','#bea192','#f0d4b1','#fff0d0'],['#825039','#c68543','#efb961','#ffe1a0'],['#4c536e','#7c8ca1','#b2c2ce','#e4e6d7']][i];
-  const coat=[['#302139','#644871','#a17faa'],['#38272b','#79513b','#bb8958'],['#1a2936','#3e6476','#7da4ab']][i];
-  p.ellipse(13,24,9,3,coat[0]);p.ellipse(11,20,7,6,coat[1]);
-  p.line(6,18,5,23,coat[2]);p.rect(7,25,3,2,fur[1]);p.rect(14,25,3,2,fur[0]);
-  p.poly([4,10,3,1,9,5,15,5,20,1,20,11],fur[1]);
-  p.poly([5,7,5,3,8,6], '#d99b9a');p.poly([16,6,19,3,18,8],'#b68091');
-  p.ellipse(12,11,10,8,fur[1]);p.ellipse(10,10,8,7,fur[2]);
-  p.line(7,5,12,4,fur[3]);p.ellipse(11,14,5,3,fur[3]);
-  p.rect(6,10,3,4,'#19182b');p.rect(15,10,3,4,'#19182b');p.px(6,10,'#fff5db');p.px(15,10,'#fff5db');
-  p.line(11,13,13,13,'#c47d89');p.px(12,14,'#784e61');p.px(11,15,'#784e61');p.px(13,15,'#784e61');
-  p.line(2,13,5,14,fur[0]);p.line(18,14,22,13,fur[0]);
-  if(i===1){p.line(9,5,10,8,fur[0]);p.line(13,5,13,8,fur[0]);p.line(17,6,16,8,fur[0]);p.rect(7,20,9,4,'#b38a59');}
-  if(i===2){p.rectOutline(5,9,5,6,'#c2ab7d');p.rectOutline(14,9,5,6,'#c2ab7d');p.line(10,11,14,11,'#c2ab7d');p.rect(16,18,6,7,'#c1ac7a');p.line(17,19,20,19,'#f1e2b3');}
-  if(i===0){p.rect(7,17,10,2,'#b67588');p.rect(12,18,3,5,'#b67588');p.rect(18,19,4,6,'#9e723e');p.rect(19,20,2,3,'#ffe5a0');}
-  p.line(18,23,22,21,fur[1]);p.line(22,21,22,18,fur[2]);p.outline('#0c0810');
-  const art = p.toCanvas(); residents.set(i, art); return art;
-}
+export { residentArt } from './town-residents';
 /** Static scenery is rasterized once; animated light stays in the scene. */
 export function townArt(): HTMLCanvasElement {
   if (cached) return cached;
