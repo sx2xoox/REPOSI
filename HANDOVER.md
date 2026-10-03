@@ -5,6 +5,8 @@
 
 ## 2026-10-03 실제 온라인 협동 통합
 
+배포 완료: 소스 `6bced55`, GitHub Pages `03c3fe6`, 번들 `index-D9i_yJyw.js`. 공개 주소 https://sx2xoox.github.io/REPOSI/ 에서 2인 실제 협동 60초·해시 61/61 일치·부활·보상·메뉴 중 진행·전원 결과·같은 로비 복귀·재시작·방장 연결 종료 안내를 모두 검증, 오류 0 (`test-results/coop-deployed/report.json`). 방 정원/시작 후 참가 거절/명령 동기화도 BC 및 WebRTC 4인 모두 통과 (`test-results/coop-net-final/report.json`).
+
 이 절이 아래의 과거 기록보다 최신이다. `handover/multiplayer-wip.patch`를 현재 코드에 통합했다. 아래의 “협동 미구현/패치 병합 전” 문구는 이전 상태 기록이다.
 
 - `startNetRun`이 실제 `GameScene + NetRun`을 시작한다. 2–4명이 하나의 월드에서 전투하며, 입력과 축복/유물 버리기/하강 종료/로비 복귀 명령을 host-paced lockstep으로 처리한다. 월드 상태 해시는 매 60틱 비교한다.
