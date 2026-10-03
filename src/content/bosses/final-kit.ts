@@ -197,14 +197,18 @@ export function hash2(x: number, y: number, seed = 0): number {
 // ================================================================== world helpers
 /** Hurt the grounded player if within `r` of (x, y). Returns true if damage was applied. */
 export function hitPlayerCircle(w: World, x: number, y: number, r: number, dmg: number, source: string, knock = 150): boolean {
-  const p = w.player;
-  if (!p.alive || p.z > 8) return false;
-  const d = Math.hypot(p.x - x, p.y - y);
-  if (d > r + p.r * 0.6) return false;
-  if (!p.hurt(w, dmg, source)) return false;
-  const n = d || 1;
-  p.knock((p.x - x) / n, (p.y - y) / n, knock);
-  return true;
+  // every keeper in reach (co-op); single-player: the keeper
+  let any = false;
+  for (const p of w.targets()) {
+    if (!p.alive || p.z > 8) continue;
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (d > r + p.r * 0.6) continue;
+    if (!p.hurt(w, dmg, source)) continue;
+    const n = d || 1;
+    p.knock((p.x - x) / n, (p.y - y) / n, knock);
+    any = true;
+  }
+  return any;
 }
 
 /** Expire every enemy projectile (phase changes clear the screen — fairness). */
@@ -512,17 +516,18 @@ export class ShockRing extends Entity {
     this.age += dt;
     this.radius += this.o.speed * dt;
     const o = this.o;
-    const p = w.player;
     const gaps = o.gaps ?? [];
     const gw = o.gapWidth ?? 0;
-    if (!this.hit && p.alive && p.z < 4 && this.radius < o.maxR * 0.9) {
-      const dx = p.x - this.x;
-      const dy = p.y - this.y;
-      const d = Math.hypot(dx, dy);
-      if (Math.abs(d - this.radius) < (o.thick ?? 4) + p.r * 0.5 && !inGap(Math.atan2(dy, dx), gaps, gw)) {
-        if (p.hurt(w, o.damage ?? 1, o.source)) {
-          p.knock(dx / (d || 1), dy / (d || 1), 170);
-          this.hit = true;
+    for (const p of w.targets()) {
+      if (!this.hit && p.alive && p.z < 4 && this.radius < o.maxR * 0.9) {
+        const dx = p.x - this.x;
+        const dy = p.y - this.y;
+        const d = Math.hypot(dx, dy);
+        if (Math.abs(d - this.radius) < (o.thick ?? 4) + p.r * 0.5 && !inGap(Math.atan2(dy, dx), gaps, gw)) {
+          if (p.hurt(w, o.damage ?? 1, o.source)) {
+            p.knock(dx / (d || 1), dy / (d || 1), 170);
+            this.hit = true;
+          }
         }
       }
     }
@@ -626,10 +631,11 @@ export class Sector extends Entity {
     const o = this.o;
     if (!this.struck && this.age >= o.warn) {
       this.struck = true;
-      const p = w.player;
-      if (p.alive && p.z < 8 && inSector(p.x, p.y, this.x, this.y, this.angle, o.half + 0.08, o.radius + p.r * 0.6, o.inner ?? 0)) {
-        const d = Math.hypot(p.x - this.x, p.y - this.y) || 1;
-        if (p.hurt(w, o.damage ?? 1, o.source)) p.knock((p.x - this.x) / d, (p.y - this.y) / d, 200);
+      for (const p of w.targets()) {
+        if (p.alive && p.z < 8 && inSector(p.x, p.y, this.x, this.y, this.angle, o.half + 0.08, o.radius + p.r * 0.6, o.inner ?? 0)) {
+          const d = Math.hypot(p.x - this.x, p.y - this.y) || 1;
+          if (p.hurt(w, o.damage ?? 1, o.source)) p.knock((p.x - this.x) / d, (p.y - this.y) / d, 200);
+        }
       }
       o.onStrike?.(w);
     }
@@ -752,16 +758,17 @@ export class Beam extends Entity {
       w.shake(0.25);
     }
     if (st === 'fire') {
-      const p = w.player;
       const canHit = o.rehit ? w.time - this.hitT >= o.rehit : this.hits === 0;
-      if (canHit && p.alive && p.z < 12 && onBeam(p.x, p.y - 4, p.r * 0.7, this.x, this.y, this.angle, this.len, o.width / 2)) {
-        if (p.hurt(w, o.damage ?? 1, o.source)) {
-          this.hits++;
-          this.hitT = w.time;
-          const nx = -Math.sin(this.angle);
-          const ny = Math.cos(this.angle);
-          const side = (p.x - this.x) * nx + (p.y - this.y) * ny >= 0 ? 1 : -1;
-          p.knock(nx * side, ny * side, 180);
+      for (const p of w.targets()) {
+        if (canHit && p.alive && p.z < 12 && onBeam(p.x, p.y - 4, p.r * 0.7, this.x, this.y, this.angle, this.len, o.width / 2)) {
+          if (p.hurt(w, o.damage ?? 1, o.source)) {
+            this.hits++;
+            this.hitT = w.time;
+            const nx = -Math.sin(this.angle);
+            const ny = Math.cos(this.angle);
+            const side = (p.x - this.x) * nx + (p.y - this.y) * ny >= 0 ? 1 : -1;
+            p.knock(nx * side, ny * side, 180);
+          }
         }
       }
       // sparks where the beam meets the wall

@@ -851,6 +851,8 @@ defineActive({
 // ====================================================================== runtime ticker
 defineGlobalHooks({
   id: 'actives_runtime',
+  // co-op: time stops and hounds live in each keeper's w.vars
+  perPlayer: true,
   onUpdate(w) {
     tickTimeStop(w);
     if (w.vars.__houndEnd !== undefined) syncHounds(w);

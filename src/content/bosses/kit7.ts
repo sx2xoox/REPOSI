@@ -302,6 +302,7 @@ export class ClockHand extends Entity {
   angle: number;
   o: HandOpts;
   private hitT = -9;
+  mem?: Record<string, number>;
   constructor(owner: Enemy, angle: number, o: HandOpts) {
     super();
     this.owner = owner;
@@ -352,20 +353,23 @@ export class ClockHand extends Entity {
     }
     if (this.on) {
       this.angle += op.omega * dt;
-      const p = w.player;
-      if (p.alive && p.z < 10 && w.time - this.hitT >= (op.rehit ?? 0.8)) {
-        for (const a of this.angles()) {
-          const len = beamToWall(w, this.x, this.y, a);
-          const c = Math.cos(a);
-          const s = Math.sin(a);
-          if (distToSegment(p.x, p.y - 2, this.x + c * 16, this.y + s * 16, this.x + c * len, this.y + s * len) > this.half + p.r * 0.6) continue;
-          if (p.hurt(w, op.damage ?? 1, op.source)) {
-            this.hitT = w.time;
-            // thrown along the sweep direction
-            const dir = Math.sign(op.omega) || 1;
-            p.knock(-s * dir, c * dir, 210);
+      for (const p of w.targets()) {
+        const lastHit = w.coop ? this.mem?.[`hit:${p.slot}`] ?? -9 : this.hitT;
+        if (p.alive && p.z < 10 && w.time - lastHit >= (op.rehit ?? 0.8)) {
+          for (const a of this.angles()) {
+            const len = beamToWall(w, this.x, this.y, a);
+            const c = Math.cos(a);
+            const s = Math.sin(a);
+            if (distToSegment(p.x, p.y - 2, this.x + c * 16, this.y + s * 16, this.x + c * len, this.y + s * len) > this.half + p.r * 0.6) continue;
+            if (p.hurt(w, op.damage ?? 1, op.source)) {
+              if (w.coop) (this.mem ??= {})[`hit:${p.slot}`] = w.time;
+              else this.hitT = w.time;
+              // thrown along the sweep direction
+              const dir = Math.sign(op.omega) || 1;
+              p.knock(-s * dir, c * dir, 210);
+            }
+            break;
           }
-          break;
         }
       }
       // sparks grinding along the floor at each tip

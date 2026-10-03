@@ -28,6 +28,8 @@ export interface Scene {
   transparent?: boolean;
   /** keep updating the scene below (rare) */
   passUpdate?: boolean;
+  /** keep updating even under other scenes (online co-op: the lockstep never stops for a menu) */
+  alwaysUpdate?: boolean;
   /** touch mode: show a corner button that taps 'cancel' ('close' = ✕, 'back' = ◀) */
   touchBack?: 'close' | 'back' | false;
   /** which top corner the back button sits in (default right) */
@@ -111,10 +113,16 @@ export class SceneManager {
     this.fadeT = Math.min(FADE_TIME, this.fadeT + dt);
     const top = this.top;
     if (!top) return;
+    // scenes that never stop (co-op game) run first, under whatever is on top
+    for (let i = 0; i < this.stack.length - 1; i++) {
+      const s = this.stack[i];
+      if (s.alwaysUpdate) s.update(dt);
+    }
+    if (this.top !== top) return; // the update changed the stack
     top.update(dt);
     if (top.passUpdate) {
       const below = this.stack[this.stack.length - 2];
-      below?.update(dt);
+      if (below && !below.alwaysUpdate) below.update(dt);
     }
   }
 

@@ -579,19 +579,20 @@ class LampBeam extends Entity {
         }
       } else this.angle += this.omega * dt;
       // hit: inside a lit wedge, no shelf between the lamp and the keeper
-      const p = w.player;
-      if (p.alive && p.z < 10 && w.time - this.hitT >= (op.rehit ?? 0.7)) {
-        for (const a of this.angles()) {
-          const d = Math.hypot(p.x - this.x, p.y - this.y);
-          const tol = Math.atan2(p.r * 0.7, Math.max(8, d));
-          if (d < 14 || !inWedge(p.x, p.y - 2, this.x, this.y, a, op.half + tol, BEAM_LEN)) continue;
-          if (rayBlocked(w.room, this.x, this.y, p.x, p.y - 2)) continue;
-          if (p.hurt(w, op.damage ?? 1, op.source)) {
-            this.hitT = w.time;
-            const side = angleDiff(a, Math.atan2(p.y - this.y, p.x - this.x)) >= 0 ? 1 : -1;
-            p.knock(-Math.sin(a) * side, Math.cos(a) * side, 190);
+      for (const p of w.targets()) {
+        if (p.alive && p.z < 10 && w.time - this.hitT >= (op.rehit ?? 0.7)) {
+          for (const a of this.angles()) {
+            const d = Math.hypot(p.x - this.x, p.y - this.y);
+            const tol = Math.atan2(p.r * 0.7, Math.max(8, d));
+            if (d < 14 || !inWedge(p.x, p.y - 2, this.x, this.y, a, op.half + tol, BEAM_LEN)) continue;
+            if (rayBlocked(w.room, this.x, this.y, p.x, p.y - 2)) continue;
+            if (p.hurt(w, op.damage ?? 1, op.source)) {
+              this.hitT = w.time;
+              const side = angleDiff(a, Math.atan2(p.y - this.y, p.x - this.x)) >= 0 ? 1 : -1;
+              p.knock(-Math.sin(a) * side, Math.cos(a) * side, 190);
+            }
+            break;
           }
-          break;
         }
       }
       // glitter where the light meets the water and sparks at its end
@@ -742,11 +743,12 @@ class LampFlash extends Entity {
     }
     if (!this.struck && this.age >= o.warn) {
       this.struck = true;
-      const p = w.player;
-      const d = Math.hypot(p.x - this.x, p.y - this.y);
-      const tol = Math.atan2(p.r * 0.7, Math.max(8, d));
-      if (p.alive && p.z < 10 && d >= 14 && inWedge(p.x, p.y - 2, this.x, this.y, this.angle, o.half + tol, BEAM_LEN) && !rayBlocked(w.room, this.x, this.y, p.x, p.y - 2)) {
-        if (p.hurt(w, o.damage ?? 1, o.source)) p.knock(Math.cos(this.angle), Math.sin(this.angle), 200);
+      for (const p of w.targets()) {
+        const d = Math.hypot(p.x - this.x, p.y - this.y);
+        const tol = Math.atan2(p.r * 0.7, Math.max(8, d));
+        if (p.alive && p.z < 10 && d >= 14 && inWedge(p.x, p.y - 2, this.x, this.y, this.angle, o.half + tol, BEAM_LEN) && !rayBlocked(w.room, this.x, this.y, p.x, p.y - 2)) {
+          if (p.hurt(w, o.damage ?? 1, o.source)) p.knock(Math.cos(this.angle), Math.sin(this.angle), 200);
+        }
       }
       w.sfx('laser', { vol: 0.7, pitch: 1.1 });
       w.sfx('lightning', { vol: 0.25, pitch: 1.5 });

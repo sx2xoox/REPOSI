@@ -13,9 +13,9 @@ import { TILE, WALL, CELL_W, CELL_H, DIR_VEC, type Dir } from './constants';
 import { Characters, Enemies, Floors, RoomTemplates, Themes, Actives, Weapons, Potions, type FloorDef } from './defs';
 import { generateFloor, matchingDoor, type FloorMap, type NodeDoor, type RoomNode } from './dungeon';
 import { Room, type Door, type DoorKind } from './room';
-import { Entity, Actor, resetEntityIds, type HitInfo, type StatusKind } from './entity';
+import { Entity, Actor, resetEntityIds, useEntityIds, type EntityIds, type HitInfo, type StatusKind } from './entity';
 import { Enemy } from './enemy';
-import { Player } from './player';
+import { Player, Purse } from './player';
 import { Projectile } from './projectile';
 import { FlowField } from './flow';
 import { ItemSystem, Loot } from './items';
@@ -28,6 +28,8 @@ import { findFocus } from './interact';
 import { roomBaseJob } from './roomart';
 import { localRules, readLocalInput, type InputSource, type SimRules } from './seam';
 import { Interpolator } from './interp';
+import { REVIVE_RANGE, REVIVE_TIME } from './coop';
+import { FadeOut, drawCoopRings, recordCoopTags, type CoopTag } from './coopfx';
 
 /** Max wall-clock ms per 1/60 s spent pre-rendering neighbour rooms (split over the frames drawn in it). */
 const IDLE_BUDGET_MS = 2.5;
@@ -55,6 +57,26 @@ export interface GameOverInfo {
   source: string;
 }
 
+/** One keeper of a co-op party (`World.startParty`). */
+export interface PartyMember {
+  /** lockstep slot 0..3 */
+  slot: number;
+  characterId: string;
+  name: string;
+}
+
+/** Co-op happenings for the HUD (toasts); UI only, never read by the simulation. */
+export interface CoopEvent {
+  kind: 'down' | 'revive' | 'left';
+  slot: number;
+  name: string;
+  /** world time */
+  t: number;
+}
+
+/** Co-op: an enemy switches to a closer keeper only when it is this much (px) closer. */
+const TARGET_STICK = 32;
+
 export interface WorldHost {
   /** open the collection / status overlay */
   openInventory(): void;
@@ -81,8 +103,21 @@ export class World {
   readonly particles = new Particles();
   readonly run: RunState;
   readonly host: WorldHost;
+  /**
+   * The CONTEXT keeper: whose turn it is. The simulation sets it before running
+   * code on behalf of a keeper (its own update, item hooks, hits it deals,
+   * pickups it collects, enemies targeting it ...) and restores it; outside the
+   * simulation (drawing, UI) it is `local`. Single-player: always the one keeper.
+   */
   player!: Player;
-  items: ItemSystem;
+  /** every keeper in the run, in slot order (co-op: those still in the session) */
+  players: Player[] = [];
+  /** this peer's keeper (camera, HUD, input) */
+  local!: Player;
+  /** online co-op run (lockstep party; downed / revive rules, party scaling) */
+  coop = false;
+  /** co-op toasts for the HUD (UI only) */
+  coopEvents: CoopEvent[] = [];
   loot: Loot;
   map!: FloorMap;
   floor!: FloorDef;
@@ -94,7 +129,6 @@ export class World {
   enemies: Enemy[] = [];
   projectiles: Projectile[] = [];
   hittables: Actor[] = [];
-  flow = new FlowField();
   /** gameplay rng (shared with run) */
   get rng(): RNG {
     return this.run.rng;
@@ -130,7 +164,7 @@ export class World {
   mapVersion = 0;
   /** free-form per-run flags for content (e.g. "devilDealTaken") */
   flags = new Set<string>();
-  vars: Record<string, number> = {};
+  private noVars: Record<string, number> = {};
   /**
    * Fills the keeper's per-step input (`Player.input`): the local devices by
    * default; scripted in tests, the network frame in lockstep multiplayer.
@@ -138,8 +172,7 @@ export class World {
   inputSource: InputSource = readLocalInput;
   /** simulation-changing options: live settings in single-player, fixed per run in multiplayer */
   rules: SimRules = localRules;
-  /** the item the keeper is next to (preview card / interact target; see game/interact.ts) */
-  focus: Entity | null = null;
+  private noFocus: Entity | null = null;
   /** entity whose update() is running: default position of sounds played via `sfx()` */
   private sfxSource: Entity | null = null;
   /** accumulating damage numbers per (enemy, color) */
@@ -163,18 +196,114 @@ export class World {
   private drawAll: Entity[] = [];
   private drawMid: Entity[] = [];
 
+  /** this run's entity id counters (made current while the world simulates; see withIds) */
+  private readonly ids: EntityIds;
+
   constructor(renderer: Renderer, run: RunState, host: WorldHost) {
     // entity ids are part of the simulation state: every run starts from 1
-    resetEntityIds();
+    this.ids = resetEntityIds();
     this.renderer = renderer;
     this.run = run;
     this.host = host;
-    this.items = new ItemSystem(this);
     this.loot = new Loot(this);
     this.snapCanvas = document.createElement('canvas');
     this.snapCanvas.width = VIEW_W;
     this.snapCanvas.height = VIEW_H;
     this.particles.density = save.settings.particles;
+  }
+
+  // ------------------------------------------------------------------ context keeper
+  /** The context keeper's items (artifacts, buffs, hook dispatch). */
+  get items(): ItemSystem {
+    return this.player.items;
+  }
+
+  /** The context keeper's scratch state for item / kit hooks (numbers). */
+  get vars(): Record<string, number> {
+    return this.player ? this.player.vars : this.noVars;
+  }
+
+  /** Path field toward the context keeper (ground enemies chase their target with it). */
+  get flow(): FlowField {
+    return this.player.flow;
+  }
+
+  /** The item the context keeper is next to (preview card / interact target; see game/interact.ts). */
+  get focus(): Entity | null {
+    return this.player ? this.player.focus : this.noFocus;
+  }
+
+  set focus(e: Entity | null) {
+    if (this.player) this.player.focus = e;
+    else this.noFocus = e;
+  }
+
+  /**
+   * Run `fn` with this world's entity id counters current. Only matters when
+   * several Worlds live in one process (headless co-op tests): the game has one.
+   */
+  withIds<T>(fn: () => T): T {
+    const prev = useEntityIds(this.ids);
+    if (prev === this.ids) return fn();
+    try {
+      return fn();
+    } finally {
+      useEntityIds(prev);
+    }
+  }
+
+  /** Run `fn` with `p` as the context keeper, restoring the previous one after. */
+  asPlayer<T>(p: Player, fn: () => T): T {
+    const prev = this.player;
+    if (prev === p) return fn();
+    this.player = p;
+    try {
+      return fn();
+    } finally {
+      this.player = prev;
+    }
+  }
+
+  /** The party leader for room / world events: the first keeper standing, else the first one. */
+  lead(): Player {
+    const ps = this.players;
+    for (let i = 0; i < ps.length; i++) if (ps[i].alive) return ps[i];
+    return ps[0] ?? this.player;
+  }
+
+  /** Nearest keeper to (x, y): standing ones first (ties: lower slot). */
+  nearestPlayer(x: number, y: number): Player {
+    const ps = this.players;
+    let best: Player | null = null;
+    let bd = Infinity;
+    for (let pass = 0; pass < 2 && !best; pass++) {
+      for (let i = 0; i < ps.length; i++) {
+        const p = ps[i];
+        if (pass === 0 && !p.alive) continue;
+        const d = dist2(x, y, p.x, p.y);
+        if (d < bd) {
+          bd = d;
+          best = p;
+        }
+      }
+    }
+    return best ?? this.player;
+  }
+
+  /** Keepers that can be hurt / targeted right now (co-op: everyone standing; single-player: the keeper). */
+  targets(): Player[] {
+    return this.coop ? this.players.filter((p) => p.alive) : [this.player];
+  }
+
+  /** Party size (enemy HP scaling). */
+  get partySize(): number {
+    return this.coop ? this.players.length : 1;
+  }
+
+  /** Co-op enemy HP scaling: x(1 + 0.5(n-1)), bosses x(1 + 0.6(n-1)). */
+  partyHpMult(boss: boolean): number {
+    const n = this.partySize;
+    return n <= 1 ? 1 : 1 + (boss ? 0.6 : 0.5) * (n - 1);
   }
 
   /** World simulation paused (overlays). Pausing ducks the music. */
@@ -199,29 +328,80 @@ export class World {
   }
 
   // ================================================================== setup
-  /** Create the player and enter floor 1. */
+  /** Create the keeper (single-player: the run's character) and enter floor 1. */
   start(): void {
-    const ch = Characters.must(this.run.characterId);
-    const p = new Player(ch);
-    this.player = p;
-    p.red = ch.hearts * 2;
-    p.soul = (ch.soulHearts ?? 0) * 2;
-    p.coins = ch.coins ?? 0;
-    p.bombs = ch.bombs ?? 1;
-    p.keys = ch.keys ?? 0;
-    this.items.recompute();
-    for (const a of ch.artifacts ?? []) this.items.give(a);
-    if (ch.active) {
-      p.activeId = ch.active;
-      p.activeCharge = Actives.get(ch.active)?.charge ?? 0;
+    this.startParty([{ slot: 0, characterId: this.run.characterId, name: '' }], 0, false);
+  }
+
+  /**
+   * Create the keepers and enter floor 1. `coop`: an online party (same seed and
+   * roster on every peer, `localSlot` = this peer's keeper): coins / bombs / keys
+   * become one shared purse (the characters' starting amounts added up).
+   */
+  startParty(members: PartyMember[], localSlot: number, coop = true): void {
+    const prevIds = useEntityIds(this.ids);
+    try {
+      this.startParty1(members, localSlot, coop);
+    } finally {
+      useEntityIds(prevIds);
     }
-    for (const id of ch.artifacts ?? []) this.run.seenOnPedestal.add(id);
-    this.items.recompute();
-    p.red = p.maxRed;
+  }
+
+  private startParty1(members: PartyMember[], localSlot: number, coop: boolean): void {
+    const sorted = [...members].sort((a, b) => a.slot - b.slot);
+    const purse = new Purse();
+    purse.bombs = 0;
+    this.coop = coop;
+    this.players = sorted.map((m) => {
+      const p = new Player(Characters.must(m.characterId));
+      p.slot = m.slot;
+      p.name = m.name;
+      p.items = new ItemSystem(this, p);
+      if (coop) p.purse = purse;
+      return p;
+    });
+    this.local = this.players.find((p) => p.slot === localSlot) ?? this.players[0];
+    for (const p of this.players) {
+      const ch = p.character;
+      this.player = p;
+      p.red = ch.hearts * 2;
+      p.soul = (ch.soulHearts ?? 0) * 2;
+      if (coop) {
+        purse.coins += ch.coins ?? 0;
+        purse.bombs += ch.bombs ?? 1;
+        purse.keys += ch.keys ?? 0;
+      } else {
+        p.coins = ch.coins ?? 0;
+        p.bombs = ch.bombs ?? 1;
+        p.keys = ch.keys ?? 0;
+      }
+      this.items.recompute();
+      for (const a of ch.artifacts ?? []) this.items.give(a);
+      if (ch.active) {
+        p.activeId = ch.active;
+        p.activeCharge = Actives.get(ch.active)?.charge ?? 0;
+      }
+      for (const id of ch.artifacts ?? []) this.run.seenOnPedestal.add(id);
+      this.items.recompute();
+      p.red = p.maxRed;
+    }
+    this.player = this.lead();
     this.startFloor(1);
+    this.player = this.local;
+  }
+
+  /** Every keeper's item system, in slot order (co-op world events); single-player: the keeper's. */
+  private eachItems(fn: (items: ItemSystem) => void): void {
+    if (!this.coop) {
+      fn(this.items);
+      return;
+    }
+    for (const p of [...this.players]) fn(p.items);
   }
 
   startFloor(index: number): void {
+    // co-op: world events run with the party leader as the context keeper
+    if (this.coop && this.player !== this.lead()) return this.asPlayer(this.lead(), () => this.startFloor(index));
     this.run.floor = index;
     const floor = Floors.all().find((f) => f.index === index);
     if (!floor) throw new Error(`no floor ${index}`);
@@ -237,12 +417,12 @@ export class World {
     const start = this.map.nodes[this.map.startId];
     // forget the previous floor's room so enterRoom() does not cache it under a
     // node id that now belongs to a different room of the new floor
-    if (this.room) this.items.expire('room');
+    if (this.room) this.eachItems((it) => it.expire('room'));
     (this as { room?: Room }).room = undefined;
     this.enterRoom(start, null);
     this.floorCard = { name: floor.name, subtitle: floor.subtitle, t: 0 };
-    this.items.expire('floor');
-    this.items.onFloorStart();
+    this.eachItems((it) => it.expire('floor'));
+    this.eachItems((it) => it.onFloorStart());
     audio.playMusic(floor.music);
     this.sfx('floor_start');
     save.progress.bestFloor = Math.max(save.progress.bestFloor, index);
@@ -266,15 +446,17 @@ export class World {
 
   /** Enter `node`. `via` = the door (in the previous room) we walked through. */
   enterRoom(node: RoomNode, via: NodeDoor | null): void {
+    if (this.coop && this.player !== this.lead()) return this.asPlayer(this.lead(), () => this.enterRoom(node, via));
     // save the room we are leaving
     if (this.room) {
       const keep = this.entities.filter((e) => e.persistent && !e.dead);
       this.roomCache.set(this.node.id, { room: this.room, entities: keep });
-      this.items.expire('room');
+      this.eachItems((it) => it.expire('room'));
     }
     const prevNode = this.node;
     this.node = node;
     this.focus = null;
+    if (this.coop) for (const q of this.players) q.focus = null;
     const cached = this.roomCache.get(node.id);
     let room: Room;
     const firstVisit = !cached;
@@ -334,7 +516,8 @@ export class World {
     p.y = free.y;
     p.vx = p.vy = p.kbx = p.kby = 0;
     p.dashT = 0;
-    this.entities.push(p);
+    if (this.coop) this.placeParty(p, room, via && prevNode ? via : null);
+    else this.entities.push(p);
 
     const rng = new RNG(node.seed ^ 0xa5a5);
     const handler = roomHandler(node.kind);
@@ -356,7 +539,9 @@ export class World {
     handler?.onEnter?.(this, room);
     this.flushPending();
     this.camInit = false;
-    this.items.onRoomEnter();
+    this.eachItems((it) => it.onRoomEnter());
+    // co-op: one more treasure pedestal per extra keeper (rolled with w.rng on the first visit)
+    if (this.coop && firstVisit && node.kind === 'treasure') this.coopExtraPedestals(room, room.centerX, room.centerY, 'treasure');
     // things spawned by room-enter hooks (familiars, hounds ...) must be visible
     // during the room slide, not pop in when it ends
     this.flushPending();
@@ -366,6 +551,74 @@ export class World {
     else if (node.kind === 'secret') audio.playMusic('secret');
     else if (node.kind !== 'boss' && audio.currentMusic !== this.floor.music && audio.currentMusic !== 'victory') audio.playMusic(this.floor.music);
     if (hostile) this.sfx('door_close', { vol: 0.6 });
+  }
+
+  /**
+   * Co-op: everyone enters together. `p` (the leader, already placed at the
+   * doorway or the room's spawn spot) goes first; the others line up beside and
+   * behind it, each on the nearest free spot. All keepers join the entity list.
+   */
+  private placeParty(p: Player, room: Room, via: NodeDoor | null): void {
+    const others = this.players.filter((q) => q !== p);
+    // spread across the doorway's width, a step further into the room each
+    let ax = 1;
+    let ay = 0;
+    let bx = 0;
+    let by = 0;
+    if (via) {
+      const v = DIR_VEC[via.dir];
+      ax = v.y !== 0 ? 1 : 0;
+      ay = v.x !== 0 ? 1 : 0;
+      bx = -v.x;
+      by = -v.y;
+    }
+    const OFFS: [number, number][] = [[-14, 6], [14, 6], [0, 14]];
+    others.forEach((q, i) => {
+      const [side, back] = OFFS[i % OFFS.length];
+      const tx = p.x + ax * side + bx * back;
+      const ty = p.y + ay * side + by * back + (via ? 0 : back * 0.5);
+      const f = room.nearestFree(tx, ty, q.r);
+      q.x = f.x;
+      q.y = f.y;
+      q.vx = q.vy = q.kbx = q.kby = 0;
+      q.dashT = 0;
+    });
+    for (const q of this.players) this.entities.push(q);
+  }
+
+  /**
+   * Co-op: extra item pedestals for the extra keepers (treasure rooms, boss
+   * rewards), rolled with the gameplay rng so every peer gets the same items
+   * while the loot stream stays as in a solo run of the same seed.
+   */
+  private coopExtraPedestals(room: Room, cx: number, cy: number, pool: 'treasure' | 'boss'): void {
+    const extra = this.players.length - 1;
+    if (extra <= 0) return;
+    const GAP = 40;
+    let x0: number;
+    let y = cy;
+    if (pool === 'treasure') {
+      // one row through the room's center: the room's own pedestal slides left to make room
+      const own = this.entities.find((e): e is Pedestal => e instanceof Pedestal && e.group === 0 && e.x === cx && e.y === cy);
+      x0 = cx - (extra * GAP) / 2;
+      if (own) {
+        own.x = x0;
+        x0 += GAP;
+      } else {
+        y = cy + 36;
+        x0 = cx - ((extra - 1) * GAP) / 2;
+      }
+    } else {
+      // a row above the boss's reward
+      y = cy - 34;
+      x0 = cx - ((extra - 1) * GAP) / 2;
+    }
+    for (let i = 0; i < extra; i++) {
+      const item = this.loot.rollItem(pool, this.rng) ?? this.loot.rollItem('treasure', this.rng);
+      if (!item) continue;
+      const pos = room.nearestFree(x0 + i * GAP, y, 8);
+      this.spawn(new Pedestal(pos.x, pos.y, item));
+    }
   }
 
   /** Spawn pickups / fireplaces etc. from template markers (enemies handled separately). */
@@ -432,7 +685,9 @@ export class World {
       console.warn(`[world] unknown enemy ${id}`);
       return null;
     }
-    const e = new Enemy(def, x, y, def.boss ? this.floor.bossHpMult ?? this.floor.hpMult : this.floor.hpMult);
+    const mult = def.boss ? this.floor.bossHpMult ?? this.floor.hpMult : this.floor.hpMult;
+    // co-op: more keepers, tougher enemies (x1 in single-player)
+    const e = new Enemy(def, x, y, this.coop ? mult * this.partyHpMult(!!def.boss) : mult);
     if (!def.flying && !def.phasing) {
       const f = this.room.nearestFree(x, y, Math.min(def.radius, 7));
       e.x = f.x;
@@ -444,9 +699,18 @@ export class World {
   }
 
   spawn<T extends Entity>(e: T): T {
+    // co-op: what a keeper's code spawns (its update, its item hooks, its familiars
+    // ...) keeps running on its behalf (see ctxFor); room / enemy spawns stay unowned
+    if (this.coop && e.ctxP === null && this.spawnOwner) e.ctxP = this.spawnOwner;
     this.pending.push(e);
     return e;
   }
+
+  /**
+   * Co-op: the keeper whose code is running right now (its own update, an entity
+   * it owns, its item hooks — ItemSystem sets it), or null (room / enemy code).
+   */
+  spawnOwner: Player | null = null;
 
   private flushPending(): void {
     if (this.pending.length) {
@@ -457,9 +721,35 @@ export class World {
 
   // ================================================================== update
   update(dt: number): void {
+    const prevIds = useEntityIds(this.ids);
+    try {
+      this.update1(dt);
+    } finally {
+      useEntityIds(prevIds);
+    }
+  }
+
+  private update1(dt: number): void {
+    if (!this.coop) {
+      this.step(dt);
+      return;
+    }
+    // co-op: world-level work runs as the party leader; afterwards (drawing, UI)
+    // the context keeper is this peer's own again
+    this.player = this.lead();
+    try {
+      this.step(dt);
+    } finally {
+      this.player = this.local;
+    }
+  }
+
+  private step(dt: number): void {
     this.savePrev();
     this.dt = dt;
     if (this.renderer) this.renderer.updateEffects(dt);
+    // co-op: a finished run stands still behind the party summary
+    if (this.coop && this.gameOver) return;
     this.updateUiTimers(dt);
     if (this.hurtT > 0) this.hurtT = Math.max(0, this.hurtT - dt);
     if (this.transition) {
@@ -493,17 +783,26 @@ export class World {
 
     this.flushPending();
     this.rebuildCaches();
-    this.flow.update(this.room, this.player.x, this.player.y);
+    const coop = this.coop;
+    if (coop) for (const p of this.players) p.flow.update(this.room, p.x, p.y);
+    else this.flow.update(this.room, this.player.x, this.player.y);
 
     for (const e of this.entities) {
       if (e.dead) continue;
       this.sfxSource = e;
+      // co-op: each entity runs on behalf of its keeper (see ctxFor)
+      if (coop) {
+        this.player = this.ctxFor(e);
+        this.spawnOwner = this.ownerOf(e);
+      }
       if (e instanceof Projectile && e.team === 'enemy') e.update(this, sdt * this.enemyTimeScale);
       else e.update(this, sdt);
     }
     this.sfxSource = null;
+    this.spawnOwner = null;
+    if (coop) this.player = this.lead();
     if (this.descending) this.updateDescend(sdt);
-    this.items.update(sdt);
+    this.eachItems((it) => it.update(sdt));
     this.flushPending();
     this.rebuildCaches();
     this.collisions();
@@ -516,12 +815,18 @@ export class World {
       const e = es[i];
       if (e.dead) {
         e.onRemove(this);
-        if (e !== this.player) continue;
+        if (!(e instanceof Player)) continue;
       }
       es[n++] = e;
     }
     es.length = n;
-    this.focus = findFocus(this);
+    if (coop) {
+      for (const p of this.players) {
+        this.player = p;
+        p.focus = findFocus(this);
+      }
+      this.player = this.lead();
+    } else this.focus = findFocus(this);
     if (this.clearMomentT >= 0) {
       this.clearMomentT -= sdt;
       if (this.clearMomentT < 0) this.roomClearMoment();
@@ -532,6 +837,7 @@ export class World {
     this.room.theme.ambientFx?.(this, sdt);
     this.checkDoors();
     this.checkClear();
+    if (coop) this.updateRevive(sdt);
     this.updateCamera(sdt);
     audio.setMusicIntensity(this.enemies.length > 0 ? 1 : 0);
 
@@ -542,6 +848,166 @@ export class World {
         this.host.onGameOver(this.gameOver);
       }
     }
+  }
+
+  // ------------------------------------------------------------------ co-op context
+  /**
+   * Co-op: the keeper an entity runs on behalf of. Keepers: themselves. Enemies:
+   * their target (nearest standing keeper, sticky). Shots / swings: their owner
+   * (an enemy's: its target). Pickups: the nearest keeper that may collect them.
+   * Pedestals, chests, fires, trapdoors: the nearest keeper. Anything else: the
+   * keeper whose code spawned it (familiars, turrets, item zones ...), else the
+   * nearest keeper (enemy hazards).
+   */
+  private ctxFor(e: Entity): Player {
+    if (e instanceof Player) return e;
+    if (e instanceof Enemy) return this.retarget(e);
+    const o = (e as { owner?: unknown }).owner;
+    if (o instanceof Player) return o.left ? this.nearestPlayer(e.x, e.y) : o;
+    if (o instanceof Enemy) return o.tgt && !o.tgt.left ? o.tgt : this.nearestPlayer(e.x, e.y);
+    if (e instanceof Pickup) return this.pickupCtx(e);
+    const c = e.ctxP;
+    if (c instanceof Player && !c.left && !(e instanceof Pedestal || e instanceof Chest || e instanceof Trapdoor || e instanceof FirePlace)) return c;
+    return this.nearestPlayer(e.x, e.y);
+  }
+
+
+  /** The keeper an entity belongs to (itself, its owner, the keeper that spawned it), if any. */
+  private ownerOf(e: Entity): Player | null {
+    if (e instanceof Player) return e;
+    if (e instanceof Enemy) return null;
+    const o = (e as { owner?: unknown }).owner;
+    if (o instanceof Player) return o.left ? null : o;
+    const c = e.ctxP;
+    return c instanceof Player && !c.left ? c : null;
+  }
+
+  /** The keeper a pickup works for: the nearest standing one that could collect it, else the nearest. */
+  private pickupCtx(pk: Pickup): Player {
+    const ps = this.players;
+    let best: Player | null = null;
+    let bd = Infinity;
+    for (let i = 0; i < ps.length; i++) {
+      const p = ps[i];
+      if (!p.alive) continue;
+      this.player = p;
+      if (!pk.canCollect(this)) continue;
+      const d = dist2(pk.x, pk.y, p.x, p.y);
+      if (d < bd) {
+        bd = d;
+        best = p;
+      }
+    }
+    return best ?? this.nearestPlayer(pk.x, pk.y);
+  }
+
+  /** Pick (and remember) the keeper an enemy goes after: the nearest standing one, switching only for a clearly closer one. */
+  private retarget(e: Enemy): Player {
+    let cur = e.tgt;
+    if (cur && !cur.alive) cur = null;
+    let best: Player | null = null;
+    let bd = Infinity;
+    for (const p of this.players) {
+      if (!p.alive) continue;
+      const d = dist2(e.x, e.y, p.x, p.y);
+      if (d < bd) {
+        bd = d;
+        best = p;
+      }
+    }
+    if (!best) return e.tgt && !e.tgt.left ? e.tgt : this.players[0];
+    if (!cur || (best !== cur && Math.sqrt(bd) < dist(e.x, e.y, cur.x, cur.y) - TARGET_STICK)) cur = best;
+    e.tgt = cur;
+    return cur;
+  }
+
+  /** Co-op: downed keepers come back after ~2 s with a teammate standing next to them. */
+  private updateRevive(dt: number): void {
+    for (const p of this.players) {
+      if (!p.downed) continue;
+      let rescuer: Player | null = null;
+      for (const q of this.players) {
+        if (q !== p && q.alive && dist2(p.x, p.y, q.x, q.y) < REVIVE_RANGE * REVIVE_RANGE &&
+          (!rescuer || (q.character.coop?.reviveSpeed ?? 1) > (rescuer.character.coop?.reviveSpeed ?? 1))) rescuer = q;
+      }
+      if (rescuer && this.deathT < 0) {
+        p.reviveT += dt * (rescuer.character.coop?.reviveSpeed ?? 1);
+        if (p.reviveT >= REVIVE_TIME) this.revive(p, rescuer.character.coop?.reviveHearts ?? 1);
+      } else if (p.reviveT > 0) p.reviveT = Math.max(0, p.reviveT - dt * 0.5);
+    }
+  }
+
+  /** Co-op: a downed keeper stands up again with one heart. */
+  revive(p: Player, hearts = 1): void {
+    if (!p.downed) return;
+    p.downed = false;
+    p.reviveT = 0;
+    if (p.maxRed > 0) p.red = Math.max(p.red, Math.min(p.maxRed, hearts * 2));
+    else p.soul = Math.max(p.soul, hearts * 2);
+    p.invuln = Math.max(p.invuln, 1.5);
+    p.flash = 0.2;
+    p.squash(0.7, 1.35);
+    this.sfx('power_up', { vol: 0.7, x: p.x });
+    this.spawn(new RingFx(p.x, p.y - 6, 30, 0.45, '#fff0b0', 3));
+    this.particles.burst(p.x, p.y - 8, { count: 24, speed: [40, 130], life: [0.3, 0.7], colors: ['#ffffff', '#fff0a0', '#ffd060'], size: [1, 2], additive: true });
+    this.coopEvent('revive', p);
+  }
+
+  /** Co-op: the keeper dropped to 0 HP and becomes a ghost; everyone down = the run is over. */
+  private downPlayer(p: Player, source: string): void {
+    if (p.downed) return;
+    p.downed = true;
+    p.reviveT = 0;
+    p.red = 0;
+    p.soul = 0;
+    p.dashT = 0;
+    p.firing = false;
+    p.statuses.clear();
+    p.vx = p.vy = 0;
+    this.run.lastDamageSource = source;
+    this.sfx('player_die', { vol: 0.7, x: p.x });
+    this.particles.burst(p.x, p.y - 6, { count: 30, speed: [40, 160], life: [0.4, 0.9], colors: ['#ff5060', '#c01828', '#ffffff'], size: [1, 3], gravity: 300, vz: [60, 150] });
+    this.spawn(new RingFx(p.x, p.y - 6, 26, 0.4, '#a8d8ff', 2));
+    this.coopEvent('down', p);
+    if (this.players.every((q) => q.downed) && this.deathT < 0) {
+      this.deathT = 0;
+      audio.stopMusic(1.2);
+      this.slowmo = 0.35;
+      this.slowmoT = 1.2;
+    }
+  }
+
+  /**
+   * Co-op: a keeper left the session. Removed at the same tick on every peer
+   * (its character fades out); the party carries on without it.
+   */
+  removePlayer(slot: number): void {
+    const p = this.players.find((q) => q.slot === slot);
+    if (!p || this.players.length <= 1) return;
+    const wasLeader = this.players[0] === p;
+    p.left = true;
+    p.dead = true;
+    // Owned summons and projectiles must not be reassigned to a surviving keeper.
+    const retire = (entities: Entity[]) => {
+      for (const e of entities) if (e.ctxP === p || (e as { owner?: unknown }).owner === p) e.dead = true;
+    };
+    retire(this.entities);
+    retire(this.pending);
+    for (const cached of this.roomCache.values()) retire(cached.entities);
+    this.players = this.players.filter((q) => q !== p);
+    this.entities = this.entities.filter((e) => e !== p);
+    this.spawn(new FadeOut(p));
+    if (this.local === p) this.local = this.players[0];
+    if (this.player === p) this.player = this.lead();
+    // the new leader's item system now dispatches the world-event global hooks
+    if (wasLeader) for (const q of this.players) q.items.invalidate();
+    this.coopEvent('left', p);
+    if (this.players.every((q) => q.downed) && this.deathT < 0) this.deathT = 0;
+  }
+
+  private coopEvent(kind: CoopEvent['kind'], p: Player): void {
+    this.coopEvents.push({ kind, slot: p.slot, name: p.name, t: this.time });
+    if (this.coopEvents.length > 8) this.coopEvents.shift();
   }
 
   private updateUiTimers(dt: number): void {
@@ -570,11 +1036,15 @@ export class World {
   }
 
   private collisions(): void {
-    const p = this.player;
+    let p = this.player;
+    const coop = this.coop;
+    const lead = p;
     // projectiles
     for (const pr of this.projectiles) {
       if (pr.dead || pr.delay > 0) continue;
       if (pr.team === 'player') {
+        // co-op: the shot's owner gets the credit (crits, item hooks, embers)
+        if (coop) this.player = p = pr.owner instanceof Player && !pr.owner.left ? pr.owner : lead;
         for (const e of this.enemies) {
           if (pr.dead) break;
           if (!e.alive || e.hidden || !e.vulnerable || pr.hitIds.has(e.id)) continue;
@@ -596,31 +1066,23 @@ export class World {
           }
         }
       } else if (pr.team === 'enemy') {
-        if (!p.alive || p.z > 12) continue;
-        const rr = pr.r + p.r - 1;
-        if (dist2(pr.x, pr.y, p.x, p.y - 4) < rr * rr) {
-          if (p.invuln > 0 && !p.dashing) continue;
-          if (p.dashing) continue; // dodge through
-          if (p.hurt(this, pr.damage, pr.owner instanceof Enemy ? pr.owner.def.name : '탄환', false, { x: p.x - pr.vx, y: p.y - pr.vy })) {
-            p.knock(Math.cos(pr.angle), Math.sin(pr.angle), 120);
-          }
-          pr.expire(this, true);
+        if (!coop) {
+          this.enemyShotHits(pr, p);
+          continue;
         }
+        // co-op: enemy bullets hit every keeper (the first one touched takes it)
+        for (const pl of this.players) if (this.enemyShotHits(pr, pl) || pr.dead) break;
       }
     }
+    if (coop) this.player = p = lead;
     // enemy contact & separation
     const es = this.enemies;
     for (let i = 0; i < es.length; i++) {
       const e = es[i];
       if (!e.alive || e.hidden) continue;
-      if (e.harmful && e.dormant <= 0 && e.contactDamage > 0 && e.z < 10 && p.alive && !e.hasStatus('charm')) {
-        const rr = e.r + p.r - 2;
-        if (dist2(e.x, e.y, p.x, p.y) < rr * rr) {
-          if (p.hurt(this, e.contactDamage, e.def.name, false, e)) {
-            const d = Math.hypot(p.x - e.x, p.y - e.y) || 1;
-            p.knock((p.x - e.x) / d, (p.y - e.y) / d, 160);
-          }
-        }
+      if (e.harmful && e.dormant <= 0 && e.contactDamage > 0 && e.z < 10 && !e.hasStatus('charm')) {
+        if (!coop) this.contactHit(e, p);
+        else for (const pl of this.players) this.contactHit(e, pl);
       }
       if (e.hasStatus('charm') && e.contactDamage > 0) {
         for (const o of es) {
@@ -660,13 +1122,52 @@ export class World {
     }
   }
 
+  /** An enemy bullet against one keeper; true when it hit (and was used up). */
+  private enemyShotHits(pr: Projectile, p: Player): boolean {
+    if (!p.alive || p.z > 12) return false;
+    const rr = pr.r + p.r - 1;
+    if (dist2(pr.x, pr.y, p.x, p.y - 4) < rr * rr) {
+      if (p.invuln > 0 && !p.dashing) return false;
+      if (p.dashing) return false; // dodge through
+      if (p.hurt(this, pr.damage, pr.owner instanceof Enemy ? pr.owner.def.name : '탄환', false, { x: p.x - pr.vx, y: p.y - pr.vy })) {
+        p.knock(Math.cos(pr.angle), Math.sin(pr.angle), 120);
+      }
+      pr.expire(this, true);
+      return true;
+    }
+    return false;
+  }
+
+  /** Contact damage of a harmful enemy against one keeper. */
+  private contactHit(e: Enemy, p: Player): void {
+    if (!p.alive) return;
+    const rr = e.r + p.r - 2;
+    if (dist2(e.x, e.y, p.x, p.y) < rr * rr) {
+      if (p.hurt(this, e.contactDamage, e.def.name, false, e)) {
+        const d = Math.hypot(p.x - e.x, p.y - e.y) || 1;
+        p.knock((p.x - e.x) / d, (p.y - e.y) / d, 160);
+      }
+    }
+  }
+
   // ================================================================== combat
   /**
    * Apply a hit to any actor. Player-caused hits on enemies go through crits,
    * item hooks, damage numbers and kill handling. Returns true if applied.
    */
   applyHit(target: Actor, hit: HitInfo): boolean {
-    const p = this.player;
+    let p = this.player;
+    if (this.coop) {
+      // co-op: the keeper who dealt it (its crits, items, embers); no friendly fire
+      const a = hit.attacker instanceof Player ? hit.attacker : hit.source instanceof Projectile && hit.source.owner instanceof Player ? hit.source.owner : null;
+      if (target instanceof Player) return a ? false : target.takeHit(this, hit);
+      if (a && !a.left) p = a;
+      if (target instanceof Enemy && (a || (hit.source instanceof Projectile && hit.source.team === 'player'))) {
+        if (!target.alive || !target.vulnerable || target.hidden) return false;
+        target.lastHitBy = p;
+        if (this.player !== p) return this.asPlayer(p, () => this.applyHit(target, hit));
+      }
+    }
     const byPlayer = hit.attacker === p || (hit.source instanceof Projectile && hit.source.team === 'player');
     if (target instanceof Enemy && byPlayer) {
       if (!target.alive || !target.vulnerable || target.hidden) return false;
@@ -729,7 +1230,8 @@ export class World {
     if (hit.light) return;
     // shake: only hits clearly above a normal shot move the camera; a swing that
     // hits a crowd shakes like its biggest hit, not like the sum of all of them
-    const shake = Math.min(0.4, (heavy ? 0.04 : 0) + Math.max(0, rel - 1.2) * 0.035 + (hit.crit ? 0.07 : 0));
+    // (co-op: only this peer's own hits)
+    const shake = !this.coop || p === this.local ? Math.min(0.4, (heavy ? 0.04 : 0) + Math.max(0, rel - 1.2) * 0.035 + (hit.crit ? 0.07 : 0)) : 0;
     if (shake > 0.01 && shake > this.hitShake) {
       this.shake(shake - this.hitShake);
       this.hitShake = shake;
@@ -766,17 +1268,25 @@ export class World {
 
   /** Damage-over-time tick (burn/poison/bleed). */
   statusDamage(target: Actor, dmg: number, kind: StatusKind): void {
-    if (target === this.player) {
-      if (kind === 'burn' || kind === 'poison') this.player.hurt(this, 1, kind === 'burn' ? '화상' : '독', true);
+    if (target === this.player || (this.coop && target instanceof Player)) {
+      if (kind === 'burn' || kind === 'poison') (target as Player).hurt(this, 1, kind === 'burn' ? '화상' : '독', true);
       return;
     }
-    this.applyHit(target, { damage: dmg, kind: 'status', attacker: this.player, light: true, noProc: true, procs: [kind] });
+    // co-op: damage over time is credited to the keeper who last hit the enemy
+    const by = this.coop && target instanceof Enemy && target.lastHitBy && !target.lastHitBy.left ? target.lastHitBy : this.player;
+    this.applyHit(target, { damage: dmg, kind: 'status', attacker: by, light: true, noProc: true, procs: [kind] });
     const col = kind === 'burn' ? ['#ffe060', '#ff7020'] : kind === 'poison' ? ['#c0ff60', '#40a020'] : ['#ff4050', '#801020'];
     this.particles.burst(target.x, target.y - 4, { count: 3, speed: [10, 30], life: [0.3, 0.6], colors: col, size: [1, 2], vz: [10, 30], gravity: -20 });
   }
 
   killEnemy(e: Enemy): void {
     if (e.dead) return;
+    // co-op: the kill (item hooks, lifesteal, luck) belongs to the keeper who last hit it
+    const by = e.lastHitBy;
+    if (this.coop && by && !by.left && this.player !== by) {
+      this.asPlayer(by, () => this.killEnemy(e));
+      return;
+    }
     e.hp = Math.min(0, e.hp);
     e.dead = true;
     const prevSrc = this.sfxSource;
@@ -870,12 +1380,17 @@ export class World {
       }
     }
     for (const h of [...this.hittables]) if (dist(x, y, h.x, h.y) < radius + h.r) h.takeHit(this, { damage, kind: 'explosion', attacker: p });
-    if ((o.hurtsPlayer ?? true) && !p.flags.has('bombImmune') && dist(x, y, p.x, p.y) < radius + p.r - 4) {
-      // enemy blasts (e.g. bursting bloaters) name their owner on the death screen
-      // enemy blasts scale with the floor's enemy damage; the keeper's own bombs do not
-      if (p.hurt(this, 2, o.source instanceof Enemy ? o.source.def.name : '폭발', !(o.source instanceof Enemy), { x, y })) {
-        const d = dist(x, y, p.x, p.y) || 1;
-        p.knock((p.x - x) / d, (p.y - y) / d, 240);
+    // co-op: every keeper in range, except that a keeper's own blasts spare its teammates
+    const friendly = o.byPlayer !== false && !(o.source instanceof Enemy);
+    for (const pl of this.coop ? this.players : [p]) {
+      if (this.coop && friendly && pl !== p) continue;
+      if ((o.hurtsPlayer ?? true) && !pl.flags.has('bombImmune') && dist(x, y, pl.x, pl.y) < radius + pl.r - 4) {
+        // enemy blasts (e.g. bursting bloaters) name their owner on the death screen
+        // enemy blasts scale with the floor's enemy damage; the keeper's own bombs do not
+        if (pl.hurt(this, 2, o.source instanceof Enemy ? o.source.def.name : '폭발', !(o.source instanceof Enemy), { x, y })) {
+          const d = dist(x, y, pl.x, pl.y) || 1;
+          pl.knock((pl.x - x) / d, (pl.y - y) / d, 240);
+        }
       }
     }
     for (const e of this.entities) {
@@ -1106,7 +1621,9 @@ export class World {
     p.squash(0.8, 1.25);
     const rare = info.rarity === 'epic' || info.rarity === 'legendary';
     playSfx(rare ? 'item_get_rare' : 'item_get');
-    this.banner(info.name, info.desc, { icon: info.icon, color: rareColor(info.rarity), quote: info.quote });
+    // co-op: a teammate's find is a small banner with their name (UI only)
+    if (this.coop && p !== this.local) this.banner(`${p.name || `P${p.slot + 1}`} · ${info.name}`, info.desc, { icon: info.icon, color: rareColor(info.rarity), small: true });
+    else this.banner(info.name, info.desc, { icon: info.icon, color: rareColor(info.rarity), quote: info.quote });
     this.spawn(new RingFx(p.x, p.y - 8, 30, 0.4, rareColor(info.rarity), 2));
   }
 
@@ -1147,8 +1664,18 @@ export class World {
 
   // ================================================================== room flow
   private checkDoors(): void {
-    const p = this.player;
-    if (!p.alive || this.transitioning) return;
+    if (!this.coop) {
+      this.checkDoorsFor(this.player);
+      return;
+    }
+    // co-op: any standing keeper opens locked doors (shared keys) and walking
+    // into an open doorway takes the whole party through
+    for (const p of [...this.players]) if (this.checkDoorsFor(p)) return;
+  }
+
+  /** Door checks for one keeper; true when it went through a door. */
+  private checkDoorsFor(p: Player): boolean {
+    if (!p.alive || this.transitioning) return false;
     for (const d of this.room.doors) {
       // unlock with key
       if (d.state === 'locked') {
@@ -1168,9 +1695,10 @@ export class World {
       const across = v.x !== 0 ? Math.abs(p.y - d.y) : Math.abs(p.x - d.x);
       if (along > 3 && across < 10) {
         this.goThroughDoor(d);
-        return;
+        return true;
       }
     }
+    return false;
   }
 
   private goThroughDoor(d: Door): void {
@@ -1207,6 +1735,7 @@ export class World {
   roomCleared(): void {
     const node = this.node;
     if (node.cleared) return;
+    if (this.coop && this.player !== this.lead()) return this.asPlayer(this.lead(), () => this.roomCleared());
     node.cleared = true;
     this.mapVersion++;
     this.run.stats.roomsCleared++;
@@ -1214,12 +1743,13 @@ export class World {
     this.sfx('door_open');
     // the chime + door glow land a beat after the last death sound
     this.clearMomentT = 0.16;
-    // active item charge
-    const p = this.player;
-    const act = p.activeId ? Actives.get(p.activeId) : undefined;
-    if (act && !act.timed && p.activeCharge < act.charge) {
-      p.activeCharge = Math.min(act.charge, p.activeCharge + (node.cw * node.ch > 1 ? 2 : 1));
-      if (p.activeCharge >= act.charge) playSfx('active_ready');
+    // active item charge (co-op: everyone's)
+    for (const p of this.coop ? this.players : [this.player]) {
+      const act = p.activeId ? Actives.get(p.activeId) : undefined;
+      if (act && !act.timed && p.activeCharge < act.charge) {
+        p.activeCharge = Math.min(act.charge, p.activeCharge + (node.cw * node.ch > 1 ? 2 : 1));
+        if (p.activeCharge >= act.charge && (!this.coop || p === this.local)) playSfx('active_ready');
+      }
     }
     const handler = roomHandler(node.kind);
     const rng = new RNG(node.seed ^ 0xc1ea);
@@ -1228,7 +1758,13 @@ export class World {
       const pos = this.room.nearestFree(this.room.centerX, this.room.centerY, 6);
       this.dropRandom(pos.x, pos.y, 'room');
     }
-    this.items.onRoomClear();
+    // co-op: a boss leaves one more reward pedestal per extra keeper
+    if (this.coop && node.kind === 'boss' && !this.gameOver && this.entities.concat(this.pending).some((e) => e instanceof Trapdoor)) {
+      this.coopExtraPedestals(this.room, this.room.centerX, this.room.centerY - 20, 'boss');
+    }
+    this.eachItems((it) => it.onRoomClear());
+    // co-op: a cleared room brings every downed keeper back
+    if (this.coop && this.deathT < 0) for (const p of this.players) if (p.downed) this.revive(p);
   }
 
   /** The room-clear "moment": a soft chime and the opened doors glowing. */
@@ -1247,12 +1783,14 @@ export class World {
    */
   beginDescend(x: number, y: number): void {
     if (this.transitioning || this.descending || this.gameOver) return;
-    const p = this.player;
     this.descending = { x, y, t: 0 };
-    p.frozen = true;
-    p.invuln = Math.max(p.invuln, 5);
-    p.vx = p.vy = p.kbx = p.kby = 0;
-    p.dashT = 0;
+    // co-op: the whole party goes down together
+    for (const p of this.coop ? this.players : [this.player]) {
+      p.frozen = true;
+      p.invuln = Math.max(p.invuln, 5);
+      p.vx = p.vy = p.kbx = p.kby = 0;
+      p.dashT = 0;
+    }
     this.sfx('trapdoor', { x });
     this.sfx('whoosh', { vol: 0.5, pitch: 0.7, x });
     this.particles.burst(x, y, { count: 16, speed: [20, 70], life: [0.3, 0.7], colors: ['#c0b0d0', '#7a6a8a', '#40304a'], size: [1, 3], drag: 3, sizeEnd: 3, fade: true });
@@ -1269,21 +1807,25 @@ export class World {
 
   private updateDescend(dt: number): void {
     const d = this.descending!;
-    const p = this.player;
+    const ps = this.coop ? [...this.players] : [this.player];
     d.t += dt;
     const k = clamp(d.t / DESCEND_FALL, 0, 1);
     // pulled to the hole's center, then sinks into it
     const pull = 1 - Math.exp(-dt * 14);
-    p.x += (d.x - p.x) * pull;
-    p.y += (d.y - p.y) * pull;
-    p.vx = p.vy = 0;
-    p.fall = k * k * (3 - 2 * k);
+    for (const p of ps) {
+      p.x += (d.x - p.x) * pull;
+      p.y += (d.y - p.y) * pull;
+      p.vx = p.vy = 0;
+      p.fall = k * k * (3 - 2 * k);
+    }
     if (d.t >= DESCEND_FALL) {
       this.descending = null;
       this.descend(true);
-      p.fall = 0;
-      p.frozen = false;
-      p.invuln = Math.min(p.invuln, 1);
+      for (const p of ps) {
+        p.fall = 0;
+        p.frozen = false;
+        p.invuln = Math.min(p.invuln, 1);
+      }
     }
   }
 
@@ -1302,6 +1844,14 @@ export class World {
     if (animated && this.floorCard) this.floorCard.t = -0.3;
   }
 
+  /** End the run now (co-op: the host's "하강 종료"); the summary screen follows. */
+  endRun(source: string): void {
+    if (this.gameOver) return;
+    this.run.lastDamageSource = source;
+    this.gameOver = { won: false, source };
+    this.host.onGameOver(this.gameOver);
+  }
+
   victory(): void {
     if (this.gameOver) return;
     this.run.won = true;
@@ -1311,6 +1861,11 @@ export class World {
   }
 
   playerDied(source: string): void {
+    // co-op: the context keeper (Player.hurt switches to it) goes down instead
+    if (this.coop) {
+      this.downPlayer(this.player, source);
+      return;
+    }
     if (this.deathT >= 0) return;
     this.deathT = 0;
     this.run.lastDamageSource = source;
@@ -1434,6 +1989,8 @@ export class World {
   }
 
   shake(amount: number): void {
+    // co-op: a teammate's own moves (its release, its items) don't shake this peer's screen
+    if (this.coop && this.spawnOwner && this.spawnOwner !== this.local) return;
     this.renderer.shake(amount);
   }
 
@@ -1469,7 +2026,8 @@ export class World {
   // ================================================================== camera & draw
   private updateCamera(dt: number): void {
     const r = this.renderer;
-    const p = this.player;
+    // co-op: every peer's camera follows its own keeper
+    const p = this.coop ? this.local : this.player;
     const room = this.room;
     let tx: number;
     let ty: number;
@@ -1533,7 +2091,38 @@ export class World {
     }
   }
 
+  /** co-op: every keeper's on-screen spot this frame (name tags / arrows in the HUD); draw-only */
+  readonly coopTags: CoopTag[] = [];
+
+  /** Draw-time context keeper of an entity (pure: same rule as ctxFor, without retargeting). */
+  private drawCtx(e: Entity): Player {
+    if (e instanceof Player) return e;
+    if (e instanceof Enemy) return e.tgt && !e.tgt.left ? e.tgt : this.local;
+    const o = (e as { owner?: unknown }).owner;
+    if (o instanceof Player && !o.left) return o;
+    const c = e.ctxP;
+    if (c instanceof Player && !c.left) return c;
+    return this.local;
+  }
+
+  private drawEntity(e: Entity, r: Renderer): void {
+    if (this.coop) this.player = this.drawCtx(e);
+    e.draw(r, this);
+  }
+
   private drawFrame(alpha: number): void {
+    if (!this.coop) {
+      this.drawFrameCtx(alpha);
+      return;
+    }
+    try {
+      this.drawFrameCtx(alpha);
+    } finally {
+      this.player = this.local;
+    }
+  }
+
+  private drawFrameCtx(alpha: number): void {
     const r = this.renderer;
     r.beginWorld('#06040a');
     this.room.drawBackground(r);
@@ -1546,24 +2135,33 @@ export class World {
     const es = this.entities;
     for (let i = 0; i < es.length; i++) {
       const e = es[i];
-      if (e.dead && e !== this.player) continue;
+      if (e.dead && !(e instanceof Player)) continue;
       all.push(e);
       if (e.layer === 1) mid.push(e);
     }
-    for (let i = 0; i < all.length; i++) if (all[i].layer === 0) all[i].draw(r, this);
+    for (let i = 0; i < all.length; i++) if (all[i].layer === 0) this.drawEntity(all[i], r);
     this.room.drawDoors(r, this.time);
+    if (this.coop) drawCoopRings(r, this);
     this.sortMid(mid);
-    for (let i = 0; i < mid.length; i++) mid[i].draw(r, this);
+    for (let i = 0; i < mid.length; i++) this.drawEntity(mid[i], r);
     this.particles.draw(r, false);
-    for (let i = 0; i < all.length; i++) if (all[i].layer === 2) all[i].draw(r, this);
+    for (let i = 0; i < all.length; i++) if (all[i].layer === 2) this.drawEntity(all[i], r);
 
     // lighting
     this.lights.begin(r, this.room.theme.ambient);
-    for (let i = 0; i < all.length; i++) all[i].light(this);
+    for (let i = 0; i < all.length; i++) {
+      if (this.coop) this.player = this.drawCtx(all[i]);
+      all[i].light(this);
+    }
+    if (this.coop) this.player = this.local;
     if (this.lights.enabled) this.drawParticleLights();
     this.lights.apply();
 
-    for (let i = 0; i < all.length; i++) if (all[i].layer === 3) all[i].draw(r, this);
+    for (let i = 0; i < all.length; i++) if (all[i].layer === 3) this.drawEntity(all[i], r);
+    if (this.coop) {
+      this.player = this.local;
+      recordCoopTags(r, this, this.coopTags);
+    }
     this.drawVignette();
 
     if (this.transition) this.drawTransition(alpha);

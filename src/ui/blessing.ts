@@ -17,7 +17,7 @@ import { divider, frame, glow, keyHintRow, spriteCentered } from './frame';
 import { Repeater, appear } from './anim';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
-import { applyBlessing, blessingRole } from '../game/blessings';
+import { blessingRole } from '../game/blessings';
 
 const CARD_W = 156;
 const CARD_H = 196;
@@ -33,8 +33,11 @@ export class BlessingOverlay implements Scene {
   private hover = -1;
   private readonly rl = new Repeater();
   private readonly rr = new Repeater();
+  private readonly floor: number;
 
-  constructor(private readonly game: GameScene, private readonly choices: string[]) {}
+  constructor(private readonly game: GameScene, private readonly choices: string[]) {
+    this.floor = game.world.run.floor;
+  }
 
   enter(): void {
     sfx('ui_open');
@@ -57,12 +60,17 @@ export class BlessingOverlay implements Scene {
   }
 
   update(dt: number): void {
+    if (this.game.online && this.game.world.run.floor !== this.floor) {
+      this.game.closeOverlay(this);
+      return;
+    }
     this.t += dt;
     if (this.chosen >= 0) {
       this.chosenT += dt;
       if (this.chosenT > 0.42) {
         this.game.closeOverlay(this);
-        applyBlessing(this.game.world, this.choices[this.chosen]);
+        // single-player: applied now; co-op: a lockstep command
+        this.game.chooseBlessing(this.choices[this.chosen], this.floor);
       }
       return;
     }

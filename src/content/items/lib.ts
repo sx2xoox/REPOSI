@@ -635,8 +635,17 @@ export abstract class Familiar extends Entity {
 /** last requested familiar counts per world (so they can follow the player at once on room enter) */
 const familiarWant = new WeakMap<World, Map<string, { want: number; make: (w: World) => Familiar; power: number }>>();
 
-/** Keep exactly `want` familiars of `key` alive in the current room. */
+/** Registry key of a familiar kind for the context keeper (co-op: every keeper has its own). */
+function famKey(w: World, key: string): string {
+  return w.coop ? `${key}#${w.player.slot}` : key;
+}
+
+/** Keep exactly `want` familiars of `key` alive in the current room (co-op: the context keeper's). */
 export function syncFamiliars<T extends Familiar>(w: World, key: string, want: number, make: (w: World) => T, power = 1): T[] {
+  return syncFamiliarKey(w, famKey(w, key), want, make, power);
+}
+
+function syncFamiliarKey<T extends Familiar>(w: World, key: string, want: number, make: (w: World) => T, power = 1): T[] {
   let reg = familiarReg.get(w);
   if (!reg) familiarReg.set(w, (reg = new Map()));
   let wants = familiarWant.get(w);
@@ -654,7 +663,8 @@ export function syncFamiliars<T extends Familiar>(w: World, key: string, want: n
   while (list.length > want) list.pop()!.dead = true;
   if (list.length < want) {
     let total = 0;
-    for (const [k, l] of reg) if (k !== key) total += l.filter((f) => !f.dead && f.room === w.room).length;
+    const mine = w.coop ? `#${w.player.slot}` : '';
+    for (const [k, l] of reg) if (k !== key && (!mine || k.endsWith(mine))) total += l.filter((f) => !f.dead && f.room === w.room).length;
     while (list.length < want && total + list.length < FAMILIAR_CAP) {
       const f = make(w);
       w.spawn(f);
@@ -671,26 +681,29 @@ export function syncFamiliars<T extends Familiar>(w: World, key: string, want: n
   return list;
 }
 
-/** Re-sync every familiar kind (room enter: they arrive with the player, visible during the room slide). */
+/** Re-sync every familiar kind (room enter: they arrive with the player, visible during the room slide). Co-op: the context keeper's. */
 export function resyncFamiliars(w: World): void {
   const wants = familiarWant.get(w);
   if (!wants) return;
-  for (const [key, s] of [...wants]) syncFamiliars(w, key, s.want, s.make, s.power);
+  const mine = w.coop ? `#${w.player.slot}` : '';
+  for (const [key, s] of [...wants]) if (!mine || key.endsWith(mine)) syncFamiliarKey(w, key, s.want, s.make, s.power);
 }
 
 defineGlobalHooks({
   id: 'familiars_follow',
+  // co-op: each keeper's familiars follow it into the room
+  perPlayer: true,
   onRoomEnter(w) {
     resyncFamiliars(w);
   },
 });
 
 export function familiarCount(w: World, key: string): number {
-  return familiarReg.get(w)?.get(key)?.filter((f) => !f.dead).length ?? 0;
+  return familiarReg.get(w)?.get(famKey(w, key))?.filter((f) => !f.dead).length ?? 0;
 }
 
 export function familiarsOf<T extends Familiar>(w: World, key: string): T[] {
-  return ((familiarReg.get(w)?.get(key) ?? []) as T[]).filter((f) => !f.dead && f.room === w.room);
+  return ((familiarReg.get(w)?.get(famKey(w, key)) ?? []) as T[]).filter((f) => !f.dead && f.room === w.room);
 }
 
 // ====================================================================== time stop

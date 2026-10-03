@@ -18,6 +18,7 @@ import { animFrame, hasAnim } from '../engine/sprites';
 import { angleTo, clamp, dist, norm, TAU } from '../engine/math';
 import { Projectile, fanAngles, orbSprite, type ProjectileOpts } from './projectile';
 import { fx } from '../engine/rng';
+import type { Player } from './player';
 
 export interface ShootOpts extends Partial<ProjectileOpts> {
   speed?: number;
@@ -68,6 +69,10 @@ export class Enemy extends Actor {
   /** ids of extra parts etc. */
   parent: Enemy | null = null;
   lastDamageSource = '';
+  /** co-op: the keeper this enemy goes after (nearest standing one, sticky; World picks it every step) */
+  tgt: Player | null = null;
+  /** co-op: the keeper who hit it last (kill credit, damage over time) */
+  lastHitBy: Player | null = null;
 
   constructor(def: EnemyDef, x: number, y: number, hpMult = 1) {
     super();
@@ -178,13 +183,13 @@ export class Enemy extends Actor {
   }
 
   // -------------------------------------------------------------- AI helpers
-  /** Position the enemy should target (player, or nearest enemy when charmed). */
+  /** Position the enemy should target (its keeper — co-op: the one it goes after —, or nearest enemy when charmed). */
   target(w: World): { x: number; y: number } {
     if (this.hasStatus('charm')) {
       const other = w.nearestEnemy(this.x, this.y, 400, undefined, this);
       if (other) return other;
     }
-    return w.player;
+    return this.tgt ?? w.player;
   }
 
   angleToTarget(w: World): number {

@@ -19,6 +19,7 @@ import type { Enemy } from './enemy';
 import type { Actor, HitInfo } from './entity';
 import type { Projectile } from './projectile';
 import type { Renderer } from '../engine/renderer';
+import type { Player } from './player';
 
 export interface ActiveEffect {
   key: string;
@@ -52,6 +53,13 @@ export interface ProcEvent {
 const EVENT_HOOKS = new Set<keyof ItemHooks>([
   'modifyHit', 'onHit', 'onKill', 'onHurt', 'onDash', 'onRoomEnter', 'onRoomClear', 'onFloorStart', 'onBomb', 'onPickup', 'onRelease', 'onDeflect',
 ]);
+/**
+ * Co-op: hooks that are world events (dispatched to every keeper's item system).
+ * A global hook (`defineGlobalHooks`) runs once for them — in the party leader's
+ * dispatch — unless it is `perPlayer`; every other hook is one keeper's own
+ * event, so its globals run in that keeper's dispatch.
+ */
+const WORLD_EVENT_HOOKS = new Set<keyof ItemHooks>(['onUpdate', 'onRoomEnter', 'onRoomClear', 'onFloorStart']);
 /** min seconds between two HUD flashes / two icon pops of the same artifact */
 export const PROC_FLASH_CD = 0.6;
 export const PROC_POP_CD = 2.5;
@@ -91,17 +99,41 @@ export class ItemSystem {
   /** effects that implement a given hook (rebuilt lazily after recompute) */
   private byHook = new Map<keyof ItemHooks, ActiveEffect[]>();
   private w: World;
+  /** the keeper these items belong to (the context player while its hooks run) */
+  readonly p: Player;
   /** guard against re-entrant dispatch loops */
   private depth = 0;
 
-  constructor(w: World) {
+  constructor(w: World, p: Player) {
     this.w = w;
+    this.p = p;
+    this.look.owner = p;
+  }
+
+  /** Run `fn` with this system's keeper as the world's context player (co-op; a no-op in single-player). */
+  private own<T>(fn: () => T): T {
+    const w = this.w;
+    if (!w.coop) return fn();
+    const prev = w.player;
+    const prevOwner = w.spawnOwner;
+    w.player = this.p;
+    w.spawnOwner = this.p;
+    try {
+      return fn();
+    } finally {
+      w.player = prev;
+      w.spawnOwner = prevOwner;
+    }
   }
 
   /** Rebuild the effect list & stats. Call after any inventory / weapon change. */
   recompute(): void {
+    this.own(() => this.recomputeOwn());
+  }
+
+  private recomputeOwn(): void {
     const w = this.w;
-    const p = w.player;
+    const p = this.p;
     const comp = p.inv.compute();
     this.computed = comp;
     this.revision++;
@@ -130,8 +162,12 @@ export class ItemSystem {
   }
 
   recomputeStats(): void {
+    this.own(() => this.recomputeStatsOwn());
+  }
+
+  private recomputeStatsOwn(): void {
     const w = this.w;
-    const p = w.player;
+    const p = this.p;
     const base: Stats = { ...BASE_STATS, ...(p.character.baseStats ?? {}) };
     base.maxHearts = p.baseHearts;
     const m = new StatMods();
@@ -156,10 +192,18 @@ export class ItemSystem {
   private with(hook: keyof ItemHooks): ActiveEffect[] {
     let l = this.byHook.get(hook);
     if (!l) {
-      l = this.effects.filter((e) => typeof e.hooks[hook] === 'function');
+      const w = this.w;
+      // co-op: a world-event global runs in the leader's dispatch only (unless perPlayer)
+      const solo = !w.coop || !WORLD_EVENT_HOOKS.has(hook) || w.players[0] === this.p;
+      l = this.effects.filter((e) => typeof e.hooks[hook] === 'function' && (solo || !e.key.startsWith('global:') || !!(e.hooks as { perPlayer?: boolean }).perPlayer));
       this.byHook.set(hook, l);
     }
     return l;
+  }
+
+  /** Forget the per-hook dispatch lists (the party leader changed). */
+  invalidate(): void {
+    this.byHook = new Map();
   }
 
   private each(hook: keyof ItemHooks, fn: (e: ActiveEffect) => void): void {
@@ -170,6 +214,12 @@ export class ItemSystem {
     const prevCur = this.cur;
     const prevEvent = this.curEvent;
     this.curEvent = EVENT_HOOKS.has(hook);
+    // hooks run with their keeper as the context player (`w.player`, `w.items`, `w.vars`)
+    const w = this.w;
+    const prevP = w.player;
+    const prevOwner = w.spawnOwner;
+    w.player = this.p;
+    if (w.coop) w.spawnOwner = this.p;
     try {
       for (let i = 0; i < list.length; i++) {
         this.cur = list[i];
@@ -183,6 +233,8 @@ export class ItemSystem {
       this.depth--;
       this.cur = prevCur;
       this.curEvent = prevEvent;
+      w.player = prevP;
+      if (w.coop) w.spawnOwner = prevOwner;
     }
   }
 
@@ -236,10 +288,14 @@ export class ItemSystem {
 
   /** Is the held weapon one of the character's favoured class (CharacterDef.affinity)? */
   get affinityActive(): boolean {
-    return this.w.player.flags.has('affinity');
+    return this.p.flags.has('affinity');
   }
 
   update(dt: number): void {
+    this.own(() => this.updateOwn(dt));
+  }
+
+  private updateOwn(dt: number): void {
     const w = this.w;
     let changed = false;
     for (const b of this.buffs) {
@@ -304,25 +360,25 @@ export class ItemSystem {
     const w = this.w;
     const item = makeItem(id);
     w.run.obtained.add(id);
-    w.player.inv.add(item);
+    this.p.inv.add(item);
     this.recompute();
     return item;
   }
 
   /** Remove one copy of an artifact (curses, trades). */
   take(id: string): boolean {
-    const ok = this.w.player.inv.removeOne(id);
+    const ok = this.p.inv.removeOne(id);
     if (ok) this.recompute();
     return ok;
   }
 
   hasArtifact(id: string): boolean {
-    return this.w.player.inv.has(id);
+    return this.p.inv.has(id);
   }
 
   /** Number of copies of an artifact held (0 if none). */
   powerOf(id: string): number {
-    return this.w.player.inv.countOf(id);
+    return this.p.inv.countOf(id);
   }
 }
 

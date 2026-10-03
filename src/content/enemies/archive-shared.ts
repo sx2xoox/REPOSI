@@ -405,10 +405,11 @@ frames('shcrash', 'fall', 5, 19, 22, paintCrash, { origin: [9, 21], fps: 14, loo
 /** A shelf slams down at (x, y): hurts the player within `radius`, scatters books. */
 export function shelfCrash(w: World, x: number, y: number, radius: number, source: string, damage = 1): void {
   w.spawn(new AnimEffect('shcrash_fall', x, y, { layer: 1 }));
-  const p = w.player;
-  const d = Math.hypot(p.x - x, p.y - y);
-  if (damage > 0 && p.alive && p.z < 8 && d < radius + p.r * 0.5) {
-    if (p.hurt(w, damage, source)) p.knock((p.x - x) / (d || 1), (p.y - y) / (d || 1), 150);
+  for (const p of w.targets()) {
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (damage > 0 && p.alive && p.z < 8 && d < radius + p.r * 0.5) {
+      if (p.hurt(w, damage, source)) p.knock((p.x - x) / (d || 1), (p.y - y) / (d || 1), 150);
+    }
   }
   w.particles.burst(x, y - 3, { count: 6, speed: [30, 80], life: [0.25, 0.5], colors: [PAPER[2], PAPER[1], '#5e452a'], size: [1, 2], gravity: 280, vz: [30, 90] });
   w.sfx('rock_break', { vol: 0.3, pitch: fx.range(1.2, 1.4) });

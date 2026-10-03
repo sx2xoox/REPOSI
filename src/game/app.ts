@@ -15,6 +15,8 @@ export class App {
     title?: () => import('../ui/scene').Scene;
     game?: (seed: string, character: string, seeded: boolean) => import('../ui/scene').Scene;
     characterSelect?: () => import('../ui/scene').Scene;
+    /** online co-op run (net/session.ts startNetRun) */
+    coop?: (session: import('../net/session').NetSession, start: import('../net/lobby').StartInfo) => import('../ui/scene').Scene;
   } = {};
 
   init(canvas: HTMLCanvasElement): void {

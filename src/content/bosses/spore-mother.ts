@@ -485,10 +485,11 @@ function* burrow(e: Enemy, w: World): Script {
   w.shake(0.5);
   e.vulnerable = true;
   // erupting from under the player's feet hurts
-  const pl = w.player;
-  if (pl.alive && Math.hypot(pl.x - e.x, pl.y - (e.y + 10)) < 30 + pl.r && pl.hurt(w, 2, NAME)) {
-    const d = Math.hypot(pl.x - e.x, pl.y - e.y) || 1;
-    pl.knock((pl.x - e.x) / d, (pl.y - e.y) / d, 200);
+  for (const pl of w.targets()) {
+    if (pl.alive && Math.hypot(pl.x - e.x, pl.y - (e.y + 10)) < 30 + pl.r && pl.hurt(w, 2, NAME)) {
+      const d = Math.hypot(pl.x - e.x, pl.y - e.y) || 1;
+      pl.knock((pl.x - e.x) / d, (pl.y - e.y) / d, 200);
+    }
   }
   sporeCloud(w, e.x, e.y, 20);
   yield 0.45;

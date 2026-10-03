@@ -36,6 +36,8 @@ export interface StartInfo {
   buildId: string;
   /** suggested initial client jitter buffer in frames (1..4), from lobby RTT jitter */
   inputDelayHint: number;
+  /** the host's simulation options for this run (game/seam SimRules; absent = defaults) */
+  rules?: { hitStop?: boolean };
 }
 
 export type LobbyState = 'joining' | 'open' | 'started' | 'closed';
@@ -232,8 +234,8 @@ export class Lobby {
     return this.role === 'host' && this.state === 'open' && this.roster.every((p) => p.host || p.ready);
   }
 
-  /** Host: start the run with `seed`; every peer receives the same StartInfo. */
-  start(seed: string): StartInfo {
+  /** Host: start the run with `seed` (and the host's sim `rules`); every peer receives the same StartInfo. */
+  start(seed: string, rules?: StartInfo['rules']): StartInfo {
     if (!this.canStart()) throw new Error('lobby: cannot start yet');
     this.rebuildRoster();
     const info: StartInfo = {
@@ -242,6 +244,7 @@ export class Lobby {
       buildId: this.o.buildId,
       inputDelayHint: this.inputDelayHint(),
     };
+    if (rules) info.rules = { ...rules };
     this.state = 'started';
     this.startInfo = info;
     for (const peer of this.peers.keys()) this.send(peer, { t: 'start', ...info });
@@ -484,6 +487,10 @@ export class Lobby {
           buildId: str(m.buildId, 64),
           inputDelayHint: Number(m.inputDelayHint) || 2,
         };
+        if (m.rules && typeof m.rules === 'object') {
+          const r = m.rules as Record<string, unknown>;
+          info.rules = typeof r.hitStop === 'boolean' ? { hitStop: r.hitStop } : {};
+        }
         if (info.buildId !== this.o.buildId) {
           this.close('version');
           return;

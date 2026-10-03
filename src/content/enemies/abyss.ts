@@ -83,12 +83,13 @@ export class VoidPool extends Entity {
         colors: ['#ffffff', VPINK.mid, '#8a2ad0'], size: 1, additive: true, light: 3,
       });
     }
-    const p = w.player;
-    if (this.armed && p.alive && p.z < 4) {
-      const dx = p.x - this.x;
-      const dy = (p.y - this.y) / 0.7;
-      const rr = this.radius * 0.85;
-      if (dx * dx + dy * dy < rr * rr) p.hurt(w, 1, this.source);
+    for (const p of w.targets()) {
+      if (this.armed && p.alive && p.z < 4) {
+        const dx = p.x - this.x;
+        const dy = (p.y - this.y) / 0.7;
+        const rr = this.radius * 0.85;
+        if (dx * dx + dy * dy < rr * rr) p.hurt(w, 1, this.source);
+      }
     }
   }
 
@@ -357,10 +358,11 @@ defineEnemy({
       e.setAnim('vtent_rise', true);
       w.shake(0.25);
       w.sfx('splat', { vol: 0.7, pitch: 0.6 });
-      const p = w.player;
-      const d = Math.hypot(p.x - e.x, p.y - e.y);
-      if (p.alive && p.z < 8 && d < R + p.r * 0.5) {
-        if (p.hurt(w, 1, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 200);
+      for (const p of w.targets()) {
+        const d = Math.hypot(p.x - e.x, p.y - e.y);
+        if (p.alive && p.z < 8 && d < R + p.r * 0.5) {
+          if (p.hurt(w, 1, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 200);
+        }
       }
       w.particles.burst(e.x, e.y, { count: 16, speed: [40, 120], life: [0.3, 0.6], colors: VOIDDUST, size: [1, 2], gravity: 260, vz: [40, 120] });
       w.spawn(new RingFx(e.x, e.y, R + 4, 0.3, VPINK.mid, 2));
@@ -691,10 +693,11 @@ defineEnemy({
         e.setAnim('wstalker_strike', true);
         w.sfx('swing_heavy', { vol: 0.55, pitch: 0.8 });
         w.shake(0.2);
-        const pl = w.player;
-        const d = Math.hypot(pl.x - e.x, pl.y - e.y);
-        if (pl.alive && pl.z < 8 && d < R + pl.r * 0.5) {
-          if (pl.hurt(w, 2, e.def.name)) pl.knock((pl.x - e.x) / (d || 1), (pl.y - e.y) / (d || 1), 220);
+        for (const pl of w.targets()) {
+          const d = Math.hypot(pl.x - e.x, pl.y - e.y);
+          if (pl.alive && pl.z < 8 && d < R + pl.r * 0.5) {
+            if (pl.hurt(w, 2, e.def.name)) pl.knock((pl.x - e.x) / (d || 1), (pl.y - e.y) / (d || 1), 220);
+          }
         }
         w.spawn(new RingFx(e.x, e.y - 6, R, 0.25, VTEAL.mid, 3));
         w.particles.burst(e.x, e.y - 8, { count: 14, speed: [80, 180], life: [0.15, 0.3], colors: ['#ffffff', VTEAL.hot, VTEAL.mid], shape: 'spark', size: [1, 2] });

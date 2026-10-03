@@ -153,10 +153,11 @@ frames('icespk', 'burst', 5, 13, 19, paintSpike, { origin: [6, 18], fps: 14, loo
 /** An ice spike erupts at (x, y): hurts the player within `radius`. */
 export function iceSpike(w: World, x: number, y: number, radius: number, source: string, damage = 1): void {
   w.spawn(new AnimEffect('icespk_burst', x, y, { layer: 1 }));
-  const p = w.player;
-  const d = Math.hypot(p.x - x, p.y - y);
-  if (damage > 0 && p.alive && p.z < 8 && d < radius + p.r * 0.5) {
-    if (p.hurt(w, damage, source)) p.knock((p.x - x) / (d || 1), (p.y - y) / (d || 1), 150);
+  for (const p of w.targets()) {
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (damage > 0 && p.alive && p.z < 8 && d < radius + p.r * 0.5) {
+      if (p.hurt(w, damage, source)) p.knock((p.x - x) / (d || 1), (p.y - y) / (d || 1), 150);
+    }
   }
   w.particles.burst(x, y - 4, { count: 7, speed: [30, 90], life: [0.25, 0.5], colors: SNOWDUST, size: [1, 2], gravity: 280, vz: [30, 90] });
   w.sfx('spike', { vol: 0.3, pitch: fx.range(1.15, 1.35) });
@@ -495,10 +496,12 @@ defineEnemy({
           const a = (i / 8) * TAU;
           iceSpike(w, e.x + Math.cos(a) * 18, e.y + Math.sin(a) * 12, 0, e.def.name, 0);
         }
-        if (p.alive && p.z < 8 && Math.hypot(p.x - e.x, p.y - e.y) < R + p.r * 0.5) {
-          if (p.hurt(w, 1, e.def.name)) {
-            const dd = Math.hypot(p.x - e.x, p.y - e.y) || 1;
-            p.knock((p.x - e.x) / dd, (p.y - e.y) / dd, 200);
+        for (const q of w.targets()) {
+          if (q.alive && q.z < 8 && Math.hypot(q.x - e.x, q.y - e.y) < R + q.r * 0.5) {
+            if (q.hurt(w, 1, e.def.name)) {
+              const dd = Math.hypot(q.x - e.x, q.y - e.y) || 1;
+              q.knock((q.x - e.x) / dd, (q.y - e.y) / dd, 200);
+            }
           }
         }
         w.spawn(new FrostPatch(e.x, e.y + 2, 20, 3));

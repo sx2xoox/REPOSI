@@ -681,13 +681,14 @@ function* chainCyclone(e: Enemy, w: World): Script {
     // slow drift toward the player
     e.chase(w, 14);
     if (Math.floor(el / 0.3) !== Math.floor((el - w.dt) / 0.3)) w.sfx('whoosh', { vol: 0.45, pitch: 0.7 });
-    const p = w.player;
-    if (p.alive && p.z < 6) {
-      for (const k of [0, Math.PI]) {
-        const ex = e.x + Math.cos(a + k) * L;
-        const ey = e.y + 4 + Math.sin(a + k) * L;
-        if (distToSegment(p.x, p.y - 3, e.x, e.y + 4, ex, ey) < 5 + p.r * 0.5 && p.hurt(w, 1, NAME)) {
-          p.knock(Math.cos(a + k + dir * Math.PI / 2), Math.sin(a + k + dir * Math.PI / 2), 180);
+    for (const p of w.targets()) {
+      if (p.alive && p.z < 6) {
+        for (const k of [0, Math.PI]) {
+          const ex = e.x + Math.cos(a + k) * L;
+          const ey = e.y + 4 + Math.sin(a + k) * L;
+          if (distToSegment(p.x, p.y - 3, e.x, e.y + 4, ex, ey) < 5 + p.r * 0.5 && p.hurt(w, 1, NAME)) {
+            p.knock(Math.cos(a + k + dir * Math.PI / 2), Math.sin(a + k + dir * Math.PI / 2), 180);
+          }
         }
       }
     }

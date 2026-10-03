@@ -18,10 +18,23 @@ import { fx } from '../engine/rng';
 import { DIR_VEC } from './constants';
 import { drawBackWeapon, equipWeapon, swapWeapons, tickHolstered, withSwapPop } from './weaponslots';
 import { emptyInput, HELD, PRESS, readLocalInput, type PlayerInput } from './seam';
+import { FlowField } from './flow';
+import type { ItemSystem } from './items';
+import type { Entity } from './entity';
 
 export type Facing = 'down' | 'up' | 'side';
 
 export const EMBER_MAX = 100;
+
+/**
+ * Coins, bombs and keys. Every keeper has their own in single-player; a co-op
+ * party shares one purse (`World.startParty` hands the same object to everyone).
+ */
+export class Purse {
+  coins = 0;
+  bombs = 1;
+  keys = 0;
+}
 
 /** Default lantern release: a ring of flame that burns enemies and erases bullets. */
 export function defaultRelease(w: World, p: Player): void {
@@ -59,9 +72,8 @@ export class Player extends Actor {
   /** one-hit barriers granted by items (each blocks one hit completely) */
   shields = 0;
   private peakMaxRed = 0;
-  coins = 0;
-  bombs = 1;
-  keys = 0;
+  /** coins / bombs / keys (shared by the whole party in co-op) */
+  purse = new Purse();
   inv = new Inventory();
   weaponId: string;
   weapon: WeaponState = newWeaponState();
@@ -116,6 +128,26 @@ export class Player extends Actor {
    */
   readonly input: PlayerInput = emptyInput();
 
+  // ---- co-op (see World.startParty; single-player: slot 0, never downed)
+  /** lockstep slot 0..3 (P1..P4) */
+  slot = 0;
+  /** nickname shown on the name tag / teammate panel */
+  name = '';
+  /** this keeper's artifacts, buffs, hook dispatch and looks (`w.items` while it is the context player) */
+  items!: ItemSystem;
+  /** per-keeper scratch state of item / kit hooks (`w.vars` while it is the context player) */
+  vars: Record<string, number> = {};
+  /** ground enemies' path field toward this keeper (`w.flow` while it is the context player) */
+  readonly flow = new FlowField();
+  /** the item this keeper stands next to (`w.focus` while it is the context player) */
+  focus: Entity | null = null;
+  /** co-op: at 0 HP the keeper is a ghost (moves, can't attack / interact / be hurt) until revived */
+  downed = false;
+  /** co-op: revive progress in seconds while a teammate stands close */
+  reviveT = 0;
+  /** co-op: left the session (removed from the world) */
+  left = false;
+
   constructor(character: CharacterDef) {
     super();
     this.character = character;
@@ -124,6 +156,30 @@ export class Player extends Actor {
     this.baseHearts = character.hearts;
     this.weaponId = character.weapon;
     this.solid = false;
+  }
+
+  get coins(): number {
+    return this.purse.coins;
+  }
+
+  set coins(v: number) {
+    this.purse.coins = v;
+  }
+
+  get bombs(): number {
+    return this.purse.bombs;
+  }
+
+  set bombs(v: number) {
+    this.purse.bombs = v;
+  }
+
+  get keys(): number {
+    return this.purse.keys;
+  }
+
+  set keys(v: number) {
+    this.purse.keys = v;
   }
 
   get maxRed(): number {
@@ -135,7 +191,7 @@ export class Player extends Actor {
   }
 
   override get alive(): boolean {
-    return !this.dead && this.red + this.soul > 0;
+    return !this.dead && !this.downed && this.red + this.soul > 0;
   }
 
   get dashing(): boolean {
@@ -155,12 +211,14 @@ export class Player extends Actor {
   }
 
   heal(halfHearts: number): number {
+    if (this.downed) return 0;
     const before = this.red;
     this.red = Math.min(this.maxRed, this.red + halfHearts);
     return this.red - before;
   }
 
   addSoul(halfHearts: number): void {
+    if (this.downed) return;
     this.soul = Math.min(24 - this.red, this.soul + halfHearts);
   }
 
@@ -179,7 +237,10 @@ export class Player extends Actor {
     this.updateStatuses(w, dt);
     this.updateKnockback(dt);
     this.updateSquash(dt);
-    if (!this.alive) return;
+    if (!this.alive) {
+      if (this.downed) this.updateGhost(w, dt);
+      return;
+    }
 
     const s = this.stats;
     const inp = this.input;
@@ -304,6 +365,34 @@ export class Player extends Actor {
       this.spikeCD = 0.6;
       this.hurt(w, 1, '가시 함정');
     }
+  }
+
+  /**
+   * Co-op: a downed keeper drifts around as a translucent ghost (movement only,
+   * over pits; no attacks, dash, items or interact) until a teammate revives them.
+   */
+  private updateGhost(w: World, dt: number): void {
+    const inp = this.input;
+    (w.inputSource ?? readLocalInput)(w, this, inp);
+    this.firing = false;
+    this.dashT = 0;
+    const speed = this.stats.moveSpeed * 0.8;
+    const k = 1 - Math.exp(-dt * 10);
+    this.vx += (inp.mx * speed - this.vx) * k;
+    this.vy += (inp.my * speed - this.vy) * k;
+    this.moving = Math.hypot(this.vx, this.vy) > 12;
+    if (this.moving) {
+      this.facing = Math.abs(this.vy) > Math.abs(this.vx) * 1.1 ? (this.vy < 0 ? 'up' : 'down') : 'side';
+      this.flip = this.vx < 0;
+    }
+    const fly = this.flying;
+    this.flying = true;
+    this.vx += this.kbx;
+    this.vy += this.kby;
+    this.move(w, dt);
+    this.vx -= this.kbx;
+    this.vy -= this.kby;
+    this.flying = fly;
   }
 
   /** Gain embers (called when dealing damage). */
@@ -534,11 +623,15 @@ export class Player extends Actor {
    */
   hurt(w: World, halfHearts: number, source = '???', raw = false, origin?: { x: number; y: number }): boolean {
     if (!this.alive || this.invuln > 0 || this.god || w.transitioning) return false;
+    // co-op: the hurt keeper's items react (onHurt) and its death downs it
+    if (w.coop && w.player !== this) return w.asPlayer(this, () => this.hurt(w, halfHearts, source, raw, origin));
+    // co-op: screen shake / flash only for this peer's own keeper
+    const own = !w.coop || this === w.local;
     if (this.shields > 0) {
       this.shields--;
       this.invuln = Math.max(this.invuln, 0.6);
       w.sfx('shield_block');
-      w.shake(0.2);
+      if (own) w.shake(0.2);
       w.spawn(new RingFx(this.x, this.y - 6, 26, 0.35, '#c8f0ff', 2));
       w.particles.burst(this.x, this.y - 6, { count: 16, speed: [40, 120], life: [0.2, 0.5], colors: ['#ffffff', '#c8f0ff', '#70b0ff'], size: [1, 2], shape: 'spark' });
       return false;
@@ -562,10 +655,12 @@ export class Player extends Actor {
     w.run.lastDamageSource = source;
     // feedback scales with the hit (1 = normal, 2+ = heavy attack)
     const heavy = Math.max(0, Math.round(halfHearts) - 1);
-    w.shake(0.42 + 0.15 * heavy);
+    if (own) w.shake(0.42 + 0.15 * heavy);
     w.hitstop(0.08 + 0.025 * heavy);
-    w.renderer.screenFlash('#ff2030', 0.24 + 0.08 * heavy);
-    w.playerHurtFx?.(halfHearts, origin);
+    if (own) {
+      w.renderer.screenFlash('#ff2030', 0.24 + 0.08 * heavy);
+      w.playerHurtFx?.(halfHearts, origin);
+    }
     w.floatText(this.x, this.y - 22, `-${halfHearts / 2}♥`, fromSoul === halfHearts ? '#a8c8ff' : '#ff7a8a');
     this.squash(0.72, 1.3);
     w.sfx('player_hurt', { pitch: heavy ? 0.9 : 1 });
@@ -604,6 +699,10 @@ export class Player extends Actor {
       this.drawFalling(r);
       return;
     }
+    if (this.downed) {
+      this.drawGhost(r);
+      return;
+    }
     const blink = this.invuln > 0 && !this.dashing && Math.floor(this.invuln * 14) % 2 === 0;
     // flying characters hover a little above their (smaller) shadow
     const hover = this.flying ? 2 + Math.sin(this.age * 3.2) : 0;
@@ -629,6 +728,18 @@ export class Player extends Actor {
       const t = clamp(1 - this.holdT / 1.0, 0, 1);
       r.sprite(this.holdIcon, this.x, this.y - 26 - Math.min(1, t * 4) * 4);
     }
+  }
+
+  /** Co-op downed keeper: a pale, floating, see-through lantern ghost. */
+  private drawGhost(r: Renderer): void {
+    const bob = Math.sin(this.age * 2.6) * 1.5;
+    r.shadow(this.x, this.y + 4, 8, 3, 0.15);
+    r.sprite(this.frameName(), this.x, this.y + 1 + bob, {
+      flipX: this.flip,
+      alpha: 0.42 + 0.08 * Math.sin(this.age * 5),
+      tint: '#a8d8ff',
+      tintAmount: 0.6,
+    });
   }
 
   /** Trapdoor fall: shrink, spin a little and sink into the hole. */
@@ -666,6 +777,10 @@ export class Player extends Actor {
   }
 
   override light(w: World): void {
+    if (this.downed) {
+      w.lights.add(this.x, this.y - 4, 34, '#a8d8ff', { intensity: 0.5 });
+      return;
+    }
     const fl = (1 + Math.sin(this.age * 9) * 0.03 + Math.sin(this.age * 23) * 0.02) * (1 - this.fall * 0.6);
     w.lights.add(this.x, this.y - 6, (this.character.lightRadius ?? 95) * fl, this.character.lightColor ?? '#ffd8a0', { intensity: 0.95 });
     w.lights.add(this.x, this.y - 6, 30, '#ffffff', { intensity: 0.35 });

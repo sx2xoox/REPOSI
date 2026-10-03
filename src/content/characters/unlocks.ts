@@ -57,6 +57,7 @@ export function moriUnlockDue(totalKills: number): boolean {
 
 defineGlobalHooks({
   id: 'character_unlocks',
+  perPlayer: true,
   onRoomEnter(w) {
     // remember the damage taken so far when a boss room is entered (백구's clean kill)
     if (w.node.kind === 'boss') w.vars.__bossRoomDmg = w.run.stats.damageTaken;

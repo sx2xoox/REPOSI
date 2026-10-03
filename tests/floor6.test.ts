@@ -359,6 +359,7 @@ function fakeWorld(seed: string): FakeWorld {
     floor: { index: FLOOR, hpMult: 1 },
     vars: {} as Record<string, number>,
     player,
+    targets: () => [player],
     room,
     enemies,
     projectiles,

@@ -8,6 +8,9 @@
 // Floats are hashed by their exact IEEE-754 bits, so even a one-ulp drift
 // changes the hash. Purely visual state (particles, lights, camera, cosmetic
 // entities, UI banners) is left out on purpose: it may legitimately differ.
+// Co-op: every keeper is covered in slot order (never "the local one": the hash
+// must not depend on which peer computes it), plus the co-op state (downed,
+// revive progress, enemy targets); a single-player world hashes exactly as before.
 
 import type { World } from './world';
 import type { Room } from './room';
@@ -116,7 +119,9 @@ export function stateHashParts(w: World): Record<string, number> {
   part('run', (h) => hashRun(h, w));
   part('world', (h) => hashWorldScalars(h, w));
   part('room', (h) => hashRoom(h, w));
-  part('player', (h) => hashPlayer(h, w.player));
+  part('player', (h) => {
+    for (const p of keepers(w)) hashPlayer(h, p, w.coop);
+  });
   part('entities', (h) => hashEntities(h, w));
   return out;
 }
@@ -125,13 +130,20 @@ function hashWorld(h: StateHasher, w: World): void {
   hashRun(h, w);
   hashWorldScalars(h, w);
   hashRoom(h, w);
-  if (w.player) hashPlayer(h, w.player);
+  for (const p of keepers(w)) hashPlayer(h, p, w.coop);
   hashEntities(h, w);
+}
+
+/** The keepers to hash: everyone (slot order) in co-op, else the world's keeper. */
+function keepers(w: World): Player[] {
+  if (w.coop) return w.players;
+  return w.player ? [w.player] : [];
 }
 
 function hashRun(h: StateHasher, w: World): void {
   const r = w.run;
-  h.str(r.seed).str(r.characterId).int(r.floor).rng(r.rng).rng(r.lootRng);
+  // co-op: run.characterId is each peer's own pick; the party roster is what they share
+  h.str(r.seed).str(w.coop ? w.players.map((p) => `${p.slot}:${p.character.id}`).join(',') : r.characterId).int(r.floor).rng(r.rng).rng(r.lootRng);
   const s = r.stats;
   h.int(s.kills).num(s.timeSec).num(s.damageTaken).num(s.damageDealt).int(s.roomsCleared).int(s.itemsTaken);
   h.int(s.coinsCollected).int(s.coinsSpent).int(s.activesUsed).int(s.bossesKilled).int(s.secretsFound).int(s.releases);
@@ -153,11 +165,13 @@ function hashWorldScalars(h: StateHasher, w: World): void {
   else h.word(0);
   for (const f of w.flags) h.str(f);
   h.word(-4);
-  for (const k in w.vars) h.str(k).num(w.vars[k]);
-  h.word(-5);
-  // buffs (temporary item effects)
-  for (const b of w.items.buffs) h.str(b.key).num(b.time).str(b.until ?? '');
-  h.word(-6);
+  // per keeper: hook scratch state and buffs (temporary item effects)
+  for (const p of keepers(w)) {
+    for (const k in p.vars) h.str(k).num(p.vars[k]);
+    h.word(-5);
+    for (const b of p.items.buffs) h.str(b.key).num(b.time).str(b.until ?? '');
+    h.word(-6);
+  }
 }
 
 function hashRoom(h: StateHasher, w: World): void {
@@ -175,7 +189,7 @@ function hashRoom(h: StateHasher, w: World): void {
       if (c.room === w.room) continue;
       h.int(id);
       hashTiles(h, c.room);
-      for (const e of c.entities) if (!(e.constructor as typeof Entity).cosmetic) hashEntity(h, e);
+      for (const e of c.entities) if (!(e.constructor as typeof Entity).cosmetic) hashEntity(h, e, w.coop);
       h.word(-12);
     }
   }
@@ -194,8 +208,9 @@ function hashWeapon(h: StateHasher, id: string | null, st: WeaponState): void {
   h.str(id).num(st.cooldown).num(st.charge).num(st.combo).num(st.comboTimer).num(st.sinceAttack).mem(st.mem as Record<string, unknown>);
 }
 
-function hashPlayer(h: StateHasher, p: Player): void {
+function hashPlayer(h: StateHasher, p: Player, coop = false): void {
   hashActor(h, p);
+  if (coop) h.int(p.slot).bool(p.downed).num(p.reviveT);
   h.num(p.red).num(p.soul).num(p.shields).num(p.baseHearts).num(p.ember).num(p.releaseT);
   h.int(p.coins).int(p.bombs).int(p.keys);
   h.num(p.aim).bool(p.firing).str(p.facing).bool(p.moving).num(p.dashT).num(p.dashCD).num(p.dashDX).num(p.dashDY).num(p.dashX0).num(p.dashY0);
@@ -219,11 +234,17 @@ function hashActor(h: StateHasher, a: Actor): void {
   h.word(-9);
 }
 
-function hashEntity(h: StateHasher, e: Entity): void {
+function hashEntity(h: StateHasher, e: Entity, coop = false): void {
   if (e instanceof Player) return; // hashed by hashPlayer (it is also in the list: mark its slot)
+  if (coop) {
+    h.int(e.ctxP instanceof Player ? e.ctxP.slot : -1);
+    const owner = (e as { owner?: unknown }).owner;
+    h.int(owner instanceof Player ? owner.slot : -1);
+  }
   if (e instanceof Enemy) {
     h.str(e.def.id);
     hashActor(h, e);
+    if (coop) h.int(e.tgt ? e.tgt.slot : -1).int(e.lastHitBy ? e.lastHitBy.slot : -1);
     h.num(e.script.steps).num(e.script.waiting).bool(e.script.done).num(e.dormant).num(e.telegraphT).int(e.phase);
     h.bool(e.hidden).bool(e.vulnerable).bool(e.harmful).bool(e.champion).bool(e.isMinion).num(e.speed);
     h.num(e.wantVX).num(e.wantVY).num(e.accel).int(e.facing).str(e.anim).num(e.contactDamage).num(e.mass);
@@ -258,8 +279,8 @@ function hashEntities(h: StateHasher, w: World): void {
   for (const list of [w.entities, pending]) {
     for (const e of list) {
       if ((e.constructor as typeof Entity).cosmetic) continue;
-      if (e === w.player) h.word(0x91a7e5);
-      else hashEntity(h, e);
+      if (w.coop ? e instanceof Player : e === w.player) h.word(0x91a7e5 + (w.coop ? (e as Player).slot : 0));
+      else hashEntity(h, e, w.coop);
       n++;
     }
     h.word(-10);

@@ -35,6 +35,7 @@ import { ItemTooltip } from './item-tooltip';
 import { UiLayer } from './layer-cache';
 import { ArtifactBar } from './artifact-bar';
 import type { HudStat } from './logic';
+import { CoopHud } from './coop';
 
 /** HUD minimap size and margin (UI units). */
 export const MINIMAP_W = 124;
@@ -120,6 +121,8 @@ export class Hud {
   readonly artifacts = new ArtifactBar();
   /** preview card of the item the keeper stands next to */
   readonly tooltip = new ItemTooltip();
+  /** online co-op: teammate panels, name tags, off-screen arrows, toasts */
+  readonly coop = new CoopHud();
   /** HUD area inside the safe insets (UI units); corner elements are drawn translated to its top-left */
   private W = UI_W;
   private H = UI_H;
@@ -306,6 +309,7 @@ export class Hud {
     this.hints.update(w, dt);
     this.artifacts.update(w, dt);
     this.tooltip.update(w, dt);
+    if (w.coop) this.coop.update(w, dt);
   }
 
   private spawnShards(slot: number, color: string): void {
@@ -344,6 +348,7 @@ export class Hud {
     d.restore();
     this.cr = null;
     this.cw = null;
+    if (w.coop) this.coop.draw(r, w, A, sa.l, sa.t, this.W, this.H, MINIMAP_MARGIN + MINIMAP_H + 34);
     this.artifacts.draw(r, w, A, sa.l, sa.t, 196, this.W - MINIMAP_W - MINIMAP_MARGIN - 10);
     this.tooltip.draw(r, w, A);
     drawBanners(r, w);

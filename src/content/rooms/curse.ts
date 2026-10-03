@@ -22,11 +22,13 @@ class CurseToll extends Entity {
     this.age += dt;
     if (w.transitioning || this.age < 0.15) return;
     this.dead = true;
-    const p = w.player;
-    if (!p.alive || p.red + p.soul <= 1) return; // never lethal
-    if (p.hurt(w, 1, '저주의 문')) {
-      w.floatText(p.x, p.y - 20, '피의 대가', '#ff6080');
-      w.particles.burst(p.x, p.y - 8, { count: 16, speed: [20, 60], life: [0.5, 1], colors: ['#ff70c0', '#a02070', '#300820'], size: [1, 2], additive: true });
+    // every keeper who walked in pays (co-op)
+    for (const p of w.targets()) {
+      if (!p.alive || p.red + p.soul <= 1) continue; // never lethal
+      if (p.hurt(w, 1, '저주의 문')) {
+        w.floatText(p.x, p.y - 20, '피의 대가', '#ff6080');
+        w.particles.burst(p.x, p.y - 8, { count: 16, speed: [20, 60], life: [0.5, 1], colors: ['#ff70c0', '#a02070', '#300820'], size: [1, 2], additive: true });
+      }
     }
   }
 }

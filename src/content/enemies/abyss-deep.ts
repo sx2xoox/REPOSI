@@ -253,10 +253,11 @@ defineEnemy({
         e.squash(1.3, 0.7);
         w.shake(0.25);
         w.sfx('slam', { vol: 0.6, pitch: 1.3 });
-        const p = w.player;
-        const d = Math.hypot(p.x - e.x, p.y - e.y);
-        if (p.alive && p.z < 8 && d < R + p.r * 0.5) {
-          if (p.hurt(w, 2, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 200);
+        for (const p of w.targets()) {
+          const d = Math.hypot(p.x - e.x, p.y - e.y);
+          if (p.alive && p.z < 8 && d < R + p.r * 0.5) {
+            if (p.hurt(w, 2, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 200);
+          }
         }
         w.particles.burst(e.x, e.y, { count: 10, speed: [40, 100], life: [0.2, 0.4], colors: ['#ffffff', MAW[3], MAW[2]], size: [1, 2], gravity: 260, vz: [30, 80] });
         yield 0.7;

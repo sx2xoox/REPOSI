@@ -584,17 +584,18 @@ class InkStroke extends Entity {
 
   override update(w: World, dt: number): void {
     this.age += dt;
-    const p = w.player;
     const c = Math.cos(this.angle);
     const s = Math.sin(this.angle);
-    if (!this.hit && this.age < this.sweep + 0.12 && p.alive && p.z < 6) {
-      const t = (p.x - this.x) * c + (p.y - this.y) * s;
-      const d = Math.abs(-(p.x - this.x) * s + (p.y - this.y) * c);
-      if (t >= -4 && t <= this.head + 4 && d < (this.o.half ?? 7) + p.r * 0.6) {
-        if (p.hurt(w, this.o.damage ?? 1, this.o.source)) {
-          const side = -(p.x - this.x) * s + (p.y - this.y) * c >= 0 ? 1 : -1;
-          p.knock(-s * side, c * side, 200);
-          this.hit = true;
+    for (const p of w.targets()) {
+      if (!this.hit && this.age < this.sweep + 0.12 && p.alive && p.z < 6) {
+        const t = (p.x - this.x) * c + (p.y - this.y) * s;
+        const d = Math.abs(-(p.x - this.x) * s + (p.y - this.y) * c);
+        if (t >= -4 && t <= this.head + 4 && d < (this.o.half ?? 7) + p.r * 0.6) {
+          if (p.hurt(w, this.o.damage ?? 1, this.o.source)) {
+            const side = -(p.x - this.x) * s + (p.y - this.y) * c >= 0 ? 1 : -1;
+            p.knock(-s * side, c * side, 200);
+            this.hit = true;
+          }
         }
       }
     }
@@ -691,14 +692,15 @@ class InkFlood extends Entity {
       this.level = Math.max(0, 1 - this.drainT / this.o.drain);
       if (this.drainT >= this.o.drain) this.dead = true;
     } else this.level = clamp(this.age / this.o.rise, 0, 1);
-    const p = w.player;
-    if (this.armed && p.alive && p.z < 4 && insideRoom(w, p.x, p.y, -4) && !this.onIsland(p.x, p.y, p.r * 0.5)) {
-      if (p.hurt(w, 1, this.o.source)) {
-        // pushed toward the nearest island so a hit also helps you out
-        let best = this.islands[0];
-        for (const i of this.islands) if (Math.hypot(i.x - p.x, i.y - p.y) < Math.hypot(best.x - p.x, best.y - p.y)) best = i;
-        const d = Math.hypot(best.x - p.x, best.y - p.y) || 1;
-        p.knock((best.x - p.x) / d, (best.y - p.y) / d, 120);
+    for (const p of w.targets()) {
+      if (this.armed && p.alive && p.z < 4 && insideRoom(w, p.x, p.y, -4) && !this.onIsland(p.x, p.y, p.r * 0.5)) {
+        if (p.hurt(w, 1, this.o.source)) {
+          // pushed toward the nearest island so a hit also helps you out
+          let best = this.islands[0];
+          for (const i of this.islands) if (Math.hypot(i.x - p.x, i.y - p.y) < Math.hypot(best.x - p.x, best.y - p.y)) best = i;
+          const d = Math.hypot(best.x - p.x, best.y - p.y) || 1;
+          p.knock((best.x - p.x) / d, (best.y - p.y) / d, 120);
+        }
       }
     }
     // floating paper on the ink

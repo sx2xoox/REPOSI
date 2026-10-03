@@ -197,11 +197,12 @@ export class InkPool extends Entity {
         colors: [CYAN[3], CYAN[2], INDIGO[3]], size: 1, additive: true, light: 3,
       });
     }
-    const p = w.player;
-    if (this.armed && p.alive && p.z < 4) {
-      const dx = p.x - this.x;
-      const dy = (p.y - this.y) / 0.7;
-      if (dx * dx + dy * dy < (this.radius * 0.85) ** 2) p.hurt(w, 1, this.source);
+    for (const p of w.targets()) {
+      if (this.armed && p.alive && p.z < 4) {
+        const dx = p.x - this.x;
+        const dy = (p.y - this.y) / 0.7;
+        if (dx * dx + dy * dy < (this.radius * 0.85) ** 2) p.hurt(w, 1, this.source);
+      }
     }
   }
 

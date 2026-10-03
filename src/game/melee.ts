@@ -136,9 +136,13 @@ export class MeleeSwing extends Entity {
             w.room.damageTile(w, tx, ty, this.o.damage);
           }
         }
-      } else if (!this.hitIds.has(w.player.id) && this.contains(w.player.x, w.player.y, w.player.r)) {
-        this.hitIds.add(w.player.id);
-        w.player.hurt(w, Math.max(1, Math.round(this.o.damage)), (this.owner as { def?: { name: string } }).def?.name ?? '공격');
+      } else {
+        // enemy swing: every keeper it reaches (single-player: the keeper)
+        for (const pl of w.coop ? w.players : [w.player]) {
+          if (this.hitIds.has(pl.id) || !this.contains(pl.x, pl.y, pl.r)) continue;
+          this.hitIds.add(pl.id);
+          pl.hurt(w, Math.max(1, Math.round(this.o.damage)), (this.owner as { def?: { name: string } }).def?.name ?? '공격');
+        }
       }
       // deflect bullets
       if (this.o.deflect) {
@@ -163,7 +167,7 @@ export class MeleeSwing extends Entity {
       colors: ['#ffffff', this.o.color, '#ffe8a0'], shape: 'spark', size: [1, 2],
     });
     w.spawn(new ImpactFx(x, y, this.o.angle, crit ? 1.4 : 1, this.o.color));
-    if (this.o.hitKick > 0) w.renderer.kick(Math.cos(this.o.angle) * this.o.hitKick, Math.sin(this.o.angle) * this.o.hitKick);
+    if (this.o.hitKick > 0 && (!w.coop || this.owner === w.local)) w.renderer.kick(Math.cos(this.o.angle) * this.o.hitKick, Math.sin(this.o.angle) * this.o.hitKick);
   }
 
   override draw(r: Renderer): void {

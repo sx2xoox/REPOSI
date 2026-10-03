@@ -802,11 +802,12 @@ defineEnemy({
       e.setAnim('sgolem_slam');
       w.shake(0.45);
       w.sfx('slam', { vol: 0.9 });
-      const p = w.player;
-      if (p.alive && p.z < 8 && Math.hypot(p.x - e.x, p.y - e.y) < R + p.r * 0.5) {
-        if (p.hurt(w, 2, e.def.name)) {
-          const d = Math.hypot(p.x - e.x, p.y - e.y) || 1;
-          p.knock((p.x - e.x) / d, (p.y - e.y) / d, 220);
+      for (const p of w.targets()) {
+        if (p.alive && p.z < 8 && Math.hypot(p.x - e.x, p.y - e.y) < R + p.r * 0.5) {
+          if (p.hurt(w, 2, e.def.name)) {
+            const d = Math.hypot(p.x - e.x, p.y - e.y) || 1;
+            p.knock((p.x - e.x) / d, (p.y - e.y) / d, 220);
+          }
         }
       }
       w.spawn(new RingFx(e.x, e.y, R + 4, 0.35, MAGMA.mid, 3));

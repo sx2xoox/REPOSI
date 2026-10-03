@@ -61,7 +61,12 @@ export interface HitInfo {
 // id 1 (`resetEntityIds`), and purely visual entities (`static cosmetic`) count
 // down from -1 on their own, so spawning them conditionally (settings, `fx`
 // chances, unlock banners) never shifts the ids of gameplay entities.
-let nextEntityId = 1;
+/** Entity id counters of one World (several Worlds in one process — headless co-op tests — each keep their own). */
+export interface EntityIds {
+  next: number;
+  nextCosmetic: number;
+}
+let ids: EntityIds = { next: 1, nextCosmetic: -1 };
 
 // shared status tints (Actor.statusTint)
 const TINT_FREEZE = { color: '#9fe8ff', amount: 0.55 } as const;
@@ -71,16 +76,22 @@ const TINT_BURN = { color: '#ff7a2a', amount: 0.25 };
 const TINT_POISON = { color: '#7dff5a', amount: 0.3 } as const;
 const TINT_SLOW = { color: '#8fa8d8', amount: 0.3 } as const;
 const TINT_WEAK = { color: '#d0d0d0', amount: 0.25 } as const;
-let nextCosmeticId = -1;
 
-/** Restart entity ids (called when a run's World is created). */
-export function resetEntityIds(): void {
-  nextEntityId = 1;
-  nextCosmeticId = -1;
+/** Restart entity ids (called when a run's World is created); returns the new counters (current from now on). */
+export function resetEntityIds(): EntityIds {
+  ids = { next: 1, nextCosmetic: -1 };
+  return ids;
+}
+
+/** Make `s` the current id counters; returns the previous ones (restore them after). */
+export function useEntityIds(s: EntityIds): EntityIds {
+  const prev = ids;
+  ids = s;
+  return prev;
 }
 
 function allocId(e: Entity): number {
-  return (e.constructor as typeof Entity).cosmetic ? nextCosmeticId-- : nextEntityId++;
+  return (e.constructor as typeof Entity).cosmetic ? ids.nextCosmetic-- : ids.next++;
 }
 
 export abstract class Entity {
@@ -130,6 +141,12 @@ export abstract class Entity {
    * Bullet-clearing effects (`World.clearEnemyBullets`) remove these too.
    */
   enemyHazard = false;
+  /**
+   * Co-op: the keeper this entity runs on behalf of (`w.player` during its
+   * update), set at spawn from the keeper whose code spawned it; null = unowned
+   * (enemy-made things: the nearest keeper). Single-player: unused.
+   */
+  ctxP: Actor | null = null;
 
   update(_w: World, _dt: number): void {}
 

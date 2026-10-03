@@ -390,8 +390,7 @@ export class FirePlace extends Actor {
     this.age += dt;
     if (this.flash > 0) this.flash -= dt;
     if (!this.lit) return;
-    const p = w.player;
-    if (dist(this.x, this.y, p.x, p.y) < this.r + p.r - 1) p.hurt(w, 1, '모닥불');
+    for (const p of w.coop ? w.players : [w.player]) if (dist(this.x, this.y, p.x, p.y) < this.r + p.r - 1) p.hurt(w, 1, '모닥불');
     if (fx.chance(dt * 14)) {
       w.particles.spawn({
         x: this.x + fx.range(-3, 3), y: this.y - 8, vy: -fx.range(15, 35), vx: fx.range(-6, 6), life: fx.range(0.3, 0.7),

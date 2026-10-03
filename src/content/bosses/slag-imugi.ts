@@ -447,10 +447,11 @@ function burstOut(e: Enemy, w: World, radius: number, ring: boolean): void {
   setUnder(e, false);
   w.sfx('explosion', { vol: 0.6, pitch: 0.7 });
   w.shake(0.55);
-  const p = w.player;
-  if (p.alive && p.z < 8 && Math.hypot(p.x - s.gx, p.y - s.gy) < radius + p.r * 0.6 && p.hurt(w, 2, NAME)) {
-    const d = Math.hypot(p.x - s.gx, p.y - s.gy) || 1;
-    p.knock((p.x - s.gx) / d, (p.y - s.gy) / d, 220);
+  for (const p of w.targets()) {
+    if (p.alive && p.z < 8 && Math.hypot(p.x - s.gx, p.y - s.gy) < radius + p.r * 0.6 && p.hurt(w, 2, NAME)) {
+      const d = Math.hypot(p.x - s.gx, p.y - s.gy) || 1;
+      p.knock((p.x - s.gx) / d, (p.y - s.gy) / d, 220);
+    }
   }
   w.particles.burst(s.gx, s.gy, { count: 26, speed: [50, 170], life: [0.3, 0.7], colors: EMBERS, size: [1, 3], gravity: 300, vz: [60, 180], light: 4 });
   w.spawn(new RingFx(s.gx, s.gy, radius + 8, 0.3, '#ffa424', 2));
@@ -543,8 +544,9 @@ function* breach(e: Enemy, w: World): Script {
   w.sfx('explosion', { vol: 0.45, pitch: 0.9 });
   w.shake(0.35);
   w.particles.burst(arc.bx, arc.by, { count: 20, speed: [40, 140], life: [0.3, 0.6], colors: EMBERS, size: [1, 2], gravity: 300, vz: [40, 140] });
-  const pl = w.player;
-  if (pl.alive && Math.hypot(pl.x - arc.bx, pl.y - arc.by) < 18 + pl.r * 0.6) pl.hurt(w, 1, NAME);
+  for (const pl of w.targets()) {
+    if (pl.alive && Math.hypot(pl.x - arc.bx, pl.y - arc.by) < 18 + pl.r * 0.6) pl.hurt(w, 1, NAME);
+  }
   w.spawn(new Hazard(arc.bx, arc.by, 15, p2 ? 4 : 3, 'fire', NAME));
   // continue under the floor so the body follows the arc down
   const dx = arc.bx - arc.ax;
@@ -653,7 +655,7 @@ function* geyser(e: Enemy, w: World): Script {
 /** Place every body segment along the head's trail; burning low segments hurt on contact. */
 function layoutBody(e: Enemy, w: World, contact: boolean): void {
   const s = st(e);
-  const p = w.player;
+  const ps = w.targets();
   for (const part of s.parts) {
     const t = s.trail.sample((part.idx + 1) * SEG_SPACING);
     part.up = t.up && !e.dead;
@@ -666,9 +668,11 @@ function layoutBody(e: Enemy, w: World, contact: boolean): void {
     }
     part.x = t.x;
     part.y = t.y - t.z;
-    if (contact && t.z < 10 && p.alive && p.z < 6 && Math.hypot(p.x - t.x, p.y - t.y) < part.r + p.r - 2 && p.hurt(w, 1, NAME)) {
-      const d = Math.hypot(p.x - t.x, p.y - t.y) || 1;
-      p.knock((p.x - t.x) / d, (p.y - t.y) / d, 160);
+    for (const p of ps) {
+      if (contact && t.z < 10 && p.alive && p.z < 6 && Math.hypot(p.x - t.x, p.y - t.y) < part.r + p.r - 2 && p.hurt(w, 1, NAME)) {
+        const d = Math.hypot(p.x - t.x, p.y - t.y) || 1;
+        p.knock((p.x - t.x) / d, (p.y - t.y) / d, 160);
+      }
     }
   }
 }

@@ -480,10 +480,11 @@ defineEnemy({
       e.facing = w.player.x >= e.x ? 1 : -1;
       w.shake(0.2);
       w.sfx('splat', { vol: 0.6, pitch: 0.7 });
-      const p = w.player;
-      const d = Math.hypot(p.x - e.x, p.y - e.y);
-      if (p.alive && p.z < 8 && d < 30 + p.r * 0.5) {
-        if (p.hurt(w, 2, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 220);
+      for (const p of w.targets()) {
+        const d = Math.hypot(p.x - e.x, p.y - e.y);
+        if (p.alive && p.z < 8 && d < 30 + p.r * 0.5) {
+          if (p.hurt(w, 2, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 220);
+        }
       }
       e.shootAt(w, null, pageShot(3, { count: e.champion ? 7 : 5, spread: 0.26, speed: 118, z: 8, range: 260 }));
       pages(w, e.x, e.y - 8, 5, 60);

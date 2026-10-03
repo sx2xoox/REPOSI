@@ -143,6 +143,13 @@ export class StatusOverlay implements Scene {
       return;
     }
     this.armedId = '';
+    if (this.game.online) {
+      // co-op: the discard is a lockstep command (applied on every peer at the same tick)
+      this.game.command({ type: 'discard', id: cur.def.id });
+      sfx('ui_place');
+      this.say(`${cur.def.name}을(를) 곁에 내려놓았다`, C.textDim);
+      return;
+    }
     const ped = discardArtifact(w, cur.def.id);
     if (!ped) {
       sfx('ui_error');

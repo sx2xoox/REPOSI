@@ -201,6 +201,7 @@ function fakeWorld(seed: string): FakeWorld {
     roomTime: 0,
     enemyTimeScale: 1,
     player,
+    targets: () => [player],
     room,
     enemies,
     get entities() { return fw.entities; },

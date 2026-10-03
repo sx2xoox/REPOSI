@@ -40,7 +40,7 @@ export function closestWithin<T extends Point>(px: number, py: number, list: Ite
 /** The entity the keeper is focusing (preview card + interact target), or null. */
 export function findFocus(w: World): Entity | null {
   const p = w.player;
-  if (!p || p.dead || w.transitioning || w.descending) return null;
+  if (!p || p.dead || p.downed || w.transitioning || w.descending) return null;
   return closestWithin(p.x, p.y, w.entities, PREVIEW_RANGE, (e) => !e.dead && e !== p && e.previewable(w));
 }
 

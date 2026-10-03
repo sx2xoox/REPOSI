@@ -122,11 +122,12 @@ class Censer extends Entity {
     this.spin += (this.targetSpin - this.spin) * Math.min(1, sdt * 3);
     this.a += this.spin * sdt;
     this.place();
-    const p = w.player;
-    if (e.dormant <= 0 && p.alive && p.z < 8) {
-      const d = Math.hypot(p.x - this.gx, p.y - this.gy);
-      if (d < 4 + p.r) {
-        if (p.hurt(w, 1, e.def.name)) p.knock((p.x - this.gx) / (d || 1), (p.y - this.gy) / (d || 1), 150);
+    for (const p of w.targets()) {
+      if (e.dormant <= 0 && p.alive && p.z < 8) {
+        const d = Math.hypot(p.x - this.gx, p.y - this.gy);
+        if (d < 4 + p.r) {
+          if (p.hurt(w, 1, e.def.name)) p.knock((p.x - this.gx) / (d || 1), (p.y - this.gy) / (d || 1), 150);
+        }
       }
     }
     this.smokeT -= dt;

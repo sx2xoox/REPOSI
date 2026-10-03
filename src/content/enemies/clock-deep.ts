@@ -177,16 +177,17 @@ defineEnemy({
       yield tele;
       e.setAnim('ckwarden_swing', true);
       w.sfx('clock_pendulum', { vol: 0.55 });
-      let hit = false;
+      const hit = new Set<number>();
       const T = 0.3;
       for (let el = 0; el < T; el += w.dt) {
         const t = clamp(el / T, 0, 1);
         const k = t * t * (3 - 2 * t);
         e.mem.blade = a0 + (a1 - a0) * k;
-        const p = w.player;
-        if (!hit && p.alive && p.z < 10 && bladeHits(e.x, e.y, e.mem.blade, p.x, p.y)) {
-          hit = true;
-          if (p.hurt(w, 2, e.def.name)) p.knock(Math.cos(e.mem.blade + side * 0.6), Math.sin(e.mem.blade + side * 0.6), 240);
+        for (const p of w.targets()) {
+          if (!hit.has(p.id) && p.alive && p.z < 10 && bladeHits(e.x, e.y, e.mem.blade, p.x, p.y)) {
+            hit.add(p.id);
+            if (p.hurt(w, 2, e.def.name)) p.knock(Math.cos(e.mem.blade + side * 0.6), Math.sin(e.mem.blade + side * 0.6), 240);
+          }
         }
         if (fx.chance(0.6)) sparks(w, e.x + Math.cos(e.mem.blade) * BLADE_LEN, e.y + Math.sin(e.mem.blade) * BLADE_LEN * 0.8, 2, 50);
         yield;
@@ -546,10 +547,12 @@ defineEnemy({
         dust(w, e.x, e.y + 4, ['#a89878', BRASS[2], BRASS[1]], 14, 80);
         sparks(w, e.x, e.y + 2, 8, 90);
         w.spawn(new RingFx(e.x, e.y + 2, R + 4, 0.3, BRASS[5], 2));
-        if (p.alive && p.z < 8 && Math.hypot(p.x - e.x, p.y - e.y) < R + p.r * 0.5) {
-          if (p.hurt(w, 2, e.def.name)) {
-            const dd = Math.hypot(p.x - e.x, p.y - e.y) || 1;
-            p.knock((p.x - e.x) / dd, (p.y - e.y) / dd, 240);
+        for (const p of w.targets()) {
+          if (p.alive && p.z < 8 && Math.hypot(p.x - e.x, p.y - e.y) < R + p.r * 0.5) {
+            if (p.hurt(w, 2, e.def.name)) {
+              const dd = Math.hypot(p.x - e.x, p.y - e.y) || 1;
+              p.knock((p.x - e.x) / dd, (p.y - e.y) / dd, 240);
+            }
           }
         }
         yield 0.9;

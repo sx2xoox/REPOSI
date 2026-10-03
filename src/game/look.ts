@@ -11,6 +11,7 @@
 import { Entity } from './entity';
 import type { World } from './world';
 import type { Projectile } from './projectile';
+import type { Player } from './player';
 import type { ArtifactDef, Rarity } from './defs';
 import type { DrawOpts, Renderer } from '../engine/renderer';
 import type { HitInfo, Actor } from './entity';
@@ -435,13 +436,13 @@ class LookFx extends Entity {
   }
 
   override update(w: World): void {
-    const p = w.player;
+    const p = this.sys.keeper(w);
     this.x = p.x;
     this.y = p.y;
   }
 
   override draw(r: Renderer, w: World): void {
-    const p = w.player;
+    const p = this.sys.keeper(w);
     if (!p || !p.alive || p.fall > 0) return;
     const L = this.sys.player;
     if (L.aura.length) {
@@ -454,7 +455,7 @@ class LookFx extends Entity {
 
   override light(w: World): void {
     const L = this.sys.player;
-    const p = w.player;
+    const p = this.sys.keeper(w);
     if (!L.glow || !p.alive) return;
     w.lights.add(p.x, p.y - 6, L.glowR, L.glow, { intensity: 0.32 });
   }
@@ -464,10 +465,17 @@ class LookFx extends Entity {
 export class LookSystem {
   shot: ShotLook | null = null;
   player: PlayerLook = EMPTY_PLAYER;
+  /** the keeper wearing this look (co-op: each keeper has its own; null = the world's player) */
+  owner: Player | null = null;
   private ent: LookFx | null = null;
   private stepT = 0;
   private hitT = -1;
   private stepN = 0;
+
+  /** The keeper this look follows. */
+  keeper(w: World): Player {
+    return this.owner ?? w.player;
+  }
 
   /** Fold the held artifacts (in pickup order) into the shot & player looks. */
   compose(sources: LookSource[]): void {
@@ -538,7 +546,7 @@ export class LookSystem {
 
   /** Keep the companion entity in the current room; footstep / dash sparkles. */
   update(w: World, dt: number): void {
-    const p = w.player;
+    const p = this.keeper(w);
     if (!p) return;
     const L = this.player;
     const want = L.aura.length > 0 || L.motes.length > 0 || L.glow !== null;
@@ -567,7 +575,7 @@ export class LookSystem {
   onDash(w: World): void {
     const L = this.player;
     if (!L.step.length) return;
-    const p = w.player;
+    const p = this.keeper(w);
     w.particles.burst(p.x, p.y + 2, {
       count: 6 + L.step.length * 2, speed: [20, 70], angle: Math.atan2(-p.dashDY, -p.dashDX), spread: 1.3, life: [0.2, 0.4],
       colors: ['#ffffff', ...L.step], size: [1, 2], additive: true,
@@ -588,7 +596,7 @@ export class LookSystem {
   drawMotes(r: Renderer, w: World, front: boolean): void {
     const motes = this.player.motes;
     if (!motes.length) return;
-    const p = w.player;
+    const p = this.keeper(w);
     if (!p.alive || p.fall > 0) return;
     const t = w.time;
     for (let i = 0; i < motes.length; i++) {

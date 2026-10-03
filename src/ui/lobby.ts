@@ -29,7 +29,7 @@ import {
   applyTypedCode, defaultNickname, finalNickname, isValidRoomCode, normalizeRoomCode, roomFromSearch, sanitizeNickname,
   randomRoomCode, searchWithoutRoom, shareLink, ROOM_ALPHABET, ROOM_CODE_LENGTH,
 } from '../net/code';
-import { NetError, hostRoom, netErrorText, transportFactory, type NetErrorCode } from '../net/transport';
+import { NetError, hostRoom, netErrorText, transportFactory, type NetErrorCode, type Transport } from '../net/transport';
 import { Lobby, MAX_PLAYERS, type LobbyPlayer, type StartInfo } from '../net/lobby';
 import { BUILD_ID, checkForUpdate } from '../net/build';
 import { activeSession, createNetSession, probeLockstep, startNetRun, type NetSession, type ProbeResult } from '../net/session';
@@ -175,6 +175,8 @@ function pingColor(ms: number): string {
 export interface LobbySceneOptions {
   /** open the join box with this code (share link) */
   join?: string;
+  /** back from a co-op run together: reopen the same room on this (still connected) transport */
+  resume?: Transport;
 }
 
 export class LobbyScene implements Scene {
@@ -230,7 +232,25 @@ export class LobbyScene implements Scene {
       { label: '돌아가기', action: () => this.back(), hint: '타이틀 화면으로 돌아갑니다.' },
     ], UI_W_BASE / 2, 214, { width: 220, size: 14, lineH: 30, hintY: 344 });
     if (o.join) this.openCode(o.join);
+    if (o.resume) this.resume(o.resume);
     activeLobbyScene = this;
+  }
+
+  /** Reopen the room on a transport that is still connected (the party came back from a run). */
+  private resume(t: Transport): void {
+    if (t.closed) {
+      this.fail(t.role === 'host' ? 'closed' : 'host-lost');
+      return;
+    }
+    if (t.role === 'host') {
+      this.attach(Lobby.host(t, this.lobbyOpts()));
+      this.setScreen('room');
+    } else {
+      this.connectMsg = '로비로 돌아가는 중…';
+      this.connectCode = t.code;
+      this.setScreen('connecting');
+      this.attach(Lobby.join(t, this.lobbyOpts()));
+    }
   }
 
   // ------------------------------------------------------------ lifecycle
@@ -465,7 +485,8 @@ export class LobbyScene implements Scene {
       return false;
     }
     sfx('ui_select');
-    l.start(randomSeedString());
+    // the host's simulation options are fixed for everyone for this run
+    l.start(randomSeedString(), { hitStop: save.settings.hitStop });
     return true;
   }
 
@@ -898,7 +919,7 @@ export class LobbyScene implements Scene {
   private drawMain(r: Renderer, A: number): void {
     r.uiText('함께하기', UI_W_BASE / 2, 22, { size: 24, bold: true, align: 'center', color: C.text, outline: C.ink, alpha: A });
     divider(r, UI_W_BASE / 2, 54, 240, C.goldDark, A);
-    r.uiText('시험 운영 · 같은 시드로 각자 플레이합니다. 협동 전투는 준비 중입니다.', UI_W_BASE / 2, 66, { size: 12, align: 'center', color: C.textDim, alpha: A });
+    r.uiText('2–4인 협동 · 함께 전투하고, 쓰러진 동료 곁에서 부활시키세요.', UI_W_BASE / 2, 66, { size: 12, align: 'center', color: C.textDim, alpha: A });
     // name plate
     const { x, y, w, h } = NAME_PLATE;
     const hot = this.hover === 'name';

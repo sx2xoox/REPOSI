@@ -1,5 +1,7 @@
 // Pause menu (Esc): resume / settings / quit (with confirm), plus a run card
 // (keeper, floor, time, kills, seed, collected items) and a controls reference.
+// Online co-op: the world keeps running behind it; 계속 / 설정 / 방 나가기, and
+// for the host 하강 종료 (ends the run for everyone, a lockstep command).
 
 import type { Scene } from './scene';
 import type { Renderer } from '../engine/renderer';
@@ -26,10 +28,34 @@ export class PauseOverlay implements Scene {
   private game: GameScene;
   private t = 0;
   private confirmQuit = false;
+  private confirmEnd = false;
   private closing = -1;
 
   constructor(game: GameScene) {
     this.game = game;
+    if (game.online) {
+      const host = !!game.net?.isHost;
+      const items: ConstructorParameters<typeof Menu>[0] = [
+        { label: '계속', action: () => this.close(), hint: '하강을 이어갑니다.' },
+        { label: '설정', action: () => app.scenes.push(new SettingsOverlay()), hint: '소리, 화면, 조작 설정.' },
+        {
+          label: () => (this.confirmQuit ? '정말 나갈까요?' : '방 나가기'),
+          danger: true,
+          action: () => this.quit(),
+          hint: () => (this.confirmQuit ? '한 번 더 누르면 방에서 나갑니다.' : host ? '방을 닫고 타이틀로 갑니다.' : '방에서 나가 타이틀로 갑니다.'),
+        },
+      ];
+      if (host) {
+        items.splice(2, 0, {
+          label: () => (this.confirmEnd ? '정말 끝낼까요?' : '하강 종료'),
+          danger: true,
+          action: () => this.endForAll(),
+          hint: () => (this.confirmEnd ? '한 번 더 누르면 모두 결과 화면으로.' : '모두의 하강을 여기서 끝냅니다.'),
+        });
+      }
+      this.menu = new Menu(items, 150, 150, { width: 220, lineH: 30, size: 14, hintY: 262 });
+      return;
+    }
     this.menu = new Menu([
       { label: '계속하기', action: () => this.close(), hint: '하강을 이어갑니다.' },
       { label: '설정', action: () => app.scenes.push(new SettingsOverlay()), hint: '소리, 화면, 조작 설정.' },
@@ -58,7 +84,19 @@ export class PauseOverlay implements Scene {
       sfx('warn', { vol: 0.4 });
       return;
     }
-    app.goTitle();
+    if (this.game.online) this.game.leaveOnline('title');
+    else app.goTitle();
+  }
+
+  /** Co-op host: end the run for everyone (a lockstep command; the summary follows). */
+  private endForAll(): void {
+    if (!this.confirmEnd) {
+      this.confirmEnd = true;
+      sfx('warn', { vol: 0.4 });
+      return;
+    }
+    this.game.command({ type: 'end' });
+    this.close();
   }
 
   update(dt: number): void {
@@ -72,7 +110,9 @@ export class PauseOverlay implements Scene {
       this.close();
       return;
     }
-    if (this.confirmQuit && this.menu.index !== 2) this.confirmQuit = false;
+    const quitIndex = this.menu.items.length - 1;
+    if (this.confirmQuit && this.menu.index !== quitIndex) this.confirmQuit = false;
+    if (this.confirmEnd && this.menu.index !== 2) this.confirmEnd = false;
     this.menu.update(app.renderer, dt);
   }
 
@@ -87,13 +127,15 @@ export class PauseOverlay implements Scene {
     const ox = uiCenterX(); // 768-wide layout centered on wide screens
     const lx = ox + 30;
     const ly = 60 + (1 - k) * 10;
-    frame(r, lx, ly, 240, 236, 'ornate', { alpha: k });
-    r.uiText('일시정지', lx + 120, ly + 16, { size: 24, bold: true, align: 'center', color: C.text, outline: C.ink, alpha: k });
+    const extra = Math.max(0, this.menu.items.length - 3) * 30;
+    frame(r, lx, ly, 240, 236 + extra, 'ornate', { alpha: k });
+    r.uiText(this.game.online ? '메뉴' : '일시정지', lx + 120, ly + 16, { size: 24, bold: true, align: 'center', color: C.text, outline: C.ink, alpha: k });
     divider(r, lx + 120, ly + 52, 180, C.goldDark, k);
     this.menu.x = lx + 120;
     this.menu.y = ly + 78;
-    this.menu.hintY = ly + 186;
+    this.menu.hintY = ly + 186 + extra;
     this.menu.draw(r, k);
+    if (this.game.online) r.uiText('함께하는 중에는 게임이 멈추지 않아요', lx + 120, ly + 212 + extra, { size: 10, font: 'small', align: 'center', color: C.textFaint, alpha: k });
 
     // ---- right: run card
     const rx = ox + 290;

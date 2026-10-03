@@ -38,9 +38,10 @@ export function rollBlessings(seed: string, floor: number, owned: (id: string) =
   return chosen;
 }
 
-/** Choices for the world's current floor. */
+/** Choices for the world's current floor (co-op: the context keeper's own three; P1 gets the solo roll). */
 export function blessingChoices(w: World): string[] {
-  return rollBlessings(w.run.seed, w.run.floor, (id) => w.items.hasArtifact(id));
+  const seed = w.coop && w.player.slot > 0 ? `${w.run.seed}#p${w.player.slot}` : w.run.seed;
+  return rollBlessings(seed, w.run.floor, (id) => w.items.hasArtifact(id));
 }
 
 /** The floor's blessing has not been chosen yet and the moment has come. */

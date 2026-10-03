@@ -333,8 +333,9 @@ export class SteamLane extends Entity {
       this.dead = true;
       return;
     }
-    const p = w.player;
-    if (p.alive && p.z < 8 && this.contains(p.x, p.y, p.r * 0.4)) p.hurt(w, 1, this.source);
+    for (const p of w.targets()) {
+      if (p.alive && p.z < 8 && this.contains(p.x, p.y, p.r * 0.4)) p.hurt(w, 1, this.source);
+    }
     // billowing steam along the lane
     const n = Math.ceil(this.len / 10);
     for (let i = 0; i < n; i++) {

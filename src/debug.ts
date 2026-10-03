@@ -7,6 +7,9 @@ import type { World } from './game/world';
 import { input } from './engine/input';
 import { Pedestal, Pickup } from './game/pickups';
 import { FIXED_DT } from './game/constants';
+import { stateHash } from './game/statehash';
+import type { GameScene } from './ui/game-scene';
+import type { CoopCommand } from './game/coop';
 
 function world(): World | undefined {
   return (window as unknown as { __world?: World }).__world;
@@ -36,6 +39,24 @@ export interface DebugApi {
   errors: string[];
   /** the live input state (bots drive `touchMove` / `touchAim` / `touchTap`) */
   input: typeof input;
+  /** online co-op run (null outside one) */
+  coop: {
+    /** lockstep state, tick, party, this peer's hash */
+    state(): Record<string, unknown> | null;
+    /** [tick, stateHash] reported to the lockstep (every 60 ticks) */
+    hashes(): [number, number][];
+    /** send a lockstep command (applied on every peer at the same tick), e.g. {type:'debug', op:'god'} */
+    cmd(c: CoopCommand): boolean;
+  };
+}
+
+function coopScene(): GameScene | null {
+  const stack = app.scenes?.stack ?? [];
+  for (const s of stack) {
+    const g = s as unknown as Partial<GameScene>;
+    if (g.net && g.world) return s as unknown as GameScene;
+  }
+  return null;
 }
 
 export function installDebug(): void {
@@ -50,6 +71,29 @@ export function installDebug(): void {
   const api: DebugApi = {
     errors,
     input,
+    coop: {
+      state() {
+        const g = coopScene();
+        const net = g?.net;
+        if (!g || !net) return null;
+        const w = g.world;
+        return {
+          state: net.state, tick: net.ticks, host: net.isHost, waiting: net.waiting, desync: net.desync, endReason: net.endReason,
+          local: w.local.slot, hash: stateHash(w), floor: w.run.floor, room: w.node.kind, gameOver: w.gameOver,
+          players: w.players.map((p) => ({ slot: p.slot, name: p.name, ch: p.character.id, hp: p.red + p.soul, downed: p.downed, x: p.x, y: p.y })),
+        };
+      },
+      hashes() {
+        const net = coopScene()?.net;
+        return net ? [...net.hashes.entries()] : [];
+      },
+      cmd(c) {
+        const g = coopScene();
+        if (!g?.net) return false;
+        g.command(c);
+        return true;
+      },
+    },
     start(seed = 'TEST-SEED', character) {
       const ch = character ?? Characters.all()[0]?.id;
       app.startRun(seed, ch, true);

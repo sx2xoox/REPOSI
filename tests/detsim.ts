@@ -159,7 +159,7 @@ function nextWaypoint(w: World, gx: number, gy: number): { x: number; y: number 
   return { x: (tx + 0.5) * TILE, y: (((c - tx) / W) + 0.5) * TILE };
 }
 
-interface BotState {
+export interface BotState {
   rng: RNG;
   strafe: number;
   strafeT: number;
@@ -178,8 +178,16 @@ function unit(x: number, y: number): [number, number] {
   return l > 1e-9 ? [x / l, y / l] : [0, 0];
 }
 
-/** One step of bot input (reads the world like a player looking at the screen). */
-function botInput(w: World, b: BotState, out: PlayerInput): void {
+/** A fresh bot (seeded); drive it with `botInput` once per step. */
+export function newBot(seed: string): BotState {
+  return {
+    rng: new RNG(`${seed}:bot`), strafe: 1, strafeT: 0, cursorMode: false, modeT: 0, dashT: 1, bombT: 3, swapT: 2,
+    door: null, roomSteps: 0, clearSteps: 0,
+  };
+}
+
+/** One step of bot input (reads the world like a player looking at the screen: `w.player`). */
+export function botInput(w: World, b: BotState, out: PlayerInput): void {
   const p = w.player;
   out.mx = out.my = out.ax = out.ay = 0;
   out.held = 0;
@@ -316,10 +324,7 @@ export function runScenario(sc: Scenario, v: Variant, partsAt = -1): RunResult {
   const w = new World(r, run, host);
   w.setQuality({ lighting: v.quality !== 'low', particles: v.particles * (v.quality === 'low' ? 0.5 : 1) });
   w.rules = fixedRules({ hitStop: true });
-  const bot: BotState = {
-    rng: new RNG(`${sc.seed}:bot`), strafe: 1, strafeT: 0, cursorMode: false, modeT: 0, dashT: 1, bombT: 3, swapT: 2,
-    door: null, roomSteps: 0, clearSteps: 0,
-  };
+  const bot = newBot(sc.seed);
   // the bot is the input source: called by the keeper's update, once per step
   w.inputSource = (ww, _p, out) => botInput(ww, bot, out);
   w.start();

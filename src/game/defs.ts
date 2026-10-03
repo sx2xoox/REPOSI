@@ -532,6 +532,12 @@ export const RoomTemplates = makeRegistry<RoomTemplate>('room template');
  */
 export interface GlobalHookDef extends ItemHooks {
   id: string;
+  /**
+   * Co-op: run the world-event hooks (onUpdate / onRoomEnter / onRoomClear /
+   * onFloorStart) once per keeper, with that keeper as `w.player` (state kept in
+   * `w.vars`, which is per keeper). Default: once per event, for the party leader.
+   */
+  perPlayer?: boolean;
 }
 export const GlobalHooks = makeRegistry<GlobalHookDef>('global hook');
 

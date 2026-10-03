@@ -287,14 +287,18 @@ export function clearEnemyShots(w: World): void {
 // ================================================================== player hits
 /** Hurt the player if (px,py) is within `r` of (x,y) on the ground. Returns true if damage applied. */
 export function hitPlayerCircle(w: World, x: number, y: number, r: number, dmg: number, source: string, knock = 150): boolean {
-  const p = w.player;
-  if (!p.alive || p.z > 8) return false;
-  const d = Math.hypot(p.x - x, p.y - y);
-  if (d > r + p.r * 0.6) return false;
-  if (!p.hurt(w, dmg, source)) return false;
-  const n = d || 1;
-  p.knock((p.x - x) / n, (p.y - y) / n, knock);
-  return true;
+  // every keeper in reach (co-op); single-player: the keeper
+  let any = false;
+  for (const p of w.targets()) {
+    if (!p.alive || p.z > 8) continue;
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (d > r + p.r * 0.6) continue;
+    if (!p.hurt(w, dmg, source)) continue;
+    const n = d || 1;
+    p.knock((p.x - x) / n, (p.y - y) / n, knock);
+    any = true;
+  }
+  return any;
 }
 
 /** Rectangular lane warning (bat-dive style) from (x,y) along `angle`. */
@@ -359,19 +363,20 @@ export class Shockwave extends Entity {
     this.age += dt;
     this.radius += this.o.speed * dt;
     const o = this.o;
-    const p = w.player;
     const gaps = o.gaps ?? [];
     const gw = o.gapWidth ?? 0;
     // the wave stops hurting just before it fades out (never invisible + dangerous)
-    if (!this.hit && p.alive && p.z < 4 && this.radius < o.maxR * 0.9) {
-      const dx = p.x - this.x;
-      const dy = p.y - this.y;
-      const d = Math.hypot(dx, dy);
-      const band = (o.thick ?? 4) + p.r * 0.5;
-      if (Math.abs(d - this.radius) < band && !inGap(Math.atan2(dy, dx), gaps, gw)) {
-        if (p.hurt(w, o.damage ?? 1, o.source)) {
-          p.knock(dx / (d || 1), dy / (d || 1), 170);
-          this.hit = true;
+    for (const p of w.targets()) {
+      if (!this.hit && p.alive && p.z < 4 && this.radius < o.maxR * 0.9) {
+        const dx = p.x - this.x;
+        const dy = p.y - this.y;
+        const d = Math.hypot(dx, dy);
+        const band = (o.thick ?? 4) + p.r * 0.5;
+        if (Math.abs(d - this.radius) < band && !inGap(Math.atan2(dy, dx), gaps, gw)) {
+          if (p.hurt(w, o.damage ?? 1, o.source)) {
+            p.knock(dx / (d || 1), dy / (d || 1), 170);
+            this.hit = true;
+          }
         }
       }
     }

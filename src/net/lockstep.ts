@@ -379,6 +379,16 @@ export class LockstepHost {
     this.closed = true;
     this.unlisten();
   }
+
+  /**
+   * Stop quietly, keeping the clients' connections (no END): the transport is
+   * handed to something else, e.g. the lobby after a co-op run ended together.
+   */
+  detach(): void {
+    if (this.closed) return;
+    this.closed = true;
+    this.unlisten();
+  }
 }
 
 // ================================================================ client
@@ -568,6 +578,11 @@ export class LockstepClient {
       this.t.send(this.t.hostId, encodePing(id));
       for (const [k, at] of this.pings) if (now - at > this.o.timeoutMs) this.pings.delete(k);
     }
+  }
+
+  /** Stop quietly without leaving (the transport is handed on, e.g. back to the lobby with the host). */
+  detach(): void {
+    this.end('closed', false);
   }
 
   /** Leave the session (the host seals a `left` marker for this slot). */

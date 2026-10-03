@@ -102,7 +102,7 @@ async function until(p, fn, what, timeout = 15000) {
 }
 async function key(p, k, times = 1) {
   for (let i = 0; i < times; i++) {
-    await p.page.keyboard.press(k);
+    await p.page.keyboard.press(k, { delay: 100 });
     await wait(120);
   }
 }

@@ -328,12 +328,13 @@ export class Lob extends Entity {
     if (this.dead) return;
     this.dead = true;
     const { x, y } = this;
-    const p = w.player;
     const dmg = this.o.damage ?? 1;
-    if (dmg > 0 && p.alive && p.z < 8 && Math.hypot(p.x - x, p.y - y) < (this.o.hitRadius ?? 11) + p.r * 0.5) {
-      if (p.hurt(w, dmg, this.o.source ?? '포탄')) {
-        const d = Math.hypot(p.x - x, p.y - y) || 1;
-        p.knock((p.x - x) / d, (p.y - y) / d, 140);
+    for (const p of w.targets()) {
+      if (dmg > 0 && p.alive && p.z < 8 && Math.hypot(p.x - x, p.y - y) < (this.o.hitRadius ?? 11) + p.r * 0.5) {
+        if (p.hurt(w, dmg, this.o.source ?? '포탄')) {
+          const d = Math.hypot(p.x - x, p.y - y) || 1;
+          p.knock((p.x - x) / d, (p.y - y) / d, 140);
+        }
       }
     }
     w.particles.burst(x, y - 2, { count: 14, speed: [30, 110], life: [0.25, 0.5], colors: ['#ffffff', this.o.color, this.o.color], size: [1, 3], gravity: 280, vz: [30, 100] });
@@ -424,12 +425,13 @@ export class Hazard extends Entity {
         life: fx.range(0.3, 0.7), colors: c.bubble, size: fx.range(1, 2), additive: this.kind === 'fire', light: this.kind === 'fire' ? 5 : 0,
       });
     }
-    const p = w.player;
-    if (this.age > this.arm && this.age < this.life - 0.25 && p.alive && p.z < 4) {
-      const dx = p.x - this.x;
-      const dy = (p.y - this.y) / 0.7;
-      const rr = this.radius * 0.85; // (no `**` in the simulation: see CLAUDE.md, determinism)
-      if (dx * dx + dy * dy < rr * rr) p.hurt(w, 1, this.source);
+    for (const p of w.targets()) {
+      if (this.age > this.arm && this.age < this.life - 0.25 && p.alive && p.z < 4) {
+        const dx = p.x - this.x;
+        const dy = (p.y - this.y) / 0.7;
+        const rr = this.radius * 0.85; // (no `**` in the simulation: see CLAUDE.md, determinism)
+        if (dx * dx + dy * dy < rr * rr) p.hurt(w, 1, this.source);
+      }
     }
   }
 

@@ -334,10 +334,11 @@ defineEnemy({
       yield 0.6;
       w.spawn(new RingFx(e.x, e.y - 8, R + 6, 0.3, CYAN.mid, 2));
       w.sfx('beam_charge', { vol: 0.3, pitch: 1.6 });
-      const p = w.player;
-      const d = Math.hypot(p.x - e.x, p.y - e.y);
-      if (p.alive && p.z < 8 && d < R + p.r * 0.5) {
-        if (p.hurt(w, 1, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 200);
+      for (const p of w.targets()) {
+        const d = Math.hypot(p.x - e.x, p.y - e.y);
+        if (p.alive && p.z < 8 && d < R + p.r * 0.5) {
+          if (p.hurt(w, 1, e.def.name)) p.knock((p.x - e.x) / (d || 1), (p.y - e.y) / (d || 1), 200);
+        }
       }
       e.shootRing(w, e.champion ? 12 : 8, glyphShot(3, 2, { speed: 62, offset: w.rng.angle(), z: 10, range: 260 }));
       yield 0.8;
@@ -480,10 +481,12 @@ defineEnemy({
         w.shake(0.35);
         w.sfx('slam', { vol: 0.65 });
         dust(w, e.x, e.y + 4, [PAPER[2], WOOD[3], WOOD[1]], 12, 70);
-        if (p.alive && p.z < 8 && Math.hypot(p.x - e.x, p.y - e.y) < R + p.r * 0.5) {
-          if (p.hurt(w, 2, e.def.name)) {
-            const dd = Math.hypot(p.x - e.x, p.y - e.y) || 1;
-            p.knock((p.x - e.x) / dd, (p.y - e.y) / dd, 220);
+        for (const q of w.targets()) {
+          if (q.alive && q.z < 8 && Math.hypot(q.x - e.x, q.y - e.y) < R + q.r * 0.5) {
+            if (q.hurt(w, 2, e.def.name)) {
+              const dd = Math.hypot(q.x - e.x, q.y - e.y) || 1;
+              q.knock((q.x - e.x) / dd, (q.y - e.y) / dd, 220);
+            }
           }
         }
         const pts = volleyTargets(e.x, e.y, p.x + p.vx * 0.3, p.y + p.vy * 0.3, 3, 28);
