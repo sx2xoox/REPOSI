@@ -12,7 +12,7 @@ export const BLESSING_CHOICES = 3;
 /** floor-card time (s) after which the blessing choice opens */
 export const BLESSING_DELAY = 1.6;
 
-const OFFENSE = new Set(['bless_might', 'bless_haste', 'bless_keen', 'bless_pierce', 'bless_first_strike', 'bless_kindle', 'bless_hunter']);
+const OFFENSE = new Set(['bless_might', 'bless_haste', 'bless_keen', 'bless_pierce', 'bless_first_strike', 'bless_kindle', 'bless_hunter', 'bless_crossstep', 'bless_footing', 'bless_patient', 'bless_afterstep', 'bless_reaction', 'bless_thread']);
 const DEFENSE = new Set(['bless_vigor', 'bless_soul', 'bless_hearth', 'bless_aegis', 'bless_shade', 'bless_release_heal', 'bless_blastproof']);
 export function blessingRole(id: string): string {
   return OFFENSE.has(id) ? '공격' : DEFENSE.has(id) ? '생존' : '탐험·기동';
