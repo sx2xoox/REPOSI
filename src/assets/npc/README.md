@@ -1,3 +1,6 @@
+# Current Ria source
+As of 2026-10-04, ria-portrait.png is the exact user-supplied codex-clipboard-72ee3099-d17b-4c4c-a5f4-dc30d3476ac9.png (SHA256 DFC0C089B11632EEA6114685FD3990ADD4E1755D6097523343815271F5122351). Earlier generation notes below are historical.
+
 # Resident portrait assets
 
 Approved by the user: NPC concept with Lume, Brik and Orin, followed by request to apply it while matching world NPC pixel density to the keeper.

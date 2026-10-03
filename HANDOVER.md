@@ -1,3 +1,6 @@
+## 2026-10-04 — Apply user-selected Ria portrait
+- Replaced ria-portrait.png with the exact user attachment codex-clipboard-72ee3099-d17b-4c4c-a5f4-dc30d3476ac9.png. Kept current UI sizing, NPC portraits and world models.
+
 ## 2026-10-04 — Refine town cat models
 - Refined native 24x24 residents only: rounder cheek/chin silhouette, inset pink ears, shorter eyes and compact muzzle, visible sleeve/paw connection. Brik now opens his eyes between blinks. Reviewed all three facings for each resident in browser (test-results/npc-refined-directions.png). Dialogue portraits and playable keeper sprites unchanged.
 
