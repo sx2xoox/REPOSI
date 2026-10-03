@@ -1,3 +1,6 @@
+## 2026-10-04 — Refine town cat models
+- Refined native 24x24 residents only: rounder cheek/chin silhouette, inset pink ears, shorter eyes and compact muzzle, visible sleeve/paw connection. Brik now opens his eyes between blinks. Reviewed all three facings for each resident in browser (test-results/npc-refined-directions.png). Dialogue portraits and playable keeper sprites unchanged.
+
 ## 2026-10-04 — Revert portrait redesign; retain world sprite polish only
 - User rejected the latest portrait redesign. Restored town-portraits.ts, story.ts and portrait asset documentation exactly to d0c0559 (the previous generated 96x108 portraits). Retained the native-size keeper/resident world sprite improvements. Excluded portrait frames from the shared cloth finish so dialogue fallback portraits also remain unchanged.
 
