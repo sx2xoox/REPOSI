@@ -9,6 +9,7 @@ import { defineDrawnSprite, hasSprite } from '../engine/sprites';
 import { ramp } from '../engine/painter';
 import { angleOf, rotateToward, TAU } from '../engine/math';
 import { fx } from '../engine/rng';
+import { save } from '../engine/save';
 import { TILE } from './constants';
 import { Tile, tileProps } from './tiles';
 import { drawShot, shotTrail, type ShotLook } from './look';
@@ -304,7 +305,24 @@ export class Projectile extends Entity {
     }
   }
 
+  /** This peer's display preference; never used by the simulation. */
+  visualOpacity(w: World): number {
+    const owner = this.owner ?? this.ctxP;
+    if (!w.coop || this.team !== 'player' || owner === w.local || !w.players.some(p => p === owner)) return 1;
+    const value = save.settings.teammateProjectileOpacity ?? 0.5;
+    return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0.5;
+  }
+
   override draw(r: Renderer, w: World): void {
+    const opacity = this.visualOpacity(w);
+    if (opacity <= 0) return;
+    const before = r.worldOpacity;
+    r.worldOpacity *= opacity;
+    try { this.drawVisible(r, w); }
+    finally { r.worldOpacity = before; }
+  }
+
+  private drawVisible(r: Renderer, w: World): void {
     if (this.style === 'none') {
       for (const b of this.behaviors) b.draw?.(this, r, w);
       return;
@@ -357,12 +375,14 @@ export class Projectile extends Entity {
   private lightCol = '';
   private lightSrc = '';
   override light(w: World): void {
-    if (this.lightR <= 0) return;
+    const opacity = this.visualOpacity(w);
+    if (this.lightR <= 0 || opacity <= 0) return;
     // color may be changed by behaviors: re-derive the #rrggbb only when it does
     if (this.lightSrc !== this.color) {
       this.lightSrc = this.color;
       this.lightCol = this.color.slice(0, 7);
     }
+    LIGHT_OPTS.intensity = 0.8 * opacity;
     w.lights.add(this.x, this.y - this.z, this.lightR, this.lightCol, LIGHT_OPTS);
   }
 }

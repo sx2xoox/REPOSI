@@ -5,6 +5,7 @@ export interface Settings {
   musicVolume: number;
   sfxVolume: number;
   screenShake: number; // 0..1.5
+  teammateProjectileOpacity?: number; // 0..1, local display only
   screenFlash?: number; // 0..1; optional for older saves
   pixelPerfect: boolean;
   damageNumbers: boolean;
@@ -88,6 +89,7 @@ export const DEFAULT_SETTINGS: Settings = {
   musicVolume: 0.55,
   sfxVolume: 0.8,
   screenShake: 1,
+  teammateProjectileOpacity: 0.5,
   pixelPerfect: false,
   damageNumbers: true,
   particles: 1,

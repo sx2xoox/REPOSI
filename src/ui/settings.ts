@@ -31,7 +31,7 @@ function cycle<T>(order: T[], cur: T, d: number): T {
 
 
 
-type NumKey = 'masterVolume' | 'musicVolume' | 'sfxVolume' | 'screenShake' | 'screenFlash' | 'particles';
+type NumKey = 'masterVolume' | 'musicVolume' | 'sfxVolume' | 'screenShake' | 'screenFlash' | 'teammateProjectileOpacity' | 'particles';
 type BoolKey = 'pixelPerfect' | 'damageNumbers' | 'showFps' | 'hitStop';
 
 export class SettingsOverlay implements Scene {
@@ -49,6 +49,7 @@ export class SettingsOverlay implements Scene {
     this.passUpdate = !!o.fromTitle;
     const s = save.settings;
     s.screenFlash ??= 1;
+    s.teammateProjectileOpacity ??= 0.5;
     const step = (k: NumKey, min: number, max: number, inc = 0.1) => (d: number) => {
       s[k] = clamp(Math.round(((s[k] ?? 1) + d * inc) * 100) / 100, min, max);
       app.applySettings();
@@ -87,6 +88,7 @@ export class SettingsOverlay implements Scene {
       { label: '화면', header: true },
       slider('화면 흔들림', 'screenShake', 0, 1.5, '폭발과 피격 시 화면 흔들림 강도.'),
       slider('화면 섬광', 'screenFlash', 0, 1, '피격·해방 시 화면 전체가 번쩍이는 강도. 공격 예고 표시는 유지됩니다.'),
+      slider('팀원 투사체 불투명도', 'teammateProjectileOpacity', 0, 1, '팀원 탄환과 탄환 빛의 표시 농도. 0% 숨김 · 100% 선명. 내 탄환과 적 탄환은 그대로입니다.'),
       slider('파티클 양', 'particles', 0.3, 1, '파편, 불꽃 등 입자 효과의 양. 낮추면 가벼워집니다.'),
       choice('그래픽 품질', QUALITY_ORDER, () => s.graphicsQuality, (v) => { s.graphicsQuality = v; applyGraphics(); }, (v) => QUALITY_LABEL[v],
         '해상도와 파티클 양. 휴대폰에서 끊기거나 뜨거워지면 낮추세요.'),

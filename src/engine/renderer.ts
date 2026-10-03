@@ -340,6 +340,8 @@ export class Renderer {
    * 1 = draw the latest simulated state as is.
    */
   alpha = 1;
+  /** Draw-only multiplier for world primitives; scoped by projectile drawing. */
+  worldOpacity = 1;
   /**
    * Fixed simulation steps run so far (incremented by the main loop before
    * each step), so a simulation can tell whether it was stepped in the latest
@@ -481,7 +483,7 @@ export class Renderer {
 
   private drawSprite(s: Sprite, x: number, y: number, o?: DrawOpts): void {
     const c = this.ctx;
-    const alpha = o?.alpha ?? 1;
+    const alpha = (o?.alpha ?? 1) * this.worldOpacity;
     if (alpha <= 0) return;
     const simple = !o || (!o.flipX && !o.flipY && !o.rot && (o.sx ?? 1) === 1 && (o.sy ?? 1) === 1);
     c.globalAlpha = alpha;
@@ -520,7 +522,7 @@ export class Renderer {
 
   rect(x: number, y: number, w: number, h: number, color: string, alpha = 1): void {
     const c = this.ctx;
-    c.globalAlpha = alpha;
+    c.globalAlpha = alpha * this.worldOpacity;
     c.fillStyle = color;
     c.fillRect(Math.round(x - this.viewX), Math.round(y - this.viewY), Math.round(w), Math.round(h));
     c.globalAlpha = 1;
@@ -528,7 +530,7 @@ export class Renderer {
 
   circle(x: number, y: number, r: number, color: string, alpha = 1): void {
     const c = this.ctx;
-    c.globalAlpha = alpha;
+    c.globalAlpha = alpha * this.worldOpacity;
     c.fillStyle = color;
     c.beginPath();
     c.arc(Math.round(x - this.viewX), Math.round(y - this.viewY), Math.max(0.5, r), 0, TAU);
@@ -538,7 +540,7 @@ export class Renderer {
 
   ring(x: number, y: number, r: number, color: string, width = 1, alpha = 1): void {
     const c = this.ctx;
-    c.globalAlpha = alpha;
+    c.globalAlpha = alpha * this.worldOpacity;
     c.strokeStyle = color;
     c.lineWidth = width;
     c.beginPath();
@@ -549,7 +551,7 @@ export class Renderer {
 
   line(x0: number, y0: number, x1: number, y1: number, color: string, width = 1, alpha = 1): void {
     const c = this.ctx;
-    c.globalAlpha = alpha;
+    c.globalAlpha = alpha * this.worldOpacity;
     c.strokeStyle = color;
     c.lineWidth = width;
     c.lineCap = 'round';
@@ -566,7 +568,7 @@ export class Renderer {
     const c = this.ctx;
     const rx = Math.max(1, w / 2);
     const ry = Math.max(1, h / 2);
-    c.globalAlpha = alpha;
+    c.globalAlpha = alpha * this.worldOpacity;
     if (rx > 64 || ry > 64) {
       c.fillStyle = '#000000';
       c.beginPath();
@@ -592,7 +594,7 @@ export class Renderer {
     if (opts.align === 'center') sx -= Math.floor(width / 2);
     else if (opts.align === 'right') sx -= width;
     const c = this.ctx;
-    c.globalAlpha = alpha;
+    c.globalAlpha = alpha * this.worldOpacity;
     c.drawImage(te.canvas, sx - s, sy - s);
     c.globalAlpha = 1;
     return width;

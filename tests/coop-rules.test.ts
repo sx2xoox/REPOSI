@@ -1,5 +1,5 @@
 import './headless';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { loadContent } from '../src/content';
 import { World } from '../src/game/world';
 import { RunState } from '../src/game/run';
@@ -12,6 +12,8 @@ import { blessingChoices } from '../src/game/blessings';
 import { Pickup, Pedestal } from '../src/game/pickups';
 import { familiarsOf, syncFamiliars, Familiar } from '../src/content/items/lib';
 import { stateHash } from '../src/game/statehash';
+import { Projectile } from '../src/game/projectile';
+import { save } from '../src/engine/save';
 import { ClockHand } from '../src/content/bosses/kit7';
 loadContent();
 function party(chars = ['bori', 'ria'], local = 1) {
@@ -32,6 +34,31 @@ function down(w: World, slot: number) {
   return p;
 }
 describe('co-op ownership and rules', () => {
+  it('teammate opacity scopes sprites and light without changing simulation state', () => {
+    const w = party(['ria', 'ria']); const r = w.renderer;
+    const teammate = new Projectile({ team: 'player', owner: w.players[0], x: 100, y: 100, angle: 0, speed: 100, damage: 5, light: 30 });
+    const own = new Projectile({ team: 'player', owner: w.local, x: 110, y: 100, angle: 0, speed: 100, damage: 5 });
+    const enemy = new Projectile({ team: 'enemy', x: 120, y: 100, angle: 0, speed: 100, damage: 1 });
+    w.spawn(teammate); w.spawn(own); w.spawn(enemy); step(w);
+    const before = stateHash(w); const previous = save.settings.teammateProjectileOpacity;
+    const drawn: number[] = [];
+    const originalDraw = r.ctx.drawImage;
+    r.ctx.drawImage = () => { drawn.push(r.ctx.globalAlpha); };
+    const light = vi.spyOn(w.lights, 'add');
+    try {
+      save.settings.teammateProjectileOpacity = 1;
+      own.draw(r, w); enemy.draw(r, w); const baseline = [...drawn]; drawn.length = 0;
+      save.settings.teammateProjectileOpacity = 0.3;
+      teammate.draw(r, w); expect(drawn).toContain(0.3); expect(r.worldOpacity).toBe(1);
+      drawn.length = 0; own.draw(r, w); enemy.draw(r, w); expect(drawn).toEqual(baseline);
+      teammate.light(w); expect(light.mock.calls.at(-1)?.[4]?.intensity).toBeCloseTo(0.24);
+      save.settings.teammateProjectileOpacity = 0;
+      drawn.length = 0; light.mockClear(); teammate.draw(r, w); teammate.light(w);
+      expect(drawn).toEqual([]); expect(light).not.toHaveBeenCalled();
+      expect(stateHash(w)).toBe(before);
+      w.coop = false; expect(teammate.visualOpacity(w)).toBe(1); w.coop = true;
+    } finally { save.settings.teammateProjectileOpacity = previous; r.ctx.drawImage = originalDraw; light.mockRestore(); }
+  });
   it('floor 7 sweeping clock hands hit both keepers, with independent cooldowns', () => {
     const w = party(['ria', 'ria']);
     const e = w.withIds(() => w.spawnEnemy('clockmaker', w.room.centerX - 50, w.room.centerY))!;
