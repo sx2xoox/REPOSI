@@ -35,5 +35,5 @@ const specs:[string,string,string,string,ItemHooks][]=[
 ];
 export const REFUGE_BLESSINGS=specs.map(([id,name,desc,color,hooks],i)=>{
  const icon='icon_'+id;defineDrawnSprite(icon,16,16,p=>{p.circle(8,8,7,'#393149');p.ring(8,8,7,1,'#d7b76d');if(i===0){p.line(4,5,12,5,color);p.line(4,11,12,11,color);p.px(12,6,color);p.px(4,10,color);}else if(i===1){p.rect(5,5,3,6,color);p.rect(4,11,9,2,color);}else if(i===2){p.ring(8,8,4,1,color);p.line(8,5,8,8,color);p.line(8,8,10,10,color);}else if(i===3){p.poly([4,11,8,4,12,11,8,9],color);}else if(i===4){p.circle(6,8,3,color);p.circle(10,8,3,'#8abfa3');}else{p.line(3,8,13,8,color);p.line(10,5,13,8,color);p.line(10,11,13,8,color);}p.px(4,3,'#ffedbb');},{outline:'#140c1c'});
- return defineArtifact({id,name,desc,quote:'각자의 방식으로 불빛을 이어 간다.',icon,rarity:'rare',tags:[],pools:[],hidden:true,blessing:true,look:{orbit:color},...hooks});
+ return defineArtifact({id,name,desc,quote:'빛마다 길이 있다.',icon,rarity:'rare',tags:[],pools:[],hidden:true,blessing:true,look:{orbit:color},...hooks});
 });
