@@ -118,7 +118,22 @@ export class TownScene implements Scene {
     r.uiRect(0, 0, UI_W, UI_H, light > 0 ? '#172b32' : '#101c26');
     r.dctx.imageSmoothingEnabled = false;
     r.dctx.drawImage(townArt(), ox, 0, 768, 432);
-    r.uiRect(ox, 88, 768, 328, '#071122', 0.3 * (1 - light));
+    r.uiRect(ox, 0, 768, 432, '#071122', 0.12 * (1 - light));
+    // Gentle canal glints, chimney smoke and embers use scene time only.
+    const ctx = r.dctx;
+    ctx.save();
+    for (let i = 0; i < 16; i++) {
+      const x = 30 + (i * 47) % 705, y = 391 + (i * 7) % 32;
+      r.uiRect(ox + x + Math.sin(this.t * .65 + i) * 4, y, 5 + i % 7, 1, '#739b9c', .12 + .12 * Math.sin(this.t + i));
+    }
+    for (const [cx, cy] of [[185, 91], [300, 51], [632, 67]]) {
+      for (let j = 0; j < 4; j++) {
+        const age = (this.t * 7 + j * 9) % 38;
+        r.uiRect(ox + cx + Math.sin(age * .1 + j) * 5, cy - age, 4 + age * .18, 3 + age * .09, '#a3aaa0', .15 * (1 - age / 38));
+      }
+    }
+    ctx.restore();
+    for (const [x, y] of [[114, 180], [568, 156], [627, 157]]) glow(r, ox + x, y, 34, '#e5a662', .1 + light * .08);
     // Residents remain in the square between their one-time conversations.
     for (const [i, x, y, name] of [[0, 294, 233, '나래'], [1, 194, 262, '도윤'], [2, 642, 260, '은서']] as const) {
       r.dctx.drawImage(residentArt(i), ox + x - 16, y - 40, 32, 48);
@@ -130,16 +145,20 @@ export class TownScene implements Scene {
       r.uiSprite(animFrame('ui_lantern', this.t + i), ox + x, y, 2);
     }
     ZONES.forEach(z => {
-      r.uiText(z.title, ox + z.x, z.y - 31, { size: 14, bold: true, align: 'center', color: z.color, outline: '#0a111c' });
-      r.uiText(z.sub, ox + z.x, z.y - 12, { size: 10, align: 'center', color: '#c0c4ba', outline: '#0a111c' });
+      const near = Math.hypot(this.x - z.x, this.y - z.y) < 100;
+      r.uiText(z.title, ox + z.x, z.y + 26, { size: 11, align: 'center', color: near ? '#f5d79b' : '#b5c3b8', outline: '#101e29' });
+      if (near && !this.menu) r.uiText('G · ' + z.sub, ox + z.x, z.y + 41, { size: 9, align: 'center', color: '#d4c3a0', outline: '#101e29' });
     });
     const ch = Characters.get(this.c.checkpoint?.character ?? this.c.character) ?? Characters.all()[0];
-    r.uiSprite(animFrame(`${ch.spritePrefix}_idle_down`, this.t), ox + this.x, this.y, 2.5);
-    r.uiText('마지막 등불터', 28, 20, { size: 25, bold: true, color: C.goldHi });
+    r.uiSprite(animFrame(`${ch.spritePrefix}_idle_down`, this.t), ox + this.x, this.y, 2);
+    r.uiRect(0, 0, UI_W, 71, '#0b1722', .72);
+    r.uiRect(28, 22, 2, 30, '#b8985f');
+    r.uiText('마지막 등불터', 40, 19, { size: 19, color: C.goldHi });
     const cp = this.c.checkpoint;
     const objective = this.c.cleared >= 7 ? '1-1부터 7-4 · 서로 다른 밤의 기록을 모으자' : `1-1부터 ${Math.max(4, this.c.cleared + 1)}-4 · ${this.c.cleared >= 4 ? '새 기록을 찾아 귀환하기' : '성소의 기록을 찾아 귀환하기'}`;
-    r.uiText(objective, 30, 58, { size: 12, color: C.textDim });
+    r.uiText(objective, 40, 47, { size: 10, color: C.textDim });
     r.uiText(`${save.slots[save.activeSlot]?.name ?? ''}${cp ? ` · 보관된 원정 ${cp.floor}-${cp.stage}` : ''}`, UI_W - 28, 28, { size: 11, align: 'right', color: C.textDim });
+    r.uiRect(0, UI_H - 25, UI_W, 25, '#091621', .8);
     r.uiText('방향키 / WASD 이동 · Enter / G 대화 · 건물 클릭으로 이용 · Esc 타이틀', UI_W / 2, UI_H - 16, { size: 10, align: 'center', color: C.textFaint });
     if (this.menu) { frame(r, UI_W / 2 - 284, 297, 568, 116, 'panel'); this.menu.draw(r); }
   }

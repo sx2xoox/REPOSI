@@ -1,3 +1,8 @@
+## 2026-10-03 — Town visual revision
+- Rebuilt cached native-resolution village scenery: staggered hip-roof shingles, plaster/timber/stone foundations, glowing framed windows, keeper workshop awning/tools, archive books/banner, engraved lantern plinth, layered foliage, benches, detailed mooring pier and boat. Residents now have distinct scarves, apron/tools and book details.
+- Reduced always-visible service labels, show interaction subtitles nearby, matched player scale to world, added a compact header/footer and time-based chimney smoke/canal glints. Scene art remains cached; animation never touches gameplay RNG.
+- TypeScript clean; Chrome checked initial/fully lit town, 844×390 mobile, and departure at 1-1 toward floor 7 with no page errors. Screenshots: test-results/town-redesign*.png.
+
 ## 2026-10-03 — Four save slots, village, staged expeditions and first-clear story
 - IMPORTANT corrected user intent: expedition one runs 1-1 → 4-4, then returns to town. Expedition two starts fresh at 1-1 and runs through 5-4; then fresh 1-1 → 6-4; then fresh 1-1 → 7-4. Subsequent expeditions can repeat through 7-4. Equipment, artifacts and blessings reset on completed expeditions/death; unlocks and story flags persist per slot. Do NOT resume directly at floor 5/6/7 after a successful return.
 - Title logo uses non-bold native pixel glyphs and brighter bottom edges to keep 불 legible. New Game opens four independent browser-local save slots, with registration confirmation; slot one imports legacy unlock/collection/progress/history without deleting legacy keys. Settings remain shared. Save schema: lanternkeeper.slots.v1; campaign stores seen story IDs, highest cleared floor, pending return scene, selected character and interrupted-stage checkpoint.
