@@ -1,3 +1,8 @@
+## 2026-10-04 — Reference-style native portraits and subtle world polish
+- User supplied the original Lume portrait as the desired common style. All three residents and default keeper Ria now use directly authored 64x72 pixel portraits: round faces, large highlighted dark eyes and simple material ramps. Ria retains floppy golden ears, teal hood and red scarf. No image resampling, blur, alpha threshold or palette conversion. Cached blink/talk frames work for Ria as well as NPCs. Other keepers retain their existing identity-specific sprite fallback.
+- Shared cloth edge lighting subtly refines all seven keeper sprites and town residents at their original native dimensions. Resident paws, coat hems and lantern/tool/book accents received small pixel refinements. Gameplay, collision and network state unchanged.
+- Validation: TypeScript and 41 character/dialogue/town tests passed; real browser checked four 64x72 portraits, NPC/Ria dialogue and all seven keepers in three facings with idle/walk/dash frames. Actual screenshots in test-results/dialogue-ria-coarse.png, npc-applied-*.png and world-art-finish.png.
+
 ## 2026-10-04 — Preserve thin portrait details
 - User reported missing pixels after the filter change. Removed alpha<128 deletion/forced opaque conversion entirely, preserving original edge coverage. Relaxed the over-aggressive 64x72 raster to a common 96x108 for NPCs and Ria; this is still below the original 128x144 NPC raster. Point sampling and source colors retained, no blur or palette remapping.
 - Browser confirmed all four illustrated portraits at 96x108, NPC/Ria dialogue switches, no page errors. Visually reviewed Ria and Lume facial/accessory edges. World sprites are unchanged. Screenshot: test-results/dialogue-ria-detail.png.

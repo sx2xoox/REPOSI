@@ -53,7 +53,7 @@ export class StoryOverlay implements Scene {
       ctx.drawImage(townPortrait(npc, blink, talking), x + 18, y - 6, 128, 144);
     } else {
       const ch = line.who === '니엘' ? Characters.get('niel') : line.who === '등불지기' ? Characters.get(save.progress.campaign?.character ?? 'ria') : null;
-      const portrait=ch?keeperPortrait(ch.id):null;
+      const portrait=ch?keeperPortrait(ch.id,this.age%4.3>4.12,!this.playback.complete&&Math.floor(this.age*7)%2===0):null;
       if(portrait){ctx.imageSmoothingEnabled=false;ctx.drawImage(portrait,x+18,y-6,128,144);}
       else if (ch) r.uiSprite(animFrame(`${ch.spritePrefix}_idle_down`, this.age), x + 82, y + 116, 5);
       else {

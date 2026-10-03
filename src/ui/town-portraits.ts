@@ -1,31 +1,7 @@
-import riaPortraitUrl from '../assets/npc/ria-portrait.png';
-import portraitUrl from '../assets/npc/resident-portraits.png';
 import { PixelPainter } from '../engine/painter';
-
-let sheet: HTMLImageElement | null = null;
-function portraitSheet(): HTMLImageElement | null {
-  if (typeof Image === 'undefined') return null;
-  if (!sheet) { sheet = new Image(); sheet.src = portraitUrl; }
-  return sheet.complete && sheet.naturalWidth > 0 ? sheet : null;
-}
-let riaSheet: HTMLImageElement | null = null;
-export const PORTRAIT_W=96, PORTRAIT_H=108;
-/** A shared coarse pixel grid for every illustrated speaker; rasterized only once. */
-function rasterPortrait(image:HTMLImageElement,sx:number,sy:number,sw:number,sh:number):HTMLCanvasElement {
-  const art=document.createElement('canvas');art.width=PORTRAIT_W;art.height=PORTRAIT_H;
-  const ctx=art.getContext('2d')!;ctx.imageSmoothingEnabled=false;
-  const scale=Math.min(PORTRAIT_W/sw,PORTRAIT_H/sh),dw=Math.round(sw*scale),dh=Math.round(sh*scale);
-  ctx.drawImage(image,sx,sy,sw,sh,Math.floor((PORTRAIT_W-dw)/2),PORTRAIT_H-dh,dw,dh);
-  return art;
-}
-export function keeperPortrait(character:string):HTMLCanvasElement|null {
-  if(character!=='ria'||typeof Image==='undefined')return null;
-  if(!riaSheet){riaSheet=new Image();riaSheet.src=riaPortraitUrl;}
-  if(!riaSheet.complete||!riaSheet.naturalWidth)return null;
-  const old=cache.get('ria');if(old)return old;
-  const art=rasterPortrait(riaSheet,0,0,riaSheet.naturalWidth,riaSheet.naturalHeight);cache.set('ria',art);return art;
-}
-export function preloadTownPortraits(): void { portraitSheet();keeperPortrait('ria'); }
+export const PORTRAIT_W=64, PORTRAIT_H=72;
+export function keeperPortrait(character:string,blink=false,talking=false):HTMLCanvasElement|null { return character==='ria'?townPortrait(3,blink,talking):null; }
+export function preloadTownPortraits():void { for(let i=0;i<4;i++)townPortrait(i,false,false); }
 const cache = new Map<string, HTMLCanvasElement>();
 export const RESIDENTS = [
   { name: '루메', role: '등불 관리인', accent: '#c6a0c8' },
@@ -35,35 +11,39 @@ export const RESIDENTS = [
 
 /** Original pixel busts using the shaded ramps and outlines of the combat art. */
 export function townPortrait(i: number, blink: boolean, talking: boolean): HTMLCanvasElement {
-  const atlas = portraitSheet();
-  if (atlas) {
-    const key = 'approved:'+i;
-    const old = cache.get(key); if (old) return old;
-    const [left,width]=[[0,640],[640,728],[1380,668]][i];
-    const scale=atlas.naturalWidth/2048;
-    const art=rasterPortrait(atlas,left*scale,0,width*scale,atlas.naturalHeight);
-    cache.set(key,art); return art;
-  }
-  const key = `fallback:${i}:${Number(blink)}:${Number(talking)}`;
+  const key = `${i}:${Number(blink)}:${Number(talking)}`;
   const old = cache.get(key); if (old) return old;
   const p = new PixelPainter(64, 72);
   const cloth = [
     ['#16101e', '#302339', '#564361', '#816886', '#b79abc'],
     ['#1d151b', '#3c2930', '#644239', '#996948', '#c69e69'],
     ['#101a25', '#253441', '#3e5867', '#6b8c93', '#a3b6ae'],
+    ['#142533','#1d3f52','#2c6c80','#46a0aa','#9adcc8'],
   ][i];
   p.ellipse(31, 67, 26, 23, cloth[1]); p.shadeSphere(28, 62, 25, 24, cloth, { dither: false });
   p.poly([11, 51, 23, 46, 31, 60, 23, 71, 7, 71], cloth[2]);
   p.line(13, 55, 9, 69, cloth[3]); p.line(17, 59, 15, 71, cloth[1]);
-  const fur=[['#997887','#cfb79f','#f4dfb9','#fff3d3'],['#965939','#cf8c48','#f2bb68','#ffdf9c'],['#525d7a','#8297ae','#becfd9','#e5ebdf']][i];
+  const fur=[['#997887','#cfb79f','#f4dfb9','#fff3d3'],['#965939','#cf8c48','#f2bb68','#ffdf9c'],['#525d7a','#8297ae','#becfd9','#e5ebdf'],['#8a4a2a','#c8823a','#f2bb62','#ffe6a6']][i];
   // Pointed ears, a soft cheek silhouette and a cream muzzle: unmistakably cats.
+  if(i===3){
+    p.poly([4,39,4,19,12,7,30,0,48,7,59,22,59,43],cloth[1]);
+    p.line(12,8,30,2,cloth[3]);p.line(30,2,48,9,cloth[2]);
+  }else{
   p.poly([10,25,8,2,25,15,42,14,56,2,54,29],fur[1]);
   p.poly([13,19,12,7,23,17], '#d49b9e');p.poly([44,17,53,7,51,23],'#c68e9c');
   p.line(10,4,10,13,fur[3]);p.line(53,4,55,16,fur[0]);
+  }
   p.ellipse(32,30,24,20,fur[1]);p.ellipse(29,27,22,18,fur[2]);
   p.ellipse(16,35,9,10,fur[2]);p.ellipse(47,35,8,10,fur[1]);
   p.ellipse(31,38,13,9,fur[3]);
   p.line(18,15,26,12,fur[3]);
+  if(i===3){
+    p.poly([13,15,8,18,5,29,5,42,10,47,16,40,18,22],fur[1]);
+    p.poly([13,17,9,21,8,37,11,42,14,34,16,21],fur[2]);
+    p.poly([48,15,54,19,58,31,57,43,52,47,47,38,45,22],fur[0]);
+    p.poly([49,18,53,22,55,37,52,42,49,34,47,21],fur[1]);
+    p.ellipse(32,39,12,7,'#fff0d1');
+  }
   if(i===1){p.poly([27,12,31,12,31,20,29,22],fur[0]);p.poly([36,12,39,13,37,21,35,20],fur[0]);p.line(13,25,18,27,fur[0]);p.line(47,25,51,23,fur[0]);}
   if(i===2){p.poly([27,12,36,12,40,20,32,25,24,20],fur[0]);}
   if(blink){p.line(18,30,25,31,'#302236');p.line(39,31,46,30,'#302236');}
@@ -73,13 +53,14 @@ export function townPortrait(i: number, blink: boolean, talking: boolean): HTMLC
     p.px(23,33,i===2?'#87b2b7':'#bda16d');p.px(43,33,i===2?'#87b2b7':'#bda16d');
   }
   p.ellipse(15,36,3,2,'#dda2a0');p.ellipse(49,36,3,2,'#cc989a');
-  p.poly([28,35,35,35,32,39],'#bc778b');p.px(29,35,'#efd1c7');
+  p.poly([28,35,35,35,32,39],i===3?'#493033':'#bc778b');p.px(29,35,'#efd1c7');
   p.line(32,39,32,41,'#845468');p.line(32,41,29,43,'#845468');p.line(32,41,35,43,'#845468');
   if(talking){p.ellipse(32,43,3,2,'#855166');p.px(32,44,'#e9a4af');}
-  p.line(6,34,16,36,fur[0]);p.line(5,40,16,39,fur[0]);p.line(47,36,58,34,fur[0]);p.line(48,39,59,40,fur[0]);
+  if(i!==3)p.line(6,34,16,36,fur[0]);if(i!==3){p.line(5,40,16,39,fur[0]);p.line(47,36,58,34,fur[0]);p.line(48,39,59,40,fur[0]);}
   p.poly([20, 44, 28, 48, 42, 44, 43, 51, 32, 55, 21, 50], i === 0 ? '#b18c91' : cloth[3]);
   p.line(22, 46, 31, 50, i === 0 ? '#e0b8a6' : cloth[4]);
-  if (i === 0) {
+  if (i === 0 || i === 3) {
+    if(i===3){p.poly([18,45,31,49,45,45,44,52,31,57,20,52],'#b94e50');p.line(20,47,31,52,'#ed8c70');}
     p.poly([31, 52, 39, 52, 37, 71, 29, 71], '#8c5969'); p.line(32, 54, 30, 70, '#c38b91');
     p.rect(42, 55, 15, 16, '#392735'); p.rect(45, 57, 9, 11, '#d89745'); p.rect(47, 58, 5, 9, '#ffe5a0');
     p.rect(41, 54, 17, 3, '#9d764b'); p.line(47, 50, 52, 50, '#caaa6b'); p.line(46, 51, 46, 54, '#7a573c');

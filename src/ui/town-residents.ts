@@ -1,3 +1,4 @@
+import { finishCloth } from '../game/sprite-finish';
 import { PixelPainter } from '../engine/painter';
 export type ResidentFacing = 'down' | 'side' | 'up';
 const cache = new Map<string, HTMLCanvasElement>();
@@ -40,5 +41,15 @@ export function residentArt(i:number, facing:ResidentFacing='down', blink=false,
   if(i===1){p.rect(5,15,3,3,fur[2]);p.line(16,17,19,14,'#be9464');p.rect(17,12,5,3,'#777986');p.line(17,12,20,12,'#b4b2b0');}
   if(i===2){p.rect(14,15,6,6,'#632f3b');p.line(15,15,18,15,'#d0bb8a');p.px(17,17,'#bb9253');p.rect(13,18,2,2,fur[2]);}
  }
+ // Small authored material cues, shared lighting direction with the keeper.
+ finishCloth(p,cloth);
+ if(!back){
+   p.px(side?8:7,4,fur[3]);p.px(side?8:7,10,fur[2]);
+   p.line(side?9:8,20,side?11:10,20,cloth[2]);
+   if(i===0){p.px(17,15,'#e0b76d');p.line(17,20,20,20,'#583c2b');p.px(19,16,'#fff2c8');p.px(8,13,'#f1ce83');}
+   if(i===1){p.line(10,17,13,17,'#c59562');p.px(10,19,'#c59562');p.px(18,13,'#ddd9c9');p.px(6,15,fur[3]);}
+   if(i===2){p.line(15,19,18,19,'#cfb991');p.px(15,16,'#aa765e');p.px(7,6,'#eed9a0');}
+ }else{p.line(9,18,10,20,cloth[0]);p.px(8,16,cloth[2]);}
+ p.px(side?8:7,21,fur[2]);p.px(side?13:14,22,fur[0]);
  p.outline('#0c0810');const art=p.toCanvas();cache.set(key,art);return art;
 }
