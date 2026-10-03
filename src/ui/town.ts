@@ -166,7 +166,7 @@ export class TownScene implements Scene {
         const blink=(this.t+person.i*.9)%4.6>4.44;
         const art=residentArt(person.i,facing,blink,Math.floor(this.t*2+person.i)%2===0);
         ctx.save();ctx.translate(Math.round(person.x-r.viewX),Math.round(person.y-r.viewY-19));
-        if(facing==='side'&&dx>0)ctx.scale(-1,1);
+        if(facing==='side'&&dx>0){ctx.translate(-1,0);ctx.scale(-1,1);}
         ctx.drawImage(art,-12,0);ctx.restore();
       }
     }

@@ -7,7 +7,7 @@ import { frame } from './frame';
 import { C } from './theme';
 import type { StoryEvent } from '../game/story';
 import { DialoguePlayback } from '../game/dialogue';
-import { townPortrait, RESIDENTS } from './town-portraits';
+import { townPortrait, keeperPortrait, preloadTownPortraits, RESIDENTS } from './town-portraits';
 import { animFrame } from '../engine/sprites';
 import { Characters } from '../game/defs';
 import { save } from '../engine/save';
@@ -19,7 +19,7 @@ export class StoryOverlay implements Scene {
   private delay = 0;
   private age = 0;
   constructor(private event: StoryEvent, private done: () => void) { this.playback = new DialoguePlayback(event); }
-  enter(): void { input.releaseAll(); sfx('ui_open', { vol: .45 }); }
+  enter(): void { preloadTownPortraits(); input.releaseAll(); sfx('ui_open', { vol: .45 }); }
   private next(): void {
     if (this.delay < .15) return;
     this.delay = 0;
@@ -53,7 +53,9 @@ export class StoryOverlay implements Scene {
       ctx.drawImage(townPortrait(npc, blink, talking), x + 18, y - 6, 128, 144);
     } else {
       const ch = line.who === '니엘' ? Characters.get('niel') : line.who === '등불지기' ? Characters.get(save.progress.campaign?.character ?? 'ria') : null;
-      if (ch) r.uiSprite(animFrame(`${ch.spritePrefix}_idle_down`, this.age), x + 82, y + 116, 5);
+      const portrait=ch?keeperPortrait(ch.id):null;
+      if(portrait){ctx.imageSmoothingEnabled=false;ctx.drawImage(portrait,x+18,y-6,128,144);}
+      else if (ch) r.uiSprite(animFrame(`${ch.spritePrefix}_idle_down`, this.age), x + 82, y + 116, 5);
       else {
         r.uiSprite(animFrame('ui_lantern', this.age), x + 82, y + 63, 4);
         r.uiText(line.who === '기록' ? '되찾은 기억' : '희미한 목소리', x + 82, y + 112, { size: 10, color: C.textDim, align: 'center' });
