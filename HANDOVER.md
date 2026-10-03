@@ -1,3 +1,6 @@
+## 2026-10-04 — Shared protagonist dialogue portrait
+- Fixed the user-reported Niel selection showing an enlarged world sprite: generic 등불지기 dialogue now uses the user-selected default keeper illustration regardless of the campaign character. Named character dialogue keeps its existing identity mapping. Browser draw instrumentation verified the selected illustration for all seven campaign character IDs, with no page errors.
+
 ## 2026-10-04 — Apply user-selected Ria portrait
 - Replaced ria-portrait.png with the exact user attachment codex-clipboard-72ee3099-d17b-4c4c-a5f4-dc30d3476ac9.png. Kept current UI sizing, NPC portraits and world models.
 
