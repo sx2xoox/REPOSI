@@ -18,7 +18,7 @@ import { ROOM_ICONS, ROOM_LABELS } from './logic';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
 
-const LEGEND: RoomKind[] = ['boss', 'treasure', 'shop', 'secret', 'challenge', 'shrine', 'curse'];
+const LEGEND: RoomKind[] = ['boss', 'treasure', 'shop', 'secret', 'challenge', 'shrine', 'curse', 'relay', 'workshop', 'vault'];
 
 export class MapOverlay implements Scene {
   transparent = true;
@@ -92,7 +92,7 @@ export class MapOverlay implements Scene {
     // legend + progress
     const lx = bx + bw + 14;
     const lw = x + W - 20 - lx;
-    frame(r, lx, by, lw, 196, 'panel', { alpha: k });
+    frame(r, lx, by, lw, 232, 'panel', { alpha: k });
     r.uiText('범례', lx + 12, by + 10, { size: 10, font: 'small', color: C.gold, alpha: k });
     const known = w.map.nodes.filter((n) => nodeKnown(w, n));
     const kinds = new Set(known.map((n) => n.kind));
@@ -112,13 +112,13 @@ export class MapOverlay implements Scene {
       const found = kinds.has(kd);
       const icon = ROOM_ICONS[kd];
       if (!icon) continue;
-      if (!found && (kd === 'secret' || kd === 'curse' || kd === 'shrine' || kd === 'challenge')) continue;
+      if (!found && kd !== 'boss' && kd !== 'treasure' && kd !== 'shop') continue;
       r.uiSprite(icon, lx + 19, ly + 5, 2, { alpha: k * (found ? 1 : 0.3) });
       r.uiText(ROOM_LABELS[kd], lx + 34, ly, { size: 10, font: 'small', color: found ? C.text : C.textMute, alpha: k });
       ly += 18;
     }
-    const py = by + 204;
-    frame(r, lx, py, lw, bh - 204, 'panel', { alpha: k });
+    const py = by + 240;
+    frame(r, lx, py, lw, bh - 240, 'panel', { alpha: k });
     const total = w.map.nodes.filter((n) => n.kind !== 'secret').length;
     const visited = w.map.nodes.filter((n) => n.visited).length;
     const cleared = w.map.nodes.filter((n) => n.cleared && n.visited).length;

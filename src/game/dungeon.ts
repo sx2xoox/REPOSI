@@ -56,33 +56,31 @@ export interface FloorMap {
   bossId: number;
 }
 
-/** Short expedition stages; rewards are spread across the four-stage floor. */
+/** Branching expeditions: a nearby optional exit, with rewards off the main route. */
 export function generateStage(floor: FloorDef, stage: number, rng: RNG): FloorMap {
-  const nodes: RoomNode[] = [];
-  const grid = new Int16Array(MAP_W * MAP_H).fill(-1);
-  const flip = rng.sign();
-  const vertical = rng.chance(0.5);
-  const add = (x: number, y: number, kind: RoomKind) => {
-    const gx = 6 + (vertical ? y : x) * flip;
-    const gy = 6 + (vertical ? x : y);
-    const n: RoomNode = { id: nodes.length, gx, gy, cw: 1, ch: 1, kind, templateId: '', seed: rng.nextU32(), depth: Math.abs(x) + Math.abs(y), visited: false, cleared: false, discovered: false, locked: false, doors: [] };
-    nodes.push(n); grid[gy * MAP_W + gx] = n.id;
+  const size = 12 + Math.min(2, Math.floor((floor.index - 1) / 3));
+  const map = generateFloor({ ...floor, roomCount: [size, size + 2], extraRooms: {} }, rng);
+  map.floor = floor;
+  const primary: RoomKind = stage === 1 ? 'treasure' : stage === 2 ? 'shop' : rng.pick<RoomKind>(['shrine', 'curse', 'challenge']);
+  const mechanism: RoomKind = stage === 1 ? 'relay' : stage === 2 ? 'workshop' : stage === 3 ? 'vault' : rng.pick<RoomKind>(['relay', 'workshop']);
+  for (const n of map.nodes) {
+    if (n.kind === 'treasure') n.kind = primary;
+    else if (n.kind === 'shop') n.kind = mechanism;
+    // Only one hidden loot room per floor; other stages gain an ordinary branch.
+    else if (n.kind === 'secret' && stage !== 3) n.kind = 'normal';
+    if (stage < 4 && n.kind === 'boss') n.kind = 'normal';
+    n.locked = floor.index >= 2 && (n.kind === 'treasure' || n.kind === 'shop');
     n.templateId = pickTemplate(n, floor, rng)?.id ?? '';
-    return n.id;
-  };
-  add(0, 0, 'start');
-  add(1, 0, 'normal');
-  const end = add(2, 0, stage === 4 ? 'boss' : 'normal');
+  }
+  for (const n of map.nodes) for (const d of n.doors) d.secret = n.kind === 'secret' || map.nodes[d.to].kind === 'secret';
   if (stage < 4) {
-    add(1, 1, stage === 1 ? 'treasure' : stage === 2 ? 'shop' : rng.pick<RoomKind>(['shrine', 'secret', 'treasure']));
+    // Depth two usually means a single fight before the exit fight. All branches stay optional.
+    const exits = map.nodes.filter(n => n.kind === 'normal' && n.depth >= 2).sort((a,b) => a.depth - b.depth || a.id - b.id);
+    map.exitId = exits[0].id;
+    map.bossId = -1;
   }
-  for (const n of nodes) for (const dir of DIRS) {
-    const to = grid[(n.gy + DIR_VEC[dir].y) * MAP_W + n.gx + DIR_VEC[dir].x];
-    if (to >= 0) n.doors.push({ dir, cx: n.gx, cy: n.gy, to, secret: false });
-  }
-  nodes[0].visited = nodes[0].cleared = nodes[0].discovered = true;
-  nodes[1].discovered = true;
-  return { floor, nodes, grid, startId: 0, bossId: stage === 4 ? end : -1, exitId: stage < 4 ? end : undefined };
+  for (const d of map.nodes[map.startId].doors) if (!d.secret) map.nodes[d.to].discovered = true;
+  return map;
 }
 
 export function shapeOf(n: RoomNode): RoomShape {

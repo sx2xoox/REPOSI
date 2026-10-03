@@ -24,6 +24,8 @@ export interface TouchButtonSpec {
 }
 
 export interface Scene {
+  /** Exploration scenes share the combat left stick without combat buttons. */
+  touchMovement?: boolean;
   /** draw the scene below as well (overlays) */
   transparent?: boolean;
   /** keep updating the scene below (rare) */

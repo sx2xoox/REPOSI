@@ -109,6 +109,11 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
   const pad = input.aimMode === 'pad';
   // '' on touch screens: the card then shows the hand of the on-screen "줍기" button
   const keyOf = () => actionLabel(input.bindings, 'interact', pad);
+  if (e.interactionInfo) {
+    const info = e.interactionInfo();
+    return { icon:info.icon, name:info.name, color:C.gold, sub:[], desc:info.desc, extra:[],
+      action:{ key:touchUiActive() ? '' : keyOf(), label:'사용', pad, ok:true }, note:'', price:null };
+  }
   if (e instanceof Pedestal && e.item) {
     const it = e.item;
     const info = itemInfo(it);
@@ -277,7 +282,7 @@ export class ItemTooltip {
   draw(r: Renderer, w: World, alpha = 1): void {
     const e = this.cur;
     if (!e || this.a <= 0.01 || alpha <= 0.01) return;
-    const sig = signature(w, e);
+    const sig = signature(w, e) + (e.interactionInfo?.().desc ?? '');
     if (sig !== this.sig || !this.card) {
       this.sig = sig;
       this.card = buildCard(w, e);

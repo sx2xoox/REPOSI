@@ -185,8 +185,12 @@ try {
   // Title -> four slots -> register -> village introduction -> cooperative pier.
   await key(host, 'Enter', 3);
   await wait(500);
-  await key(host, 'Enter', 4);
-  await host.page.mouse.click(560 * 1280 / 768, 320 * 720 / 432);
+  await host.page.keyboard.down('KeyA'); await wait(200); await host.page.keyboard.up('KeyA');
+  await key(host,'KeyG');
+  for(let i=0;i<30&&(await lobbyState(host)).scene==='StoryOverlay';i++)await key(host,'Enter');
+  await host.page.keyboard.down('KeyD'); await wait(2300); await host.page.keyboard.up('KeyD');
+  await host.page.keyboard.down('KeyS'); await wait(950); await host.page.keyboard.up('KeyS');
+  await key(host,'KeyG');
   await until(host, (s) => s.scene === 'lobby' && s.screen === 'main', 'lobby main');
   await wait(300);
   await key(host, 'Enter');
@@ -272,7 +276,8 @@ try {
   const g1 = pages[1];
   const tickBefore = (await coopState(g1)).tick;
   await g1.page.keyboard.press('Escape');
-  await wait(1200);
+  // Wait for simulation progress, rather than treating host CPU scheduling as a pause failure.
+  await until(g1, s => s.tick > tickBefore + 30, 'simulation under pause menu', 5000, coopState);
   await shot(g1, 'pause');
   const tickAfter = (await coopState(g1)).tick;
   check('the world keeps running under the pause menu', tickAfter > tickBefore + 30, `${tickBefore} -> ${tickAfter}`);
@@ -289,8 +294,10 @@ try {
   await wait(1500);
   // ---- a treasure room: one pedestal per keeper (bots hold still meanwhile)
   await hold(true);
+  await pages[0].page.waitForFunction(() => !window.__lk.world().transitioning);
   await pages[0].page.evaluate(() => window.__lk.coop.cmd({ type: 'debug', op: 'room', kind: 'treasure' }));
-  await wait(1600);
+  await until(pages[0], s => s.room === 'treasure', 'treasure room command', 10000, coopState);
+  await wait(500);
   const tr = await pages[0].page.evaluate(() => {
     const w = window.__lk.world();
     return { room: w.node.kind, peds: w.entities.filter((e) => e.item && typeof e.group === 'number').length };
@@ -324,8 +331,10 @@ try {
   await host.page.waitForFunction(() => !window.__lk.world().transitioning);
   await key(host, 'Escape');
   await wait(500);
-  await key(host, 'ArrowDown', 2);
-  await key(host, 'Enter', 2);
+  await key(host, 'ArrowDown'); await wait(450);
+  await key(host, 'ArrowDown'); await wait(450);
+  await key(host, 'Enter'); await wait(450);
+  await key(host, 'Enter');
   for (const p of pages) await until(p, (s) => !!s?.gameOver, 'party summary', 10000, coopState);
   await wait(2200);
   for (const p of pages) await shot(p, 'summary');

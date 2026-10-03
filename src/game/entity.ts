@@ -157,6 +157,9 @@ export abstract class Entity {
    * potion, weapon crate): the nearest such entity gets the item preview card
    * and is the target of the 'interact' action (see game/interact.ts).
    */
+  /** Optional explicit interaction, shared by keyboard, pad and touch. */
+  interactionInfo?(): { name: string; desc: string; icon: string };
+  interact?(_w: World): boolean;
   previewable(_w: World): boolean {
     return false;
   }

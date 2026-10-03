@@ -118,21 +118,35 @@ defineDrawnSprite('pedestal', 16, 12, (p) => {
 }, { outline: O, origin: [8, 6] });
 
 function chest(name: string, base: string, band: string, open: boolean): void {
-  defineDrawnSprite(name, 14, 12, (p) => {
-    p.rect(0, 4, 14, 8, base);
-    p.shadeVertical(0, 4, 14, 8, ramp(base, 4).reverse());
+  defineDrawnSprite(name, 18, 17, (p) => {
+    const wood = ramp(base, 5), metal = ramp(band, 4);
+    // Rounded lid, visible top plane, dark right face and separate feet.
+    p.rect(2,10,14,6,wood[1]); p.rect(2,10,12,1,wood[3]);
+    p.rect(15,9,2,6,wood[0]); p.rect(3,15,3,2,'#291c20'); p.rect(13,15,3,2,'#291c20');
+    p.line(3,12,14,12,wood[0]); p.line(4,14,12,14,wood[2]);
     if (open) {
-      p.rect(0, 0, 14, 4, '#1a0e08');
-      p.rect(1, 1, 12, 3, '#ffe9a0');
+      p.rect(2,1,14,6,wood[1]); p.rect(3,1,12,1,metal[2]);
+      p.rect(4,3,10,3,wood[0]); p.rect(2,7,14,4,'#140d19');
+      p.rect(3,7,12,1,metal[1]); p.rect(4,9,10,1,'#382634');
     } else {
-      p.rect(0, 1, 14, 4, base);
-      p.rect(0, 1, 14, 1, ramp(base, 4)[3]);
+      p.rect(2,5,14,5,wood[2]); p.rect(3,3,12,3,wood[3]);
+      p.rect(5,2,8,2,wood[4]); p.line(3,6,14,6,wood[1]);
+      p.rect(2,9,14,1,'#231820');
     }
-    p.rect(0, 4, 14, 1, band);
-    p.rect(6, 4, 2, 4, band);
-    p.px(6, 6, '#ffffff');
-  }, { outline: O, origin: [7, 9] });
+    for (const x of [4,13]) {
+      p.rect(x,open ? 1 : 3,2,open ? 6 : 7,metal[1]);
+      p.rect(x,11,2,4,metal[1]); p.px(x,4,metal[3]); p.px(x,12,metal[3]);
+    }
+    // A brass clasp on plain chests; a distinct padlock on key-locked chests.
+    if (!open) {
+      const locked = name.includes('gold');
+      if (locked) { p.rect(7,7,4,4,metal[2]); p.rect(8,8,2,2,'#2d2431'); }
+      p.rect(7,10,4,locked ? 4 : 3,metal[2]); p.px(7,10,metal[3]);
+      p.rect(9,11,1,2,'#392735');
+    }
+  }, { outline: O, origin: [9, 13] });
 }
+
 chest('chest', '#8a5a2a', '#c8b060', false);
 chest('chest_open', '#8a5a2a', '#c8b060', true);
 chest('chest_gold', '#d0a030', '#fff0a0', false);

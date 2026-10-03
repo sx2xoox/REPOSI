@@ -558,6 +558,18 @@ function texBrick(a: ThemeArt, s: WallSample): string {
   return rampPick(a.face, sh, s.x, s.y);
 }
 
+/** The dungeon masonry shader, reused by non-combat settlements and facades. */
+export function paintMasonry(p: PixelPainter, art: ThemeArt, x0: number, y0: number, width: number, height: number, seed = 71, side = false): void {
+  const sample: WallSample = { face: side ? 2 : 0, along: 0, da: 1, h: 0, dh: 1, t: 0, x: 0, y: 0, shade: 2, seed };
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    sample.x = x0 + x; sample.y = y0 + y; sample.along = x0 + x;
+    sample.h = height - y; sample.t = sample.h / height;
+    sample.shade = (side ? 1.3 : 2.3) - Math.max(0, 1 - sample.h / 6) * 1.1;
+    p.px(x0 + x, y0 + y, texBrick(art, sample));
+  }
+  p.line(x0, y0, x0 + width - 1, y0, art.face[4]);
+}
+
 function texRough(a: ThemeArt, s: WallSample): string {
   const warp = vnoise(s.along / 16, s.face * 7.3, s.seed) * 7;
   const L = Math.floor((s.h + warp) / 7);

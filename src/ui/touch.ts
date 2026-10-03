@@ -216,6 +216,7 @@ export class TouchControls {
   private taps = new Map<number, TapTracker>();
   private chromePtr = new Map<number, ChromeHit>();
   private mode: 'game' | 'menu' = 'menu';
+  private exploration: Scene | null = null;
   private fade = 0;
   private t = 0;
   private flash: Partial<Record<TouchButtonId, number>> = {};
@@ -335,7 +336,7 @@ export class TouchControls {
     if (id === 'active') return !!p.activeId;
     if (id === 'consumable') return !!p.potionId;
     if (id === 'swap') return !!p.weapon2Id;
-    if (id === 'interact') return w.focus instanceof Pedestal && !!w.focus.item;
+    if (id === 'interact') return (w.focus instanceof Pedestal && !!w.focus.item) || !!w.focus?.interact;
     return true;
   }
 
@@ -396,6 +397,19 @@ export class TouchControls {
         this.flash[owner.id] = 1;
       }
       this.syncSticks();
+      return;
+    }
+    if (app.scenes.top?.touchMovement) {
+      this.setMode('game');
+      const chrome = vis ? this.hitChrome(p) : null;
+      if (chrome) { this.chromePtr.set(e.pointerId, chrome); return; }
+      if (vis && p.x < this.layout.splitX) {
+        this.router.down(e.pointerId, p.x, p.y, () => false);
+        this.syncSticks();
+        return;
+      }
+      this.taps.set(e.pointerId, new TapTracker(p.x, p.y));
+      const point = this.toCanvas(p); input.pointMouse(point.x, point.y);
       return;
     }
     this.setMode('menu');
@@ -549,7 +563,9 @@ export class TouchControls {
     this.t += dt;
     for (const id of Object.keys(this.flash) as TouchButtonId[]) this.flash[id] = Math.max(0, (this.flash[id] ?? 0) - dt * 4);
     const g = this.gameScene();
-    this.setMode(g ? 'game' : 'menu');
+    const exploration=app.scenes.top?.touchMovement?app.scenes.top:null;
+    if(exploration!==this.exploration){this.exploration=exploration;this.router.reset();this.syncSticks();}
+    this.setMode(g || exploration ? 'game' : 'menu');
     this.fade = clamp(this.fade + dt * 4, 0, 1);
     this.refreshLayout();
     if (g && this.mode === 'game' && touchUiActive() && this.layout.scheme === 'auto') {
@@ -589,7 +605,7 @@ export class TouchControls {
     d.imageSmoothingEnabled = false;
     const g = this.gameScene();
     if (g && this.mode === 'game') this.drawGame(r, g.world);
-    else this.drawMenuChrome(r);
+    else { if(app.scenes.top?.touchMovement)this.drawStick(r,'left',this.fade,false); this.drawMenuChrome(r); }
     d.restore();
   }
 
@@ -930,6 +946,7 @@ export class TouchControls {
       const label = f.price > 0 || f.heartPrice > 0 ? '구매' : '줍기';
       this.drawBtn(r, 'interact', A, held.has('interact'), itemInfo(f.item).icon, ok, ok, 1, '', label);
     }
+    if (f?.interact && f.interactionInfo) this.drawBtn(r, 'interact', A, held.has('interact'), f.interactionInfo().icon, true, true, 1, '', '사용');
     // system
     this.drawBtn(r, 'pause', A, held.has('pause'), 'tc_pause');
     this.drawBtn(r, 'map', A, held.has('map'), 'tc_map');

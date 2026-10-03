@@ -19,6 +19,9 @@ import { C, formatTime, splitFloorName } from './theme';
 import { divider, fitScale, frame, glow, keycap, spriteCentered } from './frame';
 import { appear } from './anim';
 import { CONTROL_ROWS, PAD_NAMES, controlKeys, touchControlRows } from './keys';
+import { save } from '../engine/save';
+import { storyObjective } from '../game/story';
+import { StoryOverlay } from './story';
 import { touchUiActive } from './touch-mode';
 
 export class PauseOverlay implements Scene {
@@ -58,6 +61,10 @@ export class PauseOverlay implements Scene {
     }
     this.menu = new Menu([
       { label: '계속하기', action: () => this.close(), hint: '하강을 이어갑니다.' },
+      ...(game.run.campaign ? [{ label: '현재 목표', hint: '이번 원정에서 해야 할 일을 확인합니다.', action: () => {
+        const objective=storyObjective(save.progress.campaign!);
+        app.scenes.push(new StoryOverlay({title:objective.title,lines:[{who:'기록',text:objective.detail},{who:'기록',text:'각 층의 네 번째 구역에 보스가 있다. 방을 정리하고 열린 통로를 따라 진행하자. 발견한 기록은 마을 기록실에서 다시 읽을 수 있다.'}]},()=>{}));
+      } }] : []),
       { label: '설정', action: () => app.scenes.push(new SettingsOverlay()), hint: '소리, 화면, 조작 설정.' },
       {
         label: () => this.game.run.campaign ? '저장하고 마을로' : (this.confirmQuit ? '정말 포기할까요?' : '타이틀로 나가기'),

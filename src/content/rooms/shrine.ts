@@ -154,7 +154,7 @@ export class OfferingBowl extends Prop {
     }
     w.sfx('player_hurt', { vol: 0.5, pitch: 0.8 });
     const b = w.rng.pick(BLESSINGS);
-    const key = `shrine:${w.run.floor}:${w.node.id}`;
+    const key = `shrine:${w.run.floor}:${w.run.stage}:${w.node.id}`;
     w.items.addBuff({
       key,
       hooks: { stats: (m) => { m.addStat(b.stat, b.amount); } },

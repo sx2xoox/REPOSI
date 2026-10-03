@@ -1,121 +1,128 @@
 import { PixelPainter } from '../engine/painter';
 
+import { Themes } from '../game/defs';
+import { RNG } from '../engine/rng';
+import { TOWN_W, TOWN_H } from '../game/town-layout';
+import { TILE } from '../game/constants';
+import { hash2, vnoise, rampPick, themeArt, paintMasonry, shadePx, blendPx, shadowEllipse } from '../game/roomart';
+import { rectRug } from '../content/rooms/decor';
+
 let cached: HTMLCanvasElement | null = null;
 const residents = new Map<number, HTMLCanvasElement>();
 export function residentArt(i: number): HTMLCanvasElement {
   const old = residents.get(i); if (old) return old;
-  const p = new PixelPainter(16, 24);
-  const coats = [['#463754', '#88759f', '#bca2bb'], ['#49342e', '#99724f', '#c3a177'], ['#24464f', '#588d91', '#91b7ad']][i];
-  p.ellipse(8, 22, 6, 1, '#09131b');
-  p.rect(4, 18, 3, 4, '#2a303b'); p.rect(9, 18, 3, 4, '#252937');
-  p.rect(3, 22, 4, 1, '#a19883'); p.rect(9, 22, 4, 1, '#807b70');
-  p.poly([4, 10, 11, 10, 14, 19, 2, 19], coats[0]);
-  p.poly([4, 11, 10, 11, 11, 18, 3, 18], coats[1]);
-  p.line(5, 12, 4, 17, coats[2]); p.rect(3, 17, 10, 2, '#40383a'); p.px(7, 17, '#c4ae76');
-  p.rect(1, 12, 2, 5, coats[1]); p.rect(12, 12, 2, 5, coats[0]); p.px(2, 17, '#d1af8e'); p.px(12, 17, '#b89b83');
-  p.ellipse(8, 6, 4, 5, '#a5816e'); p.rect(5, 4, 6, 6, '#dabda0'); p.line(5, 5, 5, 8, '#f0d2ab');
-  p.px(6, 6, '#292634'); p.px(10, 6, '#292634'); p.px(8, 9, '#9e6a67');
-  p.poly([3, 6, 4, 2, 8, 0, 12, 3, 12, 5, 7, 3, 5, 7], i === 1 ? '#665446' : i === 2 ? '#7a8190' : '#3e374b');
-  p.line(5, 2, 9, 1, i === 1 ? '#ae946a' : '#aaa0b2');
-  if (i === 2) { p.line(5, 6, 11, 6, '#aaad96'); p.px(7, 7, '#222939'); p.px(10, 7, '#222939'); }
-  if (i === 0) { p.rect(10, 12, 4, 6, '#5c4a31'); p.rect(11, 13, 2, 3, '#f1c573'); }
-  // Distinct occupations, cloth edges and small carried objects.
-  if (i === 0) {
-    p.poly([3, 4, 4, 1, 9, 0, 12, 3, 11, 4, 7, 2, 5, 5], '#504765');
-    p.line(4, 2, 8, 1, '#afa0ba'); p.px(11, 3, '#d6b777');
-    p.rect(5, 10, 6, 2, '#c3a99b'); p.rect(8, 11, 2, 4, '#b08782');
-    p.line(4, 18, 9, 18, '#cab8be'); p.rect(11, 12, 3, 1, '#c3a068');
-    p.px(12, 14, '#fff0b9'); p.px(12, 17, '#bd8753');
-  } else if (i === 1) {
-    p.rect(4, 11, 7, 8, '#654735'); p.line(5, 11, 5, 17, '#b69263');
-    p.rect(5, 15, 5, 3, '#8c6644'); p.px(6, 16, '#c2a278');
-    p.line(10, 13, 12, 18, '#b9b7a1'); p.rect(9, 12, 4, 2, '#6d8791');
-    p.rect(4, 3, 8, 2, '#997a50'); p.line(4, 3, 10, 3, '#cfb47b');
-  } else {
-    p.rect(4, 10, 2, 8, '#aeb6a2'); p.rect(9, 11, 4, 7, '#3b393c');
-    p.rect(9, 11, 3, 6, '#b99a6d'); p.line(10, 12, 11, 12, '#e4d8ad');
-    p.line(10, 14, 11, 14, '#6c7568'); p.px(8, 6, '#d4caa5');
-    p.line(4, 18, 8, 18, '#9ab8b2'); p.px(5, 2, '#d2d0bd');
-  }
+  const p = new PixelPainter(24, 28);
+  const fur = [['#82657b','#bea192','#f0d4b1','#fff0d0'],['#825039','#c68543','#efb961','#ffe1a0'],['#4c536e','#7c8ca1','#b2c2ce','#e4e6d7']][i];
+  const coat=[['#302139','#644871','#a17faa'],['#38272b','#79513b','#bb8958'],['#1a2936','#3e6476','#7da4ab']][i];
+  p.ellipse(13,24,9,3,coat[0]);p.ellipse(11,20,7,6,coat[1]);
+  p.line(6,18,5,23,coat[2]);p.rect(7,25,3,2,fur[1]);p.rect(14,25,3,2,fur[0]);
+  p.poly([4,10,3,1,9,5,15,5,20,1,20,11],fur[1]);
+  p.poly([5,7,5,3,8,6], '#d99b9a');p.poly([16,6,19,3,18,8],'#b68091');
+  p.ellipse(12,11,10,8,fur[1]);p.ellipse(10,10,8,7,fur[2]);
+  p.line(7,5,12,4,fur[3]);p.ellipse(11,14,5,3,fur[3]);
+  p.rect(6,10,3,4,'#19182b');p.rect(15,10,3,4,'#19182b');p.px(6,10,'#fff5db');p.px(15,10,'#fff5db');
+  p.line(11,13,13,13,'#c47d89');p.px(12,14,'#784e61');p.px(11,15,'#784e61');p.px(13,15,'#784e61');
+  p.line(2,13,5,14,fur[0]);p.line(18,14,22,13,fur[0]);
+  if(i===1){p.line(9,5,10,8,fur[0]);p.line(13,5,13,8,fur[0]);p.line(17,6,16,8,fur[0]);p.rect(7,20,9,4,'#b38a59');}
+  if(i===2){p.rectOutline(5,9,5,6,'#c2ab7d');p.rectOutline(14,9,5,6,'#c2ab7d');p.line(10,11,14,11,'#c2ab7d');p.rect(16,18,6,7,'#c1ac7a');p.line(17,19,20,19,'#f1e2b3');}
+  if(i===0){p.rect(7,17,10,2,'#b67588');p.rect(12,18,3,5,'#b67588');p.rect(18,19,4,6,'#9e723e');p.rect(19,20,2,3,'#ffe5a0');}
+  p.line(18,23,22,21,fur[1]);p.line(22,21,22,18,fur[2]);p.outline('#0c0810');
   const art = p.toCanvas(); residents.set(i, art); return art;
 }
 /** Static scenery is rasterized once; animated light stays in the scene. */
 export function townArt(): HTMLCanvasElement {
   if (cached) return cached;
-  const p = new PixelPainter(384, 216);
+  const p = new PixelPainter(TOWN_W, TOWN_H);
   const n = (x: number, y: number, salt = 0) => {
     let v = Math.imul(x + salt * 71, 374761393) ^ Math.imul(y + 97, 668265263);
     v = Math.imul(v ^ (v >>> 13), 1274126177); return (v ^ (v >>> 16)) >>> 0;
   };
-  p.rect(0, 0, 384, 216, '#101e29');
-  // Far silhouettes, retaining wall and a valley beyond the settlement.
-  for (let x = 0; x < 384; x += 7) {
-    const h = 8 + n(x, 0) % 25;
-    p.poly([x - 12, 58, x + 3, h, x + 19, 58], '#182d35');
-    p.poly([x - 9, 63, x + 9, h + 13, x + 23, 63], '#21383c');
+  p.rect(0, 0, TOWN_W, TOWN_H, '#101e29');
+  const theme = Themes.get('crypt')!, masonry = themeArt(theme);
+  const tile = new PixelPainter(TILE, TILE);
+  for(let ty=0;ty<TOWN_H/TILE;ty++)for(let tx=0;tx<TOWN_W/TILE;tx++){
+    theme.paintFloor!(tile,tx,ty,new RNG(tx*977+ty*7919+71));p.blit(tile,tx*TILE,ty*TILE);
   }
-  p.rect(0, 61, 384, 135, '#283833');
-  for (let y = 62; y < 196; y++) for (let x = 0; x < 384; x++) {
-    const k = n(x, y);
-    if (k % 19 < 3) p.px(x, y, ['#344337', '#1f302e', '#3b493b'][k % 3]);
+  // Ruined sanctuary walls keep the exact masonry, bevel and dither language of the dungeon.
+  paintMasonry(p,masonry,0,20,TOWN_W,37,170);
+  paintMasonry(p,masonry,0,57,18,324,170,true);
+  paintMasonry(p,masonry,TOWN_W-18,57,18,324,170,true);
+  p.rect(0,0,TOWN_W,20,'#100e19');
+  for(let x=0;x<TOWN_W;x+=16){p.rect(x,17,15,4,'#504b60');p.line(x+1,17,x+13,17,'#767080');}
+  for(const x of [24,247,495,744]){
+    paintMasonry(p,masonry,x-5,12,10,54,81);
+    p.rect(x-7,12,14,4,'#514b62');p.line(x-6,12,x+6,12,'#8b8193');
+    shadowEllipse(p,x+8,68,16,5,.35);
   }
-  for (let y = 56; y < 73; y += 5) for (let x = -8; x < 384; x += 13) {
-    const xx = x + (y % 2) * 6;
-    p.rect(xx, y, 12, 4, '#39484a'); p.line(xx + 1, y, xx + 10, y, '#53605c');
-    p.px(xx + 9, y + 3, '#293b3b');
+  for(let y=55;y<381;y++)for(let x=19;x<TOWN_W-18;x++){
+    const edge=Math.min(x-18,TOWN_W-18-x,y-54,382-y);
+    if(edge<16)shadePx(p,x,y,(1-edge/16)*.45);
+    const moss=vnoise(x/13,y/10,117);
+    if(edge<27&&moss>.59)blendPx(p,x,y,'#3d5145',(moss-.59)*1.7);
   }
-  p.line(0, 55, 383, 55, '#7a8070');
-  // Broad, irregular plaza stones; restrained texture between readable silhouettes.
-  for (let y = 79; y < 190; y += 6) for (let x = 18; x < 370; x += 9) {
-    const xx = x + (Math.floor(y / 6) % 2) * 4, k = n(x, y);
-    const path = (y > 108 && y < 154) || Math.abs(xx - 188) < 28 || y > 145 && xx > 230 && xx < 316;
-    if (!path && k % 7) continue;
-    const colors = ['#445251', '#4d5956', '#3b4c4d', '#53605a'];
-    p.poly([xx + 1, y, xx + 7, y, xx + 8, y + 2, xx + 7, y + 5, xx, y + 4, xx, y + 1], '#182b2d');
-    p.rect(xx + 1, y + 1, 6, 3, colors[k % 4]);
-    p.line(xx + 2, y, xx + 6, y, '#697169');
-    if (k % 5 === 0) p.line(xx + 4, y + 1, xx + 3, y + 3, '#303f40');
-    if (k % 9 === 0) p.px(xx, y + 5, '#68734a');
-  }
+  rectRug(p,135,215,48,27,['#301721','#502533','#783745','#a05f62'],'#bd9a6b');
+  rectRug(p,564,207,51,28,['#18232c','#283a48','#405667','#617889'],'#b4a07b');
   const window = (x: number, y: number, w = 8) => {
-    p.rect(x - 2, y - 2, w + 4, 15, '#24252b'); p.rect(x - 1, y - 1, w + 2, 13, '#95775a');
+    p.rect(x - 3,y-3,w+6,17,'#5b5365'); p.line(x-3,y-3,x+w+2,y-3,'#948497'); p.rect(x - 2, y - 2, w + 4, 15, '#17131f'); p.rect(x - 1, y - 1, w + 2, 13, '#95775a');
     p.rect(x, y, w, 10, '#ce9a59'); p.rect(x + 1, y + 1, w - 2, 4, '#f0c681');
     p.line(x + w / 2, y, x + w / 2, y + 10, '#58483b'); p.line(x, y + 5, x + w, y + 5, '#58483b');
     p.rect(x - 3, y + 12, w + 6, 2, '#aaa08a'); p.rect(x - 3, y + 14, w + 6, 2, '#393d3b');
   };
   const house = (x: number, y: number, w: number, roof: string[], kind: number) => {
     const h = kind === 1 ? 34 : 37;
-    p.poly([x - 3, y + 27, x + w, y + 25, x + w + 18, y + h + 12, x + 4, y + h + 13], '#17272a');
-    p.rect(x, y, w, h, '#827561'); p.rect(x + w - 10, y, 10, h, '#4b4b46');
-    for (let yy = y + 3; yy < y + h; yy += 4) for (let xx = x + 2; xx < x + w - 11; xx += 6) {
-      if (n(xx, yy) % 4 === 0) p.line(xx, yy, xx + 3, yy, '#9a8b70');
+    // The footprint has real depth: a front face, a receding right face and a broad roof plane.
+    shadowEllipse(p,x+w*.58+7,y+h+4,w*.64,10,.55);
+    const frontW=w-10, sideW=17;
+    paintMasonry(p,masonry,x,y,frontW,h,kind*117+21);
+    const side=new PixelPainter(sideW,h);
+    paintMasonry(side,masonry,0,0,sideW,h,kind*117+21,true);
+    for(let dx=0;dx<sideW;dx++)for(let dy=0;dy<h;dy++){
+      const xx=x+frontW+dx, yy=y+dy-Math.round(dx*.6);
+      if(p.inBounds(xx,yy))p.data[yy*p.w+xx]=side.data[dy*sideW+dx];
     }
-    for (const dx of [1, w - 12]) { p.rect(x + dx, y, 3, h, '#39383a'); p.line(x + dx, y + 2, x + dx, y + h - 2, '#a38762'); }
-    p.rect(x, y + h - 6, w, 7, '#4a514d');
-    for (let xx = x; xx < x + w; xx += 7) { p.line(xx, y + h - 6, xx + 5, y + h - 6, '#8a8b75'); p.line(xx, y + h - 5, xx, y + h, '#28373a'); }
-    // A pitched roof with a separate shaded hip, individual staggered shingles and ridge caps.
-    const peak = x + w * .42, top = y - 23;
-    p.poly([x - 7, y + 4, peak, top, x + w + 4, y - 1, x + w + 7, y + 7], '#20272e');
-    p.poly([x - 5, y + 2, peak, top + 1, x + w - 9, y + 2], roof[0]);
-    p.poly([peak, top + 1, x + w + 3, y - 1, x + w + 5, y + 4, x + w - 9, y + 2], roof[3]);
-    for (let row = 0; row < 6; row++) {
-      const yy = top + 4 + row * 4, t = (yy - top) / 25;
-      const left = peak + (x - 5 - peak) * t, right = peak + (x + w - 9 - peak) * t;
-      for (let xx = Math.ceil(left); xx < right - 2; xx += 6) {
-        const k = n(xx, yy), width = Math.min(5, right - xx);
-        p.rect(xx, yy, width, 3, k % 3 ? roof[0] : roof[1]);
-        p.line(xx, yy, xx + width - 1, yy, roof[2]); p.line(xx, yy + 3, xx + width - 1, yy + 3, roof[3]);
-        if (k % 5 === 0) p.px(xx + 1, yy + 1, roof[1]);
+    for(const dx of [0,frontW-3]){
+      p.rect(x+dx,y,3,h,'#24202c');p.line(x+dx,y+3,x+dx,y+h-2,'#827080');
+    }
+    // Deep lintel and shaded lower sill, continuous into the receding side wall.
+    for(let sy=0;sy<8;sy++)for(let sx=3;sx<frontW-3;sx++)shadePx(p,x+sx,y+sy,.66-sy*.055);
+    p.rect(x-1,y+h-4,frontW+2,5,'#34313f');p.line(x,y+h-4,x+frontW,y+h-4,'#82788a');
+    p.poly([x+frontW,y+h-4,x+frontW+sideW,y+h-14,x+frontW+sideW,y+h-9,x+frontW,y+h+1],'#252331');
+    p.line(x+frontW,y+h-4,x+frontW+sideW,y+h-14,'#585468');
+    const top=y-27, left=x-7, right=x+frontW+5;
+    // Roof ridge is a horizontal span seen from above, not a triangular house icon.
+    p.poly([left,y+3,x+7,top,x+frontW-3,top,x+frontW+sideW+5,y-11,right,y+3],'#100d19');
+    for(let yy=top;yy<=y+2;yy++){
+      const t=(yy-top)/(y+2-top), l=Math.ceil(x+7+(left-x-7)*t), rr=Math.floor(x+frontW-3+(right-x-frontW+3)*t);
+      for(let xx=l;xx<=rr;xx++){
+        const row=Math.floor((yy-top)/4), tile=Math.floor((xx+row%2*4)/8);
+        const sy=(yy-top)%4,sx=(xx+row%2*4)%8;
+        let level=1.35+(hash2(tile,row,kind+4)-.5)*.65+(hash2(xx,yy,41)-.5)*.35;
+        if(sy===0)level+=.55; if(sy===3||sx===0)level-=.9;
+        p.px(xx,yy,rampPick([roof[3],roof[0],roof[1],roof[2]],level,xx,yy));
       }
     }
-    p.line(x - 6, y + 4, x + w - 8, y + 4, roof[2]);
-    p.line(x + w - 8, y + 4, x + w + 5, y + 6, roof[1]);
-    p.line(peak, top, x + w + 4, y - 2, roof[2]);
-    p.rect(x + w - 19, top - 4, 8, 15, '#5c5951');
-    for (let yy = top - 3; yy < top + 10; yy += 4) { p.line(x + w - 18, yy, x + w - 12, yy, '#9b8f78'); p.px(x + w - 15, yy + 1, '#353d40'); }
-    p.rect(x + w - 21, top - 6, 12, 3, '#a09b83'); p.rect(x + w - 19, top - 6, 8, 1, '#292e34');
+    // Right hip is a distinctly darker, receding plane.
+    p.poly([x+frontW-3,top,x+frontW+sideW+5,y-11,right,y+3],'#1c1a2a');
+    for(let j=1;j<7;j++){
+      const t=j/7;
+      const ax=x+frontW-3+(right-x-frontW+3)*t, ay=top+(y+3-top)*t;
+      const bx=x+frontW-3+(sideW+8)*t, by=top+(y-11-top)*t;
+      p.line(ax,ay,bx,by,roof[0]);
+    }
+    p.line(x+7,top,x+frontW-3,top,roof[2]);
+    p.line(x+frontW-3,top,x+frontW+sideW+5,y-11,roof[1]);
+    p.line(x+frontW-3,top,right,y+3,roof[1]);
+    // Thick overhanging eaves cast a readable shadow onto the facade.
+    p.poly([left,y+3,right,y+3,right,y+7,left+1,y+7],'#211c2b');
+    p.line(left,y+3,right,y+3,roof[1]);p.line(left+1,y+5,right,y+5,'#393040');
+    p.poly([right,y+3,x+frontW+sideW+5,y-11,x+frontW+sideW+5,y-7,right,y+7],'#151321');
+    const chimney=x+frontW-13;
+    paintMasonry(p,masonry,chimney,top-9,8,17,90);
+    p.poly([chimney+8,top-9,chimney+12,top-12,chimney+12,top+4,chimney+8,top+8],'#242131');
+    p.poly([chimney-2,top-10,chimney+3,top-13,chimney+13,top-13,chimney+8,top-10],'#8b8291');
+    p.rect(chimney-2,top-10,10,3,'#60576b');p.rect(chimney+1,top-12,7,1,'#14121c');
     const door = x + Math.floor(w * .47);
-    p.rect(door - 7, y + 12, 16, h - 12, '#24292e'); p.rect(door - 5, y + 14, 12, h - 14, '#574639');
+    p.rect(door - 9,y+10,20,h-10,'#656071');p.rect(door-8,y+11,18,h-11,'#292432');p.line(door-9,y+11,door-9,y+h-1,'#8b7f90');p.rect(door - 7, y + 12, 16, h - 12, '#16131e'); p.rect(door - 5, y + 14, 12, h - 14, '#574639');
     for (let j = 0; j < 3; j++) p.line(door - 4 + j * 4, y + 15, door - 4 + j * 4, y + h - 2, '#927253');
     p.rect(door - 5, y + 20, 12, 2, '#342f30'); p.px(door + 4, y + 27, '#e2bd70');
     p.rect(door - 10, y + h, 23, 3, '#9b9982'); p.rect(door - 12, y + h + 3, 27, 3, '#626d65'); p.line(door - 11, y + h + 3, door + 13, y + h + 3, '#afb097');
@@ -138,71 +145,54 @@ export function townArt(): HTMLCanvasElement {
       for (let j = 0; j < 5; j++) p.rect(x - 4 + j * 3, y + h, 2, 7, ['#758c83', '#9e6f59', '#c1a273'][j % 3]);
     }
   };
-  house(46, 72, 65, ['#744d48', '#93614e', '#b18464', '#48373d'], 0);
-  house(125, 52, 51, ['#41586a', '#597182', '#87978d', '#293e50'], 1);
-  house(273, 60, 66, ['#4c6562', '#688277', '#9aab8b', '#31484c'], 2);
-  // Engraved, stepped lantern monument with iron scrollwork.
-  p.ellipse(192, 104, 26, 10, '#17292b'); p.ellipse(192, 101, 24, 9, '#59645b');
-  p.ellipse(192, 98, 23, 8, '#9a9c7e'); p.ellipse(192, 97, 19, 6, '#445856');
-  for (let a = 0; a < 12; a++) { const t = a * Math.PI / 6; p.line(192 + Math.cos(t) * 19, 97 + Math.sin(t) * 6, 192 + Math.cos(t) * 23, 98 + Math.sin(t) * 8, '#606f65'); }
-  p.rect(184, 92, 16, 5, '#a3a487'); p.rect(188, 80, 8, 12, '#64766d'); p.line(188, 81, 188, 91, '#c5b891');
-  for (const x of [176, 207]) { p.rect(x, 68, 3, 29, '#243c43'); p.line(x, 69, x, 95, '#859b8d'); p.rect(x - 2, 94, 7, 3, '#788778'); }
-  p.poly([177, 69, 181, 60, 191, 56, 204, 60, 209, 69, 204, 64, 192, 60, 182, 64], '#a5aa88');
-  p.line(192, 60, 192, 80, '#9d8d63'); p.circle(192, 57, 2, '#e3c480');
-  // Small practical objects give the square scale and evidence of daily use.
-  const barrel = (x: number, y: number) => {
-    p.ellipse(x + 2, y + 10, 7, 3, '#192c2d'); p.rect(x - 5, y, 10, 9, '#715439');
-    p.ellipse(x, y, 5, 3, '#a98655'); p.ellipse(x, y, 3, 1, '#685139');
-    for (let j = -3; j < 5; j += 3) p.line(x + j, y + 2, x + j, y + 9, '#b18c5a');
-    for (const dy of [3, 8]) { p.line(x - 5, y + dy, x + 4, y + dy, '#34434a'); p.line(x - 4, y + dy, x - 1, y + dy, '#95a194'); }
-  };
-  for (const [x,y] of [[42,113],[114,103],[263,110],[346,108],[247,172]]) barrel(x,y);
-  for (const [x,y] of [[120,139],[224,124],[315,151]]) {
-    p.rect(x, y + 3, 19, 3, '#967851'); p.rect(x + 1, y, 17, 2, '#b19a6c');
-    p.rect(x + 2, y + 6, 2, 5, '#3c3d34'); p.rect(x + 15, y + 6, 2, 5, '#3c3d34');
+  house(118, 168, 80, ['#513442', '#74505c', '#a17676', '#261b2b'], 0);
+  house(302, 95, 70, ['#35384f', '#505771', '#7c8098', '#1d1c30'], 1);
+  house(543, 156, 86, ['#32444a', '#4c6263', '#758880', '#18252f'], 2);
+  // Raised lantern court: thick stone steps, iron arch and worn bronze crest.
+  shadowEllipse(p,388,222,34,12,.55);
+  for(let step=0;step<3;step++){
+    p.ellipse(384,215-step*4,30-step*4,10-step*2,'#34303f');
+    p.ellipse(384,213-step*4,30-step*4,9-step*2,'#71687d');
+    p.ellipse(384,212-step*4,28-step*4,7-step*2,'#474153');
   }
-  // Canal bank, reeds, mooring ropes and a little boat alongside the pier.
-  p.rect(0, 190, 384, 26, '#142c3c');
-  for (let y = 193; y < 216; y += 3) for (let x = 0; x < 384; x += 11) {
-    const k = n(x,y); if (k % 3) p.line(x, y, x + 2 + k % 8, y, ['#254555','#355767','#1b3749'][k % 3]);
+  for(const x of [364,405]){
+    paintMasonry(p,masonry,x,174,5,33,200);p.rect(x-3,207,11,5,'#8a7d8c');
   }
-  for (let x = 0; x < 384; x += 9) {
-    p.rect(x, 187, 8, 6, '#4e605b'); p.line(x, 187, x + 7, 187, '#8a9580'); p.line(x, 193, x + 7, 193, '#0c2331');
-    if (n(x, 9) % 3 === 0) { p.line(x + 2, 185, x, 178, '#69825b'); p.line(x + 3, 186, x + 5, 177, '#879262'); }
+  p.poly([364,176,367,163,378,157,393,157,405,164,410,176,403,172,398,165,377,165,370,173],'#756678');
+  p.line(371,163,398,161,'#c3aa85');p.line(384,163,384,188,'#ad8d58');p.circle(384,158,3,'#d6b87c');
+  // Garden beds and benches form two lanes leading toward the cooperative dock.
+  for(const [x,y,w] of [[256,275,63],[440,276,56]]){
+    paintMasonry(p,masonry,x,y,w,18,73);p.rect(x+2,y+1,w-4,5,'#1c1b29');
+    for(let j=4;j<w-3;j+=5){p.ellipse(x+j,y+1,4,4,'#30433f');p.line(x+j-2,y-1,x+j+1,y-2,'#6c7f60');}
   }
-  p.poly([319, 197, 335, 189, 350, 197, 344, 207, 326, 207], '#0b2330');
-  p.poly([321, 195, 335, 188, 348, 195, 342, 203, 327, 203], '#9b7850');
-  p.poly([325, 195, 335, 191, 344, 195, 340, 201, 329, 201], '#3b3c36');
-  p.line(328, 195, 341, 198, '#c0a375'); p.line(338, 191, 330, 206, '#c7b48b');
-  p.rect(249, 165, 63, 37, '#1d2a2c');
-  for (let y = 165; y < 201; y += 4) {
-    p.rect(250, y, 60, 3, '#79634b'); p.line(251, y, 309, y, '#b29567');
-    for (let x = 253; x < 308; x += 14) { p.px(x, y + 1, '#4b4439'); p.line(x + 3, y + 2, x + 8, y + 2, '#8e7755'); }
+  for(const [x,y] of [[127,241],[652,205],[285,132],[655,341]]){
+    shadowEllipse(p,x+3,y+7,9,4,.45);p.ellipse(x,y,7,4,'#9a7754');p.rect(x-7,y,14,10,'#755339');
+    p.ellipse(x,y+9,7,3,'#59423a');p.ellipse(x,y,6,3,'#b39363');
+    p.line(x-5,y+3,x+5,y+3,'#9f9690');p.line(x-5,y+8,x+5,y+8,'#343341');
   }
-  for (const x of [248,310]) for (const y of [168,190]) { p.rect(x, y, 4, 12, '#4f4538'); p.ellipse(x + 2,y,3,2,'#c0ab7a'); p.line(x + 1,y + 3,x + 1,y + 10,'#9b8056'); }
-  p.line(313, 192, 326, 198, '#a79771');
-  // Layered foliage clusters and bark; irregular edges avoid geometric tree blobs.
-  const tree = (x: number, y: number, size = 1) => {
-    p.ellipse(x + 4, y + 22, 14 * size, 5, '#1a2d2b');
-    p.poly([x - 3,y + 23,x - 2,y - 4,x + 3,y - 7,x + 4,y + 20,x + 8,y + 24], '#4f4c3b');
-    p.line(x - 1,y + 3,x - 1,y + 21,'#8a7c52'); p.line(x + 1,y + 11,x + 8,y + 3,'#766d47');
-    for (const [dx,dy,r] of [[0,-18,12],[-10,-8,12],[9,-9,13],[0,0,13]]) {
-      const cx=x+dx*size,cy=y+dy*size;
-      p.circle(cx,cy,r*size,'#142e2c'); p.circle(cx-2,cy-2,(r-2)*size,'#2a4939');
-      for (let yy=-r;yy<r;yy+=2) for(let xx=-r;xx<r;xx+=2) {
-        const k=n(x+xx,y+yy,dx+dy);
-        if (xx*xx+yy*yy>(r-2)*(r-2)||k%3) continue;
-        p.rect(cx+xx*size,cy+yy*size,2,1, yy < 1 ? (k%2?'#5b7450':'#436348'):'#345640');
-      }
-      p.line(cx-5,cy-r+3,cx,cy-r+2,'#7b865a');
+  for(const [x,y] of [[332,331],[451,131]]){
+    p.poly([x,y,x+5,y-5,x+36,y-5,x+31,y],'#9e8061');p.rect(x,y,31,4,'#604838');
+    p.rect(x+3,y+4,3,7,'#322934');p.rect(x+26,y+4,3,7,'#322934');
+  }
+  p.rect(0,386,TOWN_W,46,'#101d32');
+  for(let y=389;y<TOWN_H;y+=4)for(let x=0;x<TOWN_W;x+=13){const k=n(x,y);if(k%3)p.line(x,y,x+4+k%7,y,k%2?'#23354d':'#304660');}
+  for(let x=0;x<TOWN_W;x+=14){paintMasonry(p,masonry,x,376,13,11,x+17);p.line(x,375,x+12,375,'#847b8d');}
+  for(let y=340;y<416;y+=5){
+    p.rect(539,y,75,4,'#5c443c');p.line(539,y,613,y,'#a38363');
+    for(let x=542;x<611;x+=15){p.px(x,y+2,'#222131');p.line(x+3,y+2,x+10,y+2,'#735444');}
+  }
+  for(const x of [536,613])for(const y of [346,384,411]){
+    p.rect(x,y,5,13,'#45333a');p.ellipse(x+2,y,4,2,'#b69768');p.line(x+1,y+3,x+1,y+10,'#8c6b50');
+  }
+  p.poly([634,399,650,388,668,398,660,419,641,419],'#8c694b');
+  p.poly([638,399,650,392,664,399,658,414,644,414],'#242a37');
+  p.line(641,400,661,407,'#c4aa7c');p.line(655,394,645,421,'#d1b985');
+  for(const [cx,cy,radius] of [[40,113,13],[714,97,16],[54,328,21],[704,323,21],[232,105,10],[489,338,11]]){
+    shadowEllipse(p,cx+5,cy+9,radius+4,6,.45);
+    for(let j=0;j<9;j++){
+      const x=cx+(hash2(j,cx,4)-.5)*radius*1.6,y=cy+(hash2(j,cy,7)-.5)*radius;
+      p.ellipse(x,y,5+j%4,5+j%3,'#182730');p.shadeSphere(x,y,5+j%4,5+j%3,['#101821','#1c2c31','#30403e','#4d5b4c','#758064']);
     }
-  };
-  tree(20,89); tree(365,91); tree(228,66,.8); tree(20,168,1.15); tree(368,174,1.1);
-  for (let x=34;x<351;x+=5) {
-    const y=177+n(x,8)%7;
-    if(x>234&&x<315)continue;
-    p.line(x,y,x-2,y-4,'#546c43');p.line(x,y,x+2,y-6,'#758150');
-    if(n(x,3)%4===0) {p.px(x+2,y-7,'#baaa75');p.px(x+3,y-7,'#8c8285');}
   }
   return cached = p.toCanvas();
 }

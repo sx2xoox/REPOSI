@@ -1552,6 +1552,7 @@ export class World {
     if (!p || !p.alive || this.paused || this.transitioning) return false;
     const f = this.focus ?? findFocus(this);
     if (f instanceof Pedestal) return this.tryTakePedestal(f);
+    if (f?.interact) return f.interact(this);
     return false;
   }
 

@@ -228,6 +228,7 @@ export const ROOM_LABELS: Record<RoomKind, string> = {
   challenge: '도전방',
   shrine: '성소',
   curse: '저주방',
+  relay: '등불 회랑', workshop: '정비실', vault: '봉인 창고',
 };
 
 export const ROOM_ICONS: Partial<Record<RoomKind, string>> = {
@@ -238,6 +239,7 @@ export const ROOM_ICONS: Partial<Record<RoomKind, string>> = {
   challenge: 'map_challenge',
   shrine: 'map_shrine',
   curse: 'map_curse',
+  relay: 'map_relay', workshop: 'map_workshop', vault: 'map_vault',
 };
 
 // ---------------------------------------------------------------- hearts

@@ -1,6 +1,6 @@
 import type { Scene, TouchButtonSpec } from './scene';
 import type { Renderer } from '../engine/renderer';
-import { UI_W, UI_H } from '../engine/renderer';
+import { UI_W, UI_H, VIEW_W, VIEW_H } from '../engine/renderer';
 import { input } from '../engine/input';
 import { save } from '../engine/save';
 import { app } from '../game/app';
@@ -9,29 +9,38 @@ import { randomSeedString } from '../engine/rng';
 import { animFrame } from '../engine/sprites';
 import { audio } from '../audio/audio';
 import { Menu } from './widgets';
-import { frame, glow } from './frame';
+import { frame } from './frame';
 import { C } from './theme';
+import { Lighting } from '../engine/lighting';
 import { townArt, residentArt } from './town-art';
 import { StoryOverlay } from './story';
-import { INTRO, RETURNS, BOSS_STORIES } from '../game/story';
+import { storyObjective, INTRO, RETURNS, BOSS_STORIES } from '../game/story';
 import { CharacterSelectScene } from './charselect';
 import { CollectionScene } from './collection';
 import { LobbyScene } from './lobby';
 
-const ZONES = [
-  { x: 384, y: 170, title: '중앙 등불', sub: '원정 출발', color: '#dfaf62' },
-  { x: 155, y: 230, title: '등불지기의 집', sub: '캐릭터 준비', color: '#b6997a' },
-  { x: 598, y: 210, title: '귀환 기록실', sub: '기억 · 도감', color: '#82adac' },
-  { x: 560, y: 320, title: '동행의 부두', sub: '협동 방 만들기 · 참가', color: '#829cce' },
-];
+import { TOWN_W, TOWN_H, TOWN_ZONES as ZONES, TOWN_RESIDENTS, townWalkable, townPath } from '../game/town-layout';
+import { characterStats } from './logic';
 
 export class TownScene implements Scene {
-  private x = 365; private y = 290; private t = 0;
+  private x = 384; private y = 270; private t = 0;
   private menu: Menu | null = null;
+  private lights = new Lighting();
+  private facing: 'down' | 'up' | 'side' = 'down';
+  private moving = false;
+  private flip = false;
   private checked = false;
+  private path: {x:number;y:number}[] = [];
+  private destination: {kind:'resident'|'zone';index:number}|null = null;
+  private cameraX = 192; private cameraY = 162;
+  get touchMovement(): boolean { return !this.menu; }
+  private get character() { return Characters.get(this.c.checkpoint?.character ?? this.c.character) ?? Characters.all()[0]; }
   touchBack = 'back' as const;
   constructor(private join?: string) {}
   enter(): void { audio.playMusic('title'); input.releaseAll(); }
+  private uiPoint(x: number, y: number): { x: number; y: number } {
+    const r=app.renderer, p=r.worldToDisplay(x,y); return r.displayToUI(p.x,p.y);
+  }
   private get c() { return save.progress.campaign!; }
   private story(): boolean {
     const id = !this.c.seen.includes('intro') ? 'intro' : this.c.pending ? `return:${this.c.pending}` : '';
@@ -48,16 +57,19 @@ export class TownScene implements Scene {
     app.startRun(cp?.seed ?? randomSeedString(), cp?.character ?? this.c.character);
   }
   private resident(i: number): void {
-    const names = ['나래', '도윤', '은서'];
+    this.path=[];this.destination=null;this.moving=false;
+    if(i===0&&this.story())return;
+    const names = ['루메', '브릭', '오린'];
     const memories = this.c.cleared >= 7
       ? ['불빛이 늘었다고 밤이 모두 같아지는 건 아니더라. 네가 돌아올 자리만은 비워 둘게.', '다리 경첩을 두 번 손봤어. 이번에는 어느 종에 돌아오든 열리도록.', '두 권의 장부를 나란히 두었어. 빈집의 문패 주인을 찾으면, 양쪽에 이름을 써 줄 거야.']
       : this.c.cleared >= 4
-        ? ['난 분명 도윤의 말을 듣고 문을 닫았어. 그런데 그가 내민 열쇠에는 열라고 적혀 있더라.', '나래가 건너오는 걸 봤어. 그런데 나래는 내가 먼저 돌아갔다고 해. 기억 속 손이 너무 선명해서 더 무섭다.', '두 사람이 같은 말을 하게 만드는 건 해답이 아니야. 다른 말을 하게 된 이유를 찾아야지.']
+        ? ['난 분명 브릭의 말을 듣고 문을 닫았어. 그런데 그가 내민 열쇠에는 열라고 적혀 있더라.', '루메가 건너오는 걸 봤어. 그런데 루메는 내가 먼저 돌아갔다고 해. 기억 속 손이 너무 선명해서 더 무섭다.', '두 사람이 같은 말을 하게 만드는 건 해답이 아니야. 다른 말을 하게 된 이유를 찾아야지.']
         : ['여기 등불은 돌아오는 발소리에 밝아져. 심지를 찾으면 어떤 길이 이어지는지 알 수 있을 거야.', '출발 전엔 손에 익는 무기를 골라. 길에서 발견한 유물 때문에 쓰는 방식이 바뀔 수도 있어.', '같은 이야기를 두 사람이 다르게 하면, 나는 둘 다 적어 둬. 어느 쪽이 빠진 조각인지 아직 모르니까.'];
-    app.scenes.push(new StoryOverlay({ title: '등불터의 사람들', lines: [{ who: names[i], text: memories[i] }] }, () => {}));
+    app.scenes.push(new StoryOverlay({ title: '등불터의 사람들', lines: [{ who: names[i], text: memories[i] }, { who: '등불지기', text: '지금은 어디부터 확인하면 좋을까?' }, { who: names[i], text: storyObjective(this.c).detail }] }, () => {}));
   }
   private zone(i: number): void {
-    if (this.story()) return;
+    this.path=[];this.destination=null;this.moving=false;
+    if (!this.c.seen.includes('intro') || this.c.pending) { this.walkTo('resident',0); return; }
     input.releaseAll();
     if (i === 0) {
       const cp = this.c.checkpoint;
@@ -82,84 +94,97 @@ export class TownScene implements Scene {
       ], UI_W / 2, 316, { width: 440, lineH: 26 });
     } else app.scenes.set(new LobbyScene());
   }
+  private walkTo(kind:'resident'|'zone',index:number): void {
+    const target=kind==='resident'?TOWN_RESIDENTS[index]:ZONES[index];
+    if(Math.hypot(target.x-this.x,target.y-this.y)<34){kind==='resident'?this.resident(index):this.zone(index);return;}
+    this.path=townPath(this.x,this.y,target.x,target.y+12);this.destination={kind,index};
+  }
+  private interact(): void {
+    const npc=TOWN_RESIDENTS.map((n,i)=>({i,d:Math.hypot(n.x-this.x,n.y-this.y)})).sort((a,b)=>a.d-b.d)[0];
+    if(npc.d<35){this.resident(npc.i);return;}
+    const zone=ZONES.map((z,i)=>({i,d:Math.hypot(z.x-this.x,z.y-this.y)})).sort((a,b)=>a.d-b.d)[0];
+    if(zone.d<38)this.zone(zone.i);
+  }
   update(dt: number): void {
-    this.t += dt;
-    if (!this.checked) { this.checked = true; if (this.join) { app.scenes.set(new LobbyScene({ join: this.join })); return; } if (this.story()) return; }
-    if (input.pressed('cancel')) { if (this.menu) this.menu = null; else app.goTitle(); return; }
-    if (this.menu) { this.menu.update(app.renderer, dt); return; }
-    const dx = Number(input.held('right') || input.held('uiRight')) - Number(input.held('left') || input.held('uiLeft'));
-    const dy = Number(input.held('down') || input.held('uiDown')) - Number(input.held('up') || input.held('uiUp'));
-    const n = Math.hypot(dx, dy) || 1;
-    this.x = Math.max(80, Math.min(688, this.x + dx / n * dt * 155)); this.y = Math.max(130, Math.min(355, this.y + dy / n * dt * 155));
-    if (input.pressed('confirm') || input.pressed('interact')) {
-      const resident = [[294, 233], [194, 262], [642, 260]].findIndex(([x, y]) => Math.hypot(x - this.x, y - this.y) < 30);
-      if (resident >= 0) { this.resident(resident); return; }
-      const nearest = ZONES.map((z, i) => ({ i, d: Math.hypot(z.x - this.x, z.y - this.y) })).sort((a, b) => a.d - b.d)[0];
-      if (nearest.d < 100) this.zone(nearest.i);
+    this.t+=dt;
+    if(!this.checked){this.checked=true;if(this.join){app.scenes.set(new LobbyScene({join:this.join}));return;}}
+    if(input.pressed('cancel')){if(this.menu)this.menu=null;else app.goTitle();return;}
+    if(this.menu){this.menu.update(app.renderer,dt);return;}
+    let mv=input.moveVector();
+    if(!mv.x&&!mv.y){let x=Number(input.held('uiRight'))-Number(input.held('uiLeft')),y=Number(input.held('uiDown'))-Number(input.held('uiUp'));const l=Math.hypot(x,y)||1;mv={x:x/l,y:y/l};}
+    if(mv.x||mv.y){this.path=[];this.destination=null;}
+    else if(this.path.length){
+      const goal=this.path[0],dx=goal.x-this.x,dy=goal.y-this.y,dist=Math.hypot(dx,dy);
+      if(dist<3)this.path.shift();else mv={x:dx/dist,y:dy/dist};
     }
-    if (input.pressed('fire')) {
-      const p = app.renderer.displayToUI(input.mouseX, input.mouseY); const ox = (UI_W - 768) / 2;
-      const resident = [[294, 233], [194, 262], [642, 260]].findIndex(([x, y]) => Math.abs(p.x - ox - x) < 16 && Math.abs(p.y - y + 8) < 24);
-      if (resident >= 0) { this.resident(resident); return; }
-      ZONES.forEach((z, i) => { if (Math.abs(p.x - ox - z.x) < 84 && Math.abs(p.y - z.y) < 38) { this.x = z.x; this.y = z.y + 45; this.zone(i); } });
+    this.moving=!!(mv.x||mv.y);
+    if(mv.x){this.facing='side';this.flip=mv.x<0;}else if(mv.y){this.facing=mv.y<0?'up':'down';this.flip=false;}
+    const speed=characterStats(this.character).moveSpeed;
+    const nx=this.x+mv.x*speed*dt,ny=this.y+mv.y*speed*dt;
+    if(townWalkable(nx,this.y))this.x=nx;if(townWalkable(this.x,ny))this.y=ny;
+    if(this.destination){
+      const target=this.destination.kind==='resident'?TOWN_RESIDENTS[this.destination.index]:ZONES[this.destination.index];
+      if(Math.hypot(target.x-this.x,target.y-this.y)<30){const dest=this.destination;this.destination=null;this.path=[];dest.kind==='resident'?this.resident(dest.index):this.zone(dest.index);return;}
+    }
+    if(input.pressed('confirm')||input.pressed('interact')){this.interact();return;}
+    if(input.pressed('fire')){
+      const p=app.renderer.displayToWorld(input.mouseX,input.mouseY);
+      const npc=TOWN_RESIDENTS.findIndex(n=>Math.abs(n.x-p.x)<15&&p.y>n.y-26&&p.y<n.y+8);
+      if(npc>=0){this.walkTo('resident',npc);return;}
+      const zone=ZONES.findIndex(z=>Math.abs(z.x-p.x)<32&&Math.abs(z.y-p.y)<22);
+      if(zone>=0){this.walkTo('zone',zone);return;}
+      this.destination=null;this.path=townPath(this.x,this.y,p.x,p.y);
     }
   }
   touchButtons(): TouchButtonSpec[] {
-    if (this.menu) return [];
-    return [
-      ...[[294, 233], [194, 262], [642, 260]].map(([x, y], i) => ({ x: (UI_W - 768) / 2 + x - 16, y: y - 32, w: 32, h: 48, ghost: true, tap: () => this.resident(i) })),
-      ...ZONES.map((z, i) => ({ x: (UI_W - 768) / 2 + z.x - 84, y: z.y - 38, w: 168, h: 76, ghost: true, tap: () => { this.x = z.x; this.y = z.y + 45; this.zone(i); } })),
-    ];
+    if(this.menu)return [];
+    const near=[...TOWN_RESIDENTS,...ZONES].some(n=>Math.hypot(n.x-this.x,n.y-this.y)<38);
+    return near?[{x:UI_W-112,y:UI_H-100,w:76,h:58,label:'대화 / 이용',tap:()=>this.interact()}]:[];
   }
   draw(r: Renderer): void {
-    const light = Math.max(0, this.c.cleared - 3) / 4;
-    r.beginWorld('#0b151c'); r.presentWorld(); r.beginUI();
-    const ox = (UI_W - 768) / 2;
-    r.uiRect(0, 0, UI_W, UI_H, light > 0 ? '#172b32' : '#101c26');
-    r.dctx.imageSmoothingEnabled = false;
-    r.dctx.drawImage(townArt(), ox, 0, 768, 432);
-    r.uiRect(ox, 0, 768, 432, '#071122', 0.12 * (1 - light));
-    // Gentle canal glints, chimney smoke and embers use scene time only.
-    const ctx = r.dctx;
-    ctx.save();
-    for (let i = 0; i < 16; i++) {
-      const x = 30 + (i * 47) % 705, y = 391 + (i * 7) % 32;
-      r.uiRect(ox + x + Math.sin(this.t * .65 + i) * 4, y, 5 + i % 7, 1, '#739b9c', .12 + .12 * Math.sin(this.t + i));
+    const light=Math.min(1,Math.max(0,this.c.cleared-3)/4);
+    const wantX=Math.max(0,Math.min(TOWN_W-VIEW_W,this.x-VIEW_W/2));
+    const wantY=Math.max(0,Math.min(TOWN_H-VIEW_H,this.y-VIEW_H/2));
+    this.cameraX+=(wantX-this.cameraX)*.14;this.cameraY+=(wantY-this.cameraY)*.14;
+    r.camX=this.cameraX;r.camY=this.cameraY;r.shakeX=0;r.shakeY=0;
+    r.beginWorld('#090711');const ctx=r.ctx;
+    ctx.drawImage(townArt(),-r.viewX,-r.viewY);
+    const ch=this.character;
+    for(const [x,y] of [[107,174],[232,175],[519,166],[662,169],[272,95],[410,95]]){r.sprite('prop_sconce',x,y);r.anim('prop_flame',this.t+x,x,y);}
+    r.sprite('shop_counter',165,243);r.sprite('shop_wares',165,231);
+    r.anim('ui_lantern',this.t,384,188);
+    const people=[...TOWN_RESIDENTS.map((n,i)=>({...n,i})),{i:-1,x:this.x,y:this.y,name:''}].sort((a,b)=>a.y-b.y);
+    for(const person of people){
+      r.shadow(person.x,person.y+4,person.i<0?11:9,4,.35);
+      if(person.i<0)r.anim(ch.spritePrefix+'_'+(this.moving?'walk':'idle')+'_'+this.facing,this.t,person.x,person.y+5,{flipX:this.flip});
+      else ctx.drawImage(residentArt(person.i),Math.round(person.x-r.viewX-12),Math.round(person.y-r.viewY-23));
     }
-    for (const [cx, cy] of [[185, 91], [300, 51], [632, 67]]) {
-      for (let j = 0; j < 4; j++) {
-        const age = (this.t * 7 + j * 9) % 38;
-        r.uiRect(ox + cx + Math.sin(age * .1 + j) * 5, cy - age, 4 + age * .18, 3 + age * .09, '#a3aaa0', .15 * (1 - age / 38));
-      }
+    this.lights.enabled=save.settings.graphicsQuality!=='low';
+    this.lights.begin(r,light>.5?'#8a84a6':'#716c8f');
+    this.lights.add(this.x,this.y-6,ch.lightRadius??95,ch.lightColor??'#ffd8a0',{intensity:.95});
+    this.lights.add(this.x,this.y-6,30,'#ffffff',{intensity:.35});
+    const flicker=1+Math.sin(this.t*9)*.025;
+    this.lights.add(384,194,98*flicker,'#ffd8a0',{intensity:1});this.lights.glow(384,188,15,'#ffad48',.15);
+    for(const [x,y] of [[107,174],[232,175],[519,166],[662,169],[272,95],[410,95]])this.lights.add(x,y,44*flicker,'#ffc884',{intensity:.6});
+    for(const [x,y] of [[130,187],[310,114],[555,175],[605,175]])this.lights.add(x,y,28,'#ffd7a0',{intensity:.55});
+    for(const [i,[x,y]] of [[265,244],[485,234],[346,334],[577,365]].entries()){
+      if(i<Math.max(0,this.c.cleared-3)){r.anim('ui_lantern',this.t+i,x,y);this.lights.add(x,y,63,'#ffd8a0',{intensity:.8});}
     }
-    ctx.restore();
-    for (const [x, y] of [[114, 180], [568, 156], [627, 157]]) glow(r, ox + x, y, 34, '#e5a662', .1 + light * .08);
-    // Residents remain in the square between their one-time conversations.
-    for (const [i, x, y, name] of [[0, 294, 233, '나래'], [1, 194, 262, '도윤'], [2, 642, 260, '은서']] as const) {
-      r.dctx.drawImage(residentArt(i), ox + x - 16, y - 40, 32, 48);
-      r.uiText(name, ox + x, y + 12, { size: 9, align: 'center', color: C.textDim, outline: C.ink });
-    }
-    for (let i = 0; i <= Math.max(0, this.c.cleared - 3); i++) {
-      const x = [384, 230, 525, 115, 657][i], y = [174, 286, 276, 340, 340][i];
-      glow(r, ox + x, y, i === 0 ? 115 : 63, '#f0b566', 0.18 + light * 0.1);
-      r.uiSprite(animFrame('ui_lantern', this.t + i), ox + x, y, 2);
-    }
-    ZONES.forEach(z => {
-      const near = Math.hypot(this.x - z.x, this.y - z.y) < 100;
-      r.uiText(z.title, ox + z.x, z.y + 26, { size: 11, align: 'center', color: near ? '#f5d79b' : '#b5c3b8', outline: '#101e29' });
-      if (near && !this.menu) r.uiText('G · ' + z.sub, ox + z.x, z.y + 41, { size: 9, align: 'center', color: '#d4c3a0', outline: '#101e29' });
-    });
-    const ch = Characters.get(this.c.checkpoint?.character ?? this.c.character) ?? Characters.all()[0];
-    r.uiSprite(animFrame(`${ch.spritePrefix}_idle_down`, this.t), ox + this.x, this.y, 2);
-    r.uiRect(0, 0, UI_W, 71, '#0b1722', .72);
-    r.uiRect(28, 22, 2, 30, '#b8985f');
-    r.uiText('마지막 등불터', 40, 19, { size: 19, color: C.goldHi });
-    const cp = this.c.checkpoint;
-    const objective = this.c.cleared >= 7 ? '1-1부터 7-4 · 서로 다른 밤의 기록을 모으자' : `1-1부터 ${Math.max(4, this.c.cleared + 1)}-4 · ${this.c.cleared >= 4 ? '새 기록을 찾아 귀환하기' : '성소의 기록을 찾아 귀환하기'}`;
-    r.uiText(objective, 40, 47, { size: 10, color: C.textDim });
-    r.uiText(`${save.slots[save.activeSlot]?.name ?? ''}${cp ? ` · 보관된 원정 ${cp.floor}-${cp.stage}` : ''}`, UI_W - 28, 28, { size: 11, align: 'right', color: C.textDim });
-    r.uiRect(0, UI_H - 25, UI_W, 25, '#091621', .8);
-    r.uiText('방향키 / WASD 이동 · Enter / G 대화 · 건물 클릭으로 이용 · Esc 타이틀', UI_W / 2, UI_H - 16, { size: 10, align: 'center', color: C.textFaint });
-    if (this.menu) { frame(r, UI_W / 2 - 284, 297, 568, 116, 'panel'); this.menu.draw(r); }
+    this.lights.apply();r.presentWorld();r.beginUI();
+    for(const npc of TOWN_RESIDENTS){if(Math.hypot(npc.x-this.x,npc.y-this.y)<40){const q=this.uiPoint(npc.x,npc.y+13);r.uiText(npc.name,q.x,q.y,{size:10,align:'center',color:C.text,outline:C.ink});}}
+    for(const z of ZONES){if(Math.hypot(z.x-this.x,z.y-this.y)<48){const q=this.uiPoint(z.x,z.y+16);r.uiText(z.title+' · '+z.sub,q.x,q.y,{size:10,align:'center',color:C.goldHi,outline:C.ink});}}
+    const needTalk=!this.c.seen.includes('intro')||this.c.pending>0;
+    const chapter=Math.min(4,Math.max(1,this.c.cleared-2));
+    const objective=storyObjective(this.c);
+    const task=!this.c.seen.includes('intro')?'루메와 대화하기':this.c.pending?'루메에게 기록 전하기':objective.title;
+    r.uiRect(18,16,Math.min(500,UI_W-90),54,'#0b0813',.74);
+    r.uiRect(18,16,2,54,C.goldDark);
+    r.uiText('Chapter '+chapter+'. '+task,30,24,{size:15,color:C.goldHi,outline:C.ink});
+    const detail=needTalk?'등불 옆, 머리 위에 표시가 있는 고양이를 찾아가자.':this.c.checkpoint?'보관한 원정을 중앙 등불에서 이어갈 수 있다.':'중앙 등불에서 원정을 시작해 단서를 찾자.';
+    r.uiText(detail,30,48,{size:10,color:C.textDim});
+    const target=needTalk?TOWN_RESIDENTS[0]:ZONES[0],mark=this.uiPoint(target.x,target.y-(needTalk?35:18));
+    if(mark.x>12&&mark.x<UI_W-12&&mark.y>75&&mark.y<UI_H-12)r.uiText('!',mark.x,mark.y+Math.round(Math.sin(this.t*3)*2),{size:18,align:'center',color:C.goldHi,outline:C.ink});
+    else {const angle=Math.atan2(target.y-this.y,target.x-this.x),cx=UI_W/2,cy=UI_H/2;const dx=Math.cos(angle),dy=Math.sin(angle);const dist=Math.min((cx-25)/Math.max(.001,Math.abs(dx)),(cy-80)/Math.max(.001,Math.abs(dy)));r.uiText('◆',cx+dx*dist,cy+dy*dist,{size:13,align:'center',color:C.goldHi,outline:C.ink});}
+    if(this.menu){frame(r,UI_W/2-284,297,568,116,'panel');this.menu.draw(r);}
   }
 }
