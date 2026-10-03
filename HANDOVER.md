@@ -1,3 +1,8 @@
+## 2026-10-03 — Cycling spike traps
+- Spike tiles cycle on deterministic roomTime: down 1.6s, amber warning 0.65s, rise 0.2s, raised 1.1s, retract 0.25s. Only fully raised spikes damage grounded players.
+- Cleared rooms immediately retract all spikes and suppress damage, including on revisits. All co-op keepers use the same clock.
+- Rendering caches four frames per theme and spike positions per room tile version; no per-frame background repaint or simulation mutation.
+- Verification: typecheck, 694 tests passed (2 optional DPS tests skipped), browser screenshots in test-results/spikes with zero page errors.
 # 등불지기 (Lanternkeeper) — 인수인계 문서
 
 작성: 2026-10-02 (UTC), 최종 갱신: 모든 작업 중단 시점. 이 문서 하나로 다른 작업 공간에서 이어서 개발할 수 있도록 정리했다.

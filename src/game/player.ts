@@ -14,6 +14,7 @@ import { MeleeSwing, type SwingOpts } from './melee';
 import { Afterimage, RingFx } from './effects';
 import { Bomb } from './pickups';
 import { Tile } from './tiles';
+import { spikeState } from './spikes';
 import { fx } from '../engine/rng';
 import { DIR_VEC } from './constants';
 import { drawBackWeapon, equipWeapon, swapWeapons, tickHolstered, withSwapPop } from './weaponslots';
@@ -361,7 +362,7 @@ export class Player extends Actor {
 
     // hazards
     const tile = w.room.tileAtPx(this.x, this.y + 2);
-    if (tile === Tile.SPIKES && !this.flying && this.spikeCD <= 0 && w.time > 0.3) {
+    if (tile === Tile.SPIKES && !this.flying && this.spikeCD <= 0 && w.time > 0.3 && spikeState(w.roomTime, w.node.cleared).active) {
       this.spikeCD = 0.6;
       this.hurt(w, 1, '가시 함정');
     }

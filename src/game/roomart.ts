@@ -10,6 +10,7 @@
 
 import { TILE } from './constants';
 import { Tile } from './tiles';
+import { spikeState } from './spikes';
 import type { Room, Door, DoorKind } from './room';
 import type { ThemeDef, ThemePalette } from './defs';
 import type { DrawOpts, Renderer } from '../engine/renderer';
@@ -1085,8 +1086,9 @@ export function paintDefaultPot(p: PixelPainter, base: string, variant: number, 
 }
 
 const spikeCache = new Map<string, PixelPainter>();
-function getSpikePainter(theme: ThemeDef, art: ThemeArt): PixelPainter {
-  let p = spikeCache.get(theme.id);
+function getSpikePainter(theme: ThemeDef, art: ThemeArt, height = 0): PixelPainter {
+  const key = `${theme.id}:${height}`;
+  let p = spikeCache.get(key);
   if (p) return p;
   p = new PixelPainter(TILE, TILE);
   const plate = art.spikes?.plate ?? '#2a2430';
@@ -1102,15 +1104,48 @@ function getSpikePainter(theme: ThemeDef, art: ThemeArt): PixelPainter {
     p.px(sx - 1, sy, darken(plate, 0.5));
     p.px(sx, sy, darken(plate, 0.5));
     p.px(sx + 1, sy, darken(plate, 0.5));
-    p.px(sx - 1, sy - 1, m[1]);
-    p.px(sx, sy - 1, m[2]);
-    p.px(sx + 1, sy - 1, m[0]);
-    p.px(sx, sy - 2, m[2]);
-    p.px(sx - 1, sy - 2, m[1]);
-    p.px(sx, sy - 3, m[3]);
+    if (height >= 1) {
+      p.px(sx - 1, sy - 1, m[1]);
+      p.px(sx, sy - 1, m[2]);
+      p.px(sx + 1, sy - 1, m[0]);
+    }
+    if (height >= 2) {
+      p.px(sx, sy - 2, m[2]);
+      p.px(sx - 1, sy - 2, m[1]);
+    }
+    if (height >= 3) p.px(sx, sy - 3, m[3]);
   }
-  spikeCache.set(theme.id, p);
+  spikeCache.set(key, p);
   return p;
+}
+
+const spikeFrames = new Map<string, HTMLCanvasElement>();
+const spikePositions = new WeakMap<Room, { version: number; tiles: number[] }>();
+export function drawSpikes(r: Renderer, room: Room, roomTime: number): void {
+  let positions = spikePositions.get(room);
+  if (!positions || positions.version !== room.version) {
+    const tiles: number[] = [];
+    for (let i = 0; i < room.tiles.length; i++) if (room.tiles[i] === Tile.SPIKES) tiles.push(i);
+    positions = { version: room.version, tiles };
+    spikePositions.set(room, positions);
+  }
+  if (!positions.tiles.length) return;
+  const state = spikeState(roomTime, room.node.cleared);
+  const key = `${room.theme.id}:${state.height}`;
+  let frame = spikeFrames.get(key);
+  if (!frame) {
+    frame = getSpikePainter(room.theme, themeArt(room.theme), state.height).toCanvas();
+    spikeFrames.set(key, frame);
+  }
+  for (const i of positions.tiles) {
+    const x = (i % room.w) * TILE, y = Math.floor(i / room.w) * TILE;
+    r.ctx.drawImage(frame, x - r.viewX, y - r.viewY);
+    if (state.warning) {
+      const alpha = 0.45 + 0.35 * Math.sin(roomTime * 35);
+      r.rect(x + 3, y + 3, 10, 1, '#ffbe62', alpha);
+      r.rect(x + 3, y + 12, 10, 1, '#ffbe62', alpha);
+    }
+  }
 }
 
 function paintHiddenDoorHints(p: PixelPainter, room: Room): void {

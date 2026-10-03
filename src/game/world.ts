@@ -2125,7 +2125,7 @@ export class World {
   private drawFrameCtx(alpha: number): void {
     const r = this.renderer;
     r.beginWorld('#06040a');
-    this.room.drawBackground(r);
+    this.room.drawBackground(r, this.roomTime);
     this.particles.draw(r, true);
     // reusable lists (no per-frame allocation); mid layer is y-sorted
     const all = this.drawAll;

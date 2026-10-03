@@ -8,7 +8,7 @@ import type { World } from './world';
 import type { Renderer } from '../engine/renderer';
 import { RNG } from '../engine/rng';
 import { clamp } from '../engine/math';
-import { drawDoor, renderRoomBackground } from './roomart';
+import { drawDoor, drawSpikes, renderRoomBackground } from './roomart';
 
 export type DoorKind = 'normal' | 'treasure' | 'shop' | 'boss' | 'secret' | 'challenge' | 'shrine' | 'curse' | 'start';
 export type DoorState = 'open' | 'closed' | 'locked' | 'hidden';
@@ -308,13 +308,14 @@ export class Room {
     return this.decals;
   }
 
-  drawBackground(r: Renderer): void {
+  drawBackground(r: Renderer, roomTime = 0): void {
     if (!this.bg || this.bgDirty) {
       this.bg = renderRoomBackground(this);
       this.bgDirty = false;
     }
     r.ctx.drawImage(this.bg, -r.viewX, -r.viewY);
     if (this.decals) r.ctx.drawImage(this.decals, -r.viewX, -r.viewY);
+    drawSpikes(r, this, roomTime);
   }
 
   /** Doors are drawn every frame (animated). */
