@@ -1,3 +1,6 @@
+## 2026-10-04 — Preserve thin portrait details
+- User reported missing pixels after the filter change. Removed alpha<128 deletion/forced opaque conversion entirely, preserving original edge coverage. Relaxed the over-aggressive 64x72 raster to a common 96x108 for NPCs and Ria; this is still below the original 128x144 NPC raster. Point sampling and source colors retained, no blur or palette remapping.
+- Browser confirmed all four illustrated portraits at 96x108, NPC/Ria dialogue switches, no page errors. Visually reviewed Ria and Lume facial/accessory edges. World sprites are unchanged. Screenshot: test-results/dialogue-ria-detail.png.
 ## 2026-10-04 — Remove dialogue portrait blur
 - The 64x72 rasterization had high-quality smoothing enabled and then mapped averaged colors into a restricted palette. This softened small facial features before the final nearest-neighbor enlargement. Removed both filtering and forced palette remapping; preserve source colors with point sampling, retain 64x72 dimensions and opaque/transparent pixel edges. Final UI enlargement already disables smoothing.
 - Verified TypeScript, real NPC and Ria dialogue screenshots, all four cached portraits remain 64x72 and no browser errors. No changes to NPC world sprites, story or simulation.

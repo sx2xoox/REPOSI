@@ -9,19 +9,13 @@ function portraitSheet(): HTMLImageElement | null {
   return sheet.complete && sheet.naturalWidth > 0 ? sheet : null;
 }
 let riaSheet: HTMLImageElement | null = null;
-export const PORTRAIT_W=64, PORTRAIT_H=72;
+export const PORTRAIT_W=96, PORTRAIT_H=108;
 /** A shared coarse pixel grid for every illustrated speaker; rasterized only once. */
 function rasterPortrait(image:HTMLImageElement,sx:number,sy:number,sw:number,sh:number):HTMLCanvasElement {
   const art=document.createElement('canvas');art.width=PORTRAIT_W;art.height=PORTRAIT_H;
   const ctx=art.getContext('2d')!;ctx.imageSmoothingEnabled=false;
   const scale=Math.min(PORTRAIT_W/sw,PORTRAIT_H/sh),dw=Math.round(sw*scale),dh=Math.round(sh*scale);
   ctx.drawImage(image,sx,sy,sw,sh,Math.floor((PORTRAIT_W-dw)/2),PORTRAIT_H-dh,dw,dh);
-  const pixels=ctx.getImageData(0,0,PORTRAIT_W,PORTRAIT_H),data=pixels.data;
-  for(let at=0;at<data.length;at+=4){
-    if(data[at+3]<128){data[at+3]=0;continue;}
-    data[at+3]=255;
-  }
-  ctx.putImageData(pixels,0,0);
   return art;
 }
 export function keeperPortrait(character:string):HTMLCanvasElement|null {
