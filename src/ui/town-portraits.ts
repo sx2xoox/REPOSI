@@ -10,31 +10,16 @@ function portraitSheet(): HTMLImageElement | null {
 }
 let riaSheet: HTMLImageElement | null = null;
 export const PORTRAIT_W=64, PORTRAIT_H=72;
-// Shared material ramps: broad readable pixel clusters, without hundreds of resampling shades.
-const PORTRAIT_PALETTE=[
- '#100c19','#211b2a','#363044','#514455',
- '#fff1d1','#f2d9b5','#d9b998','#bb9380','#916b67',
- '#ffe2a0','#efbd75','#dca05d','#bd7d43','#945531','#633b30',
- '#e1e6dc','#bbc7ce','#95a5b5','#738297','#515d76',
- '#a2b9b2','#739893','#527b82','#345866','#23404f','#182b3c',
- '#c5a2ae','#a17e97','#7e5c7e','#624561','#49334d','#32253b',
- '#d39e89','#b97978','#9b5763','#784153','#552e40',
- '#c8a16b','#a97e51','#89603f','#6a4835','#4b332e',
- '#ffe9a0','#f4c263','#d59b45','#a97535','#72512f',
- '#f5ddb6','#cab391','#a59079','#78685f'
-].map(c=>[parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)]);
 /** A shared coarse pixel grid for every illustrated speaker; rasterized only once. */
 function rasterPortrait(image:HTMLImageElement,sx:number,sy:number,sw:number,sh:number):HTMLCanvasElement {
   const art=document.createElement('canvas');art.width=PORTRAIT_W;art.height=PORTRAIT_H;
-  const ctx=art.getContext('2d')!;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  const ctx=art.getContext('2d')!;ctx.imageSmoothingEnabled=false;
   const scale=Math.min(PORTRAIT_W/sw,PORTRAIT_H/sh),dw=Math.round(sw*scale),dh=Math.round(sh*scale);
   ctx.drawImage(image,sx,sy,sw,sh,Math.floor((PORTRAIT_W-dw)/2),PORTRAIT_H-dh,dw,dh);
   const pixels=ctx.getImageData(0,0,PORTRAIT_W,PORTRAIT_H),data=pixels.data;
   for(let at=0;at<data.length;at+=4){
     if(data[at+3]<128){data[at+3]=0;continue;}
-    let best=PORTRAIT_PALETTE[0],score=Infinity;
-    for(const color of PORTRAIT_PALETTE){const dr=data[at]-color[0],dg=data[at+1]-color[1],db=data[at+2]-color[2];const distance=dr*dr*2+dg*dg*3+db*db;if(distance<score){score=distance;best=color;}}
-    data[at]=best[0];data[at+1]=best[1];data[at+2]=best[2];data[at+3]=255;
+    data[at+3]=255;
   }
   ctx.putImageData(pixels,0,0);
   return art;
