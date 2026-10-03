@@ -212,6 +212,9 @@ function paintHood(p: PixelPainter, hx: number, hy: number, eyes: KeepPose['eyes
   p.poly([x - 13, y + 11, x - 8, y + 4, x + 8, y + 4, x + 13, y + 11, x + 9, y + 13, x - 9, y + 13], ROBE[2]);
   p.line(x - 12, y + 11, x - 7, y + 5, ROBE[4]);
   // face opening (deep shadow)
+  p.line(x - 8, y - 5, x - 4, y - 10, '#938192');
+  p.poly([x - 2, y - 12, x + 2, y - 12, x + 1, y - 7, x - 1, y - 7], '#bbaa85');
+  p.px(x, y - 10, p2 ? '#b9edff' : '#513348');
   p.ellipse(x, y + 1.5, 7, 8, HOOD_IN);
   // porcelain mask, half lost in the hood's shadow
   ball(p, x, y + 3.5, 4.2, 5.6, MASK, false);
@@ -264,6 +267,14 @@ function paintKeeper(p: PixelPainter, o: KeepPose, p2: boolean): void {
     paintBell(p, o.bell[0], o.bell[1], o.ang, p2, o.ringing);
   }
   paintRobe(p, o.hem ?? 0, o.flare ?? 0, p2);
+  // A mourning stole follows the robe's sway.
+  for (const s of [-1, 1]) {
+    const x = CX + s * 10;
+    const hem = o.hem ?? 0;
+    p.poly([x - 2, 27, x + 2, 27, x + s * 3 + 2, 57 + hem, x + s * 3, 54 + hem, x + s * 3 - 2, 58 + hem], '#72627c');
+    p.line(x - 1, 29, x + s * 3 - 1, 52 + hem, '#b6a0a6');
+    for (let y = 33; y < 50; y += 5) p.line(x, y, x + s * 2, y + 1, p2 ? '#99d4ef' : '#49354e');
+  }
   // rope from hands to the bell crown
   if (!o.bellBack) {
     p.line(o.lh[0], o.lh[1] + 1, o.bell[0], o.bell[1] - 2, '#6a5a40');

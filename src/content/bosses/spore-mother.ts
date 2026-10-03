@@ -138,6 +138,14 @@ function paintCap(p: PixelPainter, o: MomPose, p2: boolean): void {
   for (let i = -6; i <= 6; i++) p.line(cx + i * rx * 0.11, cy + ry * 0.55 - 3, cx + i * rx * 0.15, cy + ry * 0.55 + 3, GILL[2]);
   p.ellipse(cx, cy + ry * 0.55 + 2, rx * 0.45, 2.2, GILL[0]);
   // dome
+  // Drooping gill fronds give the cap a living canopy silhouette.
+  for (const s of [-1, 1]) for (let i = 0; i < 3; i++) {
+    const x = cx + s * rx * (0.5 + i * 0.16);
+    const y = cy + ry * 0.55;
+    const len = 9 - i * 2 + (p2 ? 2 : 0);
+    p.poly([x - 2, y, x + 2, y, x + s, y + len, x - 1, y + len - 2], '#483a62');
+    p.line(x, y + 2, x + s, y + len - 1, p2 ? '#c5e887' : '#8f7aab');
+  }
   p.ellipse(cx, cy, rx, ry, CAP[2]);
   for (let y = Math.floor(cy - ry - 1); y <= cy + ry * 0.6; y++) {
     for (let x = Math.floor(cx - rx - 1); x <= cx + rx + 1; x++) {

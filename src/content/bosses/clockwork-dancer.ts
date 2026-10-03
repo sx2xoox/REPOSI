@@ -127,6 +127,14 @@ function paintSkirt(p: PixelPainter, o: DancerPose, p2: boolean): void {
     }
   }
   // brass hem line following the lower edge
+  // Rose-lined scalloped overskirt, readable at the native pixel scale.
+  for (let i = -2; i <= 2; i++) {
+    const x = CX + i * flare * 0.31;
+    const y = cy + 1 - Math.abs(i) * 0.45;
+    p.poly([x - 3, y - 2, x + 3, y - 2, x + 2, y + 3, x, y + 4, x - 2, y + 2], i % 2 ? '#6c4766' : '#875776');
+    p.line(x - 2, y - 1, x, y + 3, '#c29aa3');
+    p.px(x + 1, y + 1, p2 ? AMBER[3] : BRASS7[3]);
+  }
   for (let x = CX - flare; x <= CX + flare; x++) {
     const nx = (x + 0.5 - CX) / flare;
     const dy = Math.sqrt(Math.max(0, 1 - nx * nx)) * 4.4;

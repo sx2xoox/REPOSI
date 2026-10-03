@@ -111,6 +111,15 @@ function paintQueen(p: PixelPainter, W: number, H: number, k: number, o: QPose):
   p.ellipse(cx, base - ry * 0.32, rx * 0.66, ry * 0.42, JELLY[2]);
   p.ellipse(cx + rx * 0.04, base - ry * 0.28, rx * 0.46, ry * 0.3, CORE);
   // swallowed treasures
+  // The swallowed royal collar sits behind the face and bones.
+  for (let i = -3; i <= 3; i++) {
+    const x = cx + rx * i * 0.2;
+    const y = base - ry * (0.24 - Math.abs(i) * 0.025);
+    p.ellipse(x, y, 2.1 * k, 1.5 * k, '#dbab50');
+    p.px(x - k, y - k, '#ffe2a0');
+  }
+  p.poly([cx - 3 * k, base - ry * 0.18, cx, base - ry * 0.24, cx + 3 * k, base - ry * 0.18, cx, base - ry * 0.08], k < 0.8 ? '#de675b' : '#ad6633');
+  p.line(cx, base - ry * 0.2, cx - k, base - ry * 0.13, '#ffe5af');
   const skx = cx + rx * 0.34;
   const sky = base - ry * 0.26 + bob * 0.5;
   ball(p, skx, sky, 4 * k, 3.4 * k, BONE_IN, false);

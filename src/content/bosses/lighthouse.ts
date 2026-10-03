@@ -26,6 +26,7 @@ import type { Enemy } from '../../game/enemy';
 import type { World } from '../../game/world';
 import type { Script } from '../../engine/script';
 import { frames, gather, Lob, lob, spotAround, WARN_RED } from '../enemies/shared';
+import { ShiftedPainter } from './kit13';
 import {
   ball, bossDeathBurst, clearEnemyShots, crack, dissolveMinions, gapRing, hash2, hitPlayerCircle, inRoom, insideRoom, limb, lum, minionCount,
   phaseDone, phaseGate, phaseShift, pickPattern, ShockRing,
@@ -44,6 +45,7 @@ const DEEP = '#04060c';
 
 const W = 48;
 const H = 86;
+const TOP_PAD = 12;
 /** pivot = the waterline at the tower's foot (entity position) */
 const ORIGIN: [number, number] = [24, 72];
 const CX = 24;
@@ -227,6 +229,18 @@ function paintTower(p: PixelPainter, o: TowerPose, p2: boolean): void {
   const crouch = o.crouch ?? 0;
   paintFoot(p, o.rip, p2);
   paintShaft(p, o.sway, crouch, p2);
+  // Wreckage chains and a split porthole below the gallery.
+  const cx = CX + o.sway * 0.5;
+  for (let i = 0; i < 7; i++) {
+    const x = cx - 12 + i * 4;
+    const y = 43 + Math.sin(i / 6 * Math.PI) * 7;
+    p.ring(x, y, 2.2, 1, IRON[2]);
+    p.px(x - 1, y - 1, '#aa9670');
+  }
+  p.circle(cx, 28 + crouch * 3, 5, BRASS[1]);
+  p.circle(cx, 28 + crouch * 3, 3.5, DEEP);
+  p.line(cx - 2, 27 + crouch * 3, cx + 1, 30 + crouch * 3, p2 ? CYAN[2] : '#527a82');
+  p.px(cx - 3, 25 + crouch * 3, BRASS[4]);
   paintGallery(p, o.sway, crouch, p2);
   paintLampRoom(p, o.sway, crouch, !!o.bright, p2);
 }
@@ -245,7 +259,13 @@ const FPS: Record<string, number> = { idle: 4, charge: 10, crouch: 6, hurt: 1 };
 
 for (const [state, poses] of Object.entries(POSES)) {
   for (const [pre, p2] of [['lh', false], ['lh2', true]] as const) {
-    frames(pre, state, poses.length, W, H, (p, i) => paintTower(p, poses[i], p2), { origin: ORIGIN, fps: FPS[state] ?? 6, outline: OUTLINE6 });
+    // The dome finial and phase-two frame extend above y=0. Pad the sprite and
+    // its origin equally so the waterline and separate lens stay aligned.
+    frames(pre, state, poses.length, W, H + TOP_PAD, (p, i) => {
+      const tower = new ShiftedPainter(W, H + TOP_PAD, TOP_PAD);
+      paintTower(tower, poses[i], p2);
+      p.data.set(tower.data);
+    }, { origin: [ORIGIN[0], ORIGIN[1] + TOP_PAD], fps: FPS[state] ?? 6, outline: OUTLINE6 });
   }
 }
 

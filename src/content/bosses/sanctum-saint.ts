@@ -287,6 +287,13 @@ function paintSaint(p: PixelPainter, o: SaintPose, p2: boolean): void {
   const hx = CX + (o.head?.[0] ?? 0);
   const hy = ORIGIN[1] + HEAD_DY + (o.head?.[1] ?? 0);
   paintVeilBack(p, hx, hy, o.hem);
+  // Pointed stained-glass panels attached to the frost veil.
+  for (const s of [-1, 1]) {
+    p.poly([hx + s * 6, hy + 3, hx + s * 15, hy - 8, hx + s * 18, hy + 5, hx + s * 12, hy + 21], '#304d76');
+    p.line(hx + s * 15, hy - 7, hx + s * 17, hy + 5, '#a3ccde');
+    p.line(hx + s * 17, hy + 5, hx + s * 12, hy + 19, '#759ec2');
+    p.poly([hx + s * 12, hy + 1, hx + s * 15, hy + 5, hx + s * 12, hy + 12, hx + s * 10, hy + 6], p2 ? '#cc739d' : '#7394bb');
+  }
   paintDress(p, o.hem, p2);
   paintArms(p, o);
   paintMantle(p, o.hem, p2);

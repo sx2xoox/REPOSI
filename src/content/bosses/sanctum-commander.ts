@@ -110,6 +110,10 @@ function paintTorso(p: PixelPainter, cx: number, top: number, bot: number, p2: b
     p.line(cx - 8 + k, y + 1, cx + 8 - k, y + 1, STEEL[4]);
   }
   // frozen sanctum emblem: a cyan star-cross
+  // Heraldic enamel framed in old silver on the breastplate.
+  p.poly([rx - 8, top + 3, rx, top + 3, rx - 1, top + 11, rx - 4, top + 14, rx - 7, top + 11], '#203d67');
+  p.line(rx - 8, top + 3, rx - 7, top + 10, '#94aec2');
+  p.line(rx - 7, top + 10, rx - 4, top + 13, '#94aec2');
   const ex = rx - 4;
   const ey = top + 7;
   p.line(ex, ey - 3, ex, ey + 3, ICEC[1]);

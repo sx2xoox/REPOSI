@@ -145,6 +145,14 @@ function paintSmith(p: PixelPainter, o: SmithPose, p2: boolean): void {
   const rh: V = [o.rh[0], o.rh[1] + OY];
   const lh: V = [o.lh[0], o.lh[1] + OY];
   // --- legs + boots
+  // Twin exhaust housings behind the shoulders.
+  for (const s of [-1, 1]) {
+    const x = CX + s * 13;
+    p.poly([x - 3, 32 + B, x - 3, 14 + B, x + s * 3, 11 + B, x + 3, 32 + B], IRON[1]);
+    p.line(x - 2, 15 + B, x - 2, 29 + B, IRON[4]);
+    p.rect(x - 3, 14 + B, 7, 2, IRON[3]);
+    for (let y = 18; y <= 26; y += 4) p.rect(x - 1, y + B, 3, 2, p2 ? HOT[4] : HOT[1]);
+  }
   for (const s of [-1, 1]) {
     const lift = s * step;
     const hipX = CX + s * 6;
@@ -224,6 +232,14 @@ function paintSmith(p: PixelPainter, o: SmithPose, p2: boolean): void {
     p.px(CX + 6, ab - 2, HOT[3]);
   }
   // diagonal chain across the chest
+  // Reinforced apron buckle and tool loops below the furnace door.
+  p.rect(CX - 10, ty + 10, 21, 3, LEATHER[0]);
+  p.rect(CX - 3, ty + 9, 6, 5, IRON[3]);
+  p.rect(CX - 1, ty + 10, 3, 3, HOT[p2 ? 3 : 1]);
+  for (const dx of [-8, 7]) {
+    p.line(CX + dx, ty + 14, CX + dx, ab - 3, IRON[1]);
+    p.line(CX + dx - 1, ty + 14, CX + dx - 1, ab - 5, IRON[4]);
+  }
   paintChainLine(p, CX - 13, ty - 9, CX + 12, ty + 7);
   // --- shoulders (pauldrons)
   const rsh: V = [CX + 15, 27 + B];

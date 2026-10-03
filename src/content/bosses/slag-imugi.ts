@@ -53,6 +53,10 @@ function paintSegment(p: PixelPainter, w: number, h: number, hot: number, seed: 
   p.line(cx - rx * 0.7, cy, cx - rx * 0.3, cy + ry * 0.3, SLAG[4]);
   p.line(cx - rx * 0.3, cy + ry * 0.3, cx + rx * 0.4, cy + ry * 0.3, SLAG[1]);
   // dorsal crest plate
+  for (const s of [-1, 1]) {
+    p.line(cx + s * rx * 0.35, cy - ry * 0.45, cx + s * rx * 0.8, cy, '#927668');
+    p.line(cx + s * rx * 0.8, cy, cx + s * rx * 0.5, cy + ry * 0.6, p2 ? MOLTEN[3] : '#54434a');
+  }
   p.poly([cx - rx * 0.4, cy - ry * 0.55, cx, cy - ry - 2.5, cx + rx * 0.4, cy - ry * 0.55], SLAG[3]);
   p.line(cx, cy - ry - 2, cx, cy - ry * 0.4, SLAG[5]);
   p.px(cx - rx * 0.5, cy - ry * 0.4, SLAG[5]);
@@ -95,6 +99,9 @@ function paintHeadSide(p: PixelPainter, hot: number, p2: boolean, open: number):
   }
   if (!p2) paintPearl(p, 26, 14 + jo * 0.5, 2.4);
   // eye
+  p.line(8, 6, 12, 9, '#a28774');
+  p.line(12, 9, 10, 12, '#54434a');
+  p.line(20, 11, 25, 12, '#927668');
   p.rect(16, 7, 3, 2, MOLTEN[3]);
   p.px(17, 7, '#ffffff');
   p.px(18, 8, '#3a0a04');
@@ -147,6 +154,12 @@ function paintHeadDown(p: PixelPainter, hot: number, p2: boolean, open: number, 
     p.px(cx + s2 * 5, 9, MOLTEN[2]);
   }
   // nostrils + glowing seams
+  // Interlocking forehead scales and a copper nose ridge.
+  for (let row = 0; row < 3; row++) {
+    const y = 4 + row * 3;
+    p.poly([cx - 3, y, cx, y + 2, cx + 3, y, cx, y + 4], '#54434a');
+    p.line(cx - 2, y, cx, y + 2, p2 ? MOLTEN[3] : '#a28774');
+  }
   p.px(cx - 2, 14, MOLTEN[2]);
   p.px(cx + 2, 14, MOLTEN[2]);
   crack(p, cx - 6, 5, cx - 2, 12, hotc, 3, 0.6);
@@ -166,6 +179,11 @@ function paintHeadUp(p: PixelPainter, hot: number, p2: boolean): void {
   ball(p, cx, 11, 9.5, 8.5, SLAG.slice(0, 5), false);
   ball(p, cx, 6, 6, 4, SLAG.slice(0, 5), false);
   p.line(cx, 3, cx, 18, SLAG[5]);
+  for (let row = 0; row < 3; row++) {
+    const y = 5 + row * 4;
+    p.line(cx - 4, y, cx, y + 2, p2 ? MOLTEN[3] : '#a28774');
+    p.line(cx, y + 2, cx + 4, y, '#54434a');
+  }
   crack(p, cx - 6, 6, cx - 2, 14, MOLTEN[Math.min(4, 1 + hot + (p2 ? 1 : 0))], 4, 0.8);
   crack(p, cx + 6, 7, cx + 2, 15, MOLTEN[Math.min(4, 1 + hot)], 8, 0.8);
   p.px(cx - 8, 9, MOLTEN[3]);

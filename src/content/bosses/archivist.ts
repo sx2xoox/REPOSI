@@ -280,6 +280,19 @@ function paintStaff(p: PixelPainter, gx: number, gy: number, ang: number, p2: bo
 
 function paintArch(p: PixelPainter, o: ArchPose, p2: boolean): void {
   paintRobe(p, o.hem, p2);
+  // Bound manuscript strips follow the robe's sway.
+  for (const s of [-1, 1]) {
+    const x = 30 + s * 12;
+    const bend = s * (2 + o.hem * 0.4);
+    p.poly([x - 3, 28, x + 3, 28, x + bend + 3, 60, x + bend, 57, x + bend - 3, 62], '#9c9877');
+    p.line(x - 2, 29, x + bend - 2, 56, '#dfd4aa');
+    for (let i = 0; i < 7; i++) {
+      const xx = x + bend * i / 7;
+      p.line(xx, 33 + i * 3, xx + 2, 33 + i * 3, p2 ? '#478b9d' : '#4c5756');
+    }
+    p.circle(x, 29, 2, '#a07e39');
+    p.px(x - 1, 28, '#e7d090');
+  }
   paintSleeve(p, [21, 29], o.lh);
   paintSleeve(p, [39, 29], o.rh);
   paintHead(p, o, p2);

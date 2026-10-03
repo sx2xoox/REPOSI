@@ -353,6 +353,15 @@ function paintColossus(p: PixelPainter, o: ColPose, p2: boolean): void {
   limb(p, rsh[0] - 2, shY - 1, 2.4, CX + 2, shY - 3, 1.8, BONE);
   ball(p, lsh[0], lsh[1], 5, 4.4, BONE, true);
   ball(p, rsh[0], rsh[1], 5, 4.4, BONE, true);
+  // Funeral seals bind the shoulders; soul light splits them in phase two.
+  for (const s of [-1, 1]) {
+    const x = CX + s * 15;
+    p.poly([x - 3, shY - 3, x + 3, shY - 2, x + 2, shY + 12, x, shY + 10, x - 2, shY + 13], '#642c3b');
+    p.line(x - 2, shY - 2, x - 2, shY + 8, '#b96962');
+    p.line(x, shY, x, shY + (p2 ? 3 : 7), p2 ? '#d7a9ff' : '#d7b98a');
+    for (const dy of [1, 4]) p.line(x - 1, shY + dy, x + 1, shY + dy, '#d7b98a');
+    if (p2) p.line(x + 1, shY + 5, x - 1, shY + 10, '#b47bef');
+  }
   // scapula spikes over the shoulders
   limb(p, lsh[0] - 1, lsh[1] - 3, 1.8, lsh[0] - 5, lsh[1] - 8, 0.5, BONE);
   limb(p, rsh[0] + 1, rsh[1] - 3, 1.8, rsh[0] + 5, rsh[1] - 8, 0.5, BONE);

@@ -286,6 +286,13 @@ function paintNeedle(p: PixelPainter, x: number, y: number, ang: number, lit: bo
 function paintClockmaker(p: PixelPainter, o: CkPose, p2: boolean): void {
   paintPedestal(p, o, p2);
   paintDial(p, p2);
+  // Exposed escapement on the lower dial, behind the coat.
+  for (const s of [-1, 1]) {
+    const x = DX + s * 14;
+    p.circle(x, DY + 12, 6, '#342136');
+    paintGear(p, x, DY + 12, 5, 8, o.gear * s, BRASS7, p2 ? AMBER[3] : '#446a68');
+    p.line(x, DY + 17, DX + s * 9, DY + 23, BRASS7[2]);
+  }
   paintTorso(p, o, p2);
   const by = o.bob + (o.lean ?? 0);
   paintArm(p, [25, 23 + by], o.lh);

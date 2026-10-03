@@ -174,6 +174,14 @@ export function paintLantern(p: PixelPainter, k: number, cracked: boolean, strai
     p.px(x + 1, 64, IRON[0]);
   }
   // bottom finial + dripping void tar
+  // Shackles and burial seals leave the eye aperture clear.
+  for (const s of [-1, 1]) {
+    const x = cx + s * 31;
+    for (let i = 0; i < 4; i++) p.ring(x + s * Math.sin(i) * 2, 29 + i * 4, 2, 1, IRON[4]);
+    p.poly([x - 3, 43, x + 3, 43, x + 4, 55, x + 1, 53, x - 2, 57], cracked ? '#65446f' : '#9c8290');
+    p.line(x, 45, x + 1, 51, cracked ? VMAG[3] : '#443047');
+    p.line(x - 1, 47, x + 2, 47, cracked ? VMAG[4] : '#443047');
+  }
   p.poly([cx - 5, 69, cx, 77, cx + 5, 69], IRON[3]);
   p.line(cx - 2, 70, cx - 1, 74, IRON[5]);
   const drips: [number, number][] = [[24, 4], [33, 6], [54, 5], [63, 3]];
