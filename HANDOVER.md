@@ -1,3 +1,6 @@
+## 2026-10-04 — Revert portrait redesign; retain world sprite polish only
+- User rejected the latest portrait redesign. Restored town-portraits.ts, story.ts and portrait asset documentation exactly to d0c0559 (the previous generated 96x108 portraits). Retained the native-size keeper/resident world sprite improvements. Excluded portrait frames from the shared cloth finish so dialogue fallback portraits also remain unchanged.
+
 ## 2026-10-04 — Reference-style native portraits and subtle world polish
 - User supplied the original Lume portrait as the desired common style. All three residents and default keeper Ria now use directly authored 64x72 pixel portraits: round faces, large highlighted dark eyes and simple material ramps. Ria retains floppy golden ears, teal hood and red scarf. No image resampling, blur, alpha threshold or palette conversion. Cached blink/talk frames work for Ria as well as NPCs. Other keepers retain their existing identity-specific sprite fallback.
 - Shared cloth edge lighting subtly refines all seven keeper sprites and town residents at their original native dimensions. Resident paws, coat hems and lantern/tool/book accents received small pixel refinements. Gameplay, collision and network state unchanged.

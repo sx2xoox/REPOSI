@@ -233,7 +233,7 @@ export function paintFrame(p: PixelPainter, spec: CharSpec, pose: Pose, info: Fr
   }
   spec.overlay?.(p, pose, info);
   const pal=spec.palette;
-  finishCloth(p, pal['1']?[pal['1'],pal['2'],pal['3']]:[pal.R,pal.r,pal.s]);
+  if (info.kind !== 'portrait') finishCloth(p, pal['1']?[pal['1'],pal['2'],pal['3']]:[pal.R,pal.r,pal.s]);
 }
 
 /** Register every sprite & animation for a character spec. */

@@ -1,8 +1,5 @@
 # Resident portrait assets
 
-## Current runtime (2026-10-04)
-The user selected the original, simpler Lume portrait as the common style. Runtime portraits are now authored directly at 64x72 in `src/ui/town-portraits.ts`, including Ria, with cached blink/talk frames and nearest-neighbor display. The PNGs below are retained as historical design sources only; they are no longer imported or shipped by Vite. The following generation notes describe the superseded implementation.
-
 Approved by the user: NPC concept with Lume, Brik and Orin, followed by request to apply it while matching world NPC pixel density to the keeper.
 
 `resident-portraits.png` is a built-in image_gen generated atlas (2048×768). It is loaded once, sampled into three cached 96×108 UI portraits with nearest-neighbor point sampling and original colors, displayed at 128×144 without smoothing. Runtime source rectangles avoid neighbouring silhouettes. World sprites are authored separately in `src/ui/town-residents.ts` on 24×24 native canvases; no bitmap portrait is reused as a world model.
