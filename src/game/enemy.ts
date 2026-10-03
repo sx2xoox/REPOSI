@@ -165,6 +165,19 @@ export class Enemy extends Actor {
     }
   }
 
+  override applyStatus(s: StatusApply, roll: () => number): boolean {
+    if (!this.isBoss) return super.applyStatus(s, roll);
+    // Bosses can be interrupted briefly, but repeated procs cannot stop their AI forever.
+    if (s.kind === 'freeze' || s.kind === 'stun') {
+      if (this.age < (this.mem.__controlReady ?? 0)) return false;
+      const applied = super.applyStatus({ ...s, duration: Math.min(0.35, s.duration) }, roll);
+      if (applied) this.mem.__controlReady = this.age + 2;
+      return applied;
+    }
+    if (s.kind === 'slow') return super.applyStatus({ ...s, power: Math.min(0.3, s.power ?? 0) }, roll);
+    return super.applyStatus(s, roll);
+  }
+
   override takeHit(w: World, hit: HitInfo): boolean {
     if (!this.alive || !this.vulnerable || this.hidden) return false;
     let dmg = hit.damage;

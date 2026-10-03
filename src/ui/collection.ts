@@ -62,7 +62,7 @@ function buildEntries(tab: TabId): Entry[] {
       return Artifacts.all().filter((d) => !d.hidden || seenItems.has(d.id)).sort(byRarity).map((d) => ({
         id: d.id, name: d.name, sprite: d.icon, seen: seenItems.has(d.id), rarity: d.rarity,
         lines: () => ({
-          title: d.name, sub: RARITY_NAME[d.rarity], body: d.desc, quote: d.quote,
+          title: d.name, sub: RARITY_NAME[d.rarity], body: [d.desc, d.detail].filter(Boolean).join(' '), quote: d.quote,
           tags: d.tags.map((t) => Sets.get(t)).filter((s): s is NonNullable<typeof s> => !!s).map((s) => ({ icon: s.icon, name: s.name, color: s.color })),
           facts: [['등장', poolText(d.pools)], ...(d.unique ? [['특성', '한 번만 등장'] as [string, string]] : [])],
         }),

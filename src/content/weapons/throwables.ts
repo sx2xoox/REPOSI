@@ -181,7 +181,7 @@ function pinwheelBehavior(dir: number): ProjBehavior {
 defineWeapon({
   id: 'pinwheel_boomerang',
   name: '바람개비 부메랑',
-  desc: '휘어져 날아가 크게 원을 그리고 손으로 돌아온다. 동시에 두 개까지 던질 수 있다.',
+  desc: '크게 원을 그리고 손으로 돌아온다. 날아가는 칼날이 2개 미만일 때 추가 투척 (다중 탄환 적용).',
   icon: 'icon_pinwheel_boomerang',
   heldSprite: 'w_pinwheel',
   kind: 'ranged',

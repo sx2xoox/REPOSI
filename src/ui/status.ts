@@ -1,4 +1,4 @@
-// Status overlay (Tab): two tabs — 유물 (artifacts) and 축복 (floor blessings) —
+// Status overlay (Tab): artifacts, floor blessings, and full character abilities.
 // each with its own grid and detail card (name, rarity, tags, description, quote,
 // copies; blessings: the floor they came from). An artifact can be discarded
 // (X / Del / pad X / the "버리기" button, pressed twice) back onto a pedestal.
@@ -22,11 +22,12 @@ import { potionSpriteFor } from '../game/pickups';
 import { C, formatTime, roman, splitFloorName } from './theme';
 import { fitScale, frame, gauge, iconSlot, keyHintRow, keyHintWidth, keycap, spriteCentered } from './frame';
 import { Repeater, Spring, appear } from './anim';
-import { fullStatRows, gridMove, scrollToRow } from './logic';
+import { characterKitRows, fullStatRows, gridMove, scrollToRow } from './logic';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
 import { estimateDps, powerScore } from '../game/power';
 import { SYNERGIES, synergyActive } from '../game/synergies';
+import { RELEASE_COOLDOWN } from '../game/ember';
 
 const COLS = 10;
 const CELL = 40;
@@ -38,6 +39,7 @@ const DETAIL_H = 136;
 const TABS = [
   { label: '유물', icon: 'ui_gem' },
   { label: '축복', icon: 'ui_flame' },
+  { label: '캐릭터', icon: 'st_dash' },
 ] as const;
 /** seconds the discard stays armed ("한 번 더 눌러 버리기") */
 const ARM_TIME = 3;
@@ -58,7 +60,7 @@ export class StatusOverlay implements Scene {
   private rep = { l: new Repeater(), r: new Repeater(), u: new Repeater(), d: new Repeater() };
   private resScroll = 0;
   private hover = -1;
-  /** 0 = 유물, 1 = 축복 */
+  /** 0 = 유물, 1 = 축복, 2 = 캐릭터 */
   private tab = 0;
   private tabT = 9;
   /** artifact id armed for discarding (second press discards) and when */
@@ -87,6 +89,7 @@ export class StatusOverlay implements Scene {
 
   /** Entries of the current tab (artifacts incl. innate traits, or blessings). */
   private list(): ComputedArtifact[] {
+    if (this.tab === 2) return [];
     const all = this.game.world.items.computed?.artifacts ?? [];
     return all.filter((a) => !!a.def.blessing === (this.tab === 1));
   }
@@ -272,7 +275,7 @@ export class StatusOverlay implements Scene {
       frame(r, q.x, q.y + oy, q.w, q.h, on ? 'buttonHi' : 'button', { alpha: k });
       spriteCentered(r, tb.icon, q.x + 15, q.y + 13 + oy, fitScale(tb.icon, 16, 2), { alpha: k * (on ? 1 : 0.55) });
       r.uiText(tb.label, q.x + 26, q.y + 6 + oy, { size: 12, bold: on, color: on ? C.goldHi : C.textDim, alpha: k });
-      r.uiText(`${count}`, q.x + q.w - 10, q.y + 8 + oy, { size: 10, font: 'small', align: 'right', color: on ? C.text : C.textFaint, alpha: k });
+      if (i < 2) r.uiText(`${count}`, q.x + q.w - 10, q.y + 8 + oy, { size: 10, font: 'small', align: 'right', color: on ? C.text : C.textFaint, alpha: k });
     });
     if (!touch) {
       const tabKey = pad ? 'LB/RB' : `${actionLabel(input.bindings, 'tabPrev')}/${actionLabel(input.bindings, 'tabNext')}`;
@@ -280,8 +283,9 @@ export class StatusOverlay implements Scene {
       if (this.tab === 0) hints.push([actionLabel(input.bindings, 'discard', pad), '버리기']);
       hints.push([actionLabel(input.bindings, 'inventory', pad), '닫기']);
       const total = hints.reduce((sum, [kk, l]) => sum + keyHintWidth(r, kk, l, pad), 0) + 12 * (hints.length - 1);
-      keyHintRow(r, hints, GX + COLS * CELL - 2 - total / 2, 69 + oy, { alpha: k * 0.8, pad, gap: 12 });
+      keyHintRow(r, hints, GX + COLS * CELL - 2 - total / 2, 407 + oy, { alpha: k * 0.8, pad, gap: 12 });
     }
+    if (this.tab === 2) { this.drawCharacter(r, k, oy); return; }
     const tk = k * appear(this.tabT, 0.2);
     const d = r.dctx;
     d.save();
@@ -369,11 +373,11 @@ export class StatusOverlay implements Scene {
       r.uiText(st.name, tx + 17, dy + 33, { size: 10, font: 'small', color: st.color, alpha: ka });
       tx += tw + 4;
     }
-    const lines = r.wrapText(def.desc, dw - 92, 12);
-    lines.slice(0, 2).forEach((l, i) => r.uiText(l, GX + 76, dy + 54 + i * 15, { size: 12, color: C.text, alpha: ka }));
+    const lines = r.wrapText([def.desc, def.detail].filter(Boolean).join(' '), dw - 92, def.detail ? 10 : 12, false, def.detail ? 'small' : 'main');
+    lines.slice(0, def.detail ? 4 : 2).forEach((l, i) => r.uiText(l, GX + 76, dy + 54 + i * (def.detail ? 11 : 15), { size: def.detail ? 10 : 12, font: def.detail ? 'small' : 'main', color: C.text, alpha: ka }));
     const qy = dy + 57 + Math.min(2, lines.length) * 15;
-    if (def.signature) r.uiText(`특징 · ${def.signature}`, GX + 76, qy, { size: 10, font: 'small', color: C.info, alpha: ka });
-    else if (def.quote) r.uiText(`“${def.quote}”`, GX + 76, qy, { size: 10, font: 'small', color: '#a89878', alpha: ka });
+    if (!def.detail && def.signature) r.uiText(`특징 · ${def.signature}`, GX + 76, qy, { size: 10, font: 'small', color: C.info, alpha: ka });
+    else if (!def.detail && def.quote) r.uiText(`“${def.quote}”`, GX + 76, qy, { size: 10, font: 'small', color: '#a89878', alpha: ka });
     // bottom strip: source / discard
     const by = dy + DETAIL_H - 34;
     r.uiRect(GX + 12, by - 6, dw - 24, 1, C.rimDark, ka);
@@ -411,6 +415,28 @@ export class StatusOverlay implements Scene {
     const lx = q.x + (q.w - lw - kw) / 2;
     if (key) keycap(r, key, lx, q.y + q.h / 2 + oy, { align: 'left', alpha: ka, pad });
     r.uiText(label, lx + kw, q.y + 6 + oy, { size: 10, font: 'small', color: armed ? C.bad : C.text, alpha: ka });
+  }
+
+  private drawCharacter(r: Renderer, k: number, oy: number): void {
+    const p = this.game.world.local;
+    const ch = p.character;
+    const touch = touchUiActive();
+    const rows = characterKitRows(ch, true, touch);
+    const cards = [
+      ...rows.map(row => ({ title: `${row.label} · ${row.name}`, icon: row.icon, desc: row.desc,
+        hint: row.kind === 'dash' ? `${touch ? '대시 버튼' : actionLabel(input.bindings, 'dash', input.aimMode === 'pad')} · 재사용 ${p.stats.dashCooldown.toFixed(2)}초`
+          : row.kind === 'release' ? `${touch ? '해방 버튼' : actionLabel(input.bindings, 'special', input.aimMode === 'pad')} · 게이지 100 · 재사용 ${RELEASE_COOLDOWN}초` : '' })),
+      { title: `선호 무기 · ${ch.affinity?.name ?? '없음'}`, icon: Weapons.get(p.weaponId)?.icon ?? 'ui_question',
+        desc: ch.affinity?.desc ?? '모든 무기를 고르게 다룹니다.', hint: p.flags.has('affinity') ? '현재 적용 중' : '현재 미적용' },
+    ];
+    cards.forEach((card, i) => {
+      const y = GY + i * 77 + oy;
+      frame(r, GX, y, COLS * CELL - 2, 72, 'panel', { alpha: k });
+      spriteCentered(r, card.icon, GX + 22, y + 22, fitScale(card.icon, 24, 2), { alpha: k });
+      r.uiText(card.title, GX + 43, y + 8, { size: 12, bold: true, color: ch.color, alpha: k });
+      r.wrapText(card.desc, 366, 10, false, 'small').forEach((line, j) => r.uiText(line, GX + 12, y + 29 + j * 12, { size: 10, font: 'small', color: C.textDim, alpha: k }));
+      if (card.hint) r.uiText(card.hint, GX + 384, y + 58, { size: 10, font: 'small', align: 'right', color: C.gold, alpha: k });
+    });
   }
 
   // ---------------------------------------------------------------- equipment

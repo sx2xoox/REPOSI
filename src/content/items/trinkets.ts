@@ -388,7 +388,8 @@ defineDrawnSprite('icon_sweet_sachet', 16, 16, (p) => {
 defineArtifact({
   id: 'sweet_sachet',
   name: '달콤한 향주머니',
-  desc: '공격이 7% 확률로 적을 매혹해 내 편으로 싸우게 한다',
+  desc: '공격이 7% 확률로 일반 적을 4초간 매혹한다',
+  detail: '보스는 매혹되지 않는다. 행운·중복 보정 적용, 광선은 기본 발동 확률 절반.',
   quote: '적도 향기에는 약하다.',
   rarity: 'rare',
   tags: [],

@@ -54,6 +54,8 @@ export interface HitInfo {
   noProc?: boolean;
   /** Explicit direct release damage attribution (not passive/familiar damage). */
   release?: boolean;
+  /** Base direct-hit ember credit, computed from actual damage before onHit hooks. */
+  emberCharge?: number;
 }
 
 // Entity ids are simulation state (hit lists, per-shot wobble phases ...): every

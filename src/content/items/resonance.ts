@@ -208,7 +208,7 @@ resonance('storm', '번개', '#ffe95a', 'res_storm', [
       chainLightning(w, p.x, p.y - 6, { jumps: 3, damage: dmg(w) * 0.8, range: 100 });
     },
   }],
-  [5, '번개가 2번 더 튀고, 맞은 적이 마비된다', {
+  [5, '번개 +2회, 적 마비 (보스는 짧게 마비·2초 재적용 대기)', {
     stats(m) {
       m.flag('stormMastery');
     },

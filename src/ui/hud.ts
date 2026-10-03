@@ -403,7 +403,7 @@ export class Hud {
       this.minimap.drawPulse(r, w, this.W - MINIMAP_W - MINIMAP_MARGIN, MINIMAP_MARGIN, MINIMAP_W, MINIMAP_H, this.t, A);
     }
     if (touchUi) return; // the touch buttons carry the ember gauge, weapon and potion
-    if (this.emberFull || this.emberFlash > 0 || this.releaseFlash > 0) this.drawEmber(r, w, A);
+    if (this.emberFull || this.emberFlash > 0 || this.releaseFlash > 0 || w.player.releaseCooldown > 0) this.drawEmber(r, w, A);
     else this.lyEmber.draw(r, `${Math.round(108 * clamp(this.emberShown, 0, 1))}`, ox, oy, 0, this.H - 44, 160, 44, A, this.paintEmber);
     if (this.potionPop > 0 || this.weaponPop > 0 || this.swapAnim > 0) this.drawSlots(r, w, A);
     else {
@@ -577,7 +577,7 @@ export class Hud {
     const y = this.H - 30;
     const gw = 112;
     const f = this.emberShown;
-    const full = this.emberFull;
+    const full = this.emberFull && w.player.releaseCooldown <= 0;
     const pulse = 0.5 + 0.5 * Math.sin(this.t * 7);
     if (full) glow(r, x + 10, y + 8, 34 + 6 * pulse, '#ff9a3a', (0.3 + 0.2 * pulse) * A);
     if (this.releaseFlash > 0) glow(r, x + 60, y + 8, 120 * (1.4 - this.releaseFlash * 0.4), '#ffe080', this.releaseFlash * 0.7 * A);
@@ -587,6 +587,7 @@ export class Hud {
       fill: full ? '#ffb030' : '#e0602a', hi: full ? '#fff0a0' : '#ffa060', lo: full ? '#c06010' : '#8a2a10',
       segments: 4, alpha: A, flash: this.emberFlash,
     });
+    if (w.player.releaseCooldown > 0) r.uiText(`해방 재사용 ${w.player.releaseCooldown.toFixed(1)}초`, gx + gw + 8, y + 3, { size: 10, font: 'small', color: C.textDim, alpha: A });
     if (full) {
       // flame licks on the gauge's top edge
       for (let i = 0; i < 9; i++) {

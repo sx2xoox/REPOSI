@@ -15,6 +15,7 @@ import { Afterimage, RingFx } from './effects';
 import { Bomb } from './pickups';
 import { Tile } from './tiles';
 import { spikeState } from './spikes';
+import { RELEASE_COOLDOWN } from './ember';
 import { fx } from '../engine/rng';
 import { DIR_VEC } from './constants';
 import { drawBackWeapon, equipWeapon, swapWeapons, tickHolstered, withSwapPop } from './weaponslots';
@@ -91,6 +92,7 @@ export class Player extends Actor {
   /** ember gauge 0..EMBER_MAX, filled by dealing damage; F releases it */
   ember = 0;
   releaseT = 0;
+  releaseCooldown = 0;
 
   // control state
   aim = 0;
@@ -233,6 +235,7 @@ export class Player extends Actor {
     if (this.holdT > 0) this.holdT -= dt;
     if (this.spikeCD > 0) this.spikeCD -= dt;
     if (this.releaseT > 0) this.releaseT -= dt;
+    this.releaseCooldown = Math.max(0, this.releaseCooldown - dt);
     if (this.emberReadyFlash > 0) this.emberReadyFlash -= dt * 2;
     this.recoil *= Math.exp(-dt * 20);
     this.updateStatuses(w, dt);
@@ -407,11 +410,12 @@ export class Player extends Actor {
 
   /** "등불 해방" — spend a full ember gauge on the character's special move. */
   release(w: World): void {
-    if (this.ember < EMBER_MAX || this.holdT > 0) {
+    if (this.ember < EMBER_MAX || this.holdT > 0 || this.releaseCooldown > 0) {
       if (this.ember < EMBER_MAX) w.sfx('ui_error', { vol: 0.4 });
       return;
     }
     this.ember = 0;
+    this.releaseCooldown = RELEASE_COOLDOWN;
     this.releaseT = 0.5;
     this.invuln = Math.max(this.invuln, 0.6);
     w.run.stats.releases++;

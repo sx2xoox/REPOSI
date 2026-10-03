@@ -910,8 +910,8 @@ export class TouchControls {
     this.drawBtn(r, 'bomb', A, held.has('bomb'), 'hud_bomb', p.bombs > 0, false, 1, '', '', String(p.bombs));
     // lantern release: ember gauge on the rim
     const ember = clamp(p.ember / EMBER_MAX, 0, 1);
-    const full = ember >= 1;
-    this.drawBtn(r, 'special', A, held.has('special'), full ? animFrame('ui_lantern', this.t) : 'ui_lantern_0', full, full, ember, C.ember, '해방');
+    const full = ember >= 1 && p.releaseCooldown <= 0;
+    this.drawBtn(r, 'special', A, held.has('special'), full ? animFrame('ui_lantern', this.t) : 'ui_lantern_0', full, full, ember, C.ember, p.releaseCooldown > 0 ? `${p.releaseCooldown.toFixed(1)}초` : '해방');
     // active item: charge (only while held)
     const adef = p.activeId ? Actives.get(p.activeId) : undefined;
     if (adef) {

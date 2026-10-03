@@ -742,7 +742,7 @@ defineDrawnSprite('icon_act_oath_dagger', 16, 16, (p) => {
 defineActive({
   id: 'oath_dagger',
   name: '맹세의 단검',
-  desc: '체력 반 칸을 바쳐 이 방에서 공격력 +3, 공격력 x1.3',
+  desc: '현재 체력 반 칸 소모 (빨간 체력 우선, 최대 체력 유지). 이 방에서 공격력 +3, ×1.3',
   quote: '피로 쓴 맹세는 지워지지 않는다.',
   rarity: 'rare',
   icon: 'icon_act_oath_dagger',

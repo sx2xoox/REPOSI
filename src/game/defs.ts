@@ -147,6 +147,8 @@ export interface ArtifactDef extends ItemHooks {
   name: string;
   /** one-line effect description shown in banners/tooltips (Korean) */
   desc: string;
+  /** Full rules and exclusions shown in inventory / preview / collection. */
+  detail?: string;
   /** flavor quote shown in the pickup banner (Isaac-style), optional */
   quote?: string;
   rarity: Rarity;

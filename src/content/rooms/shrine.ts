@@ -14,6 +14,7 @@ import { RingFx } from '../../game/effects';
 import { Prop } from '../props/prop';
 import { roundRug, withDecals } from './decor';
 import { HintLabel } from './label';
+import { heartCostKind, heartCostText, payHeartCost } from '../../game/heart-cost';
 
 defineDrawnSprite('shrine_lantern', 24, 40, (p) => {
   const S = ['#1e2440', '#2e3860', '#46548a', '#6a7cb8', '#9aaae0'];
@@ -94,12 +95,12 @@ export class LanternShrine extends Prop {
 
 interface Blessing { stat: StatKey; amount: number; desc: string }
 const BLESSINGS: Blessing[] = [
-  { stat: 'damage', amount: 1.5, desc: '공격력이 영원히 증가한다.' },
-  { stat: 'fireRate', amount: 0.4, desc: '공격 속도가 영원히 증가한다.' },
-  { stat: 'moveSpeed', amount: 12, desc: '이동 속도가 영원히 증가한다.' },
-  { stat: 'range', amount: 45, desc: '사거리가 영원히 증가한다.' },
-  { stat: 'luck', amount: 2, desc: '행운이 영원히 증가한다.' },
-  { stat: 'critChance', amount: 0.08, desc: '치명타 확률이 영원히 증가한다.' },
+  { stat: 'damage', amount: 1.5, desc: '공격력이 이번 도전 동안 증가한다.' },
+  { stat: 'fireRate', amount: 0.4, desc: '공격 속도가 이번 도전 동안 증가한다.' },
+  { stat: 'moveSpeed', amount: 12, desc: '이동 속도가 이번 도전 동안 증가한다.' },
+  { stat: 'range', amount: 45, desc: '사거리가 이번 도전 동안 증가한다.' },
+  { stat: 'luck', amount: 2, desc: '행운이 이번 도전 동안 증가한다.' },
+  { stat: 'critChance', amount: 0.08, desc: '치명타 확률이 이번 도전 동안 증가한다.' },
 ];
 
 export class OfferingBowl extends Prop {
@@ -145,13 +146,8 @@ export class OfferingBowl extends Prop {
   }
 
   private offerHeart(w: World): void {
-    const p = w.player;
-    if (p.maxRed >= 4) {
-      p.baseHearts = Math.max(1, p.baseHearts - 1);
-      w.items.recompute();
-    } else if (p.soul >= 2) {
-      p.soul -= 2;
-    } else {
+    const costText = heartCostText(w.player, 1);
+    if (!payHeartCost(w, 1)) {
       w.sfx('ui_error');
       w.floatText(this.x, this.y - 16, '바칠 심장이 없다', '#ff8080');
       return;
@@ -167,7 +163,7 @@ export class OfferingBowl extends Prop {
     });
     this.consume(w);
     w.sfx('power_up');
-    w.banner('등불의 맹약', b.desc, { color: '#b8ccff' });
+    w.banner('등불의 맹약', `${costText} · ${b.desc}`, { color: '#b8ccff' });
   }
 
   private consume(w: World): void {
@@ -185,8 +181,11 @@ export class OfferingBowl extends Prop {
     const bob = Math.sin(this.age * 3) * 1.5;
     const icon = this.kind === 'coin' ? 'hud_coin' : 'pk_heart';
     r.sprite(icon, this.x, this.y - 11 + bob);
-    const afford = this.kind === 'coin' ? w.player.coins >= this.cost : w.player.maxRed >= 4 || w.player.soul >= 2;
+    const afford = this.kind === 'coin' ? w.player.coins >= this.cost : !!heartCostKind(w.player, 1);
     r.pixelText(`${this.cost}`, this.x, this.y + 5, afford ? '#ffffff' : '#ff7070', { align: 'center', outline: '#140c1c' });
+    if (this.kind === 'heart' && dist(w.local.x, w.local.y, this.x, this.y) < 72) {
+      r.pixelText(heartCostText(w.local, 1), this.x, this.y + 18, '#ffb0b8', { align: 'center', outline: '#140c1c' });
+    }
   }
 
   override light(w: World): void {
@@ -204,7 +203,7 @@ registerRoomHandler('shrine', {
     const left = w.spawn(new OfferingBowl(cx - 34, cy + 22, 'coin', shrine));
     const right = w.spawn(new OfferingBowl(cx + 34, cy + 22, 'heart', shrine));
     w.spawn(new HintLabel(left.x, left.y - 24, '온기: 체력 회복', () => !left.used, '#ffe8a0', 40));
-    w.spawn(new HintLabel(right.x, right.y - 24, '맹약: 영원한 축복', () => !right.used, '#ffb0b8', 40));
+    w.spawn(new HintLabel(right.x, right.y - 24, '맹약: 이번 도전 능력치 증가', () => !right.used, '#ffb0b8', 65));
   },
   spawnEnemies() {
     return false;

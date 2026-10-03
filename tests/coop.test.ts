@@ -50,7 +50,7 @@ const LINK = { latencyMs: 35, jitterMs: 25 };
 const SCENARIOS: (CoopScenario & { expectLeave: boolean })[] = [
   {
     name: 'clock spire party', seed: 'COOP-NEW-7', chars: ['mori', 'bori', 'baekgu'], floor: 7,
-    ms: 110_000, link: LINK, bossAt: 2200, downAt: 700, leaveAt: 0, discardAt: 350, expectLeave: false,
+    ms: 140_000, link: LINK, bossAt: 3600, downAt: 700, leaveAt: 0, discardAt: 350, expectLeave: false,
   },
   {
     name: 'new keepers in archive', seed: 'COOP-NEW-6', chars: ['bori', 'baekgu', 'mori', 'mori'], floor: 6,

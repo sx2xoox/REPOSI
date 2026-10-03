@@ -4,6 +4,7 @@
 
 import { Actor, Entity, type HitInfo } from './entity';
 import type { World } from './world';
+import { heartCostKind } from './heart-cost';
 import type { Renderer } from '../engine/renderer';
 import { Actives, Artifacts, Potions, RARITY_COLOR, Weapons, type Rarity } from './defs';
 import { fx } from '../engine/rng';
@@ -186,11 +187,11 @@ export interface PedestalItem {
   id: string;
 }
 
-export function itemInfo(it: PedestalItem): { name: string; desc: string; icon: string; rarity: Rarity; quote?: string } {
+export function itemInfo(it: PedestalItem): { name: string; desc: string; detail?: string; icon: string; rarity: Rarity; quote?: string } {
   switch (it.kind) {
     case 'artifact': {
       const d = Artifacts.must(it.id);
-      return { name: d.name, desc: d.desc, icon: d.icon, rarity: d.rarity, quote: d.quote };
+      return { name: d.name, desc: d.desc, detail: d.detail, icon: d.icon, rarity: d.rarity, quote: d.quote };
     }
     case 'active': {
       const d = Actives.must(it.id);
@@ -244,7 +245,7 @@ export class Pedestal extends Entity {
   affordable(w: World): boolean {
     const p = w.player;
     if (this.price > 0 && p.coins < this.price) return false;
-    if (this.heartPrice > 0 && p.maxRed < this.heartPrice * 2 + 2 && p.soul < this.heartPrice * 2) return false;
+    if (this.heartPrice > 0 && !heartCostKind(p, this.heartPrice)) return false;
     return true;
   }
 

@@ -5,6 +5,7 @@ import { defineArtifact } from '../../game/defs';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { type PixelPainter, ramp } from '../../engine/painter';
 import { Projectile } from '../../game/projectile';
+import { Enemy } from '../../game/enemy';
 import { angleDiff } from '../../engine/math';
 import { fx } from '../../engine/rng';
 import type { World } from '../../game/world';
@@ -43,7 +44,8 @@ defineDrawnSprite('icon_fallen_star', 16, 16, (p) => {
 defineArtifact({
   id: 'fallen_star',
   name: '떨어진 별 조각',
-  desc: '행운 +1, 치명타 +6%. 치명타 시 등불 게이지 +3',
+  desc: '행운 +1, 치명타 +6%p. 직접 치명타로 불씨 충전',
+  detail: '기본 충전 +3. 광선·보스 대상은 각각 절반. 추가 파편 제외. 행운 보정 적용.',
   signature: '치명타가 터지면 별빛이 번쩍이며 등불 게이지가 찬다',
   quote: '소원은 이미 이루어졌다. 아마도.',
   rarity: 'common',
@@ -56,8 +58,8 @@ defineArtifact({
     m.addStat('critChance', 0.06 * power);
   },
   onHit(w, t, hit, power) {
-    if (!hit.crit || !isAttack(hit)) return;
-    w.player.addEmber(3 * power);
+    if (!hit.crit || !isPrimary(hit)) return;
+    w.player.addEmber(3 * power * (hit.kind === 'laser' ? 0.5 : 1) * (t instanceof Enemy && t.isBoss ? 0.5 : 1));
     w.particles.burst(t.x, t.y - t.z - 6, { count: 6, speed: [30, 90], life: [0.2, 0.4], colors: ['#ffffff', '#fff2b0', '#ffe890'], shape: 'spark', size: [1, 2], additive: true });
     proc(w, 'fallen_star');
   },
@@ -225,7 +227,8 @@ defineDrawnSprite('icon_comet_tail', 16, 16, (p) => {
 defineArtifact({
   id: 'comet_tail',
   name: '혜성 꼬리',
-  desc: '치명타 피해 +50%. 치명타가 별 조각 3개를 흩뿌린다',
+  desc: '치명타 배율 +0.5. 직접 치명타 시 별 조각 3개',
+  detail: '예: 치명타 ×1.8 → ×2.3. 추가 파편은 별 조각을 다시 만들지 않는다.',
   quote: '빛은 지나간 자리에 남는다.',
   rarity: 'epic',
   tags: ['star'],
@@ -294,7 +297,8 @@ function makeLance(w: World, p: Projectile, power: number): void {
 defineArtifact({
   id: 'radiant_lance',
   name: '광휘의 창',
-  desc: '공격이 모든 적을 꿰뚫는 빛의 창 하나로 합쳐진다',
+  desc: '전방 무기 탄환을 관통 빛의 창으로 합친다',
+  detail: '근접 공격에는 창을 추가 발사한다. 광선과 추가 파편에는 적용되지 않는다.',
   quote: '흩어진 빛을 모으면 창이 된다.',
   rarity: 'legendary',
   tags: ['star'],

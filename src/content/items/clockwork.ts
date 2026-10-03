@@ -297,6 +297,7 @@ defineArtifact({
   id: 'armillary',
   name: '작은 혼천의',
   desc: '3번째 공격마다 탄환이 주위를 돌다 강해져 날아간다',
+  detail: '무기 탄환에 적용. 근접은 회전탄을 추가 발사하며 광선에는 미적용. 2개 이상이면 2번째마다.',
   quote: '하늘의 길을 손안에 담았다.',
   rarity: 'epic',
   tags: ['clockwork', 'star'],
@@ -418,7 +419,8 @@ defineDrawnSprite('fx_abyss_glass', 7, 9, (p) => {
 defineArtifact({
   id: 'abyssal_hourglass',
   name: '심연의 모래시계',
-  desc: '공격 속도 +0.5. 피격당하면 3초간 시간이 멈춘다',
+  desc: '공격 속도 +0.5. 피격 시 적의 시간 3초 정지',
+  detail: '적과 적 탄환에 적용. 재사용 대기 6초.',
   quote: '시간도 심연 앞에서는 걸음을 멈춘다.',
   rarity: 'legendary',
   tags: ['clockwork', 'shadow'],

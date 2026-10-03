@@ -39,7 +39,7 @@ export function beamTickMult(focus: number): number {
 defineWeapon({
   id: 'void_gaze',
   name: '공허의 눈',
-  desc: '누르고 있는 동안 모든 것을 꿰뚫는 광선을 쏟아낸다. 오래 쏠수록 굵어진다.',
+  desc: '누르고 있으면 적을 관통하는 광선을 쏜다. 벽에 막히며, 1.2초간 유지하면 굵기와 피해가 최대가 된다.',
   icon: 'icon_void_gaze',
   heldSprite: 'w_void_eye',
   kind: 'beam',

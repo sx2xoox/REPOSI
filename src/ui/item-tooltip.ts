@@ -8,6 +8,7 @@
 import type { Renderer } from '../engine/renderer';
 import { UI_H, UI_W } from '../engine/renderer';
 import type { World } from '../game/world';
+import { heartCostText } from '../game/heart-cost';
 import type { Entity } from '../game/entity';
 import { input } from '../engine/input';
 import { clamp, ease } from '../engine/math';
@@ -170,9 +171,11 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
       label = '구매';
     } else if (e.heartPrice > 0) {
       price = { icon: 'hud_heart_full', text: `${e.heartPrice}`, ok };
+      extra.push([{ t: heartCostText(p, e.heartPrice), c: C.bad }]);
+      extra.push([{ t: '최대 체력 부족 시 영혼 하트로 지불', c: C.textFaint }]);
       label = '거래';
     }
-    return { icon: info.icon, name: info.name, color: col, sub, desc: info.desc, extra, action: { key: keyOf(), label, pad, ok }, note: '', price };
+    return { icon: info.icon, name: info.name, color: col, sub, desc: [info.desc, info.detail].filter(Boolean).join(' '), extra, action: { key: keyOf(), label, pad, ok }, note: '', price };
   }
   if (e instanceof Pickup) {
     if (e.kind === 'potion') {
@@ -227,7 +230,7 @@ function signature(w: World, e: Entity): string {
   let s = `${e.id}|${p.weaponId}|${p.weapon2Id ?? ''}|${p.activeId ?? ''}|${p.potionId ?? ''}|${input.aimMode === 'pad' ? 1 : 0}|${touchUiActive() ? 1 : 0}`;
   if (e instanceof Pedestal) s += `|${e.item?.kind}:${e.item?.id}|${e.price}|${e.heartPrice}|${e.affordable(w) ? 1 : 0}|${p.coins >= e.price ? 1 : 0}|${e.item ? w.items.powerOf(e.item.id) : 0}`;
   else if (e instanceof Pickup) s += `|${e.kind}|${e.potionId}|${w.run.identified.has(e.potionId) ? 1 : 0}|${e.price}|${p.coins >= e.price ? 1 : 0}|${e.canCollect(w) ? 1 : 0}`;
-  return `${s}|${w.items.revision}`;
+  return `${s}|${w.items.revision}|${p.maxRed}|${p.soul}`;
 }
 
 export class ItemTooltip {
@@ -280,7 +283,7 @@ export class ItemTooltip {
       this.card = buildCard(w, e);
       if (this.card) {
         const c = this.card;
-        this.lines = r.wrapText(c.desc, CARD_W - PAD * 2, 10, false, 'small').slice(0, 3);
+        this.lines = r.wrapText(c.desc, CARD_W - PAD * 2, 10, false, 'small');
         this.extraLines = c.extra.flatMap((row) => {
           if (row.length !== 1) return [row];
           return r.wrapText(row[0].t, CARD_W - PAD * 2, 10, false, 'small').map((t) => [{ t, c: row[0].c }]);

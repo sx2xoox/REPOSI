@@ -207,7 +207,7 @@ defineDrawnSprite('icon_heartstring', 16, 16, (p) => {
 defineArtifact({
   id: 'heartstring',
   name: '심장 실',
-  desc: '붉은 체력이 가득 차 있으면 공격력 +30%',
+  desc: '빨간 체력 최대 시 공격 피해 +30% (지속 제외)',
   quote: '온전할 때, 가장 강하다.',
   rarity: 'rare',
   tags: ['blood'],
@@ -247,7 +247,8 @@ defineDrawnSprite('icon_blood_pact', 16, 16, (p) => {
 defineArtifact({
   id: 'blood_pact',
   name: '피의 서약',
-  desc: '공격력 ×1.4, 최대 체력 -1. 피격 후 2회 치명타',
+  desc: '공격력 ×1.4, 최대 체력 -1칸. 피격 후 2회 치명타',
+  detail: '보유 중 최대 빨간 체력이 감소한다. 버리면 최대치는 복구되지만 잃은 체력은 회복되지 않는다.',
   quote: '서명은 피로 한다.',
   signature: '피격당하면 다음 공격 2회가 반드시 치명타가 된다',
   rarity: 'epic',

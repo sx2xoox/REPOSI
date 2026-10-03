@@ -2,6 +2,8 @@
 // player. Exposes the API used by all content (enemies, items, rooms).
 
 import type { Renderer } from '../engine/renderer';
+import { attackEmber } from './ember';
+import { payHeartCost } from './heart-cost';
 import { VIEW_H, VIEW_W } from '../engine/renderer';
 import { Lighting } from '../engine/lighting';
 import { Particles } from '../engine/particles';
@@ -1190,7 +1192,9 @@ export class World {
         const dealt = Math.max(0, before - Math.max(0, target.hp));
         this.run.stats.damageDealt += dealt;
         // bosses fill the gauge at half rate: a release is a burst, not the main boss-killing tool
-        if (hit.kind !== 'status' && !hit.noProc) p.addEmber(Math.min(6, 1.2 + dealt / Math.max(1, p.stats.damage) * 1.3) * (target.isBoss ? 0.5 : 1) * (p.flags.has('kindleBlessing') ? 1.35 : 1));
+        const secondary = hit.source instanceof Projectile && hit.source.generation > 0;
+        hit.emberCharge = hit.kind !== 'status' && !hit.noProc && !secondary ? attackEmber(p.stats.damage, dealt, target.isBoss, hit.kind === 'laser') : 0;
+        if (hit.emberCharge > 0) p.addEmber(hit.emberCharge * (p.flags.has('kindleBlessing') ? 1.35 : 1));
         this.hitFeedback(target, hit, dealt);
         this.items.onHit(target, hit);
         if (target.hp <= 0) this.killEnemy(target);
@@ -1569,16 +1573,13 @@ export class World {
     const p = this.player;
     const it = ped.item;
     if (!it) return;
+    if (ped.heartPrice > 0 && !payHeartCost(this, ped.heartPrice)) return;
     if (ped.price > 0) {
       p.coins -= ped.price;
       this.run.stats.coinsSpent += ped.price;
       playSfx('buy');
     }
     if (ped.heartPrice > 0) {
-      const cost = ped.heartPrice * 2;
-      const fromMax = Math.min(cost, p.maxRed);
-      p.baseHearts = Math.max(0, p.baseHearts - Math.ceil(fromMax / 2));
-      if (fromMax < cost) p.soul = Math.max(0, p.soul - (cost - fromMax));
       this.flags.add('devilDeal');
     }
     ped.item = null;

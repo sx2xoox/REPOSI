@@ -228,6 +228,7 @@ defineArtifact({
   id: 'stormcaller_rod',
   name: '폭풍 부름 지팡이',
   desc: '치명타 확률 +6%. 치명타가 연쇄 번개를 일으킨다',
+  detail: '직접 치명타만 발동. 처음 맞힌 적을 제외한 주변 적에게 번개가 튄다.',
   quote: '번개는 가장 높은 곳에 떨어진다.',
   rarity: 'epic',
   tags: ['storm', 'star'],
@@ -264,7 +265,8 @@ defineDrawnSprite('icon_tempest_heart', 16, 16, (p) => {
 defineArtifact({
   id: 'tempest_heart',
   name: '폭풍의 심장',
-  desc: '모든 공격이 번개를 튕긴다. 공격 속도 +20%',
+  desc: '직접 공격이 번개를 튕긴다. 공격 속도 +20%',
+  detail: '재사용 0.12초. 처음 맞힌 적을 제외한 주변 적에게 적용. 추가 파편은 발동 제외.',
   quote: '이 심장은 천둥으로 뛴다.',
   rarity: 'legendary',
   tags: ['storm'],

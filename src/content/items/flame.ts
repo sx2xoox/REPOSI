@@ -5,6 +5,8 @@ import { defineDrawnSprite } from '../../engine/sprites';
 import { ramp } from '../../engine/painter';
 import { RingFx } from '../../game/effects';
 import { defaultRelease } from '../../game/player';
+import { attackEmber } from '../../game/ember';
+import { Enemy } from '../../game/enemy';
 import { fx } from '../../engine/rng';
 import {
   O, HazardZone, addHitStatus, enemiesNear, isAttack, hitWeight, isPrimary, itemHit, miniBlast, roll, rollHit, shout, stackMul,
@@ -110,16 +112,17 @@ defineDrawnSprite('icon_bellows', 16, 16, (p) => {
 defineArtifact({
   id: 'bellows',
   name: '작은 풀무',
-  desc: '등불 게이지가 40% 더 빨리 찬다',
+  desc: '직접 공격의 등불 기본 충전량 +40%',
+  detail: '광선·보스 대상의 충전 감쇠 적용. 추가 파편·지속 피해·해방은 충전 제외.',
   quote: '숨을 불어넣으면 불은 대답한다.',
   rarity: 'common',
   tags: ['flame', 'clockwork'],
   icon: 'icon_bellows',
   look: { aura: '#ffb040', mote: '#ffd060' },
   pools: ['treasure', 'shop', 'shrine'],
-  onHit(w, _t, hit, power) {
-    if (!isAttack(hit)) return;
-    w.player.addEmber(1.0 * power * hitWeight(hit));
+  onHit(w, t, hit, power) {
+    if (!isPrimary(hit)) return;
+    w.player.addEmber(0.4 * power * (hit.emberCharge ?? attackEmber(w.player.stats.damage, hit.damage, t instanceof Enemy && t.isBoss, hit.kind === 'laser')));
     proc(w, 'bellows', true);
   },
 });
@@ -197,7 +200,8 @@ defineDrawnSprite('icon_kiln_core', 16, 16, (p) => {
 defineArtifact({
   id: 'kiln_core',
   name: '가마의 심장',
-  desc: '공격이 적중할 때마다 작은 폭발이 일어난다',
+  desc: '직접 공격 적중 시 작은 폭발이 일어난다',
+  detail: '재사용 0.06초 (광선 0.15초). 추가 파편으로는 발동하지 않는다.',
   quote: '그 안의 불은 천 년째 꺼지지 않았다.',
   rarity: 'epic',
   tags: ['flame'],
@@ -332,7 +336,8 @@ defineDrawnSprite('icon_twin_wick', 16, 16, (p) => {
 defineArtifact({
   id: 'twin_wick',
   name: '쌍심지',
-  desc: '등불 해방이 잠시 후 한 번 더 발동한다',
+  desc: '해방 0.55초 뒤 추가 발동 (최대 2회)',
+  detail: '1개 보유 시 1회, 2개 이상이면 2회. 추가 해방은 해방 발동 유물을 다시 발동시키지 않는다.',
   quote: '눈에 쌍심지를 켜고 덤벼라.',
   rarity: 'epic',
   tags: ['flame'],

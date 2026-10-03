@@ -182,6 +182,7 @@ export class ItemSystem {
     for (const e of this.effects) safe(() => e.hooks.stats?.(m, e.power, w));
     const oldMax = p.stats ? p.maxRed : -1;
     p.stats = computeStats(base, m);
+    p.stats.maxHearts = Math.max(1, p.stats.maxHearts - (p.vars.__heartContainersSpent ?? 0));
     p.flags = m.flags;
     p.flying = m.flags.has('flying');
     p.onMaxHeartsChanged(w, oldMax);
