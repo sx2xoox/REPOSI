@@ -192,7 +192,7 @@ export function greatswordMult(charge: number): number {
 defineWeapon({
   id: 'titan_greatsword',
   name: '거인의 대검',
-  desc: '누르고 있으면 대검을 들어 올리고, 떼면 몸을 한 바퀴 돌며 주위를 모두 벤다. 짧게 누르면 내려찍는다. 탄환 반사 피해는 공격력의 40%.',
+  desc: '거대한 칼날로 먼 거리까지 벤다. 누르고 있다 떼면 몸을 한 바퀴 돌며 주위를 크게 휩쓸고, 짧게 누르면 내려찍는다. 벽에 막히며, 회전 베기로 반사한 탄환 피해는 공격력의 40%.',
   icon: 'icon_titan_greatsword',
   heldSprite: 'w_titan_sword',
   kind: 'charge',
@@ -226,13 +226,13 @@ defineWeapon({
     const c = st.charge;
     st.charge = 0;
     beginAttack(w, p, st, aim);
-    const reach = 34 + s.range * 0.045;
+    const reach = (34 + s.range * 0.045) * 2;
     if (c >= 0.35) {
       // full spin
       let landed = false;
       p.swing(w, {
         angle: aim, arc: Math.PI * 2, reach, damage: s.damage * greatswordMult(c), knockback: s.knockback * 3.2, swingDir: 1,
-        color: c >= 1 ? '#ffe8a0' : '#d8e0ff', visual: 0.26, duration: 0.12, hitKick: 2.5, reflect: true,
+        color: c >= 1 ? '#ffe8a0' : '#d8e0ff', visual: 0.26, duration: 0.12, hitKick: 2.5, reflect: true, respectWalls: true,
         onHit: (ww) => {
           if (landed) return;
           landed = true;
@@ -248,7 +248,7 @@ defineWeapon({
       w.particles.burst(p.x, p.y - 2, { count: 16, speed: [60, 140], life: [0.2, 0.4], colors: ['#d0c0b0', '#a09080'], size: [1, 2], ground: true });
     } else {
       // tap: overhead cleave
-      p.swing(w, { angle: aim, arc: 2.4, reach: reach * 0.95, damage: s.damage * 1.4, knockback: s.knockback * 2.6, color: '#d8e0ff', visual: 0.2, duration: 0.09, hitKick: 2 });
+      p.swing(w, { angle: aim, arc: 2.4, reach: reach * 0.95, damage: s.damage * 1.4, knockback: s.knockback * 2.6, color: '#d8e0ff', visual: 0.2, duration: 0.09, hitKick: 2, respectWalls: true });
       const side = Math.cos(aim) >= 0 ? 1 : -1;
       startSwingPose(st, w, aim - side * 2.2, aim + side * 0.6, 0.09, 0.12);
       st.cooldown = attackInterval(p);
@@ -261,7 +261,7 @@ defineWeapon({
     const spinT = (w.time - (st.mem.spinAt ?? -9)) / 0.24;
     if (spinT >= 0 && spinT < 1) {
       const a = (st.mem.spinA ?? p.aim) + spinT * Math.PI * 2 * (Math.cos(st.mem.spinA ?? 0) >= 0 ? 1 : -1);
-      drawHeld(r, p, 'w_titan_sword', a, 6, { flash: 0.4 });
+      drawHeld(r, p, 'w_titan_sword', a, 6, { sx: 2, sy: 2, flash: 0.4 });
       return;
     }
     if (st.mem.drawing) {
@@ -269,15 +269,16 @@ defineWeapon({
       const side = Math.cos(p.aim) >= 0 ? 1 : -1;
       const c = st.charge;
       const shake = c >= 1 ? fx.range(-0.06, 0.06) : 0;
-      drawHeld(r, p, 'w_titan_sword', p.aim - side * (1.2 + c * 1.1) + shake, 3, { flash: c >= 1 ? 0.25 + 0.2 * Math.sin(w.time * 30) : 0 });
+      const angle = p.aim - side * (1.2 + c * 1.1) + shake;
+      drawHeld(r, p, 'w_titan_sword', angle, 3, { sx: 2, sy: 2, flash: c >= 1 ? 0.25 + 0.2 * Math.sin(w.time * 30) : 0 });
       if (c > 0.2) {
-        const h = visualHandPos(p, p.aim - side * 2, 16);
-        r.sprite(glowSprite(6 + c * 10, c >= 1 ? '#ffe8a0' : '#a0b0ff'), h.x, h.y, { alpha: 0.2 + c * 0.35, additive: true });
+        const h = visualHandPos(p, angle, 3);
+        r.sprite(glowSprite(6 + c * 10, c >= 1 ? '#ffe8a0' : '#a0b0ff'), h.x + Math.cos(angle) * 38, h.y + Math.sin(angle) * 38, { alpha: 0.2 + c * 0.35, additive: true });
       }
       return;
     }
     const pose = swingPose(st, w, meleeRest(st, p.aim));
-    drawHeld(r, p, 'w_titan_sword', pose.angle, pose.phase === 1 ? 5 : 2, { flash: pose.phase === 1 ? 0.4 : 0 });
+    drawHeld(r, p, 'w_titan_sword', pose.angle, pose.phase === 1 ? 5 : 2, { sx: 2, sy: 2, flash: pose.phase === 1 ? 0.4 : 0 });
   },
 });
 

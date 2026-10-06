@@ -23,6 +23,8 @@ export interface StatusApply {
   power?: number;
   /** 0..1, default 1 */
   chance?: number;
+  /** Intrinsic weapon application cadence, snapshotted when an attack is created. */
+  procKey?: string;
 }
 
 export interface StatusState {

@@ -405,7 +405,7 @@ export class CharacterSelectScene implements Scene {
     const x = UI_W_BASE / 2 - w / 2;
     const oy = (1 - k) * 8;
     frame(r, x, y + oy, w, h, 'tooltip', { alpha: A * 0.95, color: open ? c.color : C.rim });
-    const rows = characterKitRows(c, open, touchUiActive());
+    const rows = characterKitRows(c, open, touchUiActive(), true);
     const rowH = (h - 8) / rows.length;
     rows.forEach((row, i) => {
       const ry = y + oy + 5 + i * rowH;

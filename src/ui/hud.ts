@@ -356,7 +356,7 @@ export class Hud {
     if (this.clearT >= 0) drawRoomClear(r, this.clearT, w.banners.length === 0 && !w.floorCard);
     if (w.floorCard) drawFloorCard(r, w.floorCard);
     if (w.bossIntro) drawBossIntro(r, w, w.bossIntro);
-    if (!w.bossIntro) this.hints.draw(r, w, (this.bossShown > 0.05 ? UI_H - 56 : UI_H - 18) - sa.b);
+    if (!w.bossIntro && !this.tooltip.hasCompactHint(w)) this.hints.draw(r, w, (this.bossShown > 0.05 ? UI_H - 56 : UI_H - 18) - sa.b);
     if (save.settings.showFps) r.uiText(`${Math.round(fps)} FPS`, UI_W / 2, 4, { size: 10, font: 'small', align: 'center', color: '#80ff80' });
   }
 

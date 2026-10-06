@@ -1,0 +1,434 @@
+{
+  "provider": "PixelLab",
+  "date": "2026-10-06",
+  "batch": "legendary-five-local-preview",
+  "processing": "Exact native PNG bytes copied from PixelLab output. No resizing, repainting, recoloring, trimming, smoothing or runtime scale changes. Initial and refined originals are retained. Character appearance untouched.",
+  "review": {
+    "contactSheet": "test-results/balance-preview/art/installed-review.png",
+    "nativeContactSheet": "test-results/balance-preview/art/installed-native.png",
+    "imageGenerationCount": 10,
+    "targetedEditCount": 3,
+    "estimatedGenerationUnits": 53,
+    "estimateNote": "10 Pro Flash creations quoted at 5 each; 3 Pixen single-image material corrections quoted at 1 each. Pro Flash price was marked provisional by the provider."
+  },
+  "weapons": [
+    {
+      "id": "sunset_rifle",
+      "name": "노을 사냥총",
+      "provider": "PixelLab",
+      "grip": [
+        8,
+        8
+      ],
+      "muzzle": [
+        26,
+        7
+      ],
+      "targetOpaqueBudget": [
+        25,
+        9
+      ],
+      "assets": {
+        "held": {
+          "file": "held-sunset_rifle.png",
+          "original": "originals/legendary-oct06/held-sunset_rifle.png",
+          "jobId": "acb6684e-00f4-4ce2-8cbd-979e26afab80",
+          "sha256": "4a1e8bfa3a57d069f663f3933e866a3b81ed8455b617cd652426b3e63df71949",
+          "canvas": [
+            28,
+            16
+          ],
+          "opaqueBounds": [
+            2,
+            5,
+            25,
+            8
+          ],
+          "opaquePixels": 93,
+          "partialAlphaPixels": 0
+        },
+        "icon": {
+          "file": "icon-sunset_rifle.png",
+          "original": "originals/legendary-oct06/icon-sunset_rifle.png",
+          "jobId": "f5c7845c-840e-4534-88fc-099f36ac2050",
+          "sha256": "d0d000e7bdd1f2dbe9c1f91bc035979f617e23d9532b94ba0729d03f7120c354",
+          "canvas": [
+            16,
+            16
+          ],
+          "opaqueBounds": [
+            0,
+            1,
+            16,
+            15
+          ],
+          "opaquePixels": 55,
+          "partialAlphaPixels": 0
+        }
+      },
+      "history": [
+        {
+          "kind": "held",
+          "selected": true,
+          "tool": "create_image_pro_flash",
+          "jobId": "acb6684e-00f4-4ce2-8cbd-979e26afab80",
+          "seed": 610060,
+          "description": "Single isolated tiny equipment sprite for a polished low top-down pixel-art roguelike. Native pixel art with readable 1-pixel dark plum outline, clean intentional pixel clusters, limited material palettes, three-tone hue-shifted shading, top-left light. Transparent background. No ground, shadow, text, hands, character or glow cloud. Horizontal and perfectly level, firing RIGHT. Rear walnut shoulder stock at left x=2, hand grip at x=8,y=9, barrel extends right to x=25,y=6. Entire opaque weapon is 24 to 25 pixels wide and at most 9 pixels high, vertically centered. Two transparent pixels of margin. An elegant single-shot antique hunting rifle. A long dark walnut shoulder stock on the left, slender long aged-brass barrel and tiny iron muzzle on the right. Restrained sunset-copper inlay and one ivory sight. Recognizable long precise hunting rifle, not a revolver, not a modern rifle. No scope.",
+          "original": "originals/legendary-oct06/held-sunset_rifle.png",
+          "sha256": "4a1e8bfa3a57d069f663f3933e866a3b81ed8455b617cd652426b3e63df71949"
+        },
+        {
+          "kind": "icon",
+          "selected": true,
+          "tool": "create_image_pro_flash",
+          "jobId": "f5c7845c-840e-4534-88fc-099f36ac2050",
+          "seed": 610061,
+          "description": "Single isolated tiny equipment sprite for a polished low top-down pixel-art roguelike. Native pixel art with readable 1-pixel dark plum outline, clean intentional pixel clusters, limited material palettes, three-tone hue-shifted shading, top-left light. Transparent background. No ground, shadow, text, hands, character or glow cloud. Inventory icon composed specifically at 16x16 native pixels, distinct chunky silhouette with 1 transparent pixel of margin. Diagonal bottom-left grip to top-right blade or barrel if useful. For the longbow keep a recognizable upright crescent curve with string permitted only in this icon. An elegant single-shot antique hunting rifle. A long dark walnut shoulder stock on the left, slender long aged-brass barrel and tiny iron muzzle on the right. Restrained sunset-copper inlay and one ivory sight. Recognizable long precise hunting rifle, not a revolver, not a modern rifle. No scope.",
+          "original": "originals/legendary-oct06/icon-sunset_rifle.png",
+          "sha256": "d0d000e7bdd1f2dbe9c1f91bc035979f617e23d9532b94ba0729d03f7120c354"
+        }
+      ],
+      "gripVerifiedOpaque": true
+    },
+    {
+      "id": "gatekeeper_shotgun",
+      "name": "문지기 산탄총",
+      "provider": "PixelLab",
+      "grip": [
+        5,
+        8
+      ],
+      "muzzle": [
+        22,
+        6
+      ],
+      "targetOpaqueBudget": [
+        22,
+        11
+      ],
+      "assets": {
+        "held": {
+          "file": "held-gatekeeper_shotgun.png",
+          "original": "originals/legendary-oct06/held-gatekeeper_shotgun.png",
+          "jobId": "6e0f39fa-f183-4674-985f-f2fba3788a3b",
+          "sha256": "0c8bca8e02c99e1d4eb2a06f49b21d46322ca623371644d04727fdf852e28de1",
+          "canvas": [
+            24,
+            16
+          ],
+          "opaqueBounds": [
+            2,
+            3,
+            21,
+            11
+          ],
+          "opaquePixels": 154,
+          "partialAlphaPixels": 0
+        },
+        "icon": {
+          "file": "icon-gatekeeper_shotgun.png",
+          "original": "originals/legendary-oct06/refined-icon-gatekeeper_shotgun.png",
+          "jobId": "cc22fd7d-9648-4d0b-b665-db72ace4908e",
+          "sha256": "08b25644bc5f6cd1bf9da23763a879107ac94e184162106ce3d23b2ec8c6ce4e",
+          "canvas": [
+            16,
+            16
+          ],
+          "opaqueBounds": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "opaquePixels": 105,
+          "partialAlphaPixels": 0
+        }
+      },
+      "history": [
+        {
+          "kind": "held",
+          "selected": true,
+          "tool": "create_image_pro_flash",
+          "jobId": "6e0f39fa-f183-4674-985f-f2fba3788a3b",
+          "seed": 610062,
+          "description": "Single isolated tiny equipment sprite for a polished low top-down pixel-art roguelike. Native pixel art with readable 1-pixel dark plum outline, clean intentional pixel clusters, limited material palettes, three-tone hue-shifted shading, top-left light. Transparent background. No ground, shadow, text, hands, character or glow cloud. Horizontal and perfectly level, firing RIGHT. Stock at left, hand grip near x=6,y=10, double muzzle at x=21,y=7. Entire opaque weapon at most 22 pixels wide and 11 pixels high. One transparent pixel around the entire silhouette. A compact heavy double-barrel gatekeeper shotgun. Short dark chestnut shoulder stock, two thick parallel blackened-iron barrels with brass rims and a tiny warm amber iron lantern ornament attached to the receiver. Stout wide muzzle, clear paired barrels. Practical dark-iron close-range weapon, clearly shorter and thicker than a rifle. No trumpet muzzle, no modern tactical parts.",
+          "original": "originals/legendary-oct06/held-gatekeeper_shotgun.png",
+          "sha256": "0c8bca8e02c99e1d4eb2a06f49b21d46322ca623371644d04727fdf852e28de1"
+        },
+        {
+          "kind": "icon",
+          "selected": false,
+          "tool": "create_image_pro_flash",
+          "jobId": "93270162-ca6c-4c54-a9e9-d8fb2c23f339",
+          "seed": 610063,
+          "description": "Single isolated tiny equipment sprite for a polished low top-down pixel-art roguelike. Native pixel art with readable 1-pixel dark plum outline, clean intentional pixel clusters, limited material palettes, three-tone hue-shifted shading, top-left light. Transparent background. No ground, shadow, text, hands, character or glow cloud. Inventory icon composed specifically at 16x16 native pixels, distinct chunky silhouette with 1 transparent pixel of margin. Diagonal bottom-left grip to top-right blade or barrel if useful. For the longbow keep a recognizable upright crescent curve with string permitted only in this icon. A compact heavy double-barrel gatekeeper shotgun. Short dark chestnut shoulder stock, two thick parallel blackened-iron barrels with brass rims and a tiny warm amber iron lantern ornament attached to the receiver. Stout wide muzzle, clear paired barrels. Practical dark-iron close-range weapon, clearly shorter and thicker than a rifle. No trumpet muzzle, no modern tactical parts.",
+          "original": "originals/legendary-oct06/icon-gatekeeper_shotgun.png",
+          "sha256": "0572d7383e185f4c074e7675f8af0fedeba4ad0ec775c9206d0582a23f661398"
+        },
+        {
+          "kind": "icon",
+          "selected": true,
+          "tool": "edit_image_pixen",
+          "jobId": "cc22fd7d-9648-4d0b-b665-db72ace4908e",
+          "seed": 610082,
+          "description": "Keep the tiny 16x16 pixel-art shotgun icon, diagonal pose, transparent background and compact silhouette. Change both paired barrels to BLACKENED IRON with bright silver-grey edges and small aged brass muzzle rims. Dark chestnut wood stock. Replace green material with dark iron. One tiny warm amber lantern pendant at receiver. Clearly visible TWO short parallel barrels, no giant yellow muzzle. Crisp dark outline, no glow cloud.",
+          "original": "originals/legendary-oct06/refined-icon-gatekeeper_shotgun.png",
+          "sha256": "08b25644bc5f6cd1bf9da23763a879107ac94e184162106ce3d23b2ec8c6ce4e"
+        }
+      ],
+      "gripVerifiedOpaque": true
+    },
+    {
+      "id": "dawn_pike",
+      "name": "여명 관통창",
+      "provider": "PixelLab",
+      "grip": [
+        7,
+        8
+      ],
+      "targetOpaqueBudget": [
+        27,
+        7
+      ],
+      "assets": {
+        "held": {
+          "file": "held-dawn_pike.png",
+          "original": "originals/legendary-oct06/held-dawn_pike.png",
+          "jobId": "a1952de9-3e68-4630-83d7-26a574ce8821",
+          "sha256": "cf2cd63163187e7159503d8feb990877dbc2a21f946eb66cbb1485d22281b475",
+          "canvas": [
+            28,
+            16
+          ],
+          "opaqueBounds": [
+            1,
+            6,
+            26,
+            4
+          ],
+          "opaquePixels": 72,
+          "partialAlphaPixels": 0
+        },
+        "icon": {
+          "file": "icon-dawn_pike.png",
+          "original": "originals/legendary-oct06/icon-dawn_pike.png",
+          "jobId": "2a645523-aa58-4b44-bd5f-57645993917e",
+          "sha256": "1324a9be2aaf8c7d18f6ee356ecaf32f6722ca19ec1395f1fab8d8f661ab4d5c",
+          "canvas": [
+            16,
+            16
+          ],
+          "opaqueBounds": [
+            1,
+            1,
+            14,
+            15
+          ],
+          "opaquePixels": 50,
+          "partialAlphaPixels": 0
+        }
+      },
+      "history": [
+        {
+          "kind": "held",
+          "selected": true,
+          "tool": "create_image_pro_flash",
+          "jobId": "a1952de9-3e68-4630-83d7-26a574ce8821",
+          "seed": 610064,
+          "description": "Single isolated tiny equipment sprite for a polished low top-down pixel-art roguelike. Native pixel art with readable 1-pixel dark plum outline, clean intentional pixel clusters, limited material palettes, three-tone hue-shifted shading, top-left light. Transparent background. No ground, shadow, text, hands, character or glow cloud. Entire spear is perfectly HORIZONTAL, tip pointing RIGHT, handle at left. Hand grip at x=6,y=8. Total opaque length 26 pixels, total opaque height only 5 to 7 pixels. Head and tip at right x=26, shaft through y=8. Transparent margin. Not a diagonal spear. A slender long piercing pike. A sharp elongated golden translucent glass spear blade on the right, warm pale yellow cutting edge and bronze socket, a long narrow teal leather-wrapped dark shaft, small bronze pommel on the left. Clean diamond-shaped spear tip, slim shaft. No tassels, no aura, no floating particles. The long reach must read clearly.",
+          "original": "originals/legendary-oct06/held-dawn_pike.png",
+          "sha256": "cf2cd63163187e7159503d8feb990877dbc2a21f946eb66cbb1485d22281b475"
+        },
+        {
+          "kind": "icon",
+          "selected": true,
+          "tool": "create_image_pro_flash",
+          "jobId": "2a645523-aa58-4b44-bd5f-57645993917e",
+          "seed": 610065,
+          "description": "Single isolated tiny equipment sprite for a polished low top-down pixel-art roguelike. Native pixel art with readable 1-pixel dark plum outline, clean intentional pixel clusters, limited material palettes, three-tone hue-shifted shading, top-left light. Transparent background. No ground, shadow, text, hands, character or glow cloud. Inventory icon composed specifically at 16x16 native pixels, distinct chunky silhouette with 1 transparent pixel of margin. Diagonal bottom-left grip to top-right blade or barrel if useful. For the longbow keep a recognizable upright crescent curve with string permitted only in this icon. A slender long piercing pike. A sharp elongated golden translucent glass spear blade on the right, warm pale yellow cutting edge and bronze socket, a long narrow teal leather-wrapped dark shaft, small bronze pommel on the left. Clean diamond-shaped spear tip, slim shaft. No tassels, no aura, no floating particles. The long reach must read clearly.",
+          "original": "originals/legendary-oct06/icon-dawn_pike.png",
+          "sha256": "1324a9be2aaf8c7d18f6ee356ecaf32f6722ca19ec1395f1fab8d8f661ab4d5c"
+        }
+      ],
+      "gripVerifiedOpaque": true
+    },
+    {
+      "id": "gatebreaker_maul",
+      "name": "성문 파쇄추",
+      "provider": "PixelLab",
+      "grip": [
+        6,
+        12
+      ],
+      "targetOpaqueBudget": [
+        21,
+        16
+      ],
+      "assets": {
+        "held": {
+          "file": "held-gatebreaker_maul.png",
+          "original": "originals/legendary-oct06/held-gatebreaker_maul.png",
+          "jobId": "1f56f9de-b8da-4941-a761-cc79f553177e",
+          "sha256": "fdc97af7976b4ee3b091db51ff617366229cb8d17b2c771520b9de6f78e59892",
+          "canvas": [
+            24,
+            24
+          ],
+          "opaqueBounds": [
+            1,
+            6,
+            21,
+            12
+          ],
+          "opaquePixels": 142,
+          "partialAlphaPixels": 0
+        },
+        "icon": {
+          "file": "icon-gatebreaker_maul.png",
+          "original": "originals/legendary-oct06/icon-gatebreaker_maul.png",
+          "jobId": "d8f25905-a9fe-4a22-b0bb-eb7e607ccf1e",
+          "sha256": "7e1bcf391877f348896506293830561ffa76722b3253f20a13d514f79562aba3",
+          "canvas": [
+            16,
+            16
+          ],
+          "opaqueBounds": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "opaquePixels": 123,
+          "partialAlphaPixels": 0
+        }
+      },
+      "history": [
+        {
+          "kind": "held",
+          "selected": true,
+          "tool": "create_image_pro_flash",
+          "jobId": "1f56f9de-b8da-4941-a761-cc79f553177e",
+          "seed": 610066,
+          "description": "Single isolated tiny equipment sprite for a polished low top-down pixel-art roguelike. Native pixel art with readable 1-pixel dark plum outline, clean intentional pixel clusters, limited material palettes, three-tone hue-shifted shading, top-left light. Transparent background. No ground, shadow, text, hands, character or glow cloud. Horizontal equipment pose, haft runs LEFT to RIGHT, hand grip on the left near x=5,y=12, block hammer head on the RIGHT. Entire silhouette only 20 to 21 pixels wide and at most 16 pixels tall; center it with transparent margin. Head is a compact rectangular block, not a giant building. A heavy gate-breaking maul. A thick rectangular dark iron hammer head framed in chipped cool grey stone, a small warm golden lantern core embedded in the head face. A short thick dark wood haft wrapped in muted red leather with bronze end cap. The stone-rimmed squared block on the RIGHT is the unmistakable striking head. Visually heavy, restrained stone and iron shading, no spikes or aura.",
+          "original": "originals/legendary-oct06/held-gatebreaker_maul.png",
+          "sha256": "fdc97af7976b4ee3b091db51ff617366229cb8d17b2c771520b9de6f78e59892"
+        },
+        {
+          "kind": "icon",
+          "selected": true,
+          "tool": "create_image_pro_flash",
+          "jobId": "d8f25905-a9fe-4a22-b0bb-eb7e607ccf1e",
+          "seed": 610067,
+          "description": "Single isolated tiny equipment sprite for a polished low top-down pixel-art roguelike. Native pixel art with readable 1-pixel dark plum outline, clean intentional pixel clusters, limited material palettes, three-tone hue-shifted shading, top-left light. Transparent background. No ground, shadow, text, hands, character or glow cloud. Inventory icon composed specifically at 16x16 native pixels, distinct chunky silhouette with 1 transparent pixel of margin. Diagonal bottom-left grip to top-right blade or barrel if useful. For the longbow keep a recognizable upright crescent curve with string permitted only in this icon. A heavy gate-breaking maul. A thick rectangular dark iron hammer head framed in chipped cool grey stone, a small warm golden lantern core embedded in the head face. A short thick dark wood haft wrapped in muted red leather with bronze end cap. The stone-rimmed squared block on the RIGHT is the unmistakable striking head. Visually heavy, restrained stone and iron shading, no spikes or aura.",
+          "original": "originals/legendary-oct06/icon-gatebreaker_maul.png",
+          "sha256": "7e1bcf391877f348896506293830561ffa76722b3253f20a13d514f79562aba3"
+        }
+      ],
+      "gripVerifiedOpaque": true
+    },
+    {
+      "id": "silvermoon_longbow",
+      "name": "은월 장궁",
+      "provider": "PixelLab",
+      "grip": [
+        10,
+        11
+      ],
+      "bowTips": [
+        [
+          5,
+          2
+        ],
+        [
+          5,
+          21
+        ]
+      ],
+      "targetOpaqueBudget": [
+        10,
+        22
+      ],
+      "assets": {
+        "held": {
+          "file": "held-silvermoon_longbow.png",
+          "original": "originals/legendary-oct06/refined-held-silvermoon_longbow.png",
+          "jobId": "b312b928-a925-47e5-9c78-f0c35459e85e",
+          "sha256": "1232c11936588719496346c99f448f31e6dd01ec5b9ca42d1746395096f414a8",
+          "canvas": [
+            16,
+            24
+          ],
+          "opaqueBounds": [
+            4,
+            1,
+            8,
+            22
+          ],
+          "opaquePixels": 68,
+          "partialAlphaPixels": 0
+        },
+        "icon": {
+          "file": "icon-silvermoon_longbow.png",
+          "original": "originals/legendary-oct06/refined-icon-silvermoon_longbow.png",
+          "jobId": "64e305ac-fcd7-4cdb-a36e-4ed38789a8df",
+          "sha256": "3121dc6f06c6706ed372829bb25db99b9e5262c863ef3d3c3629f1bd9e1abf31",
+          "canvas": [
+            16,
+            16
+          ],
+          "opaqueBounds": [
+            4,
+            0,
+            9,
+            16
+          ],
+          "opaquePixels": 72,
+          "partialAlphaPixels": 0
+        }
+      },
+      "history": [
+        {
+          "kind": "held",
+          "selected": false,
+          "tool": "create_image_pro_flash",
+          "jobId": "03d89cd2-0f79-4a8e-9c29-534f14ce21b0",
+          "seed": 610068,
+          "description": "Single isolated tiny equipment sprite for a polished low top-down pixel-art roguelike. Native pixel art with readable 1-pixel dark plum outline, clean intentional pixel clusters, limited material palettes, three-tone hue-shifted shading, top-left light. Transparent background. No ground, shadow, text, hands, character or glow cloud. Bow stands VERTICALLY while aiming RIGHT, upper and lower tips both toward LEFT x=4,y=2 and x=4,y=21, purple central grip toward RIGHT near x=10,y=12. Opaque limb height 20 to 21 pixels, width no more than 10 pixels. Keep entire bow within transparent margin. A slender elegant silver crescent longbow, curved metallic silver limbs with cool moon-blue shadows, small pale gold limb collars and a dark purple leather central grip. One continuous crescent limb bows to the RIGHT. Tips end on LEFT, purple grip at right center. Open transparent inside curve. Render ONLY the bow limbs and grip. Absolutely NO bowstring and NO arrow: the game animates the string separately.",
+          "original": "originals/legendary-oct06/held-silvermoon_longbow.png",
+          "sha256": "674694d408315ef31e8cf97d389c1517dc5d406795f99affc72cee679e3ac2f1"
+        },
+        {
+          "kind": "held",
+          "selected": true,
+          "tool": "edit_image_pixen",
+          "jobId": "b312b928-a925-47e5-9c78-f0c35459e85e",
+          "seed": 610081,
+          "description": "Keep this exact native 16x24 canvas, slender upright crescent bow pose and small silhouette. Replace the black-only limb with clearly visible BRIGHT SILVER and ivory edge highlights, cool blue-grey metal shadows, a DARK PURPLE leather grip at center-right and tiny pale gold collars. Dark plum outline only at the outer edge. Preserve transparent interior. No bowstring, arrow, aura, extra decorations or size increase.",
+          "original": "originals/legendary-oct06/refined-held-silvermoon_longbow.png",
+          "sha256": "1232c11936588719496346c99f448f31e6dd01ec5b9ca42d1746395096f414a8"
+        },
+        {
+          "kind": "icon",
+          "selected": false,
+          "tool": "create_image_pro_flash",
+          "jobId": "fe23bccd-4d80-40f1-874f-0874406bc054",
+          "seed": 610069,
+          "description": "Single isolated tiny equipment sprite for a polished low top-down pixel-art roguelike. Native pixel art with readable 1-pixel dark plum outline, clean intentional pixel clusters, limited material palettes, three-tone hue-shifted shading, top-left light. Transparent background. No ground, shadow, text, hands, character or glow cloud. Inventory icon composed specifically at 16x16 native pixels, distinct chunky silhouette with 1 transparent pixel of margin. Diagonal bottom-left grip to top-right blade or barrel if useful. For the longbow keep a recognizable upright crescent curve with string permitted only in this icon. A slender elegant silver crescent longbow, curved metallic silver limbs with cool moon-blue shadows, small pale gold limb collars and a dark purple leather central grip. One continuous crescent limb bows to the RIGHT. Tips end on LEFT, purple grip at right center. Open transparent inside curve. Render ONLY the bow limbs and grip. Absolutely NO bowstring and NO arrow: the game animates the string separately.",
+          "original": "originals/legendary-oct06/icon-silvermoon_longbow.png",
+          "sha256": "b10c5268f455616f19d22631e05e299ebe9d0e66d60cb6f9cc28b11a477c4d3c"
+        },
+        {
+          "kind": "icon",
+          "selected": true,
+          "tool": "edit_image_pixen",
+          "jobId": "64e305ac-fcd7-4cdb-a36e-4ed38789a8df",
+          "seed": 610083,
+          "description": "Keep this exact 16x16 icon canvas and upright crescent bow silhouette. Repair the black-only shape: fill the limbs with BRIGHT SILVER and ivory highlights, cool blue-grey metal shading, DARK PURPLE leather central grip and two tiny pale gold collars. A readable silver crescent longbow facing right, tips at left. Dark plum outline only on edges, transparent background and open interior. No glow cloud, text or enlargement.",
+          "original": "originals/legendary-oct06/refined-icon-silvermoon_longbow.png",
+          "sha256": "3121dc6f06c6706ed372829bb25db99b9e5262c863ef3d3c3629f1bd9e1abf31"
+        }
+      ],
+      "gripVerifiedOpaque": true
+    }
+  ]
+}

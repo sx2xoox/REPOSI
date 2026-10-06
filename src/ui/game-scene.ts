@@ -146,6 +146,12 @@ export class GameScene implements Scene, WorldHost {
     }
     if (id) applyBlessing(this.world, id);
     else markBlessed(this.world);
+    this.persistBlessingDecision();
+  }
+
+  /** Floor-start choices must survive a reload, including the one-use reroll. */
+  persistBlessingDecision(): void {
+    if (!this.net) this.saveCheckpoint();
   }
 
   openFacility(id: number): void {
@@ -283,8 +289,7 @@ export class GameScene implements Scene, WorldHost {
       else this.openOverlay(new BlessingOverlay(this, choices));
       return;
     }
-    markBlessed(w);
-    if (!choices.length) return;
+    if (!choices.length) { markBlessed(w); return; }
     if (autoBlessEnabled()) applyBlessing(w, choices[0]);
     else this.openOverlay(new BlessingOverlay(this, choices));
   }

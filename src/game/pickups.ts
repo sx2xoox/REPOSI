@@ -14,6 +14,7 @@ import { defineDrawnSprite } from '../engine/sprites';
 import { ramp } from '../engine/painter';
 import { sceneSprite } from '../ui/pixellab-scenery';
 import { PREVIEW_RANGE } from './interact';
+import { STAGES_PER_FLOOR } from './stage-plan';
 
 export type PickupKind =
   | 'coin' | 'nickel' | 'dime'
@@ -445,10 +446,8 @@ export class FirePlace extends Actor {
 
 // ------------------------------------------------------------------ trapdoor
 export class Trapdoor extends Entity {
-  /** opens after a short delay so the player doesn't fall in immediately */
+  /** Opens visually before it can be used. Entry always requires interaction. */
   openT = 0;
-  /** a player standing on it when it appears must step off once first */
-  private armed = false;
   constructor(x: number, y: number) {
     super();
     this.x = x;
@@ -458,13 +457,34 @@ export class Trapdoor extends Entity {
     this.persistent = true;
   }
 
+  override previewable(): boolean {
+    return !this.dead && this.openT >= 1;
+  }
+
+  override interactionInfo(w?: World) {
+    const run = w?.run;
+    const nextStage = run?.staged && run.stage < STAGES_PER_FLOOR;
+    const returning = run?.campaign && !nextStage && run.floor >= run.targetFloor;
+    const destination = !run ? '내려가기' : returning ? '마을로 귀환' :
+      nextStage ? `${run.floor}-${run.stage + 1}로 내려가기` :
+      run.staged ? `${run.floor + 1}-1로 내려가기` : `${run.floor + 1}층으로 내려가기`;
+    const desc = returning ? '원정을 마치고 마을로 돌아갑니다.' :
+      nextStage ? '구덩이를 이용해 다음 스테이지로 이동합니다.' : '구덩이를 이용해 다음 층으로 이동합니다.';
+    return { name: destination, icon: 'trapdoor', desc: desc + (w?.coop ? ' 팀원 모두 함께 이동합니다.' : ''),
+      actionLabel: returning ? '귀환' : '내려가기', available: this.previewable() };
+  }
+
+  override interact(w: World): boolean {
+    const p = w.player;
+    if (!this.previewable() || !p.alive || p.downed || w.paused || w.transitioning || w.descending || w.gameOver ||
+      !w.entities.includes(this) || dist(this.x, this.y, p.x, p.y) >= PREVIEW_RANGE) return false;
+    w.beginDescend(this.x, this.y);
+    return true;
+  }
+
   override update(w: World, dt: number): void {
     this.age += dt;
     this.openT = Math.min(1, this.openT + dt * 1.5);
-    const p = w.player;
-    const d = dist(this.x, this.y, p.x, p.y);
-    if (!this.armed && d > 14) this.armed = true;
-    if (this.armed && this.openT >= 1 && d < 7 && !p.dead && !w.transitioning && !w.descending) w.beginDescend(this.x, this.y);
     // while the keeper falls in, the hole breathes out a little dust
     if (w.descending && fx.chance(dt * 40)) {
       const a = fx.angle();

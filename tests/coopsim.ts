@@ -20,7 +20,7 @@ import { NetRun } from '../src/net/netrun';
 import { World, type WorldHost, type PartyMember } from '../src/game/world';
 import { RunState } from '../src/game/run';
 import { Artifacts, Actives } from '../src/game/defs';
-import { emptyInput, fixedRules } from '../src/game/seam';
+import { emptyInput, fixedRules, type PlayerInput } from '../src/game/seam';
 import { stateHash } from '../src/game/statehash';
 import { blessingChoices, blessingDue } from '../src/game/blessings';
 import { discardBlockFor } from '../src/game/interact';
@@ -53,6 +53,8 @@ export interface CoopScenario {
   extraStep?: (w: World, tick: number) => void;
   /** Decisions sent through the actual lockstep transport, once sampled per peer. */
   commands?: (w: World, step: number) => CoopCommand[];
+  /** Optional local device input, encoded and delivered over the real transport. */
+  input?: (w: World, step: number, out: PlayerInput) => void;
   /** Keep authored encounter tests in their room after completion. */
   stayInRoom?: boolean;
   /** test only: nudge the last keeper by 1e-9 px on one peer at this tick (desync detection) */
@@ -155,7 +157,8 @@ export function runCoop(sc: CoopScenario): CoopResult {
       p.gone = true;
       return;
     }
-    if (w.local.alive) botInput(w, p.bot, sample);
+    if (sc.input) sc.input(w, p.steps, sample);
+    else if (w.local.alive) botInput(w, p.bot, sample);
     else {
       // downed: drift toward the nearest teammate
       const mate = w.players.find((q) => q !== w.local && q.alive);

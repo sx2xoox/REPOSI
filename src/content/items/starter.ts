@@ -6,6 +6,7 @@ import { ramp } from '../../engine/painter';
 import { RingFx } from '../../game/effects';
 import { Projectile } from '../../game/projectile';
 import { isMelee, proc } from './lib';
+import { effectProc } from '../../game/procs';
 
 const O = '#0c0810';
 
@@ -21,6 +22,7 @@ defineArtifact({
   id: 'long_wick',
   name: '긴 심지',
   desc: '공격력 +2. 5번째 공격마다 큰 불꽃탄',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '오래 타는 불이 더 뜨겁다.',
   signature: '5번째 공격마다 크고 뜨거운 불꽃탄이 나간다 (피해 +60%)',
   rarity: 'common',
@@ -35,6 +37,7 @@ defineArtifact({
     w.vars.__wickN = (w.vars.__wickN ?? 0) + 1;
     w.vars.__wickOn = w.vars.__wickN % 5 === 0 ? w.time : -1;
     if (w.vars.__wickOn < 0 || !isMelee(w)) return;
+    if (!w.enemies.some((e) => e.alive && e.vulnerable && !e.hidden) || !effectProc(w, () => true)) return;
     // melee keepers throw a short flame instead
     const pl = w.player;
     const p = new Projectile({
@@ -106,6 +109,7 @@ defineArtifact({
   id: 'quick_feather',
   name: '재빠른 깃털',
   desc: '이속 +12%, 공속 +0.5. 대시 후 깃털탄 2발',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '바람보다 먼저 닿는다.',
   signature: '대시한 뒤 첫 공격에 적을 쫓는 깃털 2개가 함께 날아간다',
   rarity: 'common',
@@ -121,7 +125,8 @@ defineArtifact({
     w.vars.__featherT = w.time + 1.5;
   },
   onAttack(w, angle, power) {
-    if ((w.vars.__featherT ?? 0) < w.time) return;
+    if ((w.vars.__featherT ?? 0) <= w.time) return;
+    if (!w.enemies.some((e) => e.alive && e.vulnerable && !e.hidden) || !effectProc(w, () => true)) return;
     w.vars.__featherT = 0;
     const pl = w.player;
     for (const da of [-0.4, 0.4]) {

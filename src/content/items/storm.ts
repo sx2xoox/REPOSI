@@ -34,6 +34,7 @@ defineArtifact({
   id: 'copper_coil',
   name: '구리 코일',
   desc: '공격이 10% 확률로 근처 적에게 번개를 튕긴다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '감긴 만큼 튀어 오른다.',
   rarity: 'common',
   tags: ['storm'],
@@ -69,6 +70,7 @@ defineArtifact({
   id: 'static_cape',
   name: '정전기 망토',
   desc: '대시가 빨라진다. 대시하면 주변 적에게 번개가 친다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '옷깃만 스쳐도 찌릿하다.',
   rarity: 'common',
   tags: ['storm', 'shadow'],
@@ -148,7 +150,8 @@ defineDrawnSprite('icon_thunder_drum', 16, 16, (p) => {
 defineArtifact({
   id: 'thunder_drum',
   name: '천둥 북',
-  desc: '적이 있는 방에 들어서면 모든 적에게 벼락이 떨어진다',
+  desc: '방의 첫 전투가 시작되면 적 전체에 벼락',
+  detail: '실제 적이 나타날 때 발동. 방마다 1회이며 재입장·후속 웨이브로 초기화되지 않는다. 동일 적 상태 재부여 0.5초. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '북이 울리면 하늘이 대답한다.',
   rarity: 'rare',
   tags: ['storm'],
@@ -156,14 +159,15 @@ defineArtifact({
   look: { mote: '#ffe95a', aura: '#7ad8ff' },
   pools: ['treasure', 'boss', 'challenge'],
   onRoomEnter(w) {
-    if (!w.node.cleared) w.vars.__drumT = w.time + 0.75;
+    w.vars.__drumT = w.node.cleared ? 0 : 1;
   },
   onUpdate(w, _dt, power) {
-    const t = w.vars.__drumT ?? 0;
-    if (t <= 0 || w.time < t) return;
-    w.vars.__drumT = 0;
-    const es = w.enemies.filter((e) => e.alive && !e.hidden && e.vulnerable);
+    const key = `__drumDone:${w.run.floor}:${w.run.stage}:${w.node.id}`;
+    if (!(w.vars.__drumT ?? 0) || w.vars[key] || w.node.cleared) return;
+    const es = w.enemies.filter((e) => e.alive && !e.hidden && e.vulnerable && !e.ignoreForClear && e.dormant <= 0);
     if (!es.length) return;
+    w.vars.__drumT = 0;
+    w.vars[key] = 1;
     w.sfx('lightning', { vol: 0.9, pitch: 0.7 });
     w.sfx('slam', { vol: 0.5 });
     w.shake(0.5);
@@ -193,6 +197,7 @@ defineArtifact({
   id: 'ball_lightning',
   name: '구전 정령',
   desc: '번개 정령이 따라다니며 가까운 적을 감전시킨다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '말은 안 통하지만, 마음은 통한다.',
   rarity: 'rare',
   tags: ['storm'],
@@ -228,7 +233,7 @@ defineArtifact({
   id: 'stormcaller_rod',
   name: '폭풍 부름 지팡이',
   desc: '치명타 확률 +6%. 치명타가 연쇄 번개를 일으킨다',
-  detail: '직접 치명타만 발동. 처음 맞힌 적을 제외한 주변 적에게 번개가 튄다.',
+  detail: '직접 치명타만 발동. 처음 맞힌 적을 제외한 주변 적에게 번개가 튄다. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '번개는 가장 높은 곳에 떨어진다.',
   rarity: 'epic',
   tags: ['storm', 'star'],
@@ -266,7 +271,7 @@ defineArtifact({
   id: 'tempest_heart',
   name: '폭풍의 심장',
   desc: '직접 공격이 번개를 튕긴다. 공격 속도 +20%',
-  detail: '재사용 0.12초. 처음 맞힌 적을 제외한 주변 적에게 적용. 추가 파편은 발동 제외.',
+  detail: '최소 간격 0.2초. 처음 맞힌 적을 제외한 주변 적에게 적용. 추가 파편은 발동 제외. 상태 재부여 0.5초. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '이 심장은 천둥으로 뛴다.',
   rarity: 'legendary',
   tags: ['storm'],
@@ -278,8 +283,6 @@ defineArtifact({
   },
   onHit(w, t, hit, power) {
     if (!isPrimary(hit)) return;
-    if ((w.vars.__tempestT ?? -1) > w.time) return;
-    w.vars.__tempestT = w.time + 0.12;
     chainLightning(w, t.x, t.y - t.z - 4, { jumps: 2, damage: dmg(w) * 0.45 * stackMul(power), range: 80, exclude: new Set([t.id]), quiet: fx.chance(0.6) });
   },
   onUpdate(w, dt) {

@@ -19,7 +19,7 @@ import { Enemy } from './enemy';
 import { Player } from './player';
 import { Projectile } from './projectile';
 import { MeleeSwing } from './melee';
-import { Bomb, Chest, Pedestal, Pickup } from './pickups';
+import { Bomb, Chest, Pedestal, Pickup, Trapdoor } from './pickups';
 import type { RNG } from '../engine/rng';
 import type { WeaponState } from './defs';
 
@@ -237,6 +237,7 @@ function hashActor(h: StateHasher, a: Actor): void {
 
 function hashEntity(h: StateHasher, e: Entity, coop = false): void {
   h.int(e.encounterId).num(e.enemyDamageScale);
+  h.str((e as unknown as { procEffect?: string }).procEffect ?? '');
   if (e instanceof Player) return; // hashed by hashPlayer (it is also in the list: mark its slot)
   if (coop) {
     h.int(e.ctxP instanceof Player ? e.ctxP.slot : -1);
@@ -262,13 +263,15 @@ function hashEntity(h: StateHasher, e: Entity, coop = false): void {
   if (e instanceof Projectile) {
     h.str(e.team).num(e.angle).num(e.speed).num(e.damage).num(e.traveled).num(e.life).int(e.pierce).int(e.bounce);
     h.num(e.homing).num(e.delay).num(e.curve).int(e.generation).int(e.hitIds.size).int(e.behaviors.length).mem(e.mem);
+    for (const status of e.statuses) h.str(status.kind).num(status.duration).num(status.power ?? 0).num(status.chance ?? 1).str(status.procKey ?? '');
+    h.word(-20);
   } else if (e instanceof MeleeSwing) {
     h.int(e.owner.id).mem(e.o as unknown as Record<string, unknown>).int(e.hits);
     for (const id of e.hitIds) h.int(id);
     h.word(-17);
     for (const id of e.tilesHit) h.int(id);
     h.word(-18);
-    for (const status of e.o.statuses ?? []) h.str(status.kind).num(status.duration).num(status.power ?? 0).num(status.chance ?? 1);
+    for (const status of e.o.statuses ?? []) h.str(status.kind).num(status.duration).num(status.power ?? 0).num(status.chance ?? 1).str(status.procKey ?? '');
     h.word(-19);
   } else if (e instanceof Pickup) {
     h.str(e.kind).int(e.price).str(e.potionId).num(e.grace).bool(e.waitForLeave);
@@ -278,6 +281,8 @@ function hashEntity(h: StateHasher, e: Entity, coop = false): void {
     h.bool(e.locked).bool(e.opened);
   } else if (e instanceof Bomb) {
     h.num(e.fuse).num(e.damage).num(e.radius).str(e.owner);
+  } else if (e instanceof Trapdoor) {
+    h.num(e.openT);
   }
   const m = (e as unknown as { mem?: Record<string, unknown> }).mem;
   if (m && !(e instanceof Projectile)) h.mem(m);

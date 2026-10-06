@@ -1,4 +1,4 @@
-// Pure (DOM-free) logic for the on-screen touch controls: floating joystick
+// Pure (DOM-free) logic for the on-screen touch controls: fixed movement joystick
 // math, the button layout for a given viewport / safe area / HUD geometry, a
 // small pointer router that assigns every touch pointer to a stick, a button,
 // the attack button or nothing, and the auto-aim target picker. Unit-tested in
@@ -6,10 +6,10 @@
 // draws it.
 //
 // Two schemes (설정 > 터치 조작 방식):
-//   'auto' (default): left floating stick = move, big ATTACK button bottom-right
+//   'auto' (default): left fixed stick = move, big ATTACK button bottom-right
 //          (hold = attack, auto-aims at the best target; drag past a dead zone =
 //          manual aim in the drag direction), action buttons in an arc around it.
-//   'twin': left floating stick = move, right floating stick = aim + auto-fire.
+//   'twin': left fixed stick = move, right floating stick = aim + auto-fire.
 //
 // All coordinates here are CSS pixels of the viewport.
 
@@ -219,6 +219,11 @@ export function hitCircle(c: Circle, x: number, y: number, margin = 1.25): boole
   return Math.hypot(x - c.x, y - c.y) <= c.r * margin;
 }
 
+/** Fixed movement pad with a small finger margin; unrelated screen taps do not move the keeper. */
+export function hitMoveStick(layout: TouchLayout, x: number, y: number): boolean {
+  return x < layout.splitX && hitCircle({ ...layout.leftRest, r: layout.stickR }, x, y, 1.4);
+}
+
 /**
  * Closest enabled button under (x, y), or null; with `attack` the attack button
  * competes too (returned as 'attack'). Closeness is relative to each radius.
@@ -280,8 +285,8 @@ export type Owner =
   | { kind: 'ignored' };
 
 /**
- * Assigns gameplay touch pointers: buttons first, then the floating stick of
- * the screen half the touch landed in. One pointer per stick; extra fingers in
+ * Assigns gameplay touch pointers: buttons first, then the fixed move pad or
+ * the floating right aim stick. One pointer per stick; extra fingers in
  * an occupied half are ignored until lifted.
  */
 export class TouchRouter {
@@ -311,13 +316,16 @@ export class TouchRouter {
       }
     } else {
       const side: 'left' | 'right' = x < this.layout.splitX ? 'left' : 'right';
-      if (this[side]) owner = { kind: 'ignored' };
+      if (this[side] || side === 'left' && !hitMoveStick(L, x, y)) owner = { kind: 'ignored' };
       else {
-        this[side] = { pointerId: id, base: { x, y }, finger: { x, y }, out: { x: 0, y: 0 }, engaged: false };
+        const base = side === 'left' ? { ...L.leftRest } : { x, y };
+        this[side] = { pointerId: id, base, finger: { x, y }, out: { x: 0, y: 0 }, engaged: false };
         owner = { kind: 'stick', side };
       }
     }
     this.owners.set(id, owner);
+    // A fixed pad responds immediately to a press away from its center.
+    if (owner.kind === 'stick' && owner.side === 'left') this.move(id, x, y);
     return owner;
   }
 
@@ -341,7 +349,7 @@ export class TouchRouter {
     if (!st) return;
     const R = this.layout.stickR;
     st.finger = { x, y };
-    st.base = followBase(st.base, st.finger, R);
+    if (o.side === 'right') st.base = followBase(st.base, st.finger, R);
     const dx = x - st.base.x;
     const dy = y - st.base.y;
     if (o.side === 'left') {

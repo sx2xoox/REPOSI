@@ -1,5 +1,10 @@
 /** Family-sized PixelLab exports. Integer pivots include one transparent safety pixel. */
 export const PIXELLAB_WEAPON_LAYOUT: Record<string, { grip: [number, number]; muzzle?: [number, number]; bowTips?: [[number, number], [number, number]] }> = {
+  sunset_rifle: { grip: [8, 8], muzzle: [26, 7] },
+  gatekeeper_shotgun: { grip: [5, 8], muzzle: [22, 6] },
+  dawn_pike: { grip: [7, 8] },
+  gatebreaker_maul: { grip: [6, 12] },
+  silvermoon_longbow: { grip: [10, 11], bowTips: [[5, 2], [5, 21]] },
   brass_revolver: {"grip":[3,9],"muzzle":[19,5]},
   nail_carbine: {"grip":[6,5],"muzzle":[23,3]},
   bell_blunderbuss: {"grip":[5,8],"muzzle":[23,7]},

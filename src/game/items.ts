@@ -21,6 +21,7 @@ import type { Projectile } from './projectile';
 import type { MeleeSwing } from './melee';
 import type { Renderer } from '../engine/renderer';
 import type { Player } from './player';
+import { pruneProcState, withProcContext } from './procs';
 
 export interface ActiveEffect {
   key: string;
@@ -226,7 +227,8 @@ export class ItemSystem {
       for (let i = 0; i < list.length; i++) {
         this.cur = list[i];
         try {
-          fn(list[i]);
+          const effect = list[i];
+          withProcContext(w, effect.key, () => fn(effect));
         } catch (err) {
           console.error('[items] hook error', err);
         }
@@ -299,6 +301,7 @@ export class ItemSystem {
 
   private updateOwn(dt: number): void {
     const w = this.w;
+    pruneProcState(w);
     let changed = false;
     for (const b of this.buffs) {
       if (b.time !== Infinity) {

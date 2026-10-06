@@ -1,0 +1,608 @@
+{
+  "provider": "PixelLab",
+  "date": "2026-10-06",
+  "batch": "refuge-five-skill-redesign-local-preview",
+  "processing": "Exact native 16x16 PNG bytes copied from PixelLab output. No resizing, local repainting, recoloring or smoothing. Initial and refined originals retained. Character appearance and portraits untouched.",
+  "review": {
+    "contactSheet": "test-results/balance-preview/art/skills-installed-review.png",
+    "nativeContactSheet": "test-results/balance-preview/art/skills-installed-native.png",
+    "initialPixenCreations": 15,
+    "targetedProFlashCreations": 3,
+    "materialOnlyPixenEdits": 1,
+    "estimatedGenerationUnits": 31,
+    "estimateNote": "Initial Pixen icons and single-image contrast edits quote 1 generation each; selected Pro Flash corrections quote 5 provisional generations each."
+  },
+  "icons": [
+    {
+      "id": "icon_tove_passive",
+      "character": "tove",
+      "characterName": "토브",
+      "slot": "passive",
+      "name": "폭약 준비",
+      "palette": "warm brass tan #dba26a, orange explosive sparks, dark mahogany",
+      "motif": "Three short red-orange dynamite sticks tightly tied together with brass tan cord, a short curled ivory fuse with ONE orange spark. A compact explosive bundle, no turret, cannon or gun.",
+      "file": "icon_tove_passive.png",
+      "jobId": "f6e330a1-32ac-45d4-afb1-ab261b5d791a",
+      "sha256": "8bb61c21964729c1835c82d36a8802e66fe18230caf6ca4f9a09caeb4e5778b4",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        2,
+        2,
+        12,
+        13
+      ],
+      "opaquePixels": 94,
+      "partialAlphaPixels": 0,
+      "colors": 15,
+      "refinementReason": null,
+      "history": [
+        {
+          "selected": true,
+          "tool": "create_image_pixen",
+          "jobId": "f6e330a1-32ac-45d4-afb1-ab261b5d791a",
+          "seed": 610100,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: warm brass tan #dba26a, orange explosive sparks, dark mahogany. Three short red-orange dynamite sticks tightly tied together with brass tan cord, a short curled ivory fuse with ONE orange spark. A compact explosive bundle, no turret, cannon or gun.",
+          "original": "originals/refuge-redesign-oct06/icon_tove_passive.png",
+          "sha256": "8bb61c21964729c1835c82d36a8802e66fe18230caf6ca4f9a09caeb4e5778b4"
+        }
+      ]
+    },
+    {
+      "id": "icon_tove_dash",
+      "character": "tove",
+      "characterName": "토브",
+      "slot": "dash",
+      "name": "지뢰 설치",
+      "palette": "warm brass tan #dba26a, orange explosive sparks, dark mahogany",
+      "motif": "A small flat CROSS-SHAPED bronze pressure mine viewed from above, four short squared arms, dark iron center and one bright orange warning dot. Distinct squat mechanical ground mine, no explosion cloud.",
+      "file": "icon_tove_dash.png",
+      "jobId": "4f86744d-285c-4836-963e-5d3e56ece575",
+      "sha256": "6a4e7d76686504281e6500d53e2deabce0bf6733bc433f2fee9de44bef19e012",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        2,
+        2,
+        12,
+        12
+      ],
+      "opaquePixels": 100,
+      "partialAlphaPixels": 0,
+      "colors": 25,
+      "refinementReason": null,
+      "history": [
+        {
+          "selected": true,
+          "tool": "create_image_pixen",
+          "jobId": "4f86744d-285c-4836-963e-5d3e56ece575",
+          "seed": 610101,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: warm brass tan #dba26a, orange explosive sparks, dark mahogany. A small flat CROSS-SHAPED bronze pressure mine viewed from above, four short squared arms, dark iron center and one bright orange warning dot. Distinct squat mechanical ground mine, no explosion cloud.",
+          "original": "originals/refuge-redesign-oct06/icon_tove_dash.png",
+          "sha256": "6a4e7d76686504281e6500d53e2deabce0bf6733bc433f2fee9de44bef19e012"
+        }
+      ]
+    },
+    {
+      "id": "icon_tove_release",
+      "character": "tove",
+      "characterName": "토브",
+      "slot": "release",
+      "name": "집중 포격",
+      "palette": "warm brass tan #dba26a, orange explosive sparks, dark mahogany",
+      "motif": "THREE bright ivory-orange artillery shell streaks converging down onto one small red-orange star impact, grouped clear diagonal descending lines with dark outline. Three strikes, no gun, no turret, no giant cloud.",
+      "file": "icon_tove_release.png",
+      "jobId": "47562e31-4ca9-4a5f-b0b4-e5f156e20834",
+      "sha256": "56ca70ce7db6447ccd4cc41c19994e286526d4e0ef3644ccc65098b144c3a4c1",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        1,
+        1,
+        14,
+        14
+      ],
+      "opaquePixels": 109,
+      "partialAlphaPixels": 0,
+      "colors": 38,
+      "refinementReason": "Initial icon read as a single mushroom explosion instead of focused triple bombardment.",
+      "history": [
+        {
+          "selected": false,
+          "tool": "create_image_pixen",
+          "jobId": "93c81213-6901-4e67-a7d2-962952f237bd",
+          "seed": 610102,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: warm brass tan #dba26a, orange explosive sparks, dark mahogany. THREE bright ivory-orange artillery shell streaks converging down onto one small red-orange star impact, grouped clear diagonal descending lines with dark outline. Three strikes, no gun, no turret, no giant cloud.",
+          "original": "originals/refuge-redesign-oct06/icon_tove_release.png",
+          "sha256": "d7252a681bf66e493610dfcf30f4de6cd84a6797cb95838d77f8a33b3257835f"
+        },
+        {
+          "selected": true,
+          "tool": "create_image_pro_flash",
+          "jobId": "47562e31-4ca9-4a5f-b0b4-e5f156e20834",
+          "seed": 610130,
+          "description": "ONE native 16x16 pixel-art ability icon on transparent background. THREE clearly separated bright ivory-tipped orange artillery streaks falling diagonally from upper left toward lower right, and THREE tiny orange impact stars along the lower edge. A simple THREE-STRIKE BOMBARDMENT symbol, readable chunky pixels. Warm brass and orange palette, 1-pixel dark plum outlines, top-left highlights. No mushroom cloud, no large explosion dome, no cannon, no turret, no text, no square frame. Keep a transparent 1px border.",
+          "original": "originals/refuge-redesign-oct06/refined-icon_tove_release.png",
+          "sha256": "56ca70ce7db6447ccd4cc41c19994e286526d4e0ef3644ccc65098b144c3a4c1"
+        }
+      ]
+    },
+    {
+      "id": "icon_luen_passive",
+      "character": "luen",
+      "characterName": "루엔",
+      "slot": "passive",
+      "name": "연결실",
+      "palette": "lavender purple #bba3e5, ivory knot highlights, dark grape outline",
+      "motif": "Exactly THREE large ivory thread KNOTS arranged as a triangle and joined by taut clearly visible purple threads. Open space between lines. A magical connected-thread diagram, no potion bottle, no spider or web full of tiny strands.",
+      "file": "icon_luen_passive.png",
+      "jobId": "42cc14be-ddf9-4905-92c1-76380c57dea3",
+      "sha256": "bf460437941f4167b40d382f638145871a0f293fd96417147016e2be3430e244",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        1,
+        2,
+        14,
+        13
+      ],
+      "opaquePixels": 85,
+      "partialAlphaPixels": 0,
+      "colors": 21,
+      "refinementReason": null,
+      "history": [
+        {
+          "selected": true,
+          "tool": "create_image_pixen",
+          "jobId": "42cc14be-ddf9-4905-92c1-76380c57dea3",
+          "seed": 610103,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: lavender purple #bba3e5, ivory knot highlights, dark grape outline. Exactly THREE large ivory thread KNOTS arranged as a triangle and joined by taut clearly visible purple threads. Open space between lines. A magical connected-thread diagram, no potion bottle, no spider or web full of tiny strands.",
+          "original": "originals/refuge-redesign-oct06/icon_luen_passive.png",
+          "sha256": "bf460437941f4167b40d382f638145871a0f293fd96417147016e2be3430e244"
+        }
+      ]
+    },
+    {
+      "id": "icon_luen_dash",
+      "character": "luen",
+      "characterName": "루엔",
+      "slot": "dash",
+      "name": "실 옮김",
+      "palette": "lavender purple #bba3e5, ivory knot highlights, dark grape outline",
+      "motif": "A small ivory thread spool shifting to the right along one curved lavender thread between two ivory knots. One clean purple travel swoosh and open space. Read as moving a thread anchor, no potion bottle, no text.",
+      "file": "icon_luen_dash.png",
+      "jobId": "28b026fa-8608-4d1b-ba6e-189ed5dfc4f9",
+      "sha256": "1cc738eeaa1bca4bfcceb023e796a5adf822e2b110f74c5a9ee617e97bc8bb4f",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        0,
+        1,
+        16,
+        13
+      ],
+      "opaquePixels": 65,
+      "partialAlphaPixels": 0,
+      "colors": 16,
+      "refinementReason": "Initial icon included an opaque patterned background and did not read as a thread-anchor move. One Pixen material-only edit brightens the two ivory knots and lavender thread for dark UI readability.",
+      "history": [
+        {
+          "selected": false,
+          "tool": "create_image_pixen",
+          "jobId": "86cc0ba7-1daa-4ef1-b096-ed5db0403308",
+          "seed": 610104,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: lavender purple #bba3e5, ivory knot highlights, dark grape outline. A small ivory thread spool shifting to the right along one curved lavender thread between two ivory knots. One clean purple travel swoosh and open space. Read as moving a thread anchor, no potion bottle, no text.",
+          "original": "originals/refuge-redesign-oct06/icon_luen_dash.png",
+          "sha256": "f61147a026c73a532b564674f416bc4bb17bfb77ce3c474e60d6434ca73fd4a2"
+        },
+        {
+          "selected": false,
+          "tool": "create_image_pro_flash",
+          "jobId": "6119bbda-b56c-4eca-960f-97e10620315d",
+          "seed": 610131,
+          "description": "ONE native 16x16 pixel-art ability icon on a completely TRANSPARENT background. TWO ivory thread-anchor knots, one small at left and one larger at right, connected by ONE clear bowed lavender-purple thread; a tiny pale arrow tip on the thread points toward the right knot. Readable symbol of shifting a magical thread anchor. Simple open negative space, crisp dark plum outlines and ivory highlights, lavender and grape palette. No filled background, no checkerboard, no cloth, no potion bottle, no spool, no text, no frame.",
+          "original": "originals/refuge-redesign-oct06/refined-icon_luen_dash.png",
+          "sha256": "da165326e7c6a3c4d6944d8cccbf65af008b69522fe86507dcd687dbbc118b04"
+        },
+        {
+          "selected": true,
+          "tool": "edit_image_pixen",
+          "jobId": "28b026fa-8608-4d1b-ba6e-189ed5dfc4f9",
+          "seed": 610133,
+          "description": "Keep the exact native 16x16 canvas, two knots, curved connecting thread, positions and transparent background. Improve contrast only: BOTH knot centers must be bright IVORY, each with one pale lavender shadow; the whole connecting thread must be clearly bright LAVENDER PURPLE instead of dark blue. Dark plum only for the thin outlines. Readable against a dark game UI. No extra objects, no background, no glow cloud, no size increase.",
+          "original": "originals/refuge-redesign-oct06/readable-icon_luen_dash.png",
+          "sha256": "1cc738eeaa1bca4bfcceb023e796a5adf822e2b110f74c5a9ee617e97bc8bb4f"
+        }
+      ]
+    },
+    {
+      "id": "icon_luen_release",
+      "character": "luen",
+      "characterName": "루엔",
+      "slot": "release",
+      "name": "실 절단",
+      "palette": "lavender purple #bba3e5, ivory knot highlights, dark grape outline",
+      "motif": "One lavender thread snapped sharply at center, its two ivory knot ends recoiling left and right, a small sharp silver diagonal blade crossing the break and two violet spark pixels. A clean severed-thread symbol, no liquid or potion.",
+      "file": "icon_luen_release.png",
+      "jobId": "24745dc5-2675-43e7-a73d-973146ed8fb7",
+      "sha256": "3186229370d72897b62f6fb2d4f195070336a540a6fcbed550b4891ef42a84ed",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        2,
+        1,
+        13,
+        13
+      ],
+      "opaquePixels": 99,
+      "partialAlphaPixels": 0,
+      "colors": 19,
+      "refinementReason": null,
+      "history": [
+        {
+          "selected": true,
+          "tool": "create_image_pixen",
+          "jobId": "24745dc5-2675-43e7-a73d-973146ed8fb7",
+          "seed": 610105,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: lavender purple #bba3e5, ivory knot highlights, dark grape outline. One lavender thread snapped sharply at center, its two ivory knot ends recoiling left and right, a small sharp silver diagonal blade crossing the break and two violet spark pixels. A clean severed-thread symbol, no liquid or potion.",
+          "original": "originals/refuge-redesign-oct06/icon_luen_release.png",
+          "sha256": "3186229370d72897b62f6fb2d4f195070336a540a6fcbed550b4891ef42a84ed"
+        }
+      ]
+    },
+    {
+      "id": "icon_ves_passive",
+      "character": "ves",
+      "characterName": "베스",
+      "slot": "passive",
+      "name": "보조 무기",
+      "palette": "soft coral pink #ed9fa4, cool pale sky blue, ivory metal highlights",
+      "motif": "A small pink-handled steel side dagger resting BESIDE a slightly larger pale blue short sword, both vertical and parallel. Two clearly different weapon sizes, compact secondary weapon readiness. No circular switching arrows, no character.",
+      "file": "icon_ves_passive.png",
+      "jobId": "48f5f8c0-e945-4eb2-bb06-4c929dfcddbd",
+      "sha256": "06badcc534d3914c50096e784b6f12aa07fea0120d44b4a269c99a6d08524ad6",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        2,
+        3,
+        12,
+        10
+      ],
+      "opaquePixels": 64,
+      "partialAlphaPixels": 0,
+      "colors": 21,
+      "refinementReason": null,
+      "history": [
+        {
+          "selected": true,
+          "tool": "create_image_pixen",
+          "jobId": "48f5f8c0-e945-4eb2-bb06-4c929dfcddbd",
+          "seed": 610106,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: soft coral pink #ed9fa4, cool pale sky blue, ivory metal highlights. A small pink-handled steel side dagger resting BESIDE a slightly larger pale blue short sword, both vertical and parallel. Two clearly different weapon sizes, compact secondary weapon readiness. No circular switching arrows, no character.",
+          "original": "originals/refuge-redesign-oct06/icon_ves_passive.png",
+          "sha256": "06badcc534d3914c50096e784b6f12aa07fea0120d44b4a269c99a6d08524ad6"
+        }
+      ]
+    },
+    {
+      "id": "icon_ves_dash",
+      "character": "ves",
+      "characterName": "베스",
+      "slot": "dash",
+      "name": "기동 준비",
+      "palette": "soft coral pink #ed9fa4, cool pale sky blue, ivory metal highlights",
+      "motif": "Two small leather BOOTS staggered diagonally forward, front boot coral pink and rear boot pale sky blue, two short ivory motion marks behind. Agile footwork, readable paired feet, no character body and no circular arrows.",
+      "file": "icon_ves_dash.png",
+      "jobId": "160db6ca-a170-494b-9302-482a0296b6b3",
+      "sha256": "fa99ceab7dd65abc494c223553183d665e2f5a2ae2fa8725fc57f970487d506a",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        2,
+        2,
+        11,
+        12
+      ],
+      "opaquePixels": 91,
+      "partialAlphaPixels": 0,
+      "colors": 11,
+      "refinementReason": null,
+      "history": [
+        {
+          "selected": true,
+          "tool": "create_image_pixen",
+          "jobId": "160db6ca-a170-494b-9302-482a0296b6b3",
+          "seed": 610107,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: soft coral pink #ed9fa4, cool pale sky blue, ivory metal highlights. Two small leather BOOTS staggered diagonally forward, front boot coral pink and rear boot pale sky blue, two short ivory motion marks behind. Agile footwork, readable paired feet, no character body and no circular arrows.",
+          "original": "originals/refuge-redesign-oct06/icon_ves_dash.png",
+          "sha256": "fa99ceab7dd65abc494c223553183d665e2f5a2ae2fa8725fc57f970487d506a"
+        }
+      ]
+    },
+    {
+      "id": "icon_ves_release",
+      "character": "ves",
+      "characterName": "베스",
+      "slot": "release",
+      "name": "쌍수 협공",
+      "palette": "soft coral pink #ed9fa4, cool pale sky blue, ivory metal highlights",
+      "motif": "TWO prominent short swords crossing in a crisp X, one coral pink hilt and one pale sky blue hilt, bright ivory blades, a small gold-white four-point spark at the crossing. Strong symmetrical dual-weapon attack emblem, no circular arrows.",
+      "file": "icon_ves_release.png",
+      "jobId": "14c23f5b-d811-4336-8dde-2e4b2740881f",
+      "sha256": "95f997464e8b0bc5ba2419963140bb8fe2c9c885aa171a5f6d95e464713d638a",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        2,
+        2,
+        12,
+        12
+      ],
+      "opaquePixels": 86,
+      "partialAlphaPixels": 0,
+      "colors": 36,
+      "refinementReason": null,
+      "history": [
+        {
+          "selected": true,
+          "tool": "create_image_pixen",
+          "jobId": "14c23f5b-d811-4336-8dde-2e4b2740881f",
+          "seed": 610108,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: soft coral pink #ed9fa4, cool pale sky blue, ivory metal highlights. TWO prominent short swords crossing in a crisp X, one coral pink hilt and one pale sky blue hilt, bright ivory blades, a small gold-white four-point spark at the crossing. Strong symmetrical dual-weapon attack emblem, no circular arrows.",
+          "original": "originals/refuge-redesign-oct06/icon_ves_release.png",
+          "sha256": "95f997464e8b0bc5ba2419963140bb8fe2c9c885aa171a5f6d95e464713d638a"
+        }
+      ]
+    },
+    {
+      "id": "icon_ort_passive",
+      "character": "ort",
+      "characterName": "오르트",
+      "slot": "passive",
+      "name": "방패 수비",
+      "palette": "sage green #91c6a3, aged brass rim, ivory glints, deep forest shadow",
+      "motif": "ONE sturdy upright sage-green heater SHIELD with a thick aged brass rim, small ivory central stud and pale top-left highlight. Simple solid defensive shield with clean pointed base. No sword, no person, no crown.",
+      "file": "icon_ort_passive.png",
+      "jobId": "62f7847a-ca0f-42f6-9e87-3b88d9a7b94a",
+      "sha256": "f0771744aba18ddeb8ef6af9184ebd0d5e01937b0e00ba1ee2dfacce58f04207",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        3,
+        1,
+        10,
+        13
+      ],
+      "opaquePixels": 96,
+      "partialAlphaPixels": 0,
+      "colors": 19,
+      "refinementReason": null,
+      "history": [
+        {
+          "selected": true,
+          "tool": "create_image_pixen",
+          "jobId": "62f7847a-ca0f-42f6-9e87-3b88d9a7b94a",
+          "seed": 610109,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: sage green #91c6a3, aged brass rim, ivory glints, deep forest shadow. ONE sturdy upright sage-green heater SHIELD with a thick aged brass rim, small ivory central stud and pale top-left highlight. Simple solid defensive shield with clean pointed base. No sword, no person, no crown.",
+          "original": "originals/refuge-redesign-oct06/icon_ort_passive.png",
+          "sha256": "f0771744aba18ddeb8ef6af9184ebd0d5e01937b0e00ba1ee2dfacce58f04207"
+        }
+      ]
+    },
+    {
+      "id": "icon_ort_dash",
+      "character": "ort",
+      "characterName": "오르트",
+      "slot": "dash",
+      "name": "방패 남기기",
+      "palette": "sage green #91c6a3, aged brass rim, ivory glints, deep forest shadow",
+      "motif": "A small sage-green shield LEFT BEHIND on the left and one ivory boot print moving away to the right, separated by two tiny brass motion dots. Clearly detached shield and escaping step, no full character.",
+      "file": "icon_ort_dash.png",
+      "jobId": "4850cdbb-757f-4a0d-84d3-7e3ed897a2b5",
+      "sha256": "a18184844456b417e8ee87714c26fa05bdf3b406bdd53b3dbd217519caa23e84",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        2,
+        2,
+        12,
+        12
+      ],
+      "opaquePixels": 75,
+      "partialAlphaPixels": 0,
+      "colors": 43,
+      "refinementReason": null,
+      "history": [
+        {
+          "selected": true,
+          "tool": "create_image_pixen",
+          "jobId": "4850cdbb-757f-4a0d-84d3-7e3ed897a2b5",
+          "seed": 610110,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: sage green #91c6a3, aged brass rim, ivory glints, deep forest shadow. A small sage-green shield LEFT BEHIND on the left and one ivory boot print moving away to the right, separated by two tiny brass motion dots. Clearly detached shield and escaping step, no full character.",
+          "original": "originals/refuge-redesign-oct06/icon_ort_dash.png",
+          "sha256": "a18184844456b417e8ee87714c26fa05bdf3b406bdd53b3dbd217519caa23e84"
+        }
+      ]
+    },
+    {
+      "id": "icon_ort_release",
+      "character": "ort",
+      "characterName": "오르트",
+      "slot": "release",
+      "name": "전진 대형 방패",
+      "palette": "sage green #91c6a3, aged brass rim, ivory glints, deep forest shadow",
+      "motif": "ONE broad heavy rectangular sage-green tower shield, wide aged brass rim, bright ivory center ridge, TWO compact forward-pointing brass chevrons on its right. Wide advancing shield formation. No person, sword or crown.",
+      "file": "icon_ort_release.png",
+      "jobId": "30fa408c-d4a2-4bc1-878e-557188e181c9",
+      "sha256": "1aa6c9357fe09c16dcd66599af9b760ac66344650bdbc2f4d9da5f32565814e7",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        1,
+        2,
+        14,
+        12
+      ],
+      "opaquePixels": 116,
+      "partialAlphaPixels": 0,
+      "colors": 35,
+      "refinementReason": null,
+      "history": [
+        {
+          "selected": true,
+          "tool": "create_image_pixen",
+          "jobId": "30fa408c-d4a2-4bc1-878e-557188e181c9",
+          "seed": 610111,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: sage green #91c6a3, aged brass rim, ivory glints, deep forest shadow. ONE broad heavy rectangular sage-green tower shield, wide aged brass rim, bright ivory center ridge, TWO compact forward-pointing brass chevrons on its right. Wide advancing shield formation. No person, sword or crown.",
+          "original": "originals/refuge-redesign-oct06/icon_ort_release.png",
+          "sha256": "1aa6c9357fe09c16dcd66599af9b760ac66344650bdbc2f4d9da5f32565814e7"
+        }
+      ]
+    },
+    {
+      "id": "icon_mira_passive",
+      "character": "mira",
+      "characterName": "미라",
+      "slot": "passive",
+      "name": "인장 결계",
+      "palette": "pale blue #b3c9ee, ivory pages, dark navy ink, muted gold fittings",
+      "motif": "ONE small open navy-bound spellbook with ivory pages and a clear blue DIAMOND SEAL floating just above its center fold. Restrained pale blue corners, compact warded book symbol. No letters, numbers or character.",
+      "file": "icon_mira_passive.png",
+      "jobId": "ca984d63-55b7-414b-b4e3-acdaa2df5ca0",
+      "sha256": "33b80a409a1ce2252039c1689f13637098b1c294a356e6459769baef37ae299b",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        2,
+        2,
+        12,
+        12
+      ],
+      "opaquePixels": 116,
+      "partialAlphaPixels": 0,
+      "colors": 21,
+      "refinementReason": null,
+      "history": [
+        {
+          "selected": true,
+          "tool": "create_image_pixen",
+          "jobId": "ca984d63-55b7-414b-b4e3-acdaa2df5ca0",
+          "seed": 610112,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: pale blue #b3c9ee, ivory pages, dark navy ink, muted gold fittings. ONE small open navy-bound spellbook with ivory pages and a clear blue DIAMOND SEAL floating just above its center fold. Restrained pale blue corners, compact warded book symbol. No letters, numbers or character.",
+          "original": "originals/refuge-redesign-oct06/icon_mira_passive.png",
+          "sha256": "33b80a409a1ce2252039c1689f13637098b1c294a356e6459769baef37ae299b"
+        }
+      ]
+    },
+    {
+      "id": "icon_mira_dash",
+      "character": "mira",
+      "characterName": "미라",
+      "slot": "dash",
+      "name": "결계 재배치",
+      "palette": "pale blue #b3c9ee, ivory pages, dark navy ink, muted gold fittings",
+      "motif": "An open blue-and-ivory book at the right and its smaller empty pale blue outline at the left, joined by two dotted blue motion steps. Clearly a BOOK moved from one position to another, not two full books or wings. No text.",
+      "file": "icon_mira_dash.png",
+      "jobId": "acad0d41-a721-4e7b-8d69-7e36b182626c",
+      "sha256": "f4d0ccabeccfe051e89b456472c8d88dcbe766088c94f8d7648864ec1450fdce",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        1,
+        1,
+        14,
+        14
+      ],
+      "opaquePixels": 95,
+      "partialAlphaPixels": 0,
+      "colors": 28,
+      "refinementReason": "Initial image read as a circular magical pattern instead of a visibly relocated book.",
+      "history": [
+        {
+          "selected": false,
+          "tool": "create_image_pixen",
+          "jobId": "878ec789-bcd0-4df8-88c1-404674a4fffa",
+          "seed": 610113,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: pale blue #b3c9ee, ivory pages, dark navy ink, muted gold fittings. An open blue-and-ivory book at the right and its smaller empty pale blue outline at the left, joined by two dotted blue motion steps. Clearly a BOOK moved from one position to another, not two full books or wings. No text.",
+          "original": "originals/refuge-redesign-oct06/icon_mira_dash.png",
+          "sha256": "fdf3f8238a175a948da3573d3f73096d27d06afe8a1fc39927af4b928f2a1086"
+        },
+        {
+          "selected": true,
+          "tool": "create_image_pro_flash",
+          "jobId": "acad0d41-a721-4e7b-8d69-7e36b182626c",
+          "seed": 610132,
+          "description": "ONE native 16x16 pixel-art ability icon on completely transparent background. A clearly recognizable OPEN BOOK at lower right: bright ivory two pages, central fold, dark navy cover, light blue rim. At upper left a SMALL EMPTY BLUE OUTLINE of the same open book shows its previous position. Connect the two positions with ONLY TWO small blue motion dots. Clean readable symbol of relocating a ward book. Match the source book style. Dark plum outline, pale blue and ivory. No magic circle, no ring, no checkerboard, no filled background, no text.",
+          "original": "originals/refuge-redesign-oct06/refined-icon_mira_dash.png",
+          "sha256": "f4d0ccabeccfe051e89b456472c8d88dcbe766088c94f8d7648864ec1450fdce"
+        }
+      ]
+    },
+    {
+      "id": "icon_mira_release",
+      "character": "mira",
+      "characterName": "미라",
+      "slot": "release",
+      "name": "책장 회랑",
+      "palette": "pale blue #b3c9ee, ivory pages, dark navy ink, muted gold fittings",
+      "motif": "Two upright rows of ivory book pages forming a narrow blue magical corridor with an open center path, a small pale blue doorway at the far end. Symmetrical BOOK-PAGE WALLS and deep navy open center, simple readable page-corridor emblem. No letters or characters.",
+      "file": "icon_mira_release.png",
+      "jobId": "d6083af6-a2ea-4180-9dfd-292324466a31",
+      "sha256": "9265a60f0d5c1ac4854eae53c6680c4adcb0de6c450e95c45667695521449d40",
+      "canvas": [
+        16,
+        16
+      ],
+      "opaqueBounds": [
+        1,
+        1,
+        14,
+        14
+      ],
+      "opaquePixels": 188,
+      "partialAlphaPixels": 0,
+      "colors": 32,
+      "refinementReason": null,
+      "history": [
+        {
+          "selected": true,
+          "tool": "create_image_pixen",
+          "jobId": "d6083af6-a2ea-4180-9dfd-292324466a31",
+          "seed": 610114,
+          "description": "One 16x16 native PIXEL ART skill icon for a polished top-down roguelike. Isolated transparent background, NO square frame. Readable chunky silhouette, crisp one-pixel dark plum outline #140c1c, limited palette and clean three-tone shading, small top-left light. Keep the complete symbol within one transparent pixel margin. No typography, labels, gradients, blurred glow, ground or cast shadows. Palette: pale blue #b3c9ee, ivory pages, dark navy ink, muted gold fittings. Two upright rows of ivory book pages forming a narrow blue magical corridor with an open center path, a small pale blue doorway at the far end. Symmetrical BOOK-PAGE WALLS and deep navy open center, simple readable page-corridor emblem. No letters or characters.",
+          "original": "originals/refuge-redesign-oct06/icon_mira_release.png",
+          "sha256": "9265a60f0d5c1ac4854eae53c6680c4adcb0de6c450e95c45667695521449d40"
+        }
+      ]
+    }
+  ]
+}

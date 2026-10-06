@@ -101,7 +101,7 @@ export const CONTROL_ROWS: { label: string; actions: Action[]; padLabel?: string
 
 /** Touch controls reference ('twin' scheme): [icon sprite or '', name, description]. */
 export const TOUCH_CONTROL_ROWS: [string, string, string][] = [
-  ['', '왼쪽 화면', '끌어서 이동'],
+  ['', '왼쪽 조이스틱', '기울여 이동'],
   ['', '오른쪽 화면', '끌어서 조준 · 자동 공격'],
   ['tc_dash', '대시', '이동 방향으로 돌진'],
   ['hud_bomb', '폭탄', '금 간 벽을 부순다'],
@@ -118,7 +118,7 @@ export const TOUCH_CONTROL_ROWS: [string, string, string][] = [
 export function touchControlRows(): [string, string, string][] {
   if (save.settings.touchScheme === 'twin') return TOUCH_CONTROL_ROWS;
   return [
-    ['', '왼쪽 화면', '끌어서 이동'],
+    ['', '왼쪽 조이스틱', '기울여 이동'],
     ['tc_attack', '공격', '누르면 자동 조준 · 끌면 직접 조준'],
     ...TOUCH_CONTROL_ROWS.slice(2),
   ];

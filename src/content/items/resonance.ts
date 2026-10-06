@@ -9,9 +9,10 @@ import { RingFx } from '../../game/effects';
 import { Projectile } from '../../game/projectile';
 import { Actives } from '../../game/defs';
 import { fx } from '../../engine/rng';
+import { effectInterval, effectProc } from '../../game/procs';
 import {
   O, HazardZone, Starfall, addHitStatus, chainLightning, cooldown, enemiesNear, inflict, isAttack, isPrimary,
-  itemHit, roll, rollHit, shout, spawnShards, tickTimeStop, timeStop,
+  itemHit, miniBlast, roll, rollHit, shout, spawnShards, tickTimeStop, timeStop,
 } from './lib';
 
 // ------------------------------------------------------------------ 8x8 icons
@@ -127,12 +128,12 @@ resonance('flame', '불꽃', '#ff9a40', 'res_flame', [
   }],
   [4, '불타는 적이 죽으면 폭발한다', {
     onKill(w, e) {
-      if (e.hasStatus('burn')) w.explode(e.x, e.y, 26, dmg(w) * 1.5, { hurtsPlayer: false, noTiles: true, color: '#ff7020' });
+      if (e.hasStatus('burn')) miniBlast(w, e.x, e.y, 26, dmg(w) * 1.5, '#ff7020');
     },
   }],
   [6, '화상이 근처의 적에게 옮겨 붙는다', {
     onUpdate(w) {
-      if (!cooldown(w, 'flameSpread', 0.7)) return;
+      if (!effectInterval(w, 0.7)) return;
       let spread = 0;
       for (const e of w.enemies) {
         const b = e.statuses.get('burn');
@@ -268,7 +269,8 @@ resonance('star', '별빛', '#b8a8ff', 'res_star', [
       const t = w.vars.__starfallT ?? 0;
       if (t <= 0 || w.time < t) return;
       w.vars.__starfallT = 0;
-      const targets = [...w.enemies].filter((e) => e.alive && !e.hidden);
+      const targets = [...w.enemies].filter((e) => e.alive && !e.hidden && e.vulnerable);
+      if (!targets.length || !effectProc(w, () => true)) return;
       for (let i = 0; i < 4; i++) {
         const e = targets.length ? targets[i % targets.length] : null;
         const x = e ? e.x + w.rng.range(-6, 6) : w.room.centerX + w.rng.range(-80, 80);

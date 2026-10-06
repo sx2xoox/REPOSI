@@ -272,7 +272,8 @@ describe('balance: compressed weapons, characters that matter', () => {
   const base = bestDps(PLAIN_ID, 'lantern_bolt');
   const baseCrowd = bestDps(PLAIN_ID, 'lantern_bolt', true);
 
-  it('every weapon sits within 0.85x..1.35x of the starter on a plain keeper (single target); crowd outliers are capped', () => {
+  it('all weapons retain 0.85x..1.35x single-target and 6.5x crowd caps', () => {
+    // Rarity and role variety must not make the existing legendary choices obsolete.
     const bad: string[] = [];
     for (const d of Weapons.all()) {
       const k = bestDps(PLAIN_ID, d.id) / base;

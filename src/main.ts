@@ -24,6 +24,7 @@ import { loadPixelLabArt } from './ui/pixellab-art';
 import { loadPixelLabWeapons } from './ui/pixellab-weapons';
 import { loadPixelLabScenery } from './ui/pixellab-scenery';
 import { loadPixelLabBosses } from './ui/pixellab-bosses';
+import { loadPixelLabSkills } from './ui/pixellab-skills';
 
 async function boot(): Promise<void> {
   installOrientationPrompt();
@@ -52,6 +53,8 @@ async function boot(): Promise<void> {
     // fonts are optional
   }
   await Promise.all([loadPixelLabArt(), loadPixelLabWeapons(), loadPixelLabScenery(), loadPixelLabBosses()]);
+  // Legacy scenery also wires skill icons; the replacement pack owns the final pointers.
+  await loadPixelLabSkills();
   warmAllSprites();
 
   // resize / rotation (mobile browsers report the new size a little late)

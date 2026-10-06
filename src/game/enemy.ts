@@ -19,6 +19,7 @@ import { angleTo, clamp, dist, norm, TAU } from '../engine/math';
 import { Projectile, fanAngles, orbSprite, type ProjectileOpts } from './projectile';
 import { fx } from '../engine/rng';
 import type { Player } from './player';
+import { runProcStatus } from './procs';
 
 export interface ShootOpts extends Partial<ProjectileOpts> {
   speed?: number;
@@ -190,7 +191,10 @@ export class Enemy extends Actor {
       this.squash(1.25, 0.8);
       if (hit.knockback && hit.dirX !== undefined && hit.dirY !== undefined) this.knock(hit.dirX, hit.dirY, hit.knockback);
     }
-    if (hit.statuses) for (const s of hit.statuses) this.applyStatus(s as StatusApply, () => w.rng.next());
+    if (hit.statuses) for (const s of hit.statuses) {
+      if (s.procKey && hit.attacker === w.player) runProcStatus(w, s.procKey, this.id, () => this.applyStatus(s, () => w.rng.next()));
+      else this.applyStatus(s, () => w.rng.next());
+    }
     this.def.onHurt?.(this, w, hit);
     return true;
   }

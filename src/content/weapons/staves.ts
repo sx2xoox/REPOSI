@@ -328,7 +328,7 @@ const breathFx: ProjBehavior = {
 defineWeapon({
   id: 'dragon_breath',
   name: '용숨 화염포',
-  desc: '용의 머리를 본뜬 화염 방사기. 거센 불길이 적을 꿰뚫어 태우고, 바닥에 불씨를 남긴다.',
+  desc: '적을 꿰뚫는 불길과 바닥의 불씨로 태운다. 탄환 수가 늘면 불길도 여러 갈래로 퍼진다.',
   icon: 'icon_dragon_breath',
   heldSprite: 'w_dragon_breath',
   kind: 'ranged',
@@ -364,7 +364,7 @@ defineWeapon({
       const a = aim + (w.rng.next() - 0.5) * 0.34;
       const h = handPos(p, aim, 20);
       const shots = p.fireProjectiles(w, a, {
-        count: 1, style: 'none', speed: 190 + w.rng.next() * 60, accel: -230, minSpeed: 45, range: 90 + s.range * 0.18,
+        count: s.shots, style: 'none', speed: 190 + w.rng.next() * 60, accel: -230, minSpeed: 45, range: 90 + s.range * 0.18,
         damageMult: 0.27, pierce: s.pierce + 3, radius: s.projSize + 2, knockback: 16, light: 18, color: '#ff9a30',
         statuses: [{ kind: 'burn', duration: 2.5, power: s.damage * 0.45, chance: 0.4 }], behaviors: [breathFx], x: h.x, y: h.y,
       });

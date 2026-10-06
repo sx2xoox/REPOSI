@@ -19,13 +19,15 @@ import { VIEW_H, VIEW_W } from '../../engine/renderer';
 import { fx } from '../../engine/rng';
 import { TAU, angleTo, clamp, dist2, rotateToward } from '../../engine/math';
 import { defineDrawnSprite } from '../../engine/sprites';
+import { currentProcEffect, effectProc, runProcStatus, withProcContext } from '../../game/procs';
 
 export const O = '#0c0810';
 
 // ====================================================================== proc rules
 /** A real player attack hit: projectile / melee / beam (not explosions, DoT ticks or zaps). */
 export function isAttack(hit: HitInfo): boolean {
-  return (hit.kind === 'projectile' || hit.kind === 'melee' || hit.kind === 'laser') && !hit.noProc;
+  const weaponExplosion = hit.kind === 'explosion' && (hit.source instanceof Projectile || hit.procs?.includes('weapon-primary'));
+  return (hit.kind === 'projectile' || hit.kind === 'melee' || hit.kind === 'laser' || !!weaponExplosion) && !hit.noProc;
 }
 
 /** An attack that was not itself produced by an item (no splits / shards / familiar shots). */
@@ -92,30 +94,51 @@ export function bossSafe(target: Actor, s: StatusApply): StatusApply | null {
   switch (s.kind) {
     case 'freeze': return { kind: 'slow', duration: s.duration, power: 0.45 };
     case 'charm': case 'fear': return null;
-    case 'stun': return { ...s, duration: Math.min(0.25, s.duration * 0.3) };
+    case 'stun': return target.age < (target.mem.__controlReady ?? 0) ? null : { ...s, duration: Math.min(0.25, s.duration * 0.3) };
     default: return s;
   }
 }
 
 /** Attach a status to an outgoing hit (call from modifyHit; never mutates shared arrays). */
-export function addHitStatus(w: World, target: Actor, hit: HitInfo, s: StatusApply): void {
+export function addHitStatus(w: World, target: Actor, hit: HitInfo, s: StatusApply): boolean {
+  if (!isPrimary(hit) || !target.alive || (target instanceof Enemy && (!target.vulnerable || target.hidden))) return false;
   const adj = bossSafe(target, s);
-  if (!adj) return;
-  hit.statuses = [...(hit.statuses ?? []), adj];
-  statusPuff(w, target, adj.kind);
-  ensureStatusMarks(w);
-  procHere(w);
+  if (!adj) return false;
+  return effectProc(w, () => {
+    const accepted = procStatusFor(w, target, adj);
+    if (!accepted) return false;
+    hit.statuses = [...(hit.statuses ?? []), accepted];
+    statusPuff(w, target, adj.kind);
+    ensureStatusMarks(w);
+    procHere(w);
+    return true;
+  });
+}
+
+/** A status from an already emitted effect: target cooldown only, never throttle its damage tick. */
+function procStatusFor(w: World, target: Actor, s: StatusApply, effect = currentProcEffect(w)): StatusApply | null {
+  const adj = bossSafe(target, s);
+  if (!adj || !target.alive) return null;
+  if (adj.chance !== undefined && !w.rng.chance(adj.chance)) return null;
+  const certain = { ...adj, chance: undefined };
+  if (!effect) return certain;
+  return runProcStatus(w, `${effect}:${s.kind}`, target.id, () => true) ? certain : null;
 }
 
 /** Apply a status directly (auras, zones). */
-export function inflict(w: World, target: Enemy, s: StatusApply, puff = true): void {
-  if (!target.alive) return;
+export function inflict(w: World, target: Enemy, s: StatusApply, puff = true): boolean {
+  if (!target.alive || !target.vulnerable || target.hidden) return false;
   const adj = bossSafe(target, s);
-  if (!adj) return;
-  target.applyStatus(adj, () => w.rng.next());
-  if (puff) statusPuff(w, target, adj.kind);
-  ensureStatusMarks(w);
-  procHere(w);
+  if (!adj) return false;
+  return effectProc(w, () => {
+    const accepted = procStatusFor(w, target, adj);
+    if (!accepted) return false;
+    target.applyStatus(accepted, () => w.rng.next());
+    if (puff) statusPuff(w, target, adj.kind);
+    ensureStatusMarks(w);
+    procHere(w);
+    return true;
+  });
 }
 
 // ====================================================================== proc feedback
@@ -140,18 +163,22 @@ export function statusPuff(w: World, t: Actor, kind: string): void {
 
 /** Damage tick from an item zone/aura (no crits, no procs, colored number). */
 export function zoneDamage(w: World, e: Enemy, dmg: number, color: 'burn' | 'poison' | 'bleed' | 'other' = 'other', statuses?: StatusApply[]): void {
-  w.applyHit(e, { damage: dmg, kind: 'status', attacker: w.player, light: true, noProc: true, procs: [color], statuses });
+  const accepted = statuses?.map((s) => procStatusFor(w, e, s)).filter((s): s is StatusApply => !!s);
+  w.applyHit(e, { damage: dmg, kind: 'status', attacker: w.player, light: true, noProc: true, procs: [color], statuses: accepted });
 }
 
 /** Player hit from an item effect (crits allowed, no on-hit procs). */
 export function itemHit(w: World, e: Enemy, dmg: number, o: { from?: { x: number; y: number }; knockback?: number; statuses?: StatusApply[]; kind?: HitInfo['kind']; procs?: string[] } = {}): boolean {
+  if (!e.alive || !e.vulnerable || e.hidden) return false;
+  return effectProc(w, () => {
   procHere(w);
   const fx0 = o.from ?? w.player;
   const d = Math.hypot(e.x - fx0.x, e.y - fx0.y) || 1;
-  const sts = o.statuses?.map((s) => bossSafe(e, s)).filter((s): s is StatusApply => !!s);
+  const sts = o.statuses?.map((s) => procStatusFor(w, e, s)).filter((s): s is StatusApply => !!s);
   return w.applyHit(e, {
     damage: dmg, kind: o.kind ?? 'other', attacker: w.player, noProc: true, light: true,
     dirX: (e.x - fx0.x) / d, dirY: (e.y - fx0.y) / d, knockback: o.knockback ?? 40, statuses: sts, procs: o.procs,
+  });
   });
 }
 
@@ -264,6 +291,8 @@ export interface ChainOpts {
  * The 번개 resonance (5) adds jumps and a short stun. Returns enemies hit.
  */
 export function chainLightning(w: World, x: number, y: number, o: ChainOpts): number {
+  const first = o.first?.alive && o.first.vulnerable && !o.first.hidden && !o.exclude?.has(o.first.id) ? o.first : w.nearestEnemy(x, y, o.range ?? 85, o.exclude);
+  if (!first || !effectProc(w, () => true)) return 0;
   procHere(w);
   const p = w.player;
   let jumps = o.jumps;
@@ -278,7 +307,7 @@ export function chainLightning(w: World, x: number, y: number, o: ChainOpts): nu
   let dmg = o.damage;
   let n = 0;
   const range = o.range ?? 85;
-  let next: Enemy | null = o.first ?? null;
+  let next: Enemy | null = first;
   for (let i = 0; i < jumps; i++) {
     const t = next && next.alive && !hitSet.has(next.id) ? next : w.nearestEnemy(cx, cy, range, hitSet);
     next = null;
@@ -300,6 +329,7 @@ export function chainLightning(w: World, x: number, y: number, o: ChainOpts): nu
 
 /** A bolt from the sky onto a target (thunder drum, storms). */
 export function skyBolt(w: World, e: Enemy, dmg: number, stun = 0.6, color = '#ffe95a'): void {
+  if (!e.alive || !e.vulnerable || e.hidden || !effectProc(w, () => true)) return;
   procHere(w);
   const ty = e.y - e.z - 4;
   w.spawn(new ZapFx(e.x + fx.range(-10, 10), ty - 90, e.x, ty, { color, dur: 0.25, width: 3 }));
@@ -322,14 +352,15 @@ export interface ShardOpts extends Partial<ProjectileOpts> {
 
 /** Spawn secondary player projectiles (generation >= 1, never trigger onShoot). */
 export function spawnShards(w: World, x: number, y: number, o: ShardOpts): Projectile[] {
-  procHere(w);
   const out: Projectile[] = [];
-  const base = o.angle ?? w.rng.angle();
-  const arc = o.arc ?? TAU;
   // performance cap on secondary projectiles alive at once
   let alive = 0;
   for (const pr of w.projectiles) if (pr.team === 'player' && pr.generation > 0) alive++;
   const n = Math.max(0, Math.min(o.count, 90 - alive));
+  if (!n || !w.enemies.some((e) => e.alive && e.vulnerable && !e.hidden) || !effectProc(w, () => true)) return out;
+  procHere(w);
+  const base = o.angle ?? w.rng.angle();
+  const arc = o.arc ?? TAU;
   for (let i = 0; i < n; i++) {
     const a = arc >= TAU - 0.01 ? base + (i / o.count) * TAU : base + (o.count <= 1 ? 0 : (i / (o.count - 1) - 0.5) * arc);
     const { count: _c, damage, angle: _a, arc: _arc, generation, ...rest } = o;
@@ -338,10 +369,27 @@ export function spawnShards(w: World, x: number, y: number, o: ShardOpts): Proje
       knockback: 20, light: 10, ...rest,
     });
     p.generation = generation ?? 1;
+    deferProcStatuses(w, p);
     w.spawn(p);
     out.push(p);
   }
   return out;
+}
+
+/** Item projectiles keep their emitted damage, but cannot reapply statuses on every pellet. */
+function deferProcStatuses(w: World, p: Projectile): void {
+  const effect = currentProcEffect(w);
+  if (!effect || !p.statuses.length) return;
+  const statuses = p.statuses;
+  p.statuses = [];
+  p.addBehavior({ id: 'proc-status', onHit(_p, ww, target) {
+    if (!(target instanceof Enemy) || !target.alive) return;
+    for (const s of statuses) {
+      const adj = bossSafe(target, s);
+      if (!adj) continue;
+      runProcStatus(ww, `${effect}:${s.kind}`, target.id, () => target.applyStatus(adj, () => ww.rng.next()));
+    }
+  } });
 }
 
 // ====================================================================== projectile behaviors
@@ -364,6 +412,8 @@ export function boomerangBehavior(): ProjBehavior {
   const turn = (p: Projectile) => {
     if (p.mem.boom) return;
     p.mem.boom = 1;
+    p.damage *= 0.65;
+    p.generation = Math.max(1, p.generation); // Return damage never generates another proc cascade.
     p.hitIds.clear();
     p.pierce += 99;
     p.range += 900;
@@ -371,6 +421,10 @@ export function boomerangBehavior(): ProjBehavior {
   };
   return {
     id: 'boomerang',
+    onHit(p) {
+      // Turn before Projectile.hit decides whether a zero-pierce shot expires.
+      if (!p.mem.boom) turn(p);
+    },
     update(p, w, dt) {
       if (!p.mem.boom) {
         if (p.traveled > p.range * 0.6) {
@@ -455,6 +509,7 @@ const hazards = new WeakMap<World, Map<string, HazardZone[]>>();
 
 /** Damaging ground zone (fire trail, poison puddle, frost patch). Caps per kind. */
 export class HazardZone extends Entity {
+  procEffect: string | undefined;
   kind: HazardKind;
   radius: number;
   life: number;
@@ -477,9 +532,12 @@ export class HazardZone extends Entity {
     this.layer = 0;
     this.tileCollide = false;
     this.room = w.room;
+    this.procEffect = currentProcEffect(w);
   }
 
   static add(w: World, z: HazardZone, cap: number): HazardZone {
+    // Laying a trail in an empty room does not spend its first combat activation.
+    if (w.enemies.some(e => e.alive && !e.hidden && e.vulnerable) && !effectProc(w, () => true)) { z.dead = true; return z; }
     let m = hazards.get(w);
     if (!m) hazards.set(w, (m = new Map()));
     let list = (m.get(z.kind) ?? []).filter((h) => !h.dead && h.room === w.room);
@@ -493,6 +551,11 @@ export class HazardZone extends Entity {
   }
 
   override update(w: World, dt: number): void {
+    if (this.procEffect) return withProcContext(w, this.procEffect, () => this.updateZone(w, dt), true);
+    this.updateZone(w, dt);
+  }
+
+  private updateZone(w: World, dt: number): void {
     this.age += dt;
     this.tickT -= dt;
     if (this.tickT <= 0) {
@@ -566,6 +629,7 @@ const familiarReg = new WeakMap<World, Map<string, Familiar[]>>();
  * changes, `syncFamiliars` (called from the owning item's onUpdate) respawns them.
  */
 export abstract class Familiar extends Entity {
+  procEffect: string | undefined;
   room: unknown;
   /** index among familiars of the same key, and how many there are */
   slot = 0;
@@ -609,8 +673,8 @@ export abstract class Familiar extends Entity {
       if (dist2(e.x, e.y - e.z * 0.3, this.x, this.y - this.z * 0.4) >= rr * rr) continue;
       const k = `__fc${this.id}`;
       if ((e.mem[k] ?? -99) > w.time) continue;
-      e.mem[k] = w.time + cd;
-      itemHit(w, e, dmg, { from: this, knockback: 60, statuses });
+      if (!itemHit(w, e, dmg, { from: this, knockback: 60, statuses })) continue;
+      e.mem[k] = w.time + Math.max(0.2, cd);
       hit.push(e);
     }
     return hit;
@@ -623,6 +687,8 @@ export abstract class Familiar extends Entity {
       speed: 240, radius: 2, range: 170, owner: w.player, knockback: 30, light: 12, z: this.z * 0.5, ...o,
     });
     p.generation = 1;
+    if (!w.nearestEnemy(this.x, this.y, o.range ?? 170) || !effectProc(w, () => true)) { p.dead = true; return p; }
+    deferProcStatuses(w, p);
     w.spawn(p);
     return p;
   }
@@ -667,6 +733,10 @@ function syncFamiliarKey<T extends Familiar>(w: World, key: string, want: number
     for (const [k, l] of reg) if (k !== key && (!mine || k.endsWith(mine))) total += l.filter((f) => !f.dead && f.room === w.room).length;
     while (list.length < want && total + list.length < FAMILIAR_CAP) {
       const f = make(w);
+      // Stable across room resync (which runs inside the familiars_follow global hook).
+      f.procEffect = `familiar:${key.split('#')[0]}`;
+      const update = f.update.bind(f);
+      f.update = (ww, dt) => withProcContext(ww, f.procEffect!, () => update(ww, dt));
       w.spawn(f);
       list.push(f);
       if (!followed) w.particles.burst(f.x, f.y - 8, { count: 10, speed: [20, 70], life: [0.25, 0.5], colors: ['#ffffff', '#ffe8a0', '#ffc860'], size: [1, 2], additive: true });
@@ -939,14 +1009,17 @@ export class Starfall extends Entity {
 
 // ====================================================================== small blasts
 /** Small, quiet explosion that only hurts enemies (item procs; cheaper than World.explode). */
-export function miniBlast(w: World, x: number, y: number, radius: number, damage: number, color = '#ff9a30', statuses?: StatusApply[]): void {
+export function miniBlast(w: World, x: number, y: number, radius: number, damage: number, color = '#ff9a30', statuses?: StatusApply[]): boolean {
+  const targets = enemiesNear(w, x, y, radius);
+  if (!targets.length || !effectProc(w, () => true)) return false;
   procHere(w);
   w.particles.burst(x, y, { count: 12, speed: [40, 120], life: [0.15, 0.35], colors: ['#ffffff', '#fff0a0', color, '#802010'], size: [1, 2], additive: true, light: 4, lightColor: color.slice(0, 7) });
   w.particles.burst(x, y, { count: 4, speed: [10, 30], life: [0.4, 0.7], colors: ['#706060', '#403838'], size: [2, 3], sizeEnd: 4, drag: 3 });
   w.particles.spawn({ x, y, life: 0.2, size: 2, sizeEnd: radius, colors: ['#ffffff', color], shape: 'ring' });
   w.lights.glow(x, y, radius * 1.8, color.slice(0, 7), 0.5);
   w.sfx('explosion', { vol: 0.22, pitch: fx.range(1.5, 1.8) });
-  for (const e of enemiesNear(w, x, y, radius)) itemHit(w, e, damage, { from: { x, y }, knockback: 90, statuses, kind: 'explosion' });
+  for (const e of targets) itemHit(w, e, damage, { from: { x, y }, knockback: 90, statuses, kind: 'explosion' });
+  return true;
 }
 
 // ====================================================================== misc

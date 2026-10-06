@@ -7,6 +7,7 @@ import { fx } from '../../engine/rng';
 import { O, addHitStatus, cooldown, enemiesNear, familiarsOf, isAttack, isMelee, itemHit, roll, rollHit, stackMul, syncFamiliars } from './lib';
 import { TwinShadow } from './familiars';
 import { proc, miniBlast } from './lib';
+import { effectProc } from '../../game/procs';
 import { Entity } from '../../game/entity';
 import type { World } from '../../game/world';
 import type { Renderer } from '../../engine/renderer';
@@ -182,6 +183,7 @@ defineArtifact({
   id: 'black_candle',
   name: '검은 초',
   desc: '공격력 +2.5, 행운 -1. 처치 시 가끔 검은 불꽃',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   signature: '처치 시 10% 확률로 검은 불꽃이 터져 주변 적을 겁먹게 한다',
   quote: '어둠을 태우는 불도 있다.',
   rarity: 'common',
@@ -221,6 +223,7 @@ defineArtifact({
   id: 'rear_eye',
   name: '등 뒤의 눈',
   desc: '공격할 때 등 뒤로도 약한 공격이 나간다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '등 뒤에도 눈이 있다.',
   rarity: 'common',
   tags: ['shadow'],
@@ -228,13 +231,13 @@ defineArtifact({
   look: { mote: '#c0a0ff', orbit: '#c0a0ff' },
   pools: ['treasure', 'shop'],
   onAttack(w, angle, power) {
-    if (!cooldown(w, 'rear_eye', 0.12)) return;
+    if (!w.enemies.some((e) => e.alive && e.vulnerable && !e.hidden) || !effectProc(w, () => true)) return;
     const p = w.player;
     const back = angle + Math.PI;
     if (isMelee(w)) {
-      p.swing(w, { angle: back, damage: dmg(w) * 0.6, arc: 1.8, color: '#b08aff' });
+      p.swing(w, { angle: back, damage: dmg(w) * 0.6, arc: 1.8, color: '#b08aff', noProc: true });
     } else {
-      for (const pr of p.fireProjectiles(w, back, { fromWeapon: false, count: power, damageMult: 0.7, spreadMult: 1.2 })) pr.color = '#c0a0ff';
+      for (const pr of p.fireProjectiles(w, back, { fromWeapon: false, count: power, damageMult: 0.7, spreadMult: 1.2 })) { pr.color = '#c0a0ff'; pr.generation = 1; }
     }
   },
 });
@@ -257,6 +260,7 @@ defineArtifact({
   id: 'shade_dagger',
   name: '그림자 단검',
   desc: '대시로 적을 통과하면 큰 피해를 주고 출혈시킨다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '그림자는 등 뒤에서 찌른다.',
   rarity: 'rare',
   tags: ['shadow', 'blood'],
@@ -303,6 +307,7 @@ defineArtifact({
   id: 'hollow_mask',
   name: '텅 빈 가면',
   desc: '10% 확률로 공포를 건다. 겁먹은 적에게 피해 +25%',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '가면 뒤엔 아무도 없다. 그래서 무섭다.',
   rarity: 'rare',
   tags: ['shadow'],
@@ -336,6 +341,7 @@ defineArtifact({
   id: 'twin_shadow',
   name: '쌍둥이 그림자',
   desc: '그림자 분신이 따라다니며 내 공격을 흉내 낸다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '그림자가 먼저 움직였다.',
   rarity: 'epic',
   tags: ['shadow'],

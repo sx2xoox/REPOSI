@@ -12,6 +12,7 @@ import type { World } from '../../game/world';
 import { O, addHitStatus, isAttack, isMelee, isPrimary, roll, rollHit, spawnShards, syncFamiliars } from './lib';
 import { LanternSun, MoonSatellite } from './familiars';
 import { proc } from './lib';
+import { effectProc } from '../../game/procs';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 
@@ -86,6 +87,7 @@ defineArtifact({
   id: 'constellation_needle',
   name: '별바늘',
   desc: '공격이 15% 확률로 별표식을 새긴다 (다음 공격 치명타)',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '별자리를 꿰매는 바늘.',
   rarity: 'common',
   tags: ['star'],
@@ -151,6 +153,7 @@ defineArtifact({
   id: 'moon_satellite',
   name: '작은 달',
   desc: '작은 달이 주위를 돌며 적 탄환을 막고 적을 친다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '작은 달에게도 중력은 있다.',
   rarity: 'rare',
   tags: ['star'],
@@ -228,7 +231,7 @@ defineArtifact({
   id: 'comet_tail',
   name: '혜성 꼬리',
   desc: '치명타 배율 +0.5. 직접 치명타 시 별 조각 3개',
-  detail: '예: 치명타 ×1.8 → ×2.3. 추가 파편은 별 조각을 다시 만들지 않는다.',
+  detail: '예: 치명타 ×1.8 → ×2.3. 추가 파편은 별 조각을 다시 만들지 않는다. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '빛은 지나간 자리에 남는다.',
   rarity: 'epic',
   tags: ['star'],
@@ -298,7 +301,7 @@ defineArtifact({
   id: 'radiant_lance',
   name: '광휘의 창',
   desc: '전방 무기 탄환을 관통 빛의 창으로 합친다',
-  detail: '근접 공격에는 창을 추가 발사한다. 광선과 추가 파편에는 적용되지 않는다.',
+  detail: '근접 공격에는 창을 추가 발사한다. 광선과 추가 파편에는 적용되지 않는다. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '흩어진 빛을 모으면 창이 된다.',
   rarity: 'legendary',
   tags: ['star'],
@@ -325,6 +328,7 @@ defineArtifact({
   },
   onAttack(w, angle, power) {
     if (!isMelee(w)) return;
+    if (!w.enemies.some((e) => e.alive && e.vulnerable && !e.hidden) || !effectProc(w, () => true)) return;
     const pl = w.player;
     const p = new Projectile({
       team: 'player', x: pl.x + Math.cos(angle) * 6, y: pl.y - 5 + Math.sin(angle) * 4, angle, speed: 300,
@@ -361,6 +365,7 @@ defineArtifact({
   id: 'lantern_sun',
   name: '품 안의 태양',
   desc: '작은 태양이 주위를 돌며 탄환을 녹이고 적을 태운다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '등불 속에 태양을 가두었다. 이제 태양이 등불을 지킨다.',
   rarity: 'legendary',
   tags: ['flame', 'star'],

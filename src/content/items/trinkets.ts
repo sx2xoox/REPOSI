@@ -10,6 +10,8 @@ import { TAU } from '../../engine/math';
 import { O, addHitStatus, grantPerCopy, isAttack, roll, rollHit, spawnShards, syncFamiliars, watch } from './lib';
 import { MirrorShard } from './familiars';
 import { proc } from './lib';
+import { Enemy } from '../../game/enemy';
+import { procReady } from '../../game/procs';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 const GOLD = ['#6a4410', '#b07818', '#e8b830', '#ffe070', '#fff8c8'];
@@ -73,7 +75,8 @@ defineDrawnSprite('icon_alchemist_scale', 16, 16, (p) => {
 defineArtifact({
   id: 'alchemist_scale',
   name: '연금술사의 저울',
-  desc: '동전을 주우면 8% 확률로 폭탄이나 열쇠가 나온다',
+  desc: '20금 모을 때마다 폭탄·열쇠를 번갈아 보급',
+  detail: '획득한 동전의 금액을 누적(탐욕 적용). 중복 1개당 필요 금액 -3, 최소 10금. 남은 진행은 방·무기 교체에도 유지된다.',
   quote: '동전 한 닢의 무게는 생각보다 다양하다.',
   rarity: 'common',
   tags: [],
@@ -82,9 +85,17 @@ defineArtifact({
   pools: ['shop', 'treasure'],
   onPickup(w, kind, power) {
     if (kind !== 'coin' && kind !== 'nickel' && kind !== 'dime') return;
-    if (!roll(w, 0.08, power, 0.005)) return;
     const p = w.player;
-    w.spawn(new Pickup(w.rng.chance(0.5) ? 'bomb' : 'key', p.x, p.y).pop());
+    const threshold = Math.max(10, 20 - 3 * (power - 1));
+    const value = (kind === 'coin' ? 1 : kind === 'nickel' ? 5 : 10) * Math.max(1, Math.round(p.stats.greed));
+    w.vars.__scaleGold = (w.vars.__scaleGold ?? 0) + value;
+    while (w.vars.__scaleGold >= threshold) {
+      w.vars.__scaleGold -= threshold;
+      const supply = w.vars.__scaleSupply ?? 0;
+      w.spawn(new Pickup(supply % 2 === 0 ? 'bomb' : 'key', p.x, p.y).pop());
+      w.vars.__scaleSupply = supply + 1;
+    }
+    w.floatText(p.x, p.y - 24, `보급 ${w.vars.__scaleGold}/${threshold}`, '#ffd040');
     proc(w, 'alchemist_scale');
     w.particles.burst(p.x, p.y - 6, { count: 12, speed: [20, 70], life: [0.3, 0.6], colors: ['#ffffff', GOLD[3], '#a080ff'], size: [1, 2], additive: true });
     w.sfx('coin', { pitch: 1.4 });
@@ -354,6 +365,7 @@ defineArtifact({
   id: 'mirror_shard',
   name: '거울 파편',
   desc: '거울 조각이 주위를 돌며 적 탄환을 되돌려 보낸다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '깨진 거울도 빛은 되돌려준다.',
   rarity: 'rare',
   tags: [],
@@ -388,8 +400,8 @@ defineDrawnSprite('icon_sweet_sachet', 16, 16, (p) => {
 defineArtifact({
   id: 'sweet_sachet',
   name: '달콤한 향주머니',
-  desc: '공격이 7% 확률로 일반 적을 4초간 매혹한다',
-  detail: '보스는 매혹되지 않는다. 행운·중복 보정 적용, 광선은 기본 발동 확률 절반.',
+  desc: '건강한 일반 적을 첫 타격에 4초간 매혹',
+  detail: '체력 절반 이상이며 이번 공격을 버틸 일반 적을 확정 매혹. 간격 6초(중복당 -1초, 최소 3초). 보스 무효. 추가 공격 제외. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '적도 향기에는 약하다.',
   rarity: 'rare',
   tags: [],
@@ -397,7 +409,9 @@ defineArtifact({
   look: { shot: '#ff9ad8', trail: 'petal', hit: '#ffc0e8' },
   pools: ['treasure', 'shop', 'shrine'],
   modifyHit(w, t, hit, power) {
-    if (isAttack(hit) && !t.hasStatus('charm') && rollHit(w, hit, 0.07, power)) addHitStatus(w, t, hit, { kind: 'charm', duration: 4 });
+    if (!(t instanceof Enemy) || t.isBoss || t.hasStatus('charm') || t.hp < t.maxHp * 0.5 || t.hp <= hit.damage) return;
+    if ((w.vars.__sachetReady ?? -1) > w.time || !procReady(w, 'a:sweet_sachet')) return;
+    if (addHitStatus(w, t, hit, { kind: 'charm', duration: 4 })) w.vars.__sachetReady = w.time + Math.max(3, 6 - (power - 1));
   },
 });
 
@@ -433,6 +447,7 @@ defineArtifact({
   id: 'cluster_powder',
   name: '산탄 화약통',
   desc: '폭탄 +2. 내 폭탄이 터지면 불붙은 파편이 사방으로 튄다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '하나가 터지면 여럿이 터진다.',
   rarity: 'epic',
   tags: [],

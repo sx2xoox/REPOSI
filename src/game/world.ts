@@ -1,4 +1,5 @@
 import { scaleRewardRoom } from './room-rewards';
+import { prepareBlessingOffer } from './blessings';
 // World: simulation of one run — the current floor, room, entities and the
 // player. Exposes the API used by all content (enemies, items, rooms).
 
@@ -431,6 +432,7 @@ export class World {
       this.eachItems((it) => it.expire('floor'));
       this.eachItems((it) => it.onFloorStart());
     }
+    for (const keeper of this.players) this.asPlayer(keeper, () => prepareBlessingOffer(this));
     audio.playMusic(floor.music);
     this.sfx('floor_start');
     save.progress.bestFloor = Math.max(save.progress.bestFloor, index);
@@ -714,6 +716,11 @@ export class World {
     if (this.coop && !e.worldLoot && e.ctxP === null && this.spawnOwner) e.ctxP = this.spawnOwner;
     this.pending.push(e);
     return e;
+  }
+
+  /** Includes this tick's queued spawns so singleton abilities cannot duplicate themselves. */
+  entityById(id: number): Entity | undefined {
+    return this.entities.find(e => e.id === id && !e.dead) ?? this.pending.find(e => e.id === id && !e.dead);
   }
 
   discardEncounter(id: number): void {
@@ -1783,10 +1790,6 @@ export class World {
     else if (node.kind === 'normal') {
       const pos = this.room.nearestFree(this.room.centerX, this.room.centerY, 6);
       this.dropRandom(pos.x, pos.y, 'room');
-    }
-    if (this.run.staged && node.id === this.map.exitId) {
-      const pos = this.room.nearestFree(this.room.centerX, this.room.centerY + 24, 9);
-      this.spawn(new Trapdoor(pos.x, pos.y));
     }
     // co-op: a boss leaves one more reward pedestal per extra keeper
     if (this.coop && node.kind === 'boss' && !this.gameOver && this.entities.concat(this.pending).some((e) => e instanceof Trapdoor)) {

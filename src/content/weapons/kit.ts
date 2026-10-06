@@ -84,7 +84,7 @@ export function blast(w: World, x: number, y: number, radius: number, damage: nu
     const d = dist(x, y, e.x, e.y);
     if (d > radius + e.r) continue;
     const k = d || 1;
-    if (w.applyHit(e, { damage, kind: o.kind ?? 'explosion', attacker: p, dirX: (e.x - x) / k, dirY: (e.y - y) / k, knockback: o.knockback ?? 200, statuses: o.statuses })) n++;
+    if (w.applyHit(e, { damage, kind: o.kind ?? 'explosion', attacker: p, dirX: (e.x - x) / k, dirY: (e.y - y) / k, knockback: o.knockback ?? 200, statuses: o.statuses?.map(s => ({ ...s, procKey: s.procKey ?? `weapon:${p.weaponId}:${s.kind}` })), noProc: false, procs: ['weapon-primary'] })) n++;
   }
   for (const h of [...w.hittables]) if (dist(x, y, h.x, h.y) < radius + h.r) h.takeHit(w, { damage, kind: 'explosion', attacker: p });
   const cols = o.colors ?? ['#ffffff', '#fff0a0', '#ff9a2a', '#a03010'];
@@ -227,6 +227,14 @@ export function lobBehavior(flight: number, peak: number, land: (pr: Projectile,
       }
       return false;
     },
+    // Movement may cross both flight and range in one fixed step, before the
+    // next behavior update. Complete the impact once instead of losing a shell.
+    onExpire(pr, w) {
+      if (!pr.mem.landed) {
+        pr.mem.landed = 1;
+        land(pr, w);
+      }
+    },
     draw(pr, r) {
       if (shadowSprite) r.sprite(shadowSprite, pr.x, pr.y, { alpha: 0.4 });
     },
@@ -259,7 +267,7 @@ export class FirePatch extends Entity {
       for (const e of w.enemies) {
         if (!e.alive || e.hidden || e.z > 6 || e.flying) continue;
         if (dist(this.x, this.y, e.x, e.y) > this.rad + e.r) continue;
-        if (w.applyHit(e, { damage: this.dmg, kind: 'status', attacker: w.player, light: true, knockback: 0, statuses: [{ kind: 'burn', duration: 1.5, power: this.dmg, chance: 0.35 }] })) e.flash = Math.min(e.flash, 0.03);
+        if (w.applyHit(e, { damage: this.dmg, kind: 'status', attacker: w.player, light: true, noProc: true, knockback: 0, statuses: [{ kind: 'burn', duration: 1.5, power: this.dmg, chance: 0.35, procKey: 'weapon:fire_patch:burn' }] })) e.flash = Math.min(e.flash, 0.03);
       }
     }
     if (fx.chance(dt * 14)) {
@@ -288,7 +296,7 @@ export function muzzleAt(p: Player, aim: number, len: number): { x: number; y: n
 
 /** Apply a direct hit from the player (melee-like, no projectile). */
 export function strike(w: World, target: Actor, damage: number, dirX: number, dirY: number, knockback: number, o: { kind?: 'melee' | 'laser' | 'explosion'; statuses?: StatusApply[]; light?: boolean; noProc?: boolean } = {}): boolean {
-  return w.applyHit(target, { damage, kind: o.kind ?? 'melee', attacker: w.player, dirX, dirY, knockback, statuses: o.statuses, light: o.light, noProc: o.noProc });
+  return w.applyHit(target, { damage, kind: o.kind ?? 'melee', attacker: w.player, dirX, dirY, knockback, statuses: o.statuses?.map(s => ({ ...s, procKey: s.procKey ?? `weapon:${w.player.weaponId}:${s.kind}` })), light: o.light, noProc: o.noProc });
 }
 
 /**

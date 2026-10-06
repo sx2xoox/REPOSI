@@ -32,6 +32,8 @@ export interface SwingOpts {
   deflect?: boolean;
   /** deflected bullets fly back as player shots instead of vanishing */
   reflect?: boolean;
+  /** Stop hits and the visible arc at shot-blocking terrain. Opt-in for long blades. */
+  respectWalls?: boolean;
   statuses?: HitInfo['statuses'];
   /** thrust instead of arc: hit area is a rectangle `reach` long, `arc` px wide */
   thrust?: boolean;
@@ -63,7 +65,7 @@ export class MeleeSwing extends Entity {
     this.owner = owner;
     this.o = {
       knockback: 140, duration: 0.1, visual: 0.18, color: '#ffffff', deflect: true, reflect: false, thrust: false, swingDir: 1,
-      style: 'smear', hitKick: 1.5, noProc: false, release: false,
+      style: 'smear', hitKick: 1.5, noProc: false, release: false, respectWalls: false,
       ...o,
     };
     this.x = owner.x;
@@ -91,6 +93,33 @@ export class MeleeSwing extends Entity {
     return Math.abs(angleDiff(this.o.angle, a)) <= this.o.arc / 2 + Math.atan2(pr, d);
   }
 
+  /** Exact grid traversal: even a narrow diagonal corner blocks the long blade. */
+  private visibleDistance(w: World, dx: number, dy: number, limit: number, targetTile = false): number {
+    let tx = Math.floor(this.x / TILE), ty = Math.floor(this.y / TILE);
+    const endX = Math.floor((this.x + dx * limit) / TILE), endY = Math.floor((this.y + dy * limit) / TILE);
+    const sx = dx >= 0 ? 1 : -1, sy = dy >= 0 ? 1 : -1;
+    const stepX = dx === 0 ? Infinity : TILE / Math.abs(dx);
+    const stepY = dy === 0 ? Infinity : TILE / Math.abs(dy);
+    let nextX = dx === 0 ? Infinity : ((tx + (sx > 0 ? 1 : 0)) * TILE - this.x) / dx;
+    let nextY = dy === 0 ? Infinity : ((ty + (sy > 0 ? 1 : 0)) * TILE - this.y) / dy;
+    let entered = 0;
+    while (entered < limit) {
+      // The near face of a breakable target can be struck; intervening tiles still block it.
+      if (targetTile && tx === endX && ty === endY) return limit;
+      if (tileProps(w.room.tileAt(tx, ty)).blocksShots) return Math.max(0, entered - 0.01);
+      entered = Math.min(nextX, nextY);
+      if (nextX <= entered) { tx += sx; nextX += stepX; }
+      if (nextY <= entered) { ty += sy; nextY += stepY; }
+    }
+    return limit;
+  }
+
+  private unobstructed(w: World, x: number, y: number, targetTile = false): boolean {
+    if (!this.o.respectWalls) return true;
+    const dx = x - this.x, dy = y - this.y, d = Math.hypot(dx, dy);
+    return d < 0.001 || this.visibleDistance(w, dx / d, dy / d, d, targetTile) >= d;
+  }
+
   override update(w: World, dt: number): void {
     this.age += dt;
     this.x = this.owner.x;
@@ -100,7 +129,7 @@ export class MeleeSwing extends Entity {
       if (this.team === 'player') {
         for (const e of w.enemies) {
           if (!e.alive || this.hitIds.has(e.id) || e.hidden || e.z > 24) continue;
-          if (!this.contains(e.x, e.y - e.z * 0.5, e.r)) continue;
+          if (!this.contains(e.x, e.y - e.z * 0.5, e.r) || !this.unobstructed(w, e.x, e.y)) continue;
           this.hitIds.add(e.id);
           const d = Math.hypot(e.x - this.x, e.y - this.y) || 1;
           const hit: HitInfo = {
@@ -116,7 +145,7 @@ export class MeleeSwing extends Entity {
           }
         }
         for (const h of w.hittables) {
-          if (this.hitIds.has(h.id) || !this.contains(h.x, h.y, h.r)) continue;
+          if (this.hitIds.has(h.id) || !this.contains(h.x, h.y, h.r) || !this.unobstructed(w, h.x, h.y, true)) continue;
           this.hitIds.add(h.id);
           h.takeHit(w, { damage: this.o.damage, kind: 'melee', attacker: this.owner });
         }
@@ -132,6 +161,7 @@ export class MeleeSwing extends Entity {
             if (this.tilesHit.has(key)) continue;
             if (!tileProps(w.room.tileAt(tx, ty)).breakable) continue;
             if (!this.contains((tx + 0.5) * TILE, (ty + 0.5) * TILE, 6)) continue;
+            if (!this.unobstructed(w, (tx + 0.5) * TILE, (ty + 0.5) * TILE, true)) continue;
             this.tilesHit.add(key);
             w.room.damageTile(w, tx, ty, this.o.damage);
           }
@@ -139,7 +169,7 @@ export class MeleeSwing extends Entity {
       } else {
         // enemy swing: every keeper it reaches (single-player: the keeper)
         for (const pl of w.coop ? w.players : [w.player]) {
-          if (this.hitIds.has(pl.id) || !this.contains(pl.x, pl.y, pl.r)) continue;
+          if (this.hitIds.has(pl.id) || !this.contains(pl.x, pl.y, pl.r) || !this.unobstructed(w, pl.x, pl.y)) continue;
           this.hitIds.add(pl.id);
           pl.hurt(w, Math.max(1, Math.round(this.o.damage)), (this.owner as { def?: { name: string } }).def?.name ?? '공격');
         }
@@ -148,7 +178,7 @@ export class MeleeSwing extends Entity {
       if (this.o.deflect) {
         for (const p of w.projectiles) {
           if (p.dead || p.team === this.team || p.delay > 0) continue;
-          if (!this.contains(p.x, p.y, p.r)) continue;
+          if (!this.contains(p.x, p.y, p.r) || !this.unobstructed(w, p.x, p.y)) continue;
           if (this.o.reflect && this.team === 'player') reflectProjectile(w, p, this, 0.4);
           else p.expire(w, true);
           w.particles.burst(p.x, p.y, { count: 7, speed: [40, 120], life: [0.1, 0.25], colors: ['#ffffff', '#ffe080'], shape: 'spark', size: [1, 2] });
@@ -170,7 +200,26 @@ export class MeleeSwing extends Entity {
     if (this.o.hitKick > 0 && (!w.coop || this.owner === w.local)) w.renderer.kick(Math.cos(this.o.angle) * this.o.hitKick, Math.sin(this.o.angle) * this.o.hitKick);
   }
 
-  override draw(r: Renderer): void {
+  override draw(r: Renderer, w: World): void {
+    if (!this.o.respectWalls || this.o.style === 'none') { this.drawArc(r); return; }
+    // Clip with the same terrain rule as damage, so the enlarged sweep never promises a hit through a wall.
+    const ctx = r.ctx;
+    ctx.save();
+    try {
+      ctx.beginPath();
+      for (let i = 0; i < 128; i++) {
+        const angle = i * Math.PI * 2 / 128, dx = Math.cos(angle), dy = Math.sin(angle);
+        const d = this.visibleDistance(w, dx, dy, this.o.reach + 4);
+        const x = this.x + dx * d - r.viewX, y = this.y + dy * d - r.viewY;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.clip();
+      this.drawArc(r);
+    } finally { ctx.restore(); }
+  }
+
+  private drawArc(r: Renderer): void {
     const t = this.age / this.o.visual;
     if (this.o.style === 'none') return;
     if (this.o.thrust) {

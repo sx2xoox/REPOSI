@@ -31,7 +31,7 @@ export function arsenalTrail(d: ArsenalSpec): ProjBehavior {
   }};
 }
 
-export function drawArsenal(d: ArsenalSpec, w: World, p: Player, r: Renderer, st: WeaponState, sprite: string): void {
+export function drawArsenal(d: ArsenalSpec, w: World, p: Player, r: Renderer, st: WeaponState, sprite: string, projectileSprite = 'shot_' + d.id): void {
   const thrust=d.shape==='rapier'||d.shape==='spear';
   const melee=thrust||['sabre','axe','mace','cleaver'].includes(d.shape);
   if(thrust){
@@ -56,11 +56,11 @@ export function drawArsenal(d: ArsenalSpec, w: World, p: Player, r: Renderer, st
   const tipY=layout?.muzzle?layout.muzzle[1]-sp.oy:0;
   const tip=point(tipX,tipY);
   if(bow && sprite.startsWith('pl_')){
-    const pull=p.firing?1-Math.min(1,st.cooldown/Math.max(.01,st.mem.interval??.3)):0;
+    const pull=d.charge?st.charge:p.firing?1-Math.min(1,st.cooldown/Math.max(.01,st.mem.interval??.3)):0;
     const tips=layout!.bowTips!;
     const upper=point(tips[0][0]-sp.ox,tips[0][1]-sp.oy),lower=point(tips[1][0]-sp.ox,tips[1][1]-sp.oy),nock=point(tips[0][0]-sp.ox-pull*4+Math.sin(f*32)*f,0);
     pixLine(r,upper.x,upper.y,nock.x,nock.y,'#cabda7',.85);pixLine(r,lower.x,lower.y,nock.x,nock.y,'#cabda7',.85);
-    if(p.firing&&f<.5)r.sprite('shot_'+d.id,nock.x+Math.cos(angle)*5,nock.y+Math.sin(angle)*5,{rot:angle});
+    if(p.firing&&f<.5)r.sprite(projectileSprite,nock.x+Math.cos(angle)*5,nock.y+Math.sin(angle)*5,{rot:angle});
   }
   if(st.charge>0){
     // Charge lives on the latch/head, never as a large ring around the keeper.

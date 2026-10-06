@@ -54,7 +54,9 @@ const SCENARIOS: (CoopScenario & { expectLeave: boolean })[] = [
   },
   {
     name: 'new keepers in archive', seed: 'COOP-NEW-6', chars: ['bori', 'baekgu', 'mori', 'mori'], floor: 6,
-    ms: 110_000, link: LINK, bossAt: 2200, downAt: 700, leaveAt: 0, discardAt: 350, expectLeave: false,
+    // Changed blessing/build rolls take longer through optional rooms. Keep
+    // the three-clear requirement and allow a bounded extra exploration cycle.
+    ms: 140_000, link: LINK, bossAt: 2200, downAt: 700, leaveAt: 0, discardAt: 350, expectLeave: false,
   },
   {
     name: '2 keepers', seed: 'COOP-2', chars: ['ria', 'serin'], ms: 110_000, link: LINK, bossAt: 2400, downAt: 900, leaveAt: 0, discardAt: 400,

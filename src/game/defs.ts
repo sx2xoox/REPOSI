@@ -281,8 +281,10 @@ export interface WeaponDef {
 export interface DashDef {
   /** Korean name, e.g. "불씨 질주" */
   name: string;
-  /** one-line Korean description (character select) */
+  /** Full Korean description (Tab screen). */
   desc: string;
+  /** Optional short description for the two-line character select row. */
+  summary?: string;
   /** 16x16 icon sprite (character select) */
   icon?: string;
   /** extra invulnerability after the dash ends, seconds (default 0.06) */
@@ -313,8 +315,10 @@ export interface DashDef {
 export interface PassiveDef extends ItemHooks {
   /** Korean name, e.g. "불씨 심지" */
   name: string;
-  /** one-line Korean description (character select, Tab screen) */
+  /** Full Korean description (Tab screen). */
   desc: string;
+  /** Optional short description for the two-line character select row. */
+  summary?: string;
   /** 16x16 icon sprite (Tab screen, proc pops) */
   icon: string;
   /** visible traces composed like an artifact's (aura ring, step sparkles, hit sparks ...) */
@@ -383,8 +387,10 @@ export interface CharacterDef {
    * ember gauge is full (F). Default: radial flame burst that clears bullets.
    */
   release?(w: World, p: Player): void;
-  /** one-line description of the release shown on character select */
+  /** Full description of the release (Tab screen). */
   releaseDesc?: string;
+  /** Optional short description for the two-line character select row. */
+  releaseSummary?: string;
   /** Korean name of the release (character select), e.g. "등불 개화" */
   releaseName?: string;
   releaseIcon?: string;

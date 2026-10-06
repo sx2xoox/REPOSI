@@ -1,7 +1,7 @@
 // On-screen touch controls and touch chrome for menus.
 //
 // Gameplay (GameScene on top), scheme 'auto' (default, 설정 > 터치 조작 방식):
-// floating left stick = move; a big ATTACK button bottom-right: hold to attack,
+// fixed left stick = move; a big ATTACK button bottom-right: hold to attack,
 // it auto-aims at the best target (nearest enemy in line of sight, preferring
 // the move / facing direction, sticky so it does not flicker; a reticle marks
 // it), dragging it past a dead zone aims manually in the drag direction, with no
@@ -37,7 +37,7 @@ import type { Scene, TouchButtonSpec } from './scene';
 import { C } from './theme';
 import { softKeyboard, touchUiActive } from './touch-mode';
 import {
-  computeTouchLayout, knobPosition, pickTarget, touchScheme, TapTracker, TouchRouter, GAME_BUTTONS, SYSTEM_BUTTONS,
+  computeTouchLayout, hitMoveStick, knobPosition, pickTarget, touchScheme, TapTracker, TouchRouter, GAME_BUTTONS, SYSTEM_BUTTONS,
   type Circle, type Insets, type TargetCandidate, type TouchButtonId, type TouchLayout, type Vec,
 } from './touch-logic';
 
@@ -317,9 +317,10 @@ export class TouchControls {
     const game = { x: r.offsetX / k, y: r.offsetY / k, w: (VIEW_W * r.scale) / k, h: (VIEW_H * r.scale) / k };
     const mm = minimapBlockRect(UI_W, r.uiSafe);
     const schemeChanged = this.layout.scheme !== scheme;
+    const oldLayout = this.layout;
     this.layout = computeTouchLayout({ w: vw, h: vh }, this.safe, { game, minimap: this.uiToCss(mm.x, mm.y, mm.w, mm.h) }, scheme);
     this.router.layout = this.layout;
-    if (schemeChanged) {
+    if (schemeChanged || oldLayout.leftRest.x !== this.layout.leftRest.x || oldLayout.leftRest.y !== this.layout.leftRest.y || oldLayout.stickR !== this.layout.stickR) {
       this.router.reset();
       this.syncSticks();
     }
@@ -407,7 +408,7 @@ export class TouchControls {
       this.setMode('game');
       const chrome = vis ? this.hitChrome(p) : null;
       if (chrome) { this.chromePtr.set(e.pointerId, chrome); return; }
-      if (vis && p.x < this.layout.splitX) {
+      if (vis && hitMoveStick(this.layout, p.x, p.y)) {
         this.router.down(e.pointerId, p.x, p.y, () => false);
         this.syncSticks();
         return;

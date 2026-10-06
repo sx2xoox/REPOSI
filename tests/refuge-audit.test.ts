@@ -61,10 +61,15 @@ describe('refuge release audit',()=>{
   for(let i=0;i<3;i++){w.node.id=i;h.onRoomClear!(w,1);}expect(save.hasFlag('unlock:tove')).toBe(false);
   const next=setup().world;expect(next.vars.rfChallengeRooms).toBeUndefined();
  }));
- it('Mira records actual damage, excluding overkill and secondary effects',()=>{
-  const {world:w,dummies}=setup(),p=REFUGE_PASSIVES[4];
-  p.onHit!(w,dummies[0],{damage:10000,dealtDamage:2,kind:'melee',attacker:w.player},1);expect(w.vars.rfMiraStored).toBeCloseTo(.3);
-  p.onHit!(w,dummies[0],{damage:10000,dealtDamage:10000,kind:'melee',noProc:true,attacker:w.player},1);expect(w.vars.rfMiraStored).toBeCloseTo(.3);
+ // Damage recording moved from Mira to Tove/Luen/Ves. Preserve the old
+ // actual-damage/no-secondary guarantee for every current recording passive.
+ it('damage-recording passives exclude overkill and secondary effects',()=>{
+  for(const [index,key,factor] of [[0,'rfToveEnergy',.28],[1,'rfLuenPool',1],[2,'rfVesPool',.3]] as const){
+   const {world:w,dummies}=setup(),p=REFUGE_PASSIVES[index];
+   p.onHit!(w,dummies[0],{damage:1,dealtDamage:1,kind:'melee',attacker:w.player},1);
+   p.onHit!(w,dummies[0],{damage:10000,dealtDamage:2,kind:'melee',attacker:w.player},1);expect(w.vars[key]).toBeCloseTo(2*factor);
+   p.onHit!(w,dummies[0],{damage:10000,dealtDamage:10000,kind:'melee',noProc:true,attacker:w.player},1);expect(w.vars[key]).toBeCloseTo(2*factor);
+  }
  });
 });
 
@@ -79,13 +84,13 @@ describe('attack timing and charged weapon audit',()=>{
  });
  it('the next-attack melee bonus is snapshotted before travel, not read at hit time',()=>{
   const {world:w}=setup();const b=Artifacts.must('bless_afterstep');
-  b.onDash!(w,1);b.onAttack!(w,0,1);const sw=w.player.swing(w,{angle:0,damage:10});b.onSwing!(w,sw,1);expect(sw.o.damage).toBe(12);
-  w.time+=1;b.onAttack!(w,0,1);const h={damage:sw.o.damage,kind:'melee' as const,attacker:w.player,source:sw};b.modifyHit!(w,w.player,h,1);expect(h.damage).toBe(12);
+  b.onDash!(w,1);b.onAttack!(w,0,1);const sw=w.player.swing(w,{angle:0,damage:10});b.onSwing!(w,sw,1);expect(sw.o.damage).toBe(13.5);
+  w.time+=1;b.onAttack!(w,0,1);const h={damage:sw.o.damage,kind:'melee' as const,attacker:w.player,source:sw};b.modifyHit!(w,w.player,h,1);expect(h.damage).toBe(13.5);
  });
  it('standing still enhances a fired shot; walking afterward cannot remove it',()=>{
-  const {world:w}=setup(),b=Artifacts.must('bless_footing');w.vars.bfStill=1;
-  const p=new Projectile({team:'player',x:0,y:0,angle:0,speed:100,damage:10});b.onShoot!(w,p,1);expect(p.damage).toBeCloseTo(11.8);
-  w.vars.bfStill=0;const h={damage:p.damage,kind:'projectile' as const,attacker:w.player,source:p};b.modifyHit!(w,w.player,h,1);expect(h.damage).toBeCloseTo(11.8);
+  const {world:w}=setup(),b=Artifacts.must('bless_footing');b.onUpdate!(w,.6,1);
+  const p=new Projectile({team:'player',x:0,y:0,angle:0,speed:100,damage:10});b.onShoot!(w,p,1);expect(p.damage).toBeCloseTo(13);
+  w.player.x+=2;w.time+=.31;b.onUpdate!(w,.31,1);const h={damage:p.damage,kind:'projectile' as const,attacker:w.player,source:p};b.modifyHit!(w,w.player,h,1);expect(h.damage).toBeCloseTo(13);
  });
  it('secondary shots cannot inherit attack-only bonuses',()=>{
   const {world:w}=setup();w.vars.baUntil=10;w.vars.bcUntil=10;w.vars.bfStill=1;w.vars.btUntil=10;

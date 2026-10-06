@@ -44,6 +44,7 @@ defineArtifact({
   id: 'tinder_pouch',
   name: '부싯깃 주머니',
   desc: '공격이 15% 확률로 적을 불태운다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '작은 불씨 하나면 충분하다.',
   rarity: 'common',
   tags: ['flame'],
@@ -149,6 +150,7 @@ defineArtifact({
   id: 'ashwalk_boots',
   name: '잿불 장화',
   desc: '대시한 자리에 불길이 남아 적을 태운다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '걸음마다 잿더미.',
   rarity: 'rare',
   tags: ['flame', 'shadow'],
@@ -201,7 +203,7 @@ defineArtifact({
   id: 'kiln_core',
   name: '가마의 심장',
   desc: '직접 공격 적중 시 작은 폭발이 일어난다',
-  detail: '재사용 0.06초 (광선 0.15초). 추가 파편으로는 발동하지 않는다.',
+  detail: '최소 간격 0.2초. 직전 폭발 이후 모인 직접 피해의 45%로 폭발(공격력의 35~150%). 느린 강타는 큰 폭발. 추가 파편 제외. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '그 안의 불은 천 년째 꺼지지 않았다.',
   rarity: 'epic',
   tags: ['flame'],
@@ -210,10 +212,10 @@ defineArtifact({
   pools: ['treasure', 'boss', 'challenge'],
   onHit(w, t, hit, power) {
     if (!isPrimary(hit)) return;
-    const k = '__kilnT';
-    if ((w.vars[k] ?? -1) > w.time) return;
-    w.vars[k] = w.time + (hit.kind === 'laser' ? 0.15 : 0.06);
-    miniBlast(w, t.x, t.y - 3, 20 + 3 * (power - 1), dmg(w) * 0.5 * stackMul(power), '#ff8a30');
+    const base = dmg(w);
+    w.vars.__kilnBank = Math.min(base * 3.34, (w.vars.__kilnBank ?? 0) + Math.max(0, hit.dealtDamage ?? hit.damage));
+    const blast = Math.max(base * 0.35, Math.min(base * 1.5, w.vars.__kilnBank * 0.45)) * stackMul(power);
+    if (miniBlast(w, t.x, t.y - 3, 20 + 3 * (power - 1), blast, '#ff8a30')) w.vars.__kilnBank = 0;
   },
 });
 
@@ -236,6 +238,7 @@ defineArtifact({
   id: 'rekindle_plume',
   name: '재점화 깃털',
   desc: '쓰러지면 불길 속에서 체력 2칸으로 되살아난다 (1회)',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '재가 된 것은 다시 타오를 수 있다.',
   rarity: 'epic',
   tags: ['flame', 'blood'],

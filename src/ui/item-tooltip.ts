@@ -282,13 +282,18 @@ export class ItemTooltip {
     return !!this.cur && this.a > 0.01;
   }
 
+  /** Bottom interaction prompts take priority over the general control hints. */
+  hasCompactHint(w: World): boolean {
+    return this.visible && !!this.cur?.interactionInfo?.(w).compactHint;
+  }
+
   draw(r: Renderer, w: World, alpha = 1): void {
     const e = this.cur;
     if (!e || this.a <= 0.01 || alpha <= 0.01) return;
     const compact=e.interactionInfo?.(w).compactHint;
     if(compact){
       const key=touchUiActive()?'사용':actionLabel(input.bindings,'interact',input.aimMode==='pad');
-      r.uiText(`${key} · ${compact}`,UI_W/2,UI_H-28,{size:10,align:'center',color:C.gold,outline:C.ink,alpha});
+      r.uiText(`${key} · ${compact}`,UI_W/2,UI_H-28-r.uiSafe.b,{size:10,align:'center',color:C.gold,outline:C.ink,alpha:alpha*this.a});
       return;
     }
     const sig = signature(w, e) + (e.interactionInfo?.(w).desc ?? '');

@@ -3,7 +3,8 @@
 import { defineArtifact } from '../../game/defs';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { RingFx } from '../../game/effects';
-import { O, addHitStatus, cooldown, enemiesNear, grantPerCopy, inflict, isAttack, roll, rollHit, sineBehavior, syncFamiliars } from './lib';
+import { O, addHitStatus, cooldown, enemiesNear, grantPerCopy, inflict, isAttack, roll, rollHit, spawnShards, syncFamiliars } from './lib';
+import { effectInterval } from '../../game/procs';
 import { WinterOrb } from './familiars';
 import { proc } from './lib';
 
@@ -28,6 +29,7 @@ defineArtifact({
   id: 'rime_shard',
   name: '서리 조각',
   desc: '공격이 15% 확률로 적을 둔화시킨다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '만지면 손끝이 시리다.',
   rarity: 'common',
   tags: ['frost'],
@@ -94,7 +96,8 @@ defineDrawnSprite('icon_crystal_spiral', 16, 16, (p) => {
 defineArtifact({
   id: 'crystal_spiral',
   name: '빙정 나선',
-  desc: '사거리 +20%. 탄환이 물결치며 날아간다 (탄환 한정)',
+  desc: '사거리 +20%. 공격할 때 측면 서리탄 2발',
+  detail: '조준한 본체 탄환은 직진한다. 0.8초마다 좌우 서리탄(피해 20%, 1.2초 둔화). 상태 재부여 0.5초. 추가탄은 유물 발동 제외. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '곧게 가는 것만이 길은 아니다.',
   rarity: 'common',
   tags: ['frost'],
@@ -104,8 +107,13 @@ defineArtifact({
   stats(m, power) {
     m.mulStat('range', 1 + 0.2 * power);
   },
-  onShoot(_w, p) {
-    if (p.generation === 0) p.addBehavior(sineBehavior(0.85, 11));
+  onAttack(w, angle) {
+    if ((w.vars.__spiralReady ?? -1) > w.time) return;
+    const p = w.player;
+    const shots = spawnShards(w, p.x, p.y - 4, { count: 2, angle, arc: 0.9, damage: p.stats.damage * 0.2,
+      color: '#9fe8ff', speed: p.stats.shotSpeed, range: p.stats.range, radius: 3,
+      statuses: [{ kind: 'slow', duration: 1.2, power: 0.35 }] });
+    if (shots.length) w.vars.__spiralReady = w.time + 0.8;
   },
 });
 
@@ -130,6 +138,7 @@ defineArtifact({
   id: 'glacier_lens',
   name: '빙하 렌즈',
   desc: '탄환이 커지고 느려진다. 공격이 10% 확률로 적을 얼린다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '세상이 얼어붙어 보인다.',
   rarity: 'rare',
   tags: ['frost'],
@@ -174,6 +183,7 @@ defineArtifact({
   id: 'winter_orb',
   name: '겨울을 품은 구슬',
   desc: '얼음 구슬이 주위를 돌며 적 탄환을 막고 적을 얼린다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '작은 구슬 속에서 눈이 그치지 않는다.',
   rarity: 'rare',
   tags: ['frost'],
@@ -208,6 +218,7 @@ defineArtifact({
   id: 'hoarfrost_mantle',
   name: '상고대 망토',
   desc: '영혼 하트 +1. 피격 시 주변 적을 얼리고 탄환을 지운다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '상처가 닿는 곳마다 서리가 핀다.',
   rarity: 'epic',
   tags: ['frost'],
@@ -221,7 +232,7 @@ defineArtifact({
     grantPerCopy(w, 'hoarfrost_mantle', power, () => w.player.addSoul(2));
   },
   onHurt(w, _a, power) {
-    if (!cooldown(w, 'hoarfrost', 1.5)) return;
+    if (!effectInterval(w, 1.5)) return;
     const p = w.player;
     const R = 90 + 15 * (power - 1);
     w.sfx('freeze', { vol: 0.8 });

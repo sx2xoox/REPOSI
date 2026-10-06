@@ -10,6 +10,7 @@ import {
   O, addHitStatus, cooldown, enemiesNear, growBehavior, inflict, isAttack, isMelee, isPrimary, roll, rollHit, spawnShards,
 } from './lib';
 import { proc } from './lib';
+import { effectInterval } from '../../game/procs';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 
@@ -31,6 +32,7 @@ defineArtifact({
   id: 'viper_fang',
   name: '독사의 송곳니',
   desc: '공격이 20% 확률로 적을 중독시킨다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '한 번 물면 놓지 않는다.',
   rarity: 'common',
   tags: ['venom'],
@@ -66,6 +68,7 @@ defineArtifact({
   id: 'rot_mushroom',
   name: '썩은 버섯',
   desc: '최대 체력 +1. 전투가 시작되면 포자로 적을 중독시킨다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '유통기한은 묻지 마라.',
   rarity: 'common',
   tags: ['venom'],
@@ -194,6 +197,7 @@ defineArtifact({
   id: 'plague_censer',
   name: '역병 향로',
   desc: '독 안개를 둘러 가까이 온 적을 계속 중독시킨다',
+  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '향이 퍼지면, 숨 쉬는 것들이 쓰러진다.',
   rarity: 'rare',
   tags: ['venom'],
@@ -211,7 +215,7 @@ defineArtifact({
         life: fx.range(0.6, 1.1), colors: ['#c8ff9040', '#8aff5a50', '#3a8a2030'], size: fx.range(2, 4), sizeEnd: 5, shape: 'circle', ground: true,
       });
     }
-    if (!cooldown(w, 'censer', 0.6)) return;
+    if (!effectInterval(w, 0.6)) return;
     for (const e of enemiesNear(w, p.x, p.y, R)) inflict(w, e, { kind: 'poison', duration: 3, power: dmg(w) * 0.15 }, false);
   },
 });
@@ -238,7 +242,7 @@ defineArtifact({
   id: 'toxin_splitter',
   name: '맹독 분열낭',
   desc: '적중 시 독 방울이 사방으로 튄다 (탄환 3개, 근접 2개)',
-  detail: '직접 공격만 발동한다. 광선은 3개. 독 방울은 처음 맞힌 적을 다시 맞히지 않는다.',
+  detail: '직접 공격만 발동한다. 광선은 3개. 독 방울은 처음 맞힌 적을 다시 맞히지 않는다. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '터뜨리면 안 되는 주머니였다.',
   rarity: 'rare',
   tags: ['venom'],
@@ -279,7 +283,7 @@ defineArtifact({
   id: 'nightshade_wreath',
   name: '까마중 화관',
   desc: '중독된 적이 죽으면 독이 번지고 등불 게이지가 찬다',
-  detail: '중독된 적 처치 시 기본 충전 +5, 주변 적에게 독 전파. 행운으로 충전량 증가.',
+  detail: '중독된 적 처치 시 기본 충전 +5, 주변 적에게 독 전파. 행운으로 충전량 증가. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '아름다운 것엔 독이 있다.',
   rarity: 'epic',
   tags: ['venom'],

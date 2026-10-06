@@ -12,6 +12,7 @@ import { captureCheckpoint, restoreCheckpoint } from '../src/game/checkpoint';
 import { save, DEFAULT_PROGRESS } from '../src/engine/save';
 import { Trapdoor } from '../src/game/pickups';
 import { stateHash } from '../src/game/statehash';
+import { PRESS } from '../src/game/seam';
 loadContent();
 const renderer = new Renderer(fakeDisplay(1280, 720));
 const host = { openInventory() {}, onGameOver() {} };
@@ -29,15 +30,22 @@ it('21 stage layouts are connected, deterministic, and only third stages have bo
     expect(stage === 3 ? m.bossId >= 0 : m.exitId !== undefined).toBe(true);
   }
 });
-it('clearing the last normal room creates a real passage and advances to the next stage', () => {
-  const w = world(); w.enterRoom(w.map.nodes[w.map.exitId!], null); w.update(1 / 60);
-  for (let i = 0; i < 120; i++) { for (const e of w.enemies) if (e.alive) w.killEnemy(e); w.update(1 / 60); }
+it('the starting room offers an optional passage without requiring a fight', () => {
+  const w = world();
+  expect(w.map.exitId).toBe(w.map.startId);
+  for (let i = 0; i < 120; i++) w.update(1 / 60);
   const passage = w.entities.find(e => e instanceof Trapdoor)!;
   expect(passage).toBeDefined();
-  w.player.x = passage.x + 22; w.player.y = passage.y; w.update(1 / 60);
-  w.player.x = passage.x;
+  w.player.x = passage.x; w.player.y = passage.y;
+  // Standing on the opening no longer triggers descent.
+  for (let i = 0; i < 120; i++) w.update(1 / 60);
+  expect(w.run.stage).toBe(1);
+  w.inputSource = (_w, _p, out) => { out.pressed = PRESS.interact; };
+  w.update(1 / 60);
+  w.inputSource = (_w, _p, out) => { out.pressed = 0; };
   for (let i = 0; i < 120; i++) w.update(1 / 60);
   expect([w.run.floor, w.run.stage]).toEqual([1, 2]);
+  expect(w.run.stats.roomsCleared).toBe(0);
   expect(w.map.nodes.some(n => n.kind === 'boss')).toBe(false);
 });
 it('stage checkpoints round-trip equipment, paid maximum hearts, blessings, currencies and RNG', () => {

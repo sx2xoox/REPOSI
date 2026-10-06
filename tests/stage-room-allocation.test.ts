@@ -15,7 +15,8 @@ it('preserves every group draw across layout retries and all 21 stages',()=>{
   expect(map.nodes.filter(n=>n.kind==='boss')).toHaveLength(stage===3?1:0);
   const normal=map.nodes.filter(n=>n.kind==='normal').length;expect(normal).toBeGreaterThanOrEqual(7);expect(normal).toBeLessThanOrEqual(9);
   expect(map.nodes.every(n=>!!n.templateId)).toBe(true);
-  if(stage<3){expect(map.nodes[map.exitId!].depth).toBeLessThanOrEqual(4);expect(map.nodes[map.exitId!].locked).toBe(false);}
+  if(stage<3){expect(map.exitId).toBe(map.startId);expect(map.nodes[map.exitId!].kind).toBe('start');expect(map.nodes[map.exitId!].locked).toBe(false);}
+  else expect(map.exitId).toBeUndefined();
  }
 },30000);
 it('draw probabilities match the requested independent groups',()=>{

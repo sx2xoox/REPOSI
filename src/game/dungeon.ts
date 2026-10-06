@@ -47,7 +47,7 @@ export interface RoomNode {
 }
 
 export interface FloorMap {
-  /** Cleared normal room containing the passage to the next stage. */
+  /** Starting room containing the optional passage to the next stage. */
   exitId?: number;
   floor: FloorDef;
   nodes: RoomNode[];
@@ -57,7 +57,7 @@ export interface FloorMap {
   bossId: number;
 }
 
-/** Branching expeditions: a nearby optional exit, with rewards off the main route. */
+/** Branching expeditions: an optional exit at spawn, with all exploration preserved. */
 export function generateStage(floor: FloorDef, stage: number, rng: RNG): FloorMap {
   const plan = stageRoomPlan(rng);
   const specials: RoomKind[] = ['boss', ...plan.filter(k => k !== 'secret')];
@@ -73,9 +73,9 @@ export function generateStage(floor: FloorDef, stage: number, rng: RNG): FloorMa
   }
   for (const n of map.nodes) for (const d of n.doors) d.secret = n.kind === 'secret' || map.nodes[d.to].kind === 'secret';
   if (stage < STAGES_PER_FLOOR) {
-    // Depth two usually means a single fight before the exit fight. All branches stay optional.
-    const exits = map.nodes.filter(n => n.kind === 'normal' && n.depth >= 2).sort((a,b) => a.depth - b.depth || a.id - b.id);
-    map.exitId = exits[0].id;
+    // Players may leave immediately or return after exploring. The boss stage
+    // has no shortcut; its passage still appears only after the boss is defeated.
+    map.exitId = map.startId;
     map.bossId = -1;
   }
   for (const d of map.nodes[map.startId].doors) if (!d.secret) map.nodes[d.to].discovered = true;

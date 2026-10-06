@@ -9,7 +9,7 @@ import { applyFacility, type FacilityCommand } from './facilities';
 
 import type { World } from './world';
 import type { Player } from './player';
-import { applyBlessing, blessingChoices, markBlessed } from './blessings';
+import { applyBlessing, blessingChoices, markBlessed, rerollBlessings } from './blessings';
 import { discardArtifact } from './interact';
 
 /** Seconds a teammate must stand next to a downed keeper to revive them. */
@@ -22,6 +22,7 @@ export type CoopCommand =
   | FacilityCommand
   /** the keeper picked this floor's blessing (`id: null` = skipped) */
   | { type: 'bless'; floor: number; id: string | null }
+  | { type: 'bless_reroll'; floor: number; serial: number }
   /** the keeper discards one copy of an artifact (Tab screen) */
   | { type: 'discard'; id: string }
   /** host: end the descent for everyone (pause menu "하강 종료") */
@@ -40,6 +41,8 @@ export function isCoopCommand(cmd: { type: string; [k: string]: unknown }): cmd 
       return [cmd.floor,cmd.stage,cmd.room,cmd.entity].every(v=>typeof v==='number'&&Number.isSafeInteger(v)) && typeof cmd.fingerprint==='string' && cmd.fingerprint.length<12000 && Array.isArray(cmd.materials) && cmd.materials.length<=2 && cmd.materials.every(v=>typeof v==='string'&&v.length<100);
     case 'bless':
       return typeof cmd.floor === 'number' && (cmd.id === null || typeof cmd.id === 'string');
+    case 'bless_reroll':
+      return Number.isSafeInteger(cmd.floor) && Number.isSafeInteger(cmd.serial);
     case 'discard':
       return typeof cmd.id === 'string';
     case 'end':
@@ -65,6 +68,8 @@ export function applyCoopCommand(w: World, slot: number, cmd: CoopCommand): bool
     case 'bless':
       if (!p) return false;
       return w.asPlayer(p, () => bless(w, p, cmd.floor, cmd.id));
+    case 'bless_reroll':
+      return !!p && w.asPlayer(p, () => rerollBlessings(w, cmd.floor, cmd.serial));
     case 'discard':
       if (!p || !p.alive) return false;
       return w.asPlayer(p, () => !!discardArtifact(w, cmd.id));

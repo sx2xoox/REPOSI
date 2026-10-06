@@ -32,12 +32,12 @@ const HINTS: { keys: string[]; label: string; dx: number; row: number }[] = [
 
 // touch screens: the on-screen buttons carry icons, only the sticks need explaining
 const TOUCH_HINTS: typeof HINTS = [
-  { keys: ['왼쪽'], label: '끌어서 이동', dx: -72, row: 0 },
+  { keys: ['왼쪽'], label: '스틱으로 이동', dx: -72, row: 0 },
   { keys: ['오른쪽'], label: '끌어서 공격', dx: 72, row: 0 },
 ];
 // default touch scheme: the attack button auto-aims
 const TOUCH_AUTO_HINTS: typeof HINTS = [
-  { keys: ['왼쪽'], label: '끌어서 이동', dx: -80, row: 0 },
+  { keys: ['왼쪽'], label: '스틱으로 이동', dx: -80, row: 0 },
   { keys: ['공격'], label: '누르면 자동 조준', dx: 64, row: 0 },
 ];
 
@@ -52,6 +52,10 @@ function paintHints(room: Room): void {
 registerRoomHandler('start', {
   clearOnEnter: true,
   populate(w, room) {
+    if (w.run.staged && room.node.id === w.map.exitId) {
+      const spot = room.nearestFree(room.centerX, room.centerY - 12, 9);
+      w.spawn(new Trapdoor(spot.x, spot.y));
+    }
     if (w.floor.index === 1 && w.run.floor === 1) {
       // control hints painted on the floor of the very first room
       if (typeof document !== 'undefined') void whenFontsReady().then(() => paintHints(room));

@@ -74,22 +74,22 @@ export const DEFAULT_DASH_DESC = '짧게 질주해 적의 공격을 피한다.';
 export const DEFAULT_RELEASE_DESC = '등불을 터뜨려 주변의 적과 탄환을 태운다.';
 
 /** The three kit rows of the character select strip (passive / dash / release), with defaults when absent. */
-export function characterKitRows(c: CharacterDef, open = true, touch = false): KitRow[] {
+export function characterKitRows(c: CharacterDef, open = true, touch = false, compact = false): KitRow[] {
   const pas = c.passive;
   const dash = c.dash;
   return [
     {
       kind: 'passive', label: '고유 능력', icon: pas?.icon ?? 'ui_question',
-      name: pas ? pas.name : '없음', desc: pas ? pas.desc : '특별한 능력 없이 유물에 의지하는 평범한 등불지기.',
+      name: pas ? pas.name : '없음', desc: pas ? (compact ? pas.summary ?? pas.desc : pas.desc) : '특별한 능력 없이 유물에 의지하는 평범한 등불지기.',
     },
     {
       kind: 'dash', label: '대시', icon: dash?.icon ?? 'st_dash',
-      name: dash ? dash.name : '질주', desc: dash ? dash.desc : DEFAULT_DASH_DESC,
+      name: dash ? dash.name : '질주', desc: dash ? (compact ? dash.summary ?? dash.desc : dash.desc) : DEFAULT_DASH_DESC,
       hint: open ? (touch ? '대시 버튼' : 'Space') : undefined,
     },
     {
       kind: 'release', label: '등불 해방', icon: c.releaseIcon ?? 'ui_flame',
-      name: c.releaseName ?? '등불 해방', desc: c.releaseDesc ?? DEFAULT_RELEASE_DESC,
+      name: c.releaseName ?? '등불 해방', desc: (compact ? c.releaseSummary ?? c.releaseDesc : c.releaseDesc) ?? DEFAULT_RELEASE_DESC,
       hint: open ? (touch ? '해방 버튼' : '게이지가 가득 차면 F') : undefined,
     },
   ];

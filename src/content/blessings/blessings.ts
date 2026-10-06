@@ -253,7 +253,7 @@ bless({
   disk: '#6a4a2a', glyph: (p) => { p.rect(6, 5, 4, 7, '#ffd890'); p.rect(5, 4, 6, 1, '#a07040'); p.rect(5, 12, 6, 1, '#a07040'); p.px(8, 8, '#ff8a30'); p.px(8, 7, '#fff0a0'); }, look: { aura: '#ffe0a0' },
   onRelease(w, power) {
     // once per room: several releases a floor would otherwise out-heal every other source
-    const room = w.run.floor * 1000 + w.node.id;
+    const room = (w.run.floor * 4 + w.run.stage) * 10000 + w.node.id;
     if (w.vars.__releaseHealRoom === room) return;
     w.vars.__releaseHealRoom = room;
     const p = w.player;

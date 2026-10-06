@@ -603,6 +603,7 @@ export class Player extends Actor {
         fxMaterial: shotMaterial(this.weaponId),
         ...o,
       });
+      if (p.fromWeapon && p.statuses.length) p.statuses = p.statuses.map(status => ({ ...status, procKey: status.procKey ?? `weapon:${this.weaponId}:${status.kind}` }));
       p.mem.weaponDamage = s.damage;
       // inherit a little of the player's movement (Isaac feel)
       p.vx += this.vx * 0.25;
@@ -629,6 +630,7 @@ export class Player extends Actor {
       color: this.character.lightColor ?? '#ffffff',
       ...o,
     });
+    if (!sw.o.noProc && sw.o.statuses) sw.o.statuses = sw.o.statuses.map(status => ({ ...status, procKey: status.procKey ?? `weapon:${this.weaponId}:${status.kind}` }));
     if (!sw.o.noProc) w.items.onSwing(sw);
     w.spawn(sw);
     this.lastAttackAt = w.time;

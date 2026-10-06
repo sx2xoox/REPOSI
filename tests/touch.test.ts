@@ -194,12 +194,13 @@ describe('hit testing', () => {
 });
 
 describe('TouchRouter', () => {
-  it('routes left / right halves to the move and aim sticks (multi-touch)', () => {
+  it('routes the fixed move pad and right aim stick independently (multi-touch)', () => {
     const r = new TouchRouter(layout());
     const R = r.layout.stickR;
-    expect(r.down(1, 120, 250)).toEqual({ kind: 'stick', side: 'left' });
+    const rest = r.layout.leftRest;
+    expect(r.down(1, rest.x, rest.y)).toEqual({ kind: 'stick', side: 'left' });
     expect(r.down(2, 600, 200)).toEqual({ kind: 'stick', side: 'right' });
-    r.move(1, 120 + R, 250);
+    r.move(1, rest.x + R, rest.y);
     const mv = r.moveVector();
     expect(mv.x).toBeCloseTo(1, 5);
     expect(mv.y).toBeCloseTo(0, 5);
@@ -220,15 +221,29 @@ describe('TouchRouter', () => {
     r.up(3);
     expect(r.owners.size).toBe(0);
   });
-  it('floating base follows a finger that overshoots', () => {
-    const r = new TouchRouter(layout());
-    const R = r.layout.stickR;
-    r.down(1, 100, 250);
-    r.move(1, 100 + R * 3, 250);
-    expect(r.left!.base.x).toBeCloseTo(100 + R * 2, 5);
-    // reversing direction responds immediately
-    r.move(1, 100 + R * 2 - R, 250);
-    expect(r.moveVector().x).toBeLessThan(0);
+  it('keeps the movement base fixed through overshoot, reversal, release and re-press', () => {
+    for (const scheme of ['auto', 'twin'] as const) {
+      const r = new TouchRouter(layout(scheme)), R = r.layout.stickR, rest = r.layout.leftRest;
+      r.down(1, rest.x, rest.y);
+      for (const offset of [{ x: 3, y: 0 }, { x: 0, y: -4 }, { x: -3, y: 0 }, { x: 0, y: 0 }]) {
+        r.move(1, rest.x + R * offset.x, rest.y + R * offset.y);
+        expect(r.left!.base).toEqual(rest);
+        const knob = knobPosition(r.left!.base, r.left!.finger, R);
+        expect(Math.hypot(knob.x - rest.x, knob.y - rest.y)).toBeLessThanOrEqual(R + 1e-8);
+      }
+      expect(r.moveVector()).toEqual({ x: 0, y: 0 });
+      r.up(1); r.down(2, rest.x - R * .9, rest.y);
+      expect(r.left!.base).toEqual(rest); expect(r.moveVector().x).toBe(-1);
+      r.up(2); expect(r.moveVector()).toEqual({ x: 0, y: 0 });
+      expect(r.down(3, rest.x + R * 2, rest.y).kind).toBe('ignored');
+      r.move(3, rest.x, rest.y); expect(r.moveVector()).toEqual({ x: 0, y: 0 });
+    }
+  });
+  it('retains the existing floating right aim stick', () => {
+    const r = new TouchRouter(layout()), R = r.layout.stickR;
+    r.down(1, 600, 200); r.move(1, 600 + R * 3, 200);
+    expect(r.right!.base.x).toBeCloseTo(600 + R * 2, 5);
+    r.move(1, 600 + R, 200); expect(r.aimVector()!.x).toBeLessThan(0);
   });
   it('buttons take priority and report held state', () => {
     const r = new TouchRouter(layout());
@@ -243,7 +258,7 @@ describe('TouchRouter', () => {
   });
   it('reset forgets sticks and ignores fingers still down', () => {
     const r = new TouchRouter(layout());
-    r.down(1, 100, 250);
+    r.down(1, r.layout.leftRest.x, r.layout.leftRest.y);
     r.move(1, 160, 250);
     r.reset();
     expect(r.moveVector()).toEqual({ x: 0, y: 0 });
@@ -281,7 +296,7 @@ describe('TouchRouter · auto-aim attack button', () => {
     const r = new TouchRouter(L);
     expect(r.down(1, L.splitX + 20, 60)).toEqual({ kind: 'attack' });
     expect(r.attack!.onButton).toBe(false);
-    expect(r.down(2, 100, 250)).toEqual({ kind: 'stick', side: 'left' });
+    expect(r.down(2, L.leftRest.x, L.leftRest.y)).toEqual({ kind: 'stick', side: 'left' });
     // a second attack finger is ignored
     expect(r.down(3, L.attack!.x, L.attack!.y).kind).toBe('ignored');
     const d = L.buttons.dash;
