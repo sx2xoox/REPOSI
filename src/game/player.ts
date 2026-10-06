@@ -285,6 +285,7 @@ export class Player extends Actor {
     this.firing = wantFire && this.holdT <= 0;
 
     // movement
+    const cornerIntent = this.dashT > 0 ? { x: this.dashDX, y: this.dashDY } : mv;
     if (this.dashT > 0) {
       const dd = this.character.dash;
       this.dashT -= dt;
@@ -331,7 +332,9 @@ export class Player extends Actor {
     const vy = this.vy;
     this.vx += this.kbx;
     this.vy += this.kby;
-    this.move(w, dt);
+    // Never redirect knockback, idle drift, frozen movement or a downed keeper.
+    const assist = !this.frozen && !w.paused && Math.hypot(this.kbx, this.kby) < 1 ? cornerIntent : undefined;
+    this.move(w, dt, assist);
     this.vx = vx;
     this.vy = vy;
 

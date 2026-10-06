@@ -4,6 +4,7 @@
 import type { Renderer } from '../engine/renderer';
 import type { World } from './world';
 import { clamp } from '../engine/math';
+import { slideAroundCorner, type MoveIntent } from './corner-slide';
 
 export type Team = 'player' | 'enemy' | 'neutral';
 
@@ -193,7 +194,7 @@ export abstract class Entity {
    * Integrate velocity with tile collision (axis separated, AABB of size 2r).
    * Returns which axes collided.
    */
-  move(w: World, dt: number): { hitX: boolean; hitY: boolean } {
+  move(w: World, dt: number, cornerIntent?: MoveIntent): { hitX: boolean; hitY: boolean } {
     let hitX = false;
     let hitY = false;
     const dx = this.vx * dt;
@@ -208,10 +209,13 @@ export abstract class Entity {
     const sx = dx / steps;
     const sy = dy / steps;
     for (let i = 0; i < steps; i++) {
+      const startX = this.x, startY = this.y;
+      let blockedX = false, blockedY = false;
       if (sx !== 0) {
         const nx = this.x + sx;
         if (w.room.boxBlocked(nx, this.y, this.r, this.flying, this.phasing)) {
           hitX = true;
+          blockedX = true;
           // slide: snap next to the obstacle
           let lo = 0;
           let hi = 1;
@@ -226,6 +230,7 @@ export abstract class Entity {
         const ny = this.y + sy;
         if (w.room.boxBlocked(this.x, ny, this.r, this.flying, this.phasing)) {
           hitY = true;
+          blockedY = true;
           let lo = 0;
           let hi = 1;
           for (let k = 0; k < 5; k++) {
@@ -234,6 +239,17 @@ export abstract class Entity {
           }
           this.y += sy * lo;
         } else this.y = ny;
+      }
+      if (cornerIntent && (blockedX || blockedY)) {
+        const ix = cornerIntent.x, iy = cornerIntent.y;
+        const budget = Math.max(0, Math.hypot(sx, sy) - Math.hypot(this.x - startX, this.y - startY));
+        // Only a nearly straight deliberate movement may be corrected. Diagonal
+        // input already slides along the free axis and keeps full steering control.
+        if (blockedX && ix * sx > 0 && Math.abs(ix) > Math.abs(iy) * 4) {
+          slideAroundCorner(w.room, this, 'x', sx, budget, iy);
+        } else if (blockedY && iy * sy > 0 && Math.abs(iy) > Math.abs(ix) * 4) {
+          slideAroundCorner(w.room, this, 'y', sy, budget, ix);
+        }
       }
     }
     return { hitX, hitY };
