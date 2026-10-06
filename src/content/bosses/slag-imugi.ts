@@ -1,3 +1,4 @@
+import { pickBossPattern } from './tactics';
 // Floor 3 boss: 쇳물 이무기 (the slag imugi) — 용이 되지 못한 쇳물.
 // A serpent of cooling slag swimming through the forge floor, a molten pearl
 // (여의주) clenched in its jaws — it never became a dragon.
@@ -738,7 +739,7 @@ defineBoss({
   name: NAME,
   bossTitle: '용이 되지 못한 쇳물',
   bossFloors: [3],
-  hp: 880,
+  hp: 990,
   radius: 11,
   speed: 0,
   mass: Infinity,
@@ -778,7 +779,7 @@ defineBoss({
       if (e.phase === 0 && e.hp <= e.maxHp * 0.5) yield* phaseTwo(e, w);
       const p2 = !!e.mem.p2;
       // the breach is its signature: it always opens with one and never goes long without
-      const id = sinceBreach >= 9 ? 'breach' : pickPattern(w.rng, [
+      const id = sinceBreach >= 9 ? 'breach' : pickBossPattern(e, w, [
         { id: 'breach', w: 3 + sinceBreach * 1.5 },
         { id: 'breath', w: 2.4 },
         { id: 'rain', w: 2 },
@@ -795,7 +796,7 @@ defineBoss({
       // circle under the floor for a moment
       const drift = inRoom(w, s.gx + w.rng.range(-50, 50), s.gy + w.rng.range(-30, 30), 30);
       yield* swimTo(e, w, drift.x, drift.y, 120);
-      yield p2 ? 0.15 : 0.35;
+      yield p2 ? 0.1 : 0.2;
     }
   },
   update(e, w) {

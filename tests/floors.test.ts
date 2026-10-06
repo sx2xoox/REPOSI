@@ -64,7 +64,7 @@ describe('difficulty table', () => {
     }
   });
 
-  it('bosses last ~30-60 s against a typical build on their floor', () => {
+  it('bosses stay under 70 s of baseline damage after the modest HP increase', () => {
     // the QA bot's median boss dps per floor (scripts/qa-run.mjs --suite balance, 4 characters x
     // 15 seeds; blessings, items, releases and dodging included): it grows ~1.45x per floor.
     for (const e of Enemies.all()) {
@@ -75,7 +75,7 @@ describe('difficulty table', () => {
         if (!f || !dps) continue;
         const seconds = (e.hp * (f.bossHpMult ?? f.hpMult)) / dps;
         expect(seconds, `${e.id} on floor ${fl}`).toBeGreaterThan(25);
-        expect(seconds, `${e.id} on floor ${fl}`).toBeLessThan(60);
+          expect(seconds, `${e.id} on floor ${fl}`).toBeLessThan(70);
       }
     }
   });

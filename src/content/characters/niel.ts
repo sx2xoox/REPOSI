@@ -161,6 +161,7 @@ defineCharacter({
     dashTime: 0.14,
   },
   unlocked: false,
+  unlockRequirement: '3층 이상 보스 처치 또는 4층 도달',
   unlockHint: '3층의 보스를 쓰러뜨리면 심연 속에서 누군가 깨어난다.',
   lightColor: '#c8a0ff',
   release: releaseAbyss,

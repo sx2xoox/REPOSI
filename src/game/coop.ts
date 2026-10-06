@@ -1,3 +1,4 @@
+import { applyFacility, type FacilityCommand } from './facilities';
 // Online co-op rules shared by the simulation and the UI: revive timing and
 // the lockstep commands (player decisions that change the world, applied at the
 // same tick on every peer: blessing picks, artifact discards, the host ending
@@ -18,6 +19,7 @@ export const REVIVE_RANGE = 22;
 
 /** A lockstep command (JSON, see net/wire NetCommand). */
 export type CoopCommand =
+  | FacilityCommand
   /** the keeper picked this floor's blessing (`id: null` = skipped) */
   | { type: 'bless'; floor: number; id: string | null }
   /** the keeper discards one copy of an artifact (Tab screen) */
@@ -34,6 +36,8 @@ export type CoopCommand =
 /** Is `cmd` one of ours (shape-checked: commands come from the network)? */
 export function isCoopCommand(cmd: { type: string; [k: string]: unknown }): cmd is CoopCommand {
   switch (cmd.type) {
+    case 'facility':
+      return [cmd.floor,cmd.stage,cmd.room,cmd.entity].every(v=>typeof v==='number'&&Number.isSafeInteger(v)) && typeof cmd.fingerprint==='string' && cmd.fingerprint.length<12000 && Array.isArray(cmd.materials) && cmd.materials.length<=2 && cmd.materials.every(v=>typeof v==='string'&&v.length<100);
     case 'bless':
       return typeof cmd.floor === 'number' && (cmd.id === null || typeof cmd.id === 'string');
     case 'discard':
@@ -56,6 +60,8 @@ export function isCoopCommand(cmd: { type: string; [k: string]: unknown }): cmd 
 export function applyCoopCommand(w: World, slot: number, cmd: CoopCommand): boolean {
   const p = w.players.find((q) => q.slot === slot);
   switch (cmd.type) {
+    case 'facility':
+      return !!p && w.asPlayer(p,()=>applyFacility(w,cmd));
     case 'bless':
       if (!p) return false;
       return w.asPlayer(p, () => bless(w, p, cmd.floor, cmd.id));

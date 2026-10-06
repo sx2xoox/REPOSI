@@ -37,7 +37,7 @@ defineDrawnSprite('icon_fang_blade', 16, 16, (p) => {
 defineWeapon({
   id: 'fang_blade',
   name: '흰 송곳니',
-  desc: '짧고 빠른 반격용 단도. 베기마다 탄환을 되받아치고, 간파 직후에는 몸을 날려 깊게 찌른다.',
+  desc: '짧고 빠른 반격용 단도. 베기마다 탄환을 되받아치고, 간파 직후에는 몸을 날려 깊게 찌른다. 반사 피해는 공격력의 40%.',
   icon: 'icon_fang_blade',
   heldSprite: 'w_fang_blade',
   kind: 'melee',
@@ -52,7 +52,7 @@ defineWeapon({
   update(w, p, st, _dt, firing, aim) {
     if (!attackInput(st, w, firing) || st.cooldown > 0) return;
     consumeAttack(st);
-    const s = p.stats;
+    const s = p.weaponStats;
     const hand = st.combo % 2;
     const dir = hand ? -1 : 1;
     const counter = inCounter(w);

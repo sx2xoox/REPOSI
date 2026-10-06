@@ -1,0 +1,229 @@
+{
+  "provider": "PixelLab",
+  "generatedAt": "2026-10-04",
+  "actors": {
+    "ria": {
+      "characterId": "90a1a21a-446b-42a2-b997-6e84e2f6b8ee",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        40,
+        40
+      ]
+    },
+    "bern": {
+      "characterId": "4a695e55-4b12-4f83-92f2-30e476782921",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        44,
+        44
+      ]
+    },
+    "serin": {
+      "characterId": "2e37407f-c848-4f54-a6e7-9996d37f6270",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        32,
+        32
+      ]
+    },
+    "niel": {
+      "characterId": "487978d7-6b19-455b-8934-c9eaf65e6a3f",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        32,
+        32
+      ]
+    },
+    "bori": {
+      "characterId": "cd6b50e5-72f5-4cc8-a996-a435f000ec07",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        44,
+        44
+      ]
+    },
+    "baekgu-fixed": {
+      "characterId": "0b59a196-2662-4bbc-9eb1-5c7671cfb773",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        32,
+        32
+      ]
+    },
+    "mori": {
+      "characterId": "f8fc12a2-c5ca-436b-bf74-15f987a12988",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        32,
+        32
+      ]
+    },
+    "tove": {
+      "characterId": "1b1907f9-88df-415e-b5c7-9e6775c562aa",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        40,
+        40
+      ]
+    },
+    "luen": {
+      "characterId": "7033fa50-caba-43cc-bb10-067db1e2b3c3",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        32,
+        32
+      ]
+    },
+    "ves": {
+      "characterId": "d8d89792-2028-41d2-9a34-6d3fb8d79afc",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        32,
+        32
+      ]
+    },
+    "ort": {
+      "characterId": "72e77dec-ccb1-4c83-a6ab-640975332c9c",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        32,
+        32
+      ]
+    },
+    "mira": {
+      "characterId": "01dd3656-da82-4240-98fe-00e12d4cee1e",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        44,
+        44
+      ]
+    },
+    "lume": {
+      "characterId": "2d963637-533b-49c8-b175-08cc9cbc98d5",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        32,
+        32
+      ]
+    },
+    "brik": {
+      "characterId": "376fd9ce-608e-45d7-b330-9607fdf19308",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        44,
+        44
+      ]
+    },
+    "orin": {
+      "characterId": "8c29b9e0-9373-4049-9ddb-199fd046a531",
+      "rotationSize": [
+        32,
+        32
+      ],
+      "walkingCanvas": [
+        32,
+        32
+      ]
+    }
+  },
+  "images": {
+    "keeper-house": {
+      "jobId": "293e2278-835f-41a0-9e86-5a5a5c08638f",
+      "imageId": "052cbc06-bb4e-52ef-998e-99de56da0591"
+    },
+    "archive": {
+      "jobId": "b25e588b-6a60-4de6-a10f-8e1b5cdfec94",
+      "imageId": "28ec7d07-f2a0-515a-8d76-528ab4bdad35"
+    },
+    "sanctuary": {
+      "jobId": "a260f807-3940-412f-bf02-7da6a6716b57",
+      "imageId": "f331df87-8eb6-5162-aa21-f8c33f3d679a"
+    },
+    "lantern-court": {
+      "jobId": "05d1fb02-3c92-4d61-82bf-716f839e7998",
+      "imageId": "987feba3-e7a5-542b-a1b2-a0464578271e"
+    },
+    "forge-v2": {
+      "jobId": "5dd61dc2-26ea-4cea-945e-5865032747c8",
+      "imageId": "07bb2c7e-839a-51cf-b414-b9371e250055"
+    },
+    "garden-v2": {
+      "jobId": "68258d5c-f697-47f3-aab9-54c6355fe495",
+      "imageId": "b6862655-9483-5151-a3e6-c011e32df183"
+    },
+    "boat-v2": {
+      "jobId": "ded08aba-af7b-4489-9ed1-d38212b7515b",
+      "imageId": "30161456-7c57-579c-a2a1-f82716ecf117"
+    },
+    "stone-floor": {
+      "jobId": "38c7e2af-8b8f-41f5-aa47-0a757e79bb36",
+      "imageId": "5ba72a40-79d7-5108-819e-bd3f023e631d"
+    },
+    "soil-floor": {
+      "jobId": "54840d89-69bc-4b99-b23c-5336331065e0",
+      "imageId": "896626b9-b6a6-5382-8d9a-34ada4aebff3"
+    },
+    "portrait-lume": {
+      "jobId": "fa94b3db-dabe-4f39-9872-ccf0f0664c6f",
+      "imageId": "5d3c4c84-da73-593d-b6b8-bb346f1ccc77"
+    },
+    "portrait-brik": {
+      "jobId": "a84f76ff-96dc-443f-91f6-280fb0ddb901",
+      "imageId": "1e8e4e23-3c94-57f1-9841-3023e7d55659"
+    },
+    "portrait-orin": {
+      "jobId": "ddc40798-6458-47b9-b9e0-104f656fbfc2",
+      "imageId": "f22a728e-3647-5443-868f-7ea9ebb87520"
+    }
+  },
+  "notes": [
+    "Native generated pixels; transparent actor canvases aligned at feet without resampling.",
+    "Eight idle directions; four cardinal walk cycles reused for diagonal travel.",
+    "Brik walking uses refined V3 group 47e02c00-34fc-4459-b737-c44e404ee380.",
+    "Approved existing Ria dialogue portrait retained.",
+    "Rejected original baekgu and first forge/garden/boat excluded from application bundle.",
+    "Eye refinement and regenerated walk provenance supersede original actor image details: see polish-manifest.json."
+  ]
+}

@@ -1,24 +1,11 @@
-// Challenge room "시련의 방": touching the altar seals the doors and summons three
-// waves of this floor's enemies (telegraphed by summoning circles). Surviving all
-// waves rewards an item pedestal and a chest.
-
 import { registerRoomHandler } from '../../game/roomkinds';
-import { Enemies } from '../../game/defs';
-import { Entity } from '../../game/entity';
-import { Chest, Pedestal } from '../../game/pickups';
-import { RingFx } from '../../game/effects';
-import type { World } from '../../game/world';
-import type { Room } from '../../game/room';
-import type { Renderer } from '../../engine/renderer';
+import { defineRoom } from '../../game/defs';
 import { defineDrawnSprite } from '../../engine/sprites';
-import { fx } from '../../engine/rng';
-import { dist } from '../../engine/math';
+import type { World } from '../../game/world';
+import type { Renderer } from '../../engine/renderer';
 import { Prop } from '../props/prop';
 import { ritualCircle, withDecals } from './decor';
-import { HintLabel } from './label';
-
-const WAVES = 3;
-
+import { participants, encounterWave, encounterRewards, endEncounter, roomLabel } from './encounter-kit';
 defineDrawnSprite('trial_altar', 22, 22, (p) => {
   // stepped stone base
   p.rect(0, 15, 22, 7, '#3a3846');
@@ -47,173 +34,67 @@ defineDrawnSprite('trial_gem', 4, 5, (p) => {
   p.px(2, 3, '#a01010');
 }, { origin: [2, 2] });
 
-/** Telegraphed summoning circle: grows for `time`, then spawns the enemy. */
-class SummonCircle extends Entity {
-  enemyId: string;
-  time: number;
-  altar: TrialAltar;
-  constructor(x: number, y: number, id: string, time: number, altar: TrialAltar) {
-    super();
-    this.x = x;
-    this.y = y;
-    this.enemyId = id;
-    this.time = time;
-    this.altar = altar;
-    this.layer = 0;
-    this.tileCollide = false;
-    altar.pending++;
-  }
-
-  override update(w: World, dt: number): void {
-    this.age += dt;
-    if (fx.chance(dt * 20)) {
-      const a = fx.angle();
-      w.particles.spawn({ x: this.x + Math.cos(a) * 10, y: this.y + Math.sin(a) * 6, vx: -Math.cos(a) * 16, vy: -Math.sin(a) * 10 - 6, life: 0.4, colors: ['#ffd0d0', '#ff4040'], size: 1, additive: true });
-    }
-    if (this.age >= this.time) {
-      this.dead = true;
-      this.altar.pending--;
-      const e = w.spawnEnemy(this.enemyId, this.x, this.y);
-      if (e) e.dormant = 0.45;
-      w.particles.burst(this.x, this.y - 4, { count: 18, speed: [30, 90], life: [0.3, 0.6], colors: ['#ffffff', '#ff6060', '#801010'], size: [1, 2], additive: true });
-      w.spawn(new RingFx(this.x, this.y, 16, 0.3, '#ff6060', 2));
-      w.sfx('enemy_spawn', { vol: 0.5 });
-    }
-  }
-
-  override draw(r: Renderer): void {
-    const t = Math.min(1, this.age / this.time);
-    const rad = 4 + t * 9;
-    r.circle(this.x, this.y, rad, '#ff2030', 0.18 + 0.1 * Math.sin(this.age * 30));
-    r.ring(this.x, this.y, rad, '#ff6060', 1, 0.9);
-    r.ring(this.x, this.y, 13, '#ff3040', 1, 0.35);
-  }
-
-  override light(w: World): void {
-    w.lights.add(this.x, this.y, 30, '#ff3030', { intensity: 0.6 });
-  }
-}
-
 export class TrialAltar extends Prop {
-  state: 'idle' | 'active' | 'done' = 'idle';
-  wave = 0;
-  gapT = 0;
-  pending = 0;
-  flare = 0;
-  constructor(x: number, y: number) {
-    super(x, y, 1);
-  }
-
-  override update(w: World, dt: number): void {
-    this.age += dt;
-    this.flare = Math.max(0, this.flare - dt * 1.5);
-    if (this.state === 'idle') {
-      if (w.node.cleared) {
-        this.state = 'done';
-        return;
-      }
-      w.holdClear = Math.max(w.holdClear, 1);
-      const p = w.player;
-      if (!w.transitioning && p.alive && dist(p.x, p.y, this.x, this.y - 4) < 15) this.begin(w);
-      return;
-    }
-    if (this.state !== 'active') return;
-    w.holdClear = Math.max(w.holdClear, 1);
-    const alive = w.enemies.some((e) => e.alive && !e.ignoreForClear);
-    if (alive || this.pending > 0) return;
-    this.gapT -= dt;
-    if (this.gapT > 0) return;
-    if (this.wave < WAVES) {
-      this.wave++;
-      this.spawnWave(w);
-      this.gapT = 1.1;
-    } else {
-      // all waves beaten: let the room clear (rewards in onClear)
-      this.state = 'done';
-      w.holdClear = 0;
-      this.flare = 1;
-    }
-  }
-
-  private begin(w: World): void {
-    this.state = 'active';
-    this.wave = 0;
-    this.gapT = 0.9;
-    this.flare = 1;
-    w.room.setDoorsClosed(true);
-    w.sfx('door_close');
-    w.sfx('boss_roar', { vol: 0.5, pitch: 1.3 });
-    w.shake(0.35);
-    w.banner('시련의 방', `${WAVES}번의 습격을 버텨내라!`, { color: '#ff8080', small: true });
-    w.spawn(new RingFx(this.x, this.y - 6, 60, 0.5, '#ff6060', 3));
-  }
-
-  private spawnWave(w: World): void {
-    const pool = Object.entries(w.enemyPool())
-      .map(([id, weight]) => ({ def: Enemies.get(id), weight }))
-      .filter((x): x is { def: NonNullable<typeof x.def>; weight: number } => !!x.def && !x.def.boss);
-    const n = 2 + this.wave + Math.floor(w.floor.index / 2);
-    const room = w.room;
-    const p = w.player;
-    for (let i = 0; i < n && pool.length; i++) {
-      const pick = w.rng.weighted(pool, (x) => x.weight / Math.max(1, (x.def.cost ?? 1) * 0.7));
-      if (!pick) break;
-      const pos = room.randomFreePos(w.rng, 8, { x: p.x, y: p.y, dist: 64 });
-      w.spawn(new SummonCircle(pos.x, pos.y, pick.def.id, 0.85 + i * 0.12, this));
-    }
-    w.banner(`${this.wave}번째 습격`, this.wave === WAVES ? '마지막 파도다!' : '버텨라!', { color: '#ff9090', small: true });
-    w.sfx('summon', { vol: 0.7 });
-    this.flare = 1;
-  }
-
-  override draw(r: Renderer): void {
-    r.shadow(this.x, this.y - 1, 24, 6, 0.35);
-    r.sprite('trial_altar', this.x, this.y);
-    const gemY = this.y - 14 + Math.sin(this.age * 2) * (this.state === 'idle' ? 1 : 0);
-    const done = this.state === 'done';
-    r.sprite('trial_gem', this.x, gemY, { tint: done ? '#ffd040' : undefined, tintAmount: done ? 0.8 : 0, flash: this.flare * 0.8 });
-    if (this.state === 'active') {
-      for (let i = 0; i < WAVES; i++) {
-        const lit = i < this.wave;
-        r.rect(this.x - 5 + i * 4, this.y - 4, 2, 2, lit ? '#ff5050' : '#3a2a30');
-      }
-    }
-  }
-
-  override light(w: World): void {
-    const col = this.state === 'done' ? '#ffd060' : '#ff3a3a';
-    const pulse = this.state === 'idle' ? 0.6 + 0.25 * Math.sin(this.age * 3) : 0.85;
-    w.lights.add(this.x, this.y - 14, 46 + this.flare * 40, col, { intensity: pulse });
-    w.lights.glow(this.x, this.y - 14, 8 + this.flare * 10, col, 0.35 + this.flare * 0.4);
-  }
+ mem={phase:0,used:false,pending:0,members:1,wave:0,gap:.8,clock:0};
+ constructor(x:number,y:number,readonly elite=false){super(x,y,1);}
+ get state(){return this.mem.used?'done':this.mem.phase?'active':'idle';}
+ get wave(){return this.mem.wave;}
+ override previewable(){return !this.elite&&!this.mem.used&&!this.mem.phase;}
+ override interactionInfo(){return {name:this.elite?'엘리트 소탕전':'시련의 방',icon:this.elite?'map_elite':'map_challenge',desc:this.elite?'거대 정예 적의 3차례 습격을 모두 물리치세요. 체력 3배, 피해 1.5배, 빠른 공격 회복. 입장 즉시 전투가 시작되고 문이 닫힙니다.':'5차례의 몬스터 습격을 모두 물리치세요. 시작 후 문이 닫히며, 한 번만 도전할 수 있습니다.'};}
+ override interact(w:World){
+  if(!this.previewable()||!w.player.alive||w.player.downed||Math.hypot(w.player.x-this.x,w.player.y-this.y)>30)return false;
+  if(!this.begin(w))return false;
+  w.sfx('door_close');return true;
+ }
+ /** Elite entry and voluntary challenge activation share one idempotent start. */
+ begin(w:World):boolean{
+  if(this.mem.used||this.mem.phase)return false;
+  this.mem.phase=1;this.mem.members=participants(w);w.holdClear=Math.max(1,w.holdClear);w.room.setDoorsClosed(true);
+  // Begin the first summon warnings on entry, without waiting for an altar action.
+  if(this.elite)this.nextWave(w);
+  return true;
+ }
+ private nextWave(w:World){
+  const s=this.mem;s.wave++;
+  encounterWave(w,this,(this.elite?1+s.wave:3+s.wave)+Math.floor((w.floor.index-1)/3),this.elite);
+  if(!this.elite)w.banner('시련 '+s.wave+' / 5','소환 경고를 확인하세요',{small:true,color:'#efb085'});
+ }
+ override update(w:World,dt:number){
+  this.age+=dt;const s=this.mem;if(s.used)return;w.holdClear=Math.max(1,w.holdClear);if(!s.phase)return;
+  s.clock+=dt;
+  const living=w.enemies.some(e=>e.alive&&e.encounterId===this.id);
+  if(living||s.pending){s.gap=2;return;}
+  s.gap-=dt;if(s.gap>0)return;
+  const waves=this.elite?3:5;
+  if(s.wave<waves)this.nextWave(w);
+  else{encounterRewards(w,s.members,this.elite?'elite':'challenge');endEncounter(w,this,true);w.banner(this.elite?'엘리트 소탕 완료':'시련 극복','무기 상자'+(this.elite?'':'와 유물 선택 보상')+'를 확인하세요',{small:true,color:'#ffd894'});}
+ }
+ override draw(r:Renderer){
+  if(this.elite)return;
+  r.shadow(this.x,this.y,24,6,.35);r.sprite('trial_altar',this.x,this.y);r.sprite('trial_gem',this.x,this.y-16);
+  if(this.mem.used)roomLabel(r,'완료',this.x,this.y-30,'#efbc92');
+  else if(this.mem.phase)r.pixelText(this.mem.wave+'/5',this.x,this.y-30,'#efbc92',{align:'center',outline:'#100a18'});
+ }
+ override light(w:World){if(!this.elite)w.lights.add(this.x,this.y-16,50,'#e78183',{intensity:.65});}
 }
 
-function altarSpot(room: Room): { x: number; y: number } {
-  const m = room.markers.find((k) => k.ch === '@');
-  return m ? { x: m.x, y: m.y + 6 } : { x: room.centerX, y: room.centerY + 6 };
+for(const kind of ['challenge','elite'] as const){
+ if(kind==='elite')defineRoom({id:'elite_arena',shape:'1x1',kinds:['elite'],rows:['.pp...........pp.','...X.........X...',...Array(5).fill('.................'),'...X.........X...','.pp...........pp.']});
+ registerRoomHandler(kind,{
+  clearOnEnter:false,
+  populate(w,room){
+   const cx=room.centerX,cy=room.centerY;
+   if(kind==='challenge')withDecals(room,p=>{ritualCircle(p,cx,cy,52,'#a05e69',.45);});
+   w.spawn(new TrialAltar(cx,cy,kind==='elite'));
+  },
+  spawnEnemies(){return kind==='elite';},
+  onEnter(w){
+   if(w.node.cleared)return;
+   w.holdClear=Math.max(w.holdClear,1);
+   if(kind==='elite'){
+    const encounter=w.entities.find(e=>e instanceof TrialAltar&&e.elite) as TrialAltar|undefined;
+    encounter?.begin(w);
+   }
+  },
+ });
 }
-
-registerRoomHandler('challenge', {
-  clearOnEnter: false,
-  populate(w, room) {
-    const a = altarSpot(room);
-    withDecals(room, (p) => ritualCircle(p, a.x, a.y - 4, 50, '#c03030', 0.45));
-    const altar = w.spawn(new TrialAltar(a.x, a.y));
-    w.spawn(new HintLabel(a.x, a.y - 30, '제단에 닿으면 시련 시작', () => altar.state === 'idle', '#ffb0b0'));
-  },
-  spawnEnemies() {
-    return false;
-  },
-  onEnter(w) {
-    if (!w.node.cleared) w.holdClear = Math.max(w.holdClear, 1);
-  },
-  onClear(w, room, rng) {
-    const a = altarSpot(room);
-    const item = w.loot.rollItem('challenge', w.run.lootRng) ?? w.loot.rollItem('treasure', w.run.lootRng);
-    if (item) w.spawn(new Pedestal(a.x, a.y - 40, item));
-    w.spawn(new Chest(a.x - 34, a.y + 22, w.floor.index >= 3 && rng.chance(0.5)));
-    w.spawn(new Chest(a.x + 34, a.y + 22, false));
-    w.banner('시련 극복', '등불이 더 밝게 타오른다.', { color: '#ffd060', small: true });
-    w.sfx('item_get_rare', { vol: 0.6 });
-  },
-});

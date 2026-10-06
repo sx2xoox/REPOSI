@@ -2,7 +2,7 @@ export const TOWN_W = 768;
 export const TOWN_H = 432;
 export const TOWN_ZONES = [
   { x: 384, y: 232, title: '중앙 등불', sub: '원정 출발' },
-  { x: 161, y: 224, title: '등불지기의 집', sub: '캐릭터 준비' },
+  { x: 161, y: 244, title: '등불지기의 집', sub: '캐릭터 준비' },
   { x: 584, y: 207, title: '귀환 기록실', sub: '기억 · 도감' },
   { x: 576, y: 359, title: '동행의 부두', sub: '협동 방 만들기 · 참가' },
 ];
@@ -11,6 +11,11 @@ export const TOWN_RESIDENTS = [
 ];
 const SOLID = [
   [111, 132, 103, 80], [295, 55, 92, 88], [536, 119, 110, 81],
+  [78,286,39,22], [670,270,39,22], [332,331,31,10], [451,131,31,10],
+  [207,200,48,28],
+  // Ground footprints only; the taller artwork may overlap a keeper behind it.
+  [143,239,44,7],
+  [118,241,18,11], [643,205,18,11], [276,132,18,11], [646,341,18,11],
   [359, 163, 51, 55], [256, 275, 63, 20], [440, 276, 56, 20],
 ] as const;
 export function townWalkable(x: number, y: number, radius = 5): boolean {

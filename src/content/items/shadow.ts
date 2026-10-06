@@ -49,7 +49,7 @@ class AfterImage extends Entity {
     this.x = p.x;
     this.y = p.y;
     this.frame = p.frameName();
-    this.flip = p.flip;
+    this.flip = p.spriteFlip;
     this.tileCollide = false;
     this.flying = true;
   }
@@ -234,7 +234,7 @@ defineArtifact({
     if (isMelee(w)) {
       p.swing(w, { angle: back, damage: dmg(w) * 0.6, arc: 1.8, color: '#b08aff' });
     } else {
-      for (const pr of p.fireProjectiles(w, back, { count: power, damageMult: 0.7, spreadMult: 1.2 })) pr.color = '#c0a0ff';
+      for (const pr of p.fireProjectiles(w, back, { fromWeapon: false, count: power, damageMult: 0.7, spreadMult: 1.2 })) pr.color = '#c0a0ff';
     }
   },
 });

@@ -26,6 +26,7 @@ import { blessingChoices, blessingDue } from '../src/game/blessings';
 import { discardBlockFor } from '../src/game/interact';
 import { botInput, newBot, type BotState } from './detsim';
 import type { Frame } from '../src/net/wire';
+import type { CoopCommand } from '../src/game/coop';
 
 loadContent();
 
@@ -48,6 +49,12 @@ export interface CoopScenario {
   discardAt: number;
   /** clock drift per client (fraction) */
   drift?: number[];
+  /** Optional deterministic scenario interaction before each fixed step. */
+  extraStep?: (w: World, tick: number) => void;
+  /** Decisions sent through the actual lockstep transport, once sampled per peer. */
+  commands?: (w: World, step: number) => CoopCommand[];
+  /** Keep authored encounter tests in their room after completion. */
+  stayInRoom?: boolean;
   /** test only: nudge the last keeper by 1e-9 px on one peer at this tick (desync detection) */
   inject?: { slot: number; tick: number };
 }
@@ -115,7 +122,7 @@ export function runCoop(sc: CoopScenario): CoopResult {
     session.game?.observe((f: Frame) => {
       peer.hashes[f.tick] = stateHash(world);
     });
-    nr.beforeStep = (w, tick) => script(sc, peer, w, tick);
+    nr.beforeStep = (w, tick) => { sc.extraStep?.(w, tick); script(sc, peer, w, tick); };
     const ls = slot === 0 ? host : client!;
     const netHandler = ls.onDesync;
     ls.onDesync = (e) => {
@@ -132,6 +139,7 @@ export function runCoop(sc: CoopScenario): CoopResult {
     if (p.slot === 0) host.poll();
     else clients[p.slot - 1].poll();
     const w = p.world;
+    for (const cmd of sc.commands?.(w, p.steps) ?? []) p.net.sendCommand(cmd);
     // the keeper's own decisions: blessing picks and a discard go out as commands
     if (blessingDue(w) && p.blessed !== w.run.floor) {
       p.blessed = w.run.floor;
@@ -217,6 +225,7 @@ function script(sc: CoopScenario, peer: CoopPeer, w: World, tick: number): void 
     }
     if (v && !v.downed && peer.log.some((s) => s.endsWith(':downed')) && !peer.log.some((s) => s.endsWith(':revived'))) log('revived');
   }
+  if (sc.stayInRoom) return;
   // move on: to the boss, out of stuck fights, on from long-cleared rooms
   if (sc.bossAt > 0 && tick >= sc.bossAt && w.run.floor === (sc.floor ?? 1) && !peer.log.some((s) => s.endsWith(':boss'))) {
     const boss = w.map.nodes.find((x) => x.kind === 'boss');

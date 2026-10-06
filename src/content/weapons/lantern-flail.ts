@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // 구조등 도리깨 (rescue-lantern flail): 보리's starting weapon. A heavy lantern on
 // a short chain, swung in wide slow arcs that shove everything aside; every third
 // swing is an overhead slam that drops the lantern on the ground and sends out a
@@ -77,7 +78,7 @@ defineWeapon({
     if ((st.mem.wind ?? 0) > 0) {
       st.mem.wind -= dt;
       if (st.mem.wind <= 0) {
-        const s = p.stats;
+        const s = p.weaponStats;
         const a = st.mem.windAim ?? aim;
         const reach = (26 + s.range * 0.04) * 1.15;
         const ix = p.x + Math.cos(a) * reach * 0.7;
@@ -106,7 +107,7 @@ defineWeapon({
     }
     if (!want || st.cooldown > 0) return;
     consumeAttack(st);
-    const s = p.stats;
+    const s = p.weaponStats;
     const step = st.combo % 3;
     const iv = attackInterval(p);
     const reach = 26 + s.range * 0.04;
@@ -139,9 +140,9 @@ defineWeapon({
     const rest = meleeRest(st, p.aim);
     const pose = swingPose(st, w, rest);
     const active = pose.phase === 1 || pose.phase === 2;
-    const h = handPos(p, pose.angle, active ? 4 : 1);
+    const h = visualHandPos(p, pose.angle, active ? 4 : 1);
     // the lantern glows harder mid-swing
-    const head = handPos(p, pose.angle, (active ? 4 : 1) + 20);
+    const head = visualHandPos(p, pose.angle, (active ? 4 : 1) + 20);
     const glow = 0.16 + 0.06 * Math.sin(p.age * 6) + (active ? 0.3 : 0);
     r.sprite(glowSprite(active ? 24 : 16, '#ffb040'), head.x, head.y, { alpha: glow, additive: true });
     r.sprite('w_lantern_flail', h.x, h.y, { rot: pose.angle, flipY: Math.cos(pose.angle) < 0, flash: pose.phase === 1 ? 0.4 : 0 });

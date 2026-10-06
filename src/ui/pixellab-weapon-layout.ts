@@ -1,0 +1,23 @@
+/** Family-sized PixelLab exports. Integer pivots include one transparent safety pixel. */
+export const PIXELLAB_WEAPON_LAYOUT: Record<string, { grip: [number, number]; muzzle?: [number, number]; bowTips?: [[number, number], [number, number]] }> = {
+  brass_revolver: {"grip":[3,9],"muzzle":[19,5]},
+  nail_carbine: {"grip":[6,5],"muzzle":[23,3]},
+  bell_blunderbuss: {"grip":[5,8],"muzzle":[23,7]},
+  ember_musket: {"grip":[6,7],"muzzle":[24,5]},
+  pearl_crossbow: {"grip":[6,10]},
+  crescent_bow: {"grip":[6,12],"bowTips":[[3,2],[3,22]]},
+  thorn_shortbow: {"grip":[5,10],"bowTips":[[2,2],[2,19]]},
+  glacier_arbalest: {"grip":[6,12]},
+  copper_sabre: {"grip":[5,7]},
+  rose_rapier: {"grip":[6,8]},
+  anchor_axe: {"grip":[7,10]},
+  cathedral_mace: {"grip":[8,11]},
+  comet_pike: {"grip":[8,5]},
+  obsidian_cleaver: {"grip":[5,4]},
+  moon_fan: {"grip":[2,11]},
+  dusk_knives: {"grip":[4,4]},
+  amber_wand: {"grip":[6,4],"muzzle":[18,3]},
+  tide_staff: {"grip":[7,8],"muzzle":[23,7]},
+  cinder_sceptre: {"grip":[7,9],"muzzle":[23,7]},
+  stormhorn_rod: {"grip":[7,6],"muzzle":[19,7]},
+};

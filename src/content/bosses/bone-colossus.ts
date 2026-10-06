@@ -1,3 +1,4 @@
+import { bossIntercept, pickBossPattern } from './tactics';
 // Floor 1 boss: 해골 거상 (bone colossus) — 지하묘지의 문지기.
 // A giant skeletal torso that drags itself out of a heap of grave bones, a rusted
 // gate key hanging from its neck and a captive soul flame burning in its ribcage.
@@ -623,7 +624,8 @@ function* retch(e: Enemy, w: World): Script {
 function* leap(e: Enemy, w: World, short: boolean): Script {
   const p2 = !!e.mem.p2;
   const t = e.target(w);
-  const land = landingSpot(w, t.x, t.y, e.r);
+  const aim = bossIntercept(t);
+  const land = landingSpot(w, aim.x, aim.y, e.r);
   anim(e, 'crouch', true);
   const wind = short ? 0.4 : 0.55;
   const air = 0.85;
@@ -748,7 +750,7 @@ defineBoss({
   name: NAME,
   bossTitle: '지하묘지의 문지기',
   bossFloors: [1],
-  hp: 720,
+  hp: 810,
   radius: 17,
   speed: 30,
   mass: 8,
@@ -769,7 +771,7 @@ defineBoss({
     while (true) {
       if (e.phase === 0 && e.hp <= e.maxHp * 0.5) yield* phaseTwo(e, w);
       const p2 = !!e.mem.p2;
-      const id = pickPattern(w.rng, [
+      const id = pickBossPattern(e, w, [
         { id: 'slam', w: 3 },
         { id: 'retch', w: 2.2 },
         { id: 'leap', w: 2, when: e.distToTarget(w) > 40 },
@@ -787,8 +789,8 @@ defineBoss({
       else if (id === 'soul') yield* soulSpiral(e, w);
       else yield* raiseDead(e, w);
       anim(e, 'idle');
-      yield p2 ? 0.35 : 0.6;
-      yield* crawl(e, w, p2 ? 0.5 : 0.9, 70);
+      yield p2 ? 0.2 : 0.3;
+      yield* crawl(e, w, p2 ? 0.25 : 0.45, 90);
     }
   },
   update(e, w) {

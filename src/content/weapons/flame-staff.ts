@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // 잿불 지팡이 (cinder staff): hold to pour a short cone of flame. Each puff is
 // weak and short-ranged but passes through enemies and often sets them alight.
 
@@ -72,7 +73,7 @@ defineWeapon({
       st.mem.atk = 0;
       return;
     }
-    const s = p.stats;
+    const s = p.weaponStats;
     st.mem.atk = (st.mem.atk ?? 0) - dt;
     if (st.mem.atk <= 0) {
       st.mem.atk += 1 / Math.max(0.3, s.fireRate);
@@ -98,7 +99,7 @@ defineWeapon({
   },
   draw(w, p, r) {
     const firing = w.time - p.lastAttackAt < 0.08;
-    const h = handPos(p, p.aim, 17 - p.recoil);
+    const h = visualHandPos(p, p.aim, 17 - p.recoil);
     drawHeld(r, p, 'w_flame_staff', p.aim, 6 - p.recoil);
     const fl = 1 + 0.2 * Math.sin(w.time * 31) + (firing ? 0.5 : 0);
     r.sprite(glowSprite(9 * fl, '#ff9a30'), h.x, h.y, { alpha: 0.5, additive: true });

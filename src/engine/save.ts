@@ -1,4 +1,5 @@
 // Persistent settings + meta progression in localStorage (fails gracefully).
+import { normalizeStage } from '../game/stage-plan';
 
 export interface Settings {
   masterVolume: number;
@@ -176,6 +177,11 @@ export const save = {
       write(KEY_SLOTS, this.slots);
     } else write(KEY_PROGRESS, this.progress);
   },
+  abandonExpedition(): void {
+    if (!this.progress.campaign?.checkpoint) return;
+    delete this.progress.campaign.checkpoint;
+    this.saveProgress();
+  },
   openSlot(index: number, name?: string): void {
     if (index < 0 || index >= 4) throw new Error('invalid save slot');
     // Preserve pre-slot progress in slot one; never overwrite the legacy keys.
@@ -194,6 +200,8 @@ export const save = {
     this.progress = this.slots[index]!.progress;
     this.history = this.slots[index]!.history;
     this.progress.campaign ??= newCampaign();
+    const checkpoint = this.progress.campaign.checkpoint;
+    if (checkpoint) checkpoint.stage = normalizeStage(checkpoint.stage);
     this.saveProgress();
   },
   addRun(rec: RunRecord): void {

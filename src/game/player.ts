@@ -1,10 +1,11 @@
+import { isContentTemporarilyLocked } from './release-policy';
 // The player character: movement + dash, weapon handling, hearts, consumables,
 // active item and potion, and rendering (body, held weapon, lantern light).
 
 import { Actor, type HitInfo } from './entity';
 import type { World } from './world';
 import type { Renderer } from '../engine/renderer';
-import { Actives, Potions, Weapons, enemyHitDamage, type CharacterDef, type WeaponState } from './defs';
+import { Actives, Potions, Weapons, Characters, enemyHitDamage, type CharacterDef, type WeaponState } from './defs';
 import { Inventory } from './inventory';
 import { BASE_STATS, type Stats } from './stats';
 import { angleOf, clamp, fromAngle, norm } from '../engine/math';
@@ -19,6 +20,8 @@ import { RELEASE_COOLDOWN } from './ember';
 import { fx } from '../engine/rng';
 import { DIR_VEC } from './constants';
 import { drawBackWeapon, equipWeapon, swapWeapons, tickHolstered, withSwapPop } from './weaponslots';
+import { visualHandPos } from './weapon-pose';
+import { shotMaterial } from './weapon-presentation';
 import { emptyInput, HELD, PRESS, readLocalInput, type PlayerInput } from './seam';
 import { FlowField } from './flow';
 import type { ItemSystem } from './items';
@@ -98,6 +101,8 @@ export class Player extends Actor {
   aim = 0;
   firing = false;
   facing: Facing = 'down';
+  /** Cosmetic facing follows active aim, otherwise preserves the last movement direction. */
+  private visualFacingAngle = Math.PI / 2;
   flip = false;
   moving = false;
   animT = 0;
@@ -153,6 +158,7 @@ export class Player extends Actor {
 
   constructor(character: CharacterDef) {
     super();
+    if (isContentTemporarilyLocked(character.id)) character = Characters.must('ria');
     this.character = character;
     this.team = 'player';
     this.r = 5;
@@ -292,7 +298,7 @@ export class Player extends Actor {
         this.afterT -= dt;
         if (this.afterT <= 0) {
           this.afterT = 0.03;
-          w.spawn(new Afterimage(this.frameName(), this.x, this.y, this.flip, dd?.color ?? this.character.lightColor ?? '#7ad0ff'));
+          w.spawn(new Afterimage(this.frameName(), this.x, this.y, this.spriteFlip, dd?.color ?? this.character.lightColor ?? '#7ad0ff'));
         }
       }
       dd?.update?.(w, this, dt);
@@ -337,6 +343,7 @@ export class Player extends Actor {
     // facing
     const lookA = this.dashing ? Math.atan2(this.dashDY, this.dashDX) : this.firing || (inp.held & HELD.cursorAim) !== 0 ? this.aim : this.moving ? Math.atan2(this.vy, this.vx) : null;
     if (lookA !== null) {
+      this.visualFacingAngle = lookA;
       const cx = Math.cos(lookA);
       const cy = Math.sin(lookA);
       if (Math.abs(cy) > Math.abs(cx) * 1.1) this.facing = cy < 0 ? 'up' : 'down';
@@ -386,6 +393,7 @@ export class Player extends Actor {
     this.vy += (inp.my * speed - this.vy) * k;
     this.moving = Math.hypot(this.vx, this.vy) > 12;
     if (this.moving) {
+      this.visualFacingAngle = Math.atan2(this.vy, this.vx);
       this.facing = Math.abs(this.vy) > Math.abs(this.vx) * 1.1 ? (this.vy < 0 ? 'up' : 'down') : 'side';
       this.flip = this.vx < 0;
     }
@@ -434,8 +442,8 @@ export class Player extends Actor {
    * weapon goes to the back); with both slots full the current weapon is
    * replaced and its id returned so the caller can drop it.
    */
-  equipWeapon(w: World, id: string): string | null {
-    return equipWeapon(w, this, id);
+  equipWeapon(w: World, id: string, replaceExisting = false): string | null {
+    return equipWeapon(w, this, id, replaceExisting);
   }
 
   weaponSlowsMove(): boolean {
@@ -506,7 +514,7 @@ export class Player extends Actor {
         by = ny;
       }
     }
-    w.spawn(new Afterimage(this.frameName(), this.x, this.y, this.flip, this.character.dash?.color ?? this.character.lightColor ?? '#7ad0ff', 0.35));
+    w.spawn(new Afterimage(this.frameName(), this.x, this.y, this.spriteFlip, this.character.dash?.color ?? this.character.lightColor ?? '#7ad0ff', 0.35));
     this.x = bx;
     this.y = by;
   }
@@ -557,13 +565,15 @@ export class Player extends Actor {
     return old;
   }
 
+  get weaponStats(): Stats { return { ...this.stats, damage: this.stats.damage * (1 + Math.max(-3, Math.min(3, Number(this.weapon.mem.temper ?? 0))) * .1) }; }
+
   // -------------------------------------------------------------- attacks
   /**
    * Fire the standard volley of player projectiles toward `angle` using current
    * stats (multishot, size, speed, range, pierce, bounce, homing ...).
    */
   fireProjectiles(w: World, angle: number, o: Partial<ProjectileOpts> & { damageMult?: number; count?: number; spreadMult?: number; noHooks?: boolean } = {}): Projectile[] {
-    const s = this.stats;
+    const s = o.fromWeapon === false ? this.stats : this.weaponStats;
     const count = o.count ?? s.shots;
     const out: Projectile[] = [];
     const spread = s.spread * (o.spreadMult ?? 1);
@@ -587,8 +597,10 @@ export class Player extends Actor {
         color: this.character.lightColor ?? '#9fd8ff',
         knockback: s.knockback,
         fromWeapon: true,
+        fxMaterial: shotMaterial(this.weaponId),
         ...o,
       });
+      p.mem.weaponDamage = s.damage;
       // inherit a little of the player's movement (Isaac feel)
       p.vx += this.vx * 0.25;
       p.vy += this.vy * 0.25;
@@ -605,7 +617,7 @@ export class Player extends Actor {
 
   /** Spawn a melee swing. Damage defaults to stats.damage. */
   swing(w: World, o: Partial<SwingOpts> & { angle: number }): MeleeSwing {
-    const s = this.stats;
+    const s = this.weaponStats;
     const sw = new MeleeSwing(this, {
       arc: 2.0,
       reach: 22 + s.range * 0.06,
@@ -614,6 +626,7 @@ export class Player extends Actor {
       color: this.character.lightColor ?? '#ffffff',
       ...o,
     });
+    if (!sw.o.noProc) w.items.onSwing(sw);
     w.spawn(sw);
     this.lastAttackAt = w.time;
     this.recoil = -3;
@@ -647,7 +660,8 @@ export class Player extends Actor {
       w.sfx('shield_block');
       return false;
     }
-    halfHearts = raw ? Math.max(1, Math.round(halfHearts)) : enemyHitDamage(w.floor, halfHearts);
+    const eliteScale = w.enemyDamageScale(origin);
+    halfHearts = raw ? Math.max(1, Math.round(halfHearts)) : enemyHitDamage(w.floor, eliteScale > 1 ? Math.ceil(halfHearts * eliteScale) : halfHearts);
     let dmg = halfHearts;
     const fromSoul = Math.min(this.soul, dmg);
     this.soul -= fromSoul;
@@ -682,8 +696,14 @@ export class Player extends Actor {
   }
 
   // -------------------------------------------------------------- drawing
+  get spriteFlip():boolean { return this.character.spritePrefix.startsWith('pl_') ? false : this.flip; }
   private animName(): string {
     const pre = this.character.spritePrefix;
+    if(pre.startsWith('pl_')) {
+      const angle=this.dashing?Math.atan2(this.dashDY,this.dashDX):this.firing?this.aim:null;
+      const direction=['east','south-east','south','south-west','west','north-west','north','north-east'][(Math.round((angle ?? this.visualFacingAngle)/(Math.PI/4))+8)%8];
+      return `${pre}_${this.dashing?'dash':this.moving?'walk':'idle'}_${direction}`;
+    }
     if (this.dashing && hasAnim(`${pre}_dash_${this.facing}`)) return `${pre}_dash_${this.facing}`;
     if (this.dashing && hasAnim(`${pre}_dash`)) return `${pre}_dash`;
     if (this.flash > 0 && hasAnim(`${pre}_hurt`)) return `${pre}_hurt`;
@@ -713,12 +733,12 @@ export class Player extends Actor {
     const hover = this.flying ? 2 + Math.sin(this.age * 3.2) : 0;
     r.shadow(this.x, this.y + 4, this.flying ? 9 : 11, this.flying ? 3 : 4, this.flying ? 0.25 : 0.35);
     const wdef = Weapons.get(this.weaponId);
-    const behind = this.facing === 'up';
+    const behind = this.character.spritePrefix.startsWith('pl_') ? Math.sin(this.aim) < -0.38 : this.facing === 'up';
     if (!behind) drawBackWeapon(r, this, hover);
     if (behind) this.drawWeapon(r, w, wdef);
     const tint = this.statusTint();
     r.sprite(this.frameName(), this.x, this.y + 5 - this.z - hover, {
-      flipX: this.flip,
+      flipX: this.character.spritePrefix.startsWith('pl_') ? false : this.flip,
       sx: this.squashX,
       sy: this.squashY,
       alpha: blink ? 0.35 : 1,
@@ -740,7 +760,7 @@ export class Player extends Actor {
     const bob = Math.sin(this.age * 2.6) * 1.5;
     r.shadow(this.x, this.y + 4, 8, 3, 0.15);
     r.sprite(this.frameName(), this.x, this.y + 1 + bob, {
-      flipX: this.flip,
+      flipX: this.character.spritePrefix.startsWith('pl_') ? false : this.flip,
       alpha: 0.42 + 0.08 * Math.sin(this.age * 5),
       tint: '#a8d8ff',
       tintAmount: 0.6,
@@ -753,7 +773,7 @@ export class Player extends Actor {
     const s = 1 - f * 0.85;
     r.shadow(this.x, this.y + 2, 11 * s, 4 * s, 0.35 * (1 - f));
     r.sprite(this.frameName(), this.x, this.y + 3 + f * 4, {
-      flipX: this.flip,
+      flipX: this.character.spritePrefix.startsWith('pl_') ? false : this.flip,
       sx: s * (1 + Math.sin(f * 9) * 0.08),
       sy: s,
       rot: f * f * 1.6 * (this.flip ? -1 : 1),
@@ -766,7 +786,11 @@ export class Player extends Actor {
   private drawWeapon(r: Renderer, w: World, wdef = Weapons.get(this.weaponId)): void {
     // `weapon.mem.hideUntil` lets special moves hide the held weapon for a moment
     if (!wdef || this.holdT > 0 || (this.weapon.mem.hideUntil ?? -1) > w.time) return;
-    withSwapPop(r, w, this, () => {
+    // Apply height once to every custom weapon, including free-drawn chains and bows.
+    const ctx = r.ctx;
+    ctx.save();
+    ctx.translate(0, -this.z - (this.flying ? 2 + Math.sin(this.age * 3.2) : 0));
+    try { withSwapPop(r, w, this, () => {
       if (wdef.draw) {
         wdef.draw(w, this, r, this.weapon);
         return;
@@ -774,11 +798,12 @@ export class Player extends Actor {
       if (!wdef.heldSprite) return;
       const a = this.aim;
       const dist = 7 + this.recoil;
-      r.sprite(wdef.heldSprite, this.x + Math.cos(a) * dist, this.y - 5 + Math.sin(a) * dist * 0.8, {
+      const hand = visualHandPos(this, a, dist);
+      r.sprite(wdef.heldSprite, hand.x, hand.y, {
         rot: a,
         flipY: Math.cos(a) < 0,
       });
-    });
+    }); } finally { ctx.restore(); }
   }
 
   override light(w: World): void {

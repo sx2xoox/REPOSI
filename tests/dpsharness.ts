@@ -52,6 +52,7 @@ export interface DpsOpts {
   dash?: number;
   seed?: string;
   artifacts?: string[];
+  fireCycle?: { hold: number; period: number };
 }
 
 export interface DpsResult {
@@ -105,6 +106,7 @@ export function measureDps(o: DpsOpts): DpsResult {
     }
     let firing = true;
     if (RELEASE_WEAPONS.has(o.weapon)) firing = ww.time % 1.1 < 0.95;
+    if (o.fireCycle) firing = ww.time % o.fireCycle.period < o.fireCycle.hold;
     out.held = (firing ? HELD.fire : 0) | HELD.cursorAim;
     if (o.dash) {
       dashT -= FIXED_DT;

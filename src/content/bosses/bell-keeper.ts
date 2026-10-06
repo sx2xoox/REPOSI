@@ -1,3 +1,4 @@
+import { pickBossPattern } from './tactics';
 // Floor 1 boss: 조종지기 (the funeral-bell keeper) — 꺼진 등불을 세는 자.
 // A hooded mourning wraith in a porcelain mask that tolls a huge bronze funeral
 // bell; a string of dead lanterns hangs from its belt.
@@ -627,7 +628,7 @@ defineBoss({
   name: NAME,
   bossTitle: '꺼진 등불을 세는 자',
   bossFloors: [1],
-  hp: 700,
+  hp: 790,
   radius: 13,
   speed: 46,
   mass: 5,
@@ -650,7 +651,7 @@ defineBoss({
     while (true) {
       if (e.phase === 0 && e.hp <= e.maxHp * 0.5) yield* phaseTwo(e, w);
       const p2 = !!e.mem.p2;
-      const id = pickPattern(w.rng, [
+      const id = pickBossPattern(e, w, [
         { id: 'toll', w: 3 },
         { id: 'procession', w: 2.4 },
         { id: 'drop', w: 2.2 },
@@ -665,7 +666,7 @@ defineBoss({
         if (p2) yield* bellDrop(e, w, 0.7);
       } else if (id === 'summon') yield* summonShades(e, w, p2 ? 2 : 1);
       else yield* requiem(e, w);
-      yield* drift(e, w, p2 ? w.rng.range(0.7, 1.1) : w.rng.range(1.0, 1.6));
+      yield* drift(e, w, p2 ? w.rng.range(0.35, 0.55) : w.rng.range(0.5, 0.8));
     }
   },
   update(e, w) {

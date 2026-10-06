@@ -1,3 +1,5 @@
+import { prismLattice } from './laser-patterns';
+import { pickBossPattern } from './tactics';
 // Floor 4 boss: 빙결 성녀 (the frozen saint) — 얼어붙은 마지막 찬송.
 // A hovering saint of ice whose last hymn froze the whole sanctum. A halo of
 // eight ice lances turns behind her head; her robe dissolves into frost mist.
@@ -628,8 +630,9 @@ function* patterns(e: Enemy, w: World): Script {
   while (true) {
     const p2 = !!e.mem.p2;
     const lancesUp = (e.mem.lances as number[]).filter(Boolean).length;
-    const id = pickPattern(w.rng, [
+    const id = pickBossPattern(e, w, [
       { id: 'hymn', w: 3 },
+      { id: 'prisms', w: 2.8, when: e.age - (e.mem.lastLaserAt ?? -99) > 14 && minionCount(w, e, 'frost_prism') === 0 },
       { id: 'lances', w: 2.6, when: lancesUp >= 6 },
       { id: 'bloom', w: 2.4 },
       { id: 'choir', w: 1.2, when: minionCount(w, e) === 0 && w.enemies.length < 4 },
@@ -637,13 +640,14 @@ function* patterns(e: Enemy, w: World): Script {
       { id: 'requiem', w: 2, when: p2 },
     ], e.mem.last as string | null);
     e.mem.last = id;
-    if (id === 'hymn') yield* hymn(e, w);
+    if (id === 'prisms') yield* prismLattice(e, w);
+    else if (id === 'hymn') yield* hymn(e, w);
     else if (id === 'lances') yield* haloLances(e, w);
     else if (id === 'bloom') yield* frostBloom(e, w);
     else if (id === 'choir') yield* choir(e, w);
     else if (id === 'blizzard') yield* blizzard(e, w);
     else yield* requiem(e, w);
-    yield* glide(e, w, p2 ? w.rng.range(0.7, 1.1) : w.rng.range(1.0, 1.5));
+    yield* glide(e, w, p2 ? w.rng.range(0.4, 0.6) : w.rng.range(0.55, 0.85));
   }
 }
 
@@ -652,7 +656,7 @@ defineBoss({
   name: NAME,
   bossTitle: '얼어붙은 마지막 찬송',
   bossFloors: [4],
-  hp: 1020,
+  hp: 1150,
   radius: 13,
   speed: 52,
   mass: 6,

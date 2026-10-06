@@ -1,3 +1,4 @@
+import { bossIntercept, pickBossPattern } from './tactics';
 // Floor 4 boss: 서리 기사단장 (the frost knight-commander) — 맹세에 얼어붙은 검.
 // The last commander of the sanctum guard, frozen to his oath. A towering knight in
 // rimed plate with a horned great helm and a greatsword of solid ice, drawn as a
@@ -497,7 +498,8 @@ function* leapSlam(e: Enemy, w: World): Script {
   w.sfx('enemy_charge', { vol: 0.5, pitch: 0.5 });
   yield 0.45;
   anim(e, 'raise', true);
-  const land = landingSpot(w, w.player.x, w.player.y - FEET * 0.5, e.r);
+  const aim = bossIntercept(e.target(w));
+  const land = landingSpot(w, aim.x, aim.y - FEET * 0.5, e.r);
   const time = p2 ? 0.7 : 0.8;
   w.spawn(new GroundWarning(land.x, land.y + FEET * 0.6, 30, time));
   face(e, land.x);
@@ -681,7 +683,7 @@ function* patterns(e: Enemy, w: World): Script {
   while (true) {
     const p2 = !!e.mem.p2;
     const d = e.distToTarget(w);
-    const id = pickPattern(w.rng, [
+    const id = pickBossPattern(e, w, [
       { id: 'charge', w: 2.6 },
       { id: 'leap', w: d > 70 ? 3 : 1.8 },
       { id: 'sweep', w: d < 90 ? 3.2 : 2 },
@@ -696,7 +698,7 @@ function* patterns(e: Enemy, w: World): Script {
     else if (id === 'wall') yield* glacierWall(e, w);
     else if (id === 'rally') yield* rally(e, w);
     else yield* icicleStorm(e, w);
-    yield* approach(e, w, p2 ? w.rng.range(0.5, 0.9) : w.rng.range(0.8, 1.3));
+    yield* approach(e, w, p2 ? w.rng.range(0.3, 0.5) : w.rng.range(0.45, 0.7));
   }
 }
 
@@ -705,7 +707,7 @@ defineBoss({
   name: NAME,
   bossTitle: '맹세에 얼어붙은 검',
   bossFloors: [4],
-  hp: 1100,
+  hp: 1240,
   radius: 15,
   speed: 36,
   mass: 8,

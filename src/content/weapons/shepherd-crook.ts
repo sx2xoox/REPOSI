@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // 목동의 지팡이 (shepherd's crook): 모리's starting weapon. The hooked staff
 // flings small spirit bolts; every third bolt is a whistle bolt that pierces and
 // tugs whatever it hits toward the herd point (see kit-mori), so the crook itself
@@ -131,7 +132,7 @@ defineWeapon({
   draw(w, p, r, st) {
     const aim = p.aim;
     const recoil = st.anim * 3;
-    const tip = handPos(p, aim, 18 - recoil);
+    const tip = visualHandPos(p, aim, 18 - recoil);
     r.sprite(glowSprite(10 + st.anim * 6, '#9af0e0'), tip.x, tip.y - 2, { alpha: 0.25 + st.anim * 0.4 + 0.05 * Math.sin(w.time * 7), additive: true });
     drawHeld(r, p, 'w_shepherd_crook', aim, 6 - recoil, { flash: st.anim * 0.4 });
   },

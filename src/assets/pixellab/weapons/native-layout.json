@@ -1,0 +1,523 @@
+{
+  "provider": "PixelLab",
+  "date": "2026-10-04",
+  "processing": "Accepted art exported once to family-specific pixel dimensions with nearest-neighbor sampling and 1px padding. No runtime scaling, smoothing, recoloring or pixel painting. Four small silhouettes repainted individually; approved identities retained for the others. Rejected experimental outputs are excluded.",
+  "weapons": [
+    {
+      "id": "brass_revolver",
+      "reference": "twin_lamp",
+      "source": "originals/reviewed-brass_revolver.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        21,
+        14
+      ],
+      "artBudget": [
+        19,
+        12
+      ],
+      "art": [
+        19,
+        12
+      ],
+      "sha256": "0d67947c1f00c0c4b8b12faf9146ad7db49708b5c014005920106f03520bda63",
+      "grip": [
+        3,
+        9
+      ],
+      "muzzle": [
+        19,
+        5
+      ]
+    },
+    {
+      "id": "nail_carbine",
+      "reference": "volley_crossbow",
+      "source": "originals/reviewed-nail_carbine.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        25,
+        11
+      ],
+      "artBudget": [
+        23,
+        10
+      ],
+      "art": [
+        23,
+        9
+      ],
+      "sha256": "d7d72b3f2b2699d2372e23be4a270053fdf1a81969a864a49009ad901cab236f",
+      "grip": [
+        6,
+        5
+      ],
+      "muzzle": [
+        23,
+        3
+      ]
+    },
+    {
+      "id": "bell_blunderbuss",
+      "reference": "scatter_horn",
+      "source": "originals/reviewed-bell_blunderbuss.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        25,
+        13
+      ],
+      "artBudget": [
+        23,
+        12
+      ],
+      "art": [
+        23,
+        11
+      ],
+      "sha256": "7695b235939f275853f36c49dccd3cc67fbb128d265c6a2bdc46dc027f92907c",
+      "grip": [
+        5,
+        8
+      ],
+      "muzzle": [
+        23,
+        7
+      ]
+    },
+    {
+      "id": "ember_musket",
+      "reference": "comet_tube",
+      "source": "originals/reviewed-ember_musket.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        27,
+        11
+      ],
+      "artBudget": [
+        29,
+        9
+      ],
+      "art": [
+        25,
+        9
+      ],
+      "sha256": "80d803db31550898f5e0ba1c909ba3b68d4bcc258e7eac6f94de394900ea8462",
+      "grip": [
+        6,
+        7
+      ],
+      "muzzle": [
+        24,
+        5
+      ]
+    },
+    {
+      "id": "pearl_crossbow",
+      "reference": "repeater_crossbow",
+      "source": "originals/reviewed-pearl_crossbow.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        21,
+        19
+      ],
+      "artBudget": [
+        19,
+        17
+      ],
+      "art": [
+        19,
+        17
+      ],
+      "sha256": "dc867e820ea037d0cd3148395187d8ff799abf1a42a6ec8880a6e7c3481c7797",
+      "grip": [
+        6,
+        10
+      ]
+    },
+    {
+      "id": "crescent_bow",
+      "reference": "hunter_bow",
+      "source": "originals/reviewed-crescent_bow.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        11,
+        25
+      ],
+      "artBudget": [
+        9,
+        23
+      ],
+      "art": [
+        9,
+        23
+      ],
+      "sha256": "5be2b05eadf44cf286dd02a65231aa22612d19f25bd0e99d18a8ada49b0ce333",
+      "grip": [
+        6,
+        12
+      ],
+      "bowTips": [
+        [
+          3,
+          2
+        ],
+        [
+          3,
+          22
+        ]
+      ]
+    },
+    {
+      "id": "thorn_shortbow",
+      "reference": "hunter_bow",
+      "source": "originals/reviewed-thorn_shortbow.png",
+      "sourceType": "PixelLab readability repaint",
+      "canvas": [
+        10,
+        21
+      ],
+      "artBudget": [
+        8,
+        19
+      ],
+      "art": [
+        8,
+        19
+      ],
+      "sha256": "61f1af8113e3947d799a8f8a1f89603200da0e55d0a9619ec954fdbcf52f1d36",
+      "grip": [
+        5,
+        10
+      ],
+      "bowTips": [
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          19
+        ]
+      ],
+      "pixelLabJobId": "6b764339-4e0c-4cb9-80fd-37242ccb1f53"
+    },
+    {
+      "id": "glacier_arbalest",
+      "reference": "volley_crossbow",
+      "source": "originals/reviewed-glacier_arbalest.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        24,
+        23
+      ],
+      "artBudget": [
+        23,
+        21
+      ],
+      "art": [
+        22,
+        21
+      ],
+      "sha256": "ef97563ab9dc94ea7885f10e72b0f45da982e53e62dd89023dd26648740b6d2c",
+      "grip": [
+        6,
+        12
+      ]
+    },
+    {
+      "id": "copper_sabre",
+      "reference": "sentinel_blade",
+      "source": "originals/reviewed-copper_sabre.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        24,
+        12
+      ],
+      "artBudget": [
+        24,
+        10
+      ],
+      "art": [
+        22,
+        10
+      ],
+      "sha256": "31ba3b8d84cb573f70e1ff789e13ecd9779fbb5bde0e7aa3d5fc28d55f46cea1",
+      "grip": [
+        5,
+        7
+      ]
+    },
+    {
+      "id": "rose_rapier",
+      "reference": "moon_katana",
+      "source": "originals/reviewed-rose_rapier.png",
+      "sourceType": "PixelLab readability repaint",
+      "canvas": [
+        29,
+        15
+      ],
+      "artBudget": [
+        27,
+        13
+      ],
+      "art": [
+        27,
+        13
+      ],
+      "sha256": "1292f9a01e86faf582bb77269651f5535d4a66ac4ef3f85f08b2a5444d451682",
+      "grip": [
+        6,
+        8
+      ],
+      "pixelLabJobId": "73c14f00-c461-4b9d-b373-e8967bf76c0e"
+    },
+    {
+      "id": "anchor_axe",
+      "reference": "great_hammer",
+      "source": "originals/reviewed-anchor_axe.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        26,
+        19
+      ],
+      "artBudget": [
+        25,
+        17
+      ],
+      "art": [
+        24,
+        17
+      ],
+      "sha256": "0a42648519d0762c9208e9fc64e01a8a1fbc581352366f5f8aa5640820d2bb44",
+      "grip": [
+        7,
+        10
+      ]
+    },
+    {
+      "id": "cathedral_mace",
+      "reference": "quake_mace",
+      "source": "originals/reviewed-cathedral_mace.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        26,
+        19
+      ],
+      "artBudget": [
+        24,
+        17
+      ],
+      "art": [
+        24,
+        17
+      ],
+      "sha256": "4419a992f1a04fc479442bad5839eb8f0b699257afcdac9214c1b87c25993532",
+      "grip": [
+        8,
+        11
+      ]
+    },
+    {
+      "id": "comet_pike",
+      "reference": "iron_spear",
+      "source": "originals/reviewed-comet_pike.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        37,
+        9
+      ],
+      "artBudget": [
+        35,
+        8
+      ],
+      "art": [
+        35,
+        7
+      ],
+      "sha256": "9c082659d12441b1f9fcefde3eb363130d29437954dde3dc2dde3d74706acfe2",
+      "grip": [
+        8,
+        5
+      ]
+    },
+    {
+      "id": "obsidian_cleaver",
+      "reference": "titan_greatsword",
+      "source": "originals/reviewed-obsidian_cleaver.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        31,
+        12
+      ],
+      "artBudget": [
+        29,
+        10
+      ],
+      "art": [
+        29,
+        10
+      ],
+      "sha256": "f9373a5fc13da1a299afad0da536a85942dd6ce889370b988f9268ce768272e5",
+      "grip": [
+        5,
+        4
+      ]
+    },
+    {
+      "id": "moon_fan",
+      "reference": "gale_fan",
+      "source": "originals/reviewed-moon_fan.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        17,
+        22
+      ],
+      "artBudget": [
+        16,
+        20
+      ],
+      "art": [
+        15,
+        20
+      ],
+      "sha256": "eb2153bbe1dccabd6a3919034f61f180cb27571a9508da3ed5e8ab00c69a2295",
+      "grip": [
+        2,
+        11
+      ]
+    },
+    {
+      "id": "dusk_knives",
+      "reference": "throwing_knives",
+      "source": "originals/reviewed-dusk_knives.png",
+      "sourceType": "PixelLab readability repaint",
+      "canvas": [
+        17,
+        9
+      ],
+      "artBudget": [
+        15,
+        7
+      ],
+      "art": [
+        15,
+        7
+      ],
+      "sha256": "cce8c1225b13b3ad14bc3196cdb486a63e86ce01cc7e4ebb738e8ad6166e188b",
+      "grip": [
+        4,
+        4
+      ],
+      "pixelLabJobId": "99d37a27-c747-4dfb-9f85-84a74ecd4ede"
+    },
+    {
+      "id": "amber_wand",
+      "reference": "frost_wand",
+      "source": "originals/reviewed-amber_wand.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        22,
+        8
+      ],
+      "artBudget": [
+        20,
+        7
+      ],
+      "art": [
+        20,
+        6
+      ],
+      "sha256": "3334a59799ed22a131c7fa6f5a353f380a1f9f8611ebcde143355c8e5268ed26",
+      "grip": [
+        6,
+        4
+      ],
+      "muzzle": [
+        18,
+        3
+      ]
+    },
+    {
+      "id": "tide_staff",
+      "reference": "bubble_wand",
+      "source": "originals/reviewed-tide_staff.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        26,
+        12
+      ],
+      "artBudget": [
+        24,
+        10
+      ],
+      "art": [
+        24,
+        10
+      ],
+      "sha256": "e96ae5211e6806bcca86e33a467a8f730e90e55504008706e5b50f678e44d81f",
+      "grip": [
+        7,
+        8
+      ],
+      "muzzle": [
+        23,
+        7
+      ]
+    },
+    {
+      "id": "cinder_sceptre",
+      "reference": "flame_staff",
+      "source": "originals/reviewed-cinder_sceptre.png",
+      "sourceType": "Previously approved PixelLab original",
+      "canvas": [
+        25,
+        13
+      ],
+      "artBudget": [
+        24,
+        11
+      ],
+      "art": [
+        23,
+        11
+      ],
+      "sha256": "302afac0bc4c7b7cbba0733a2f30a3b6be068993dd7b2c801ffdf44179114379",
+      "grip": [
+        7,
+        9
+      ],
+      "muzzle": [
+        23,
+        7
+      ]
+    },
+    {
+      "id": "stormhorn_rod",
+      "reference": "thunder_rod",
+      "source": "originals/reviewed-stormhorn_rod.png",
+      "sourceType": "PixelLab readability repaint",
+      "canvas": [
+        24,
+        14
+      ],
+      "artBudget": [
+        22,
+        12
+      ],
+      "art": [
+        22,
+        12
+      ],
+      "sha256": "c59bdd2875b3135ec95e2daf285fc942455347e671fa9dca7e2ba582a482f082",
+      "grip": [
+        7,
+        6
+      ],
+      "muzzle": [
+        19,
+        7
+      ],
+      "pixelLabJobId": "00c73440-6fdb-4053-956b-d6791e2fb701"
+    }
+  ]
+}

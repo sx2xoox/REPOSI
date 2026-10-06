@@ -36,7 +36,7 @@ defineDrawnSprite('icon_sentinel_blade', 16, 16, (p) => {
 defineWeapon({
   id: 'sentinel_blade',
   name: '파수꾼의 장검',
-  desc: '3연격 장검. 마지막 일격은 검기를 날린다. 모든 베기가 적 탄환을 되받아친다.',
+  desc: '3연격 장검. 마지막 일격은 검기를 날린다. 모든 베기가 적 탄환을 되받아친다. 반사 피해는 공격력의 40%.',
   icon: 'icon_sentinel_blade',
   heldSprite: 'w_sentinel_blade',
   kind: 'melee',
@@ -50,7 +50,7 @@ defineWeapon({
   update(w, p, st, _dt, firing, aim) {
     if (!attackInput(st, w, firing) || st.cooldown > 0) return;
     consumeAttack(st);
-    const s = p.stats;
+    const s = p.weaponStats;
     const step = st.combo % 3;
     const iv = attackInterval(p);
     const reach = 24 + s.range * 0.035;

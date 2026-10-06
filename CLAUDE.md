@@ -1,5 +1,8 @@
 # 등불지기 (Lanternkeeper) — project guide
 
+## User art direction — PixelLab (2026-10-04)
+New or rebuilt image assets must be generated through PixelLab, as explicitly requested by the user. Keep generated originals locally under `src/assets/pixellab`, preserve native pixel grids, and inspect actual in-game size and animation continuity before accepting assets. Code handles loading, composition, collision, lighting and animation sequencing; do not silently replace PixelLab generation with another image service or hand-authored replacement art. Existing gameplay effects can retain their procedural renderers. Credentials must never enter the game bundle or repository. Production quarantine for the new weapons remains in force. On 2026-10-04 the user approved lifting the five new keepers' temporary production lock; their normal in-game unlock conditions remain.
+
 An **original** top-down roguelike action game in the spirit of *The Binding of Isaac*
 (room-by-room dungeon floors, item synergies, secrets, bosses) and *Sephiria* (crisp
 pixel art, responsive dash-based action, juicy feedback). We aim for that level of
@@ -113,7 +116,7 @@ Commands:
 - Keep each file focused; put sprites next to the content that uses them.
 - Do not touch files owned by other workstreams unless strictly needed; if you must extend a
   core API, keep it backward compatible and small, and mention it in your final report.
-- Never run git commands that change state (commit/checkout/reset/stash) — the orchestrator commits.
+- When the user authorizes publishing or synchronizing this project, commit and push the complete reviewed source and required assets to `claude/isaac-seperia-game-12hrqr` as well as publishing the build to `gh-pages` when deployment is requested. Verify the remote source commit. A Pages-only update does not let another computer resume development. Preserve unrelated local changes, avoid force pushes, and do not reset or stash the user's work without authorization.
 
 ### Determinism (multiplayer lockstep)
 Every co-op peer runs the full simulation from the same seed and only exchanges inputs, so
@@ -146,3 +149,7 @@ handlers, dungeon generation) must be **bit-identical on every browser** (V8 / J
   seeds, view widths, quality / settings, drawing and cache warm-up. On failure it prints the first
   diverging step, the per-part hashes and the differing entities (harness: tests/detsim.ts; it
   cycles through weapons / artifacts / actives / extra enemies, so new content gets exercised).
+
+## User quality direction (2026-10-04)
+
+Prioritize finished quality over speed or item count. Review visuals at native game scale and enlarged, compare with the strongest existing content, validate actual mechanics against descriptions, and check solo/co-op, progression, save compatibility and performance before reporting completion. Do not equate passing tests with finished art or enjoyable gameplay. The five refuge keepers and twenty refuge weapons are quarantined in production until their rework is reviewed. Keep the quarantine in place in production builds. New work should be complete enough that the user does not have to repeatedly identify obvious omissions.

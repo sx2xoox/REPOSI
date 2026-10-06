@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // 공허의 눈 (void gaze): Niel's starting weapon. A floating eye orb channels a
 // piercing beam while the attack is held. The beam turns toward the aim with a
 // little drag, stops at walls (rocks too, unless shots are spectral), and
@@ -59,7 +60,7 @@ defineWeapon({
       }
       return;
     }
-    const s = p.stats;
+    const s = p.weaponStats;
     if (!m.on) {
       m.on = 1;
       m.beamA = aim;
@@ -131,7 +132,7 @@ defineWeapon({
     const a = on || fade > 0 ? m.beamA ?? p.aim : p.aim;
     // the eye orbits gently when idle
     const bob = Math.sin(p.age * 3.1) * 1.5;
-    const o = handPos(p, a, 9);
+    const o = visualHandPos(p, a, 9);
     if (fade > 0 && m.len) {
       const focus = clamp((m.chan ?? 0) / 1.2, 0, 1);
       const len = m.len;

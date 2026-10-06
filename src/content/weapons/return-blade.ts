@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // 회귀 칼날 (returning blade): a spinning ring blade that is thrown, slows at
 // the end of its flight, then whips back to the hand — cutting everything on
 // the way out and again on the way back. Only one throw at a time.
@@ -99,7 +100,7 @@ defineWeapon({
     // safety: blades lost to a room change / timeout come back to the hand
     if ((st.mem.out ?? 0) > 0 && (st.mem.room !== w.node.id || w.time - (st.mem.thrownAt ?? 0) > 4.2)) st.mem.out = 0;
     if (!firing || st.cooldown > 0 || (st.mem.out ?? 0) > 0) return;
-    const s = p.stats;
+    const s = p.weaponStats;
     st.sinceAttack = 0;
     w.items.onAttack(aim);
     const speed = s.shotSpeed * 1.25;
@@ -120,7 +121,7 @@ defineWeapon({
   },
   draw(w, p, r, st) {
     if ((st.mem.out ?? 0) > 0) return;
-    const h = handPos(p, p.aim, 7);
+    const h = visualHandPos(p, p.aim, 7);
     r.sprite(glowSprite(12, '#8ab0ff'), h.x, h.y, { alpha: 0.18, additive: true });
     r.sprite('proj_return_blade', h.x, h.y, { rot: w.time * 2 });
   },

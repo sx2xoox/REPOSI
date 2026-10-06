@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // Thrown weapons:
 //  비수 묶음     (throwing_knives, common) — quick alternating knife throws;
 //                                          knives stick in walls for a moment
@@ -98,7 +99,7 @@ defineWeapon({
     const h = handPos(p, aim + side * 0.5, 7);
     p.fireProjectiles(w, aim + side * 0.03, {
       style: 'none', color: '#d8e0f0', light: 8, x: h.x, y: h.y, behaviors: [knifeFx], pierce: p.stats.pierce + 1,
-      statuses: [{ kind: 'bleed', duration: 3, power: p.stats.damage * 0.3, chance: 0.15 }],
+      statuses: [{ kind: 'bleed', duration: 3, power: p.weaponStats.damage * 0.3, chance: 0.15 }],
     });
     kick(w, aim, 0.5);
     w.sfx('whoosh', { vol: 0.35, pitch: 1.8 + w.rng.next() * 0.2 });
@@ -223,7 +224,7 @@ defineWeapon({
   },
   draw(w, p, r, st) {
     if ((st.mem.live ?? 0) >= 2) return;
-    const h = handPos(p, p.aim, 7);
+    const h = visualHandPos(p, p.aim, 7);
     r.sprite('w_pinwheel', h.x, h.y, { rot: w.time * 1.5, sx: 0.85, sy: 0.85 });
   },
 });
@@ -305,7 +306,7 @@ defineWeapon({
     if (!firing || st.cooldown > 0) return;
     beginAttack(w, p, st, aim);
     st.cooldown = attackInterval(p);
-    const s = p.stats;
+    const s = p.weaponStats;
     const h = handPos(p, aim, 8);
     const shots = p.fireProjectiles(w, aim, {
       style: 'none', speed: s.shotSpeed * 1.2, radius: s.projSize + 2.5, pierce: s.pierce + 3, color: '#e0c060', light: 14,
@@ -319,7 +320,7 @@ defineWeapon({
   draw(w, p, r, st) {
     const f = shotFade(st, w, 0.2);
     if (f > 0.4) return; // just thrown: the hand is empty for a beat
-    const h = handPos(p, p.aim, 7);
+    const h = visualHandPos(p, p.aim, 7);
     r.sprite('w_chakram', h.x, h.y, { rot: w.time * 3, sx: 0.85, sy: 0.85 });
   },
 });

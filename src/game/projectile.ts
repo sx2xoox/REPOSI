@@ -13,6 +13,7 @@ import { save } from '../engine/save';
 import { TILE } from './constants';
 import { Tile, tileProps } from './tiles';
 import { drawShot, shotTrail, type ShotLook } from './look';
+import type { ShotMaterial } from './weapon-presentation';
 
 export interface ProjBehavior {
   /** optional id so items can avoid adding the same behavior twice */
@@ -60,6 +61,8 @@ export interface ProjectileOpts {
   crit?: boolean;
   /** created by the player's weapon (fires onShoot hooks) */
   fromWeapon?: boolean;
+  /** Cosmetic material; no effect on collision, statuses or damage. */
+  fxMaterial?: ShotMaterial;
   /** acceleration px/s^2 along direction (negative = decelerate) */
   accel?: number;
   minSpeed?: number;
@@ -95,6 +98,7 @@ export function orbSprite(d: number, color: string, outline = '#1a0d14'): string
 }
 
 export class Projectile extends Entity {
+  fxMaterial: ShotMaterial;
   owner: Actor | null;
   damage: number;
   speed: number;
@@ -164,6 +168,7 @@ export class Projectile extends Entity {
     this.statuses = o.statuses ?? [];
     this.crit = o.crit ?? false;
     this.fromWeapon = o.fromWeapon ?? false;
+    this.fxMaterial = o.fxMaterial ?? 'magic';
     this.accel = o.accel ?? 0;
     this.minSpeed = o.minSpeed ?? 0;
     this.maxSpeed = o.maxSpeed ?? 2000;
@@ -221,12 +226,15 @@ export class Projectile extends Entity {
     // trail particles for player shots
     if (this.team === 'player' && this.style !== 'none') {
       this.trailT += dt;
-      if (this.trailT > 0.03) {
+      const physical = this.fxMaterial === 'metal' || this.fxMaterial === 'wood';
+      if (this.trailT > (physical ? .075 : .04)) {
         this.trailT = 0;
         if (this.look) shotTrail(this, w, this.look);
-        else w.particles.spawn({
+        else if (this.visualOpacity(w) > 0) w.particles.spawn({
           x: this.x + fx.range(-1, 1), y: this.y - this.z + fx.range(-1, 1), life: 0.18,
-          colors: this.fxCols()[0], size: Math.max(1, this.r * 0.6), sizeEnd: 0.5, shape: 'pixel',
+          colors: physical ? ['#a9a6a0', '#656477'] : this.fxCols()[0],
+          alpha: this.visualOpacity(w) * (physical ? .35 : .7),
+          size: physical ? 1 : Math.max(1, this.r * 0.6), sizeEnd: 0.5, shape: 'pixel',
         });
       }
     }
@@ -273,11 +281,26 @@ export class Projectile extends Entity {
     if (this.dead) return;
     this.dead = true;
     for (const b of this.behaviors) b.onExpire?.(this, w);
-    const n = impact ? 6 : 4;
+    // Enemy telegraphs/impacts retain their existing visual language.
+    if (this.team !== 'player') {
+      w.particles.burst(this.x, this.y - this.z * (impact ? 1 : .3), {
+        count: impact ? 6 : 4, speed: [25, 70], life: [.15, .35], colors: this.fxCols()[1], size: [1, 2],
+      });
+      return;
+    }
+    const opacity = this.visualOpacity(w);
+    if (opacity <= 0) return;
+    const physical = this.fxMaterial === 'metal' || this.fxMaterial === 'wood';
+    const n = impact ? (physical ? 4 : 5) : 2;
     w.particles.burst(this.x, this.y - this.z * (impact ? 1 : 0.3), {
-      count: n, speed: [25, 70], life: [0.15, 0.35], colors: this.fxCols()[1], size: [1, 2],
+      count: n, speed: physical ? [35, 85] : [20, 60], life: physical ? [.06, .16] : [.12, .28],
+      colors: this.fxMaterial === 'metal' ? ['#fff0c6', '#bcb7a4', '#716777'] : this.fxMaterial === 'wood' ? ['#d9c4a4', '#957354'] : this.fxCols()[1],
+      shape: physical || this.fxMaterial === 'electric' ? 'spark' : 'pixel',
+      angle: this.angle + Math.PI, spread: physical ? 1.1 : Math.PI,
+      size: [1, 2], alpha: opacity,
     });
-    if (this.team === 'player') w.sfx('tear_splash', { vol: 0.35, pitch: fx.range(0.9, 1.15), x: this.x });
+    // Misses fade silently; physical rounds no longer make wet splash sounds.
+    if (impact && this.team === 'player') w.sfx(physical ? 'hit_metal' : this.fxMaterial === 'fire' ? 'fire' : this.fxMaterial === 'ice' ? 'freeze' : this.fxMaterial === 'electric' ? 'lightning' : 'tear_splash', { vol: .18 * opacity, pitch: fx.range(1.1, 1.35), x: this.x });
   }
 
   /** Damage and effects for hitting `target` (called by the world collision pass). */

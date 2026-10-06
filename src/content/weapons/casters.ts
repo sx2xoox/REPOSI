@@ -1,3 +1,5 @@
+import { visualHandPos } from '../../game/weapon-pose';
+import { armGaleGuard, clearGaleBullets } from './gale-guard';
 // Spread casters:
 //  나팔 산탄총 (scatter_horn, common) — a bell-mouthed blunderbuss: a cone of
 //                                      slowing pellets, brutal up close
@@ -73,7 +75,7 @@ defineWeapon({
     if (!firing || st.cooldown > 0) return;
     beginAttack(w, p, st, aim);
     st.cooldown = attackInterval(p);
-    const s = p.stats;
+    const s = p.weaponStats;
     const n = hornPellets(s.shots);
     const h = handPos(p, aim, 18);
     const cone = 0.5 + s.spread * 0.4;
@@ -152,8 +154,7 @@ defineDrawnSprite('proj_gale', 10, 24, (p) => {
 const galeFx: ProjBehavior = {
   id: 'gale',
   update(pr, w) {
-    // the gust blows enemy bullets away
-    const n = w.clearEnemyBullets(pr.x, pr.y, pr.r + 6, true);
+    const n = clearGaleBullets(pr, w);
     if (n > 0) w.particles.burst(pr.x, pr.y, { count: 4, speed: [30, 80], life: [0.15, 0.3], colors: ['#ffffff', '#c8f0d8'], size: [1, 1], shape: 'spark' });
     if (fx.chance(0.5)) {
       const side = fx.range(-1, 1) * pr.r;
@@ -170,7 +171,7 @@ const galeFx: ProjBehavior = {
 defineWeapon({
   id: 'gale_fan',
   name: '질풍 부채',
-  desc: '부채를 휘둘러 넓은 돌풍을 일으킨다. 돌풍은 적을 꿰뚫어 밀쳐내고 탄환을 날려 버린다.',
+  desc: '적을 꿰뚫어 밀쳐내는 돌풍. 공격 직후 0.18초 동안 가까운 적 탄환을 최대 3발 지운다. 다중 발사도 횟수를 공유하며 장판·레이저는 지우지 못한다.',
   icon: 'icon_gale_fan',
   heldSprite: 'w_gale_fan',
   kind: 'ranged',
@@ -186,15 +187,16 @@ defineWeapon({
     if (!firing || st.cooldown > 0) return;
     beginAttack(w, p, st, aim);
     st.cooldown = attackInterval(p);
-    const s = p.stats;
+    const s = p.weaponStats;
     const dir = (st.combo = (st.combo + 1) % 2) === 0 ? 1 : -1;
     st.comboTimer = 1;
     startSwingPose(st, w, aim - 1.3 * dir, aim + 1.1 * dir, 0.09, 0.06);
     const h = handPos(p, aim, 10);
-    p.fireProjectiles(w, aim, {
+    const gusts = p.fireProjectiles(w, aim, {
       style: 'none', radius: s.projSize + 7, speed: s.shotSpeed * 0.95, accel: -160, minSpeed: 90, range: s.range * 0.7,
       pierce: s.pierce + 99, knockback: s.knockback * 2.4, color: '#c8f0d8', light: 14, x: h.x, y: h.y, behaviors: [galeFx],
     });
+    armGaleGuard(gusts, w.time);
     w.particles.burst(h.x, h.y, { count: 8, speed: [40, 110], angle: aim, spread: 1.1, life: [0.15, 0.3], colors: ['#ffffff', '#c8f0d8', '#8ad8b0'], size: [1, 1], shape: 'spark' });
     kick(w, aim, 1);
     w.sfx('whoosh', { vol: 0.55, pitch: 1.1 + w.rng.next() * 0.1 });
@@ -205,7 +207,7 @@ defineWeapon({
     const open = pose.phase === 1 || pose.phase === 2 ? 1 : 0.75;
     drawHeld(r, p, 'w_gale_fan', pose.angle, 5, { sy: open, flash: pose.phase === 1 ? 0.35 : 0 });
     if (pose.phase === 1) {
-      const h = handPos(p, pose.angle, 12);
+      const h = visualHandPos(p, pose.angle, 12);
       r.sprite(glowSprite(10, '#c8f0d8'), h.x, h.y, { alpha: 0.4, additive: true });
     }
   },

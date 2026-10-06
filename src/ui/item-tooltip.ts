@@ -111,6 +111,7 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
   const keyOf = () => actionLabel(input.bindings, 'interact', pad);
   if (e.interactionInfo) {
     const info = e.interactionInfo();
+    if (info.compactHint) return null;
     return { icon:info.icon, name:info.name, color:C.gold, sub:[], desc:info.desc, extra:[],
       action:{ key:touchUiActive() ? '' : keyOf(), label:'사용', pad, ok:true }, note:'', price:null };
   }
@@ -163,8 +164,8 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
       if (p.character.affinity && weaponMatchesAffinity(p.character.affinity, def)) {
         extra.push([{ t: `${p.character.name} 선호 무기 · ${p.character.affinity.name}`, c: C.goldHi }]);
       }
-      if (p.weapon2Id) {
-        const held = Weapons.get(p.weaponId);
+      if (p.weapon2Id || it.id === p.weaponId) {
+        const held = Weapons.get(it.id === p.weapon2Id ? p.weapon2Id : p.weaponId);
         if (held) extra.push([{ t: `${held.name}을(를) 내려놓는다`, c: C.textFaint }]);
         label = '교체';
       } else extra.push([{ t: '빈 무기 칸에 든다', c: C.textFaint }]);
@@ -262,7 +263,9 @@ export class ItemTooltip {
     this.t += dt;
     const prev = this.cur;
     const hidden = !!w.bossIntro || w.transitioning || !!w.descending || !w.player?.alive;
-    const f = hidden ? null : w.focus;
+    const f = hidden || !w.focus?.previewable(w) ? null : w.focus;
+    // Mission devices lose their full card immediately when combat begins.
+    if (this.cur && !this.cur.previewable(w)) { this.cur = null; this.a = 0; }
     if (f && f.dead) this.cur = null;
     if (f === this.cur && f) this.a = Math.min(1, this.a + dt * 7);
     else if (!f || this.a > 0.05) {
@@ -282,6 +285,12 @@ export class ItemTooltip {
   draw(r: Renderer, w: World, alpha = 1): void {
     const e = this.cur;
     if (!e || this.a <= 0.01 || alpha <= 0.01) return;
+    const compact=e.interactionInfo?.().compactHint;
+    if(compact){
+      const key=touchUiActive()?'사용':actionLabel(input.bindings,'interact',input.aimMode==='pad');
+      r.uiText(`${key} · ${compact}`,UI_W/2,UI_H-28,{size:10,align:'center',color:C.gold,outline:C.ink,alpha});
+      return;
+    }
     const sig = signature(w, e) + (e.interactionInfo?.().desc ?? '');
     if (sig !== this.sig || !this.card) {
       this.sig = sig;

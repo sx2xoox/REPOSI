@@ -74,6 +74,14 @@ export function defineCanvasSprite(name: string, w: number, h: number, draw: (ct
   return name;
 }
 
+/** Swap artwork while retaining the frame identity and original ground/attachment pivot. */
+export function replaceSpriteArt(name: string, w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void): void {
+  if (!defs.has(name)) throw new Error(`Cannot replace unknown sprite: ${name}`);
+  const original = getSprite(name);
+  defs.set(name, { kind: 'canvas', w, h, draw, opts: { origin: [original.ox, original.oy] } });
+  compiled.delete(name);
+}
+
 export function defineAnim(name: string, frames: string[], fps = 8, loop = true): string {
   anims.set(name, { frames, fps, loop });
   return name;

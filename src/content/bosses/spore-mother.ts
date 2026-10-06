@@ -1,3 +1,4 @@
+import { bossIntercept, pickBossPattern } from './tactics';
 // Floor 2 boss: 포자 어미 (the spore mother) — 썩은 빛의 어머니.
 // A rooted giant mushroom with a gaping mouth in its fleshy stalk, a violet cap
 // studded with glowing pustules and a brood of spore shrooms at its feet.
@@ -437,7 +438,8 @@ function* rootLances(e: Enemy, w: World): Script {
     yield 0.12;
   }
   const t = e.target(w);
-  const base = Math.atan2(t.y - (e.y + 12), t.x - e.x);
+  const aim = bossIntercept(t, 0.35);
+  const base = Math.atan2(aim.y - (e.y + 12), aim.x - e.x);
   const offs = p2 ? [-0.84, -0.42, 0, 0.42, 0.84] : [-0.45, 0, 0.45];
   for (const o of offs) {
     const a = base + o;
@@ -552,7 +554,7 @@ defineBoss({
   name: NAME,
   bossTitle: '썩은 빛의 어머니',
   bossFloors: [2],
-  hp: 780,
+  hp: 880,
   radius: 18,
   speed: 0,
   mass: Infinity,
@@ -575,7 +577,7 @@ defineBoss({
       if (e.phase === 0 && e.hp <= e.maxHp * 0.5) yield* phaseTwo(e, w);
       const p2 = !!e.mem.p2;
       const close = e.distToTarget(w) < 58;
-      const id = pickPattern(w.rng, [
+      const id = pickBossPattern(e, w, [
         { id: 'burst', w: 3 },
         { id: 'sacks', w: 2.4 },
         { id: 'roots', w: 2.6 },
@@ -590,7 +592,7 @@ defineBoss({
       else if (id === 'burrow') yield* burrow(e, w);
       else yield* brood(e, w, p2 ? 2 : 1);
       anim(e, 'idle');
-      yield p2 ? 0.45 : 0.75;
+      yield p2 ? 0.25 : 0.4;
     }
   },
   update(e, w) {

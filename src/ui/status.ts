@@ -44,7 +44,8 @@ const TABS = [
 /** seconds the discard stays armed ("한 번 더 눌러 버리기") */
 const ARM_TIME = 3;
 /** equipment panel height (weapon / active row + the keeper's passive row) */
-const EQUIP_H = 120;
+const EQUIP_H = 154;
+const RES_H = 80;
 const WEAPON_KIND: Record<string, string> = { ranged: '원거리', melee: '근접', charge: '차지', beam: '광선' };
 
 export class StatusOverlay implements Scene {
@@ -448,63 +449,32 @@ export class StatusOverlay implements Scene {
     const ww = UI_W_BASE - 30 - x;
     frame(r, x, y, ww, EQUIP_H, 'panel', { alpha: k });
     r.uiText('장비', x + 12, y + 8, { size: 10, font: 'small', color: C.gold, alpha: k });
-    const wdef = Weapons.get(p.weaponId);
-    if (wdef) {
-      iconSlot(r, wdef.icon, x + 30, y + 42, 36, { alpha: k, selected: true });
-      r.uiText(wdef.name, x + 54, y + 22, { size: 12, bold: true, color: C.text, alpha: k });
-      const kind = `무기 · ${wdef.archetype ?? WEAPON_KIND[wdef.kind] ?? ''}`;
-      r.uiText(kind, x + 54, y + 37, { size: 10, font: 'small', color: C.textFaint, alpha: k });
-      // favoured weapon class of the keeper (CharacterDef.affinity) in hand
-      if (p.flags.has('affinity')) r.uiText('선호 무기', x + 54 + r.measureText(kind, 10, false, 'small') + 6, y + 37, { size: 10, font: 'small', color: C.good, alpha: k });
-    }
-    // second weapon slot (swap key)
-    const w2 = p.weapon2Id ? Weapons.get(p.weapon2Id) : undefined;
-    if (w2) {
-      // the second slot: small icon + name (swap key in the HUD)
-      r.uiSprite(w2.icon, x + 54, y + 49, 1, { alpha: k * 0.9 });
-      const maxW = ww / 2 - 84;
-      let nm = w2.name;
-      while (nm.length > 1 && r.measureText(nm, 10, false, 'small') > maxW) nm = nm.slice(0, -1);
-      r.uiText(nm === w2.name ? nm : `${nm}…`, x + 73, y + 51, { size: 10, font: 'small', color: C.textDim, alpha: k });
-    } else {
-      r.uiText('보조 무기 없음', x + 54, y + 51, { size: 10, font: 'small', color: C.textMute, alpha: k });
-    }
-    const half = x + ww / 2 + 6;
-    const act = p.activeId ? Actives.get(p.activeId) : undefined;
-    if (act) {
-      const ready = p.activeCharge >= act.charge;
-      iconSlot(r, act.icon, half + 18, y + 42, 36, { alpha: k, selected: ready });
-      r.uiText(act.name, half + 42, y + 24, { size: 12, bold: true, color: '#c0e0ff', alpha: k });
-      gauge(r, half + 42, y + 42, 70, 8, p.activeCharge / act.charge, { fill: ready ? '#ffd040' : '#5ab0ff', segments: act.timed ? 0 : act.charge, alpha: k });
-    } else {
-      iconSlot(r, null, half + 18, y + 42, 36, { alpha: k * 0.6 });
-      r.uiText('액티브 없음', half + 42, y + 34, { size: 10, font: 'small', color: C.textMute, alpha: k });
-    }
-    // descriptions (one line each)
-    const dl = (s: string) => {
-      const ls = r.wrapText(s, ww / 2 - 26, 10, false, 'small');
-      return ls.length > 1 ? `${ls[0]}…` : ls[0] ?? '';
+    const truncate = (text: string, width: number) => {
+      if (r.measureText(text, 10, false, 'small') <= width) return text;
+      while (text.length && r.measureText(text + '…', 10, false, 'small') > width) text = text.slice(0, -1);
+      return text + '…';
     };
-    if (wdef) r.uiText(dl(wdef.desc), x + 12, y + 70, { size: 10, font: 'small', color: C.textDim, alpha: k });
-    if (act) r.uiText(dl(act.desc), half, y + 70, { size: 10, font: 'small', color: C.textDim, alpha: k });
-    // the keeper's signature passive (CharacterDef.passive), dash and favoured class
-    const ch = p.character;
-    const py = y + 86;
-    r.uiRect(x + 12, py - 2, ww - 24, 1, C.rimDark, k);
-    const pas = ch.passive;
-    const flashT = pas ? this.t - this.lastPassiveProc(w.items.lastProc(`passive:${ch.id}`), w.time) : 9;
-    const pop = flashT < 0.4 ? 1 + 0.2 * (1 - flashT / 0.4) : 1;
-    iconSlot(r, pas?.icon ?? null, x + 30, py + 16, 28, { alpha: k, selected: flashT < 0.4, scale: pas ? fitScale(pas.icon, 20, 1.5) * pop : 1 });
-    const title = `고유 능력 · ${pas ? pas.name : '없음'}`;
-    r.uiText(title, x + 54, py + 2, { size: 12, bold: true, color: pas ? ch.color : C.textMute, alpha: k });
-    // the dash's name beside it when there is room (the favoured class shows on the weapon line)
-    const dashTxt = `대시 · ${ch.dash?.name ?? '질주'}`;
-    if (r.measureText(title, 12, true) + r.measureText(dashTxt, 10, false, 'small') + 70 < ww) {
-      r.uiText(dashTxt, x + ww - 12, py + 4, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: k });
+    const rows = [
+      { id: p.weaponId, state: p.weapon, label: '주무기', yy: y + 23 },
+      { id: p.weapon2Id, state: p.weapon2, label: '보조무기', yy: y + 61 },
+    ];
+    for (const row of rows) {
+      const def = row.id ? Weapons.get(row.id) : undefined;
+      iconSlot(r, def?.icon ?? null, x + 28, row.yy + 14, 30, { alpha: k, selected: row.label === '주무기', scale: def ? fitScale(def.icon, 24, 2) : 1 });
+      r.uiText(row.label, x + 51, row.yy, { size: 10, font: 'small', color: C.textFaint, alpha: k });
+      const temper = Number(row.state.mem.temper ?? 0);
+      const name = def ? def.name + (temper ? ' [' + (temper > 0 ? '+' : '') + temper + ']' : '') : '장착하지 않음';
+      r.uiText(truncate(name, ww - 112), x + 106, row.yy, { size: 10, font: 'small', color: def ? RARITY_COLOR[def.rarity] : C.textMute, alpha: k });
+      const detail = def ? (def.archetype ?? WEAPON_KIND[def.kind] ?? '') + (row.label === '주무기' && p.flags.has('affinity') ? ' · 선호 무기' : '') : '무기를 주우면 이 칸에 보관합니다';
+      r.uiText(truncate(detail, ww - 66), x + 51, row.yy + 15, { size: 10, font: 'small', color: C.textDim, alpha: k });
     }
-    const pdesc = pas ? pas.desc : '특별한 능력 없이 유물에 의지한다.';
-    const pl = r.wrapText(pdesc, ww - 66, 10, false, 'small');
-    r.uiText(pl.length > 1 ? `${pl[0]}…` : pl[0] ?? '', x + 54, py + 17, { size: 10, font: 'small', color: C.textDim, alpha: k });
+    r.uiRect(x + 12, y + 99, ww - 24, 1, C.rimDark, k);
+    const act = p.activeId ? Actives.get(p.activeId) : undefined;
+    iconSlot(r, act?.icon ?? null, x + 25, y + 117, 24, { alpha: k, scale: act ? fitScale(act.icon, 20, 1.5) : 1 });
+    r.uiText(truncate(act ? '액티브 · ' + act.name : '액티브 없음', ww - 110), x + 45, y + 104, { size: 10, font: 'small', color: act ? '#c0e0ff' : C.textMute, alpha: k });
+    if (act) gauge(r, x + 45, y + 118, ww - 64, 5, p.activeCharge / act.charge, { fill: '#ffd040', segments: act.timed ? 0 : act.charge, alpha: k });
+    const ch = p.character;
+    r.uiText(truncate('고유 능력 · ' + (ch.passive?.name ?? '없음') + '   /   대시 · ' + (ch.dash?.name ?? '질주'), ww - 24), x + 12, y + 136, { size: 10, font: 'small', color: ch.color, alpha: k });
     if (p.potionId) {
       const def = Potions.get(p.potionId);
       const known = w.run.identified.has(p.potionId);
@@ -514,18 +484,12 @@ export class StatusOverlay implements Scene {
   }
 
   // ---------------------------------------------------------------- resonance
-  /** World time of the last passive proc, as a value comparable with the overlay clock. */
-  private lastPassiveProc(procAt: number, worldTime: number): number {
-    if (!isFinite(procAt)) return -99;
-    return this.t - (worldTime - procAt);
-  }
-
   private drawResonance(r: Renderer, k: number, oy: number): void {
     const w = this.game.world;
     const x = 460;
     const y = 58 + EQUIP_H + 6 + oy;
     const ww = UI_W_BASE - 30 - x;
-    const h = 118;
+    const h = RES_H;
     frame(r, x, y, ww, h, 'panel', { alpha: k });
     r.uiText('등불 공명', x + 12, y + 8, { size: 12, bold: true, color: C.goldHi, alpha: k });
     const sets = [...(w.items.computed?.sets ?? [])].sort((a, b) => b.active.length - a.active.length || b.count - a.count);
@@ -542,7 +506,7 @@ export class StatusOverlay implements Scene {
       r.uiText('같은 속성의 유물을 모으면', x + 12, y + 34, { size: 10, font: 'small', color: C.textFaint, alpha: k });
       r.uiText('공명이 깨어납니다.', x + 12, y + 48, { size: 10, font: 'small', color: C.textFaint, alpha: k });
       // show all tags dimly as a teaser
-      Sets.all().slice(0, 8).forEach((s, i) => r.uiSprite(s.icon, x + 20 + i * 30, y + 82, 2, { alpha: k * 0.35 }));
+      Sets.all().slice(0, 8).forEach((s, i) => r.uiSprite(s.icon, x + 20 + i * 30, y + 64, 2, { alpha: k * 0.35 }));
       return;
     }
     const rowH = 28;
@@ -588,7 +552,7 @@ export class StatusOverlay implements Scene {
     const w = this.game.world;
     const p = w.player;
     const x = 460;
-    const y = 58 + EQUIP_H + 6 + 118 + 6 + oy;
+    const y = 58 + EQUIP_H + 6 + RES_H + 6 + oy;
     const ww = UI_W_BASE - 30 - x;
     const h = UI_H - 30 - y + oy - 6;
     frame(r, x, y, ww, h, 'panel', { alpha: k });

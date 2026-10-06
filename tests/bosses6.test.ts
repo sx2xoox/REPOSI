@@ -62,7 +62,7 @@ describe('floor 6 boss definitions', () => {
       expect(d.bossMusic, id).toBe('boss_drowned');
       // act-2 baseline: between the floor-4 saint (1250) scale and the floor-1 bosses, before the floor multiplier
       expect(d.hp, id).toBeGreaterThanOrEqual(700);
-      expect(d.hp, id).toBeLessThanOrEqual(950);
+      expect(d.hp, id).toBeLessThanOrEqual(1070);
     }
     expect(MUSIC_IDS).toContain('boss_drowned');
     for (const n of ['quill_write', 'page_rip', 'ink_burst', 'lamp_hum', 'foghorn', 'tide_slam']) expect(SFX_NAMES).toContain(n);

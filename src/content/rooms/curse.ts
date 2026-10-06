@@ -25,7 +25,7 @@ class CurseToll extends Entity {
     // every keeper who walked in pays (co-op)
     for (const p of w.targets()) {
       if (!p.alive || p.red + p.soul <= 1) continue; // never lethal
-      if (p.hurt(w, 1, '저주의 문')) {
+      if (p.hurt(w, 1, '저주의 문', true)) {
         w.floatText(p.x, p.y - 20, '피의 대가', '#ff6080');
         w.particles.burst(p.x, p.y - 8, { count: 16, speed: [20, 60], life: [0.5, 1], colors: ['#ff70c0', '#a02070', '#300820'], size: [1, 2], additive: true });
       }

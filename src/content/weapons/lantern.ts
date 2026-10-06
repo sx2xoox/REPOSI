@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // 등불 마탄 (lantern bolts): Ria's starting weapon. A hand lantern that sways
 // on its handle and spits flame bolts from its glass. Balanced ranged weapon.
 
@@ -74,7 +75,7 @@ defineWeapon({
   },
   draw(_w, p, r, st) {
     const aim = p.aim;
-    const h = handPos(p, aim, 7 - p.recoil * 0.8);
+    const h = visualHandPos(p, aim, 7 - p.recoil * 0.8);
     const rot = (st.mem.sway ?? 0) * (1 - Math.min(1, Math.abs(Math.sin(aim)) * 0.3));
     const glow = 0.18 + 0.08 * Math.sin(p.age * 7) + st.anim * 0.35;
     r.sprite(glowSprite(16 + st.anim * 8, '#ffb040'), h.x - Math.sin(rot) * 6, h.y + 6, { alpha: glow, additive: true });

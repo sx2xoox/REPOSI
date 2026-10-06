@@ -1,3 +1,4 @@
+import { pickBossPattern } from './tactics';
 // Floor 6 boss: 대서기관 (the Grand Archivist) — 수몰된 서고의 필경사.
 // A towering drowned scribe in a waterlogged scholar's robe, a chained tome open in
 // one hand and a quill-staff in the other; its hair drifts as if still underwater.
@@ -1097,7 +1098,7 @@ function* patterns(e: Enemy, w: World): Script {
     const p2 = !!e.mem.p2;
     const walls = w.entities.some((x) => x instanceof PageWall && !x.dead);
     const sinceFlood = e.age - (e.mem.floodAt ?? -99);
-    const id = pickPattern(w.rng, [
+    const id = pickBossPattern(e, w, [
       { id: 'write', w: 3 },
       { id: 'underline', w: 2.4 },
       { id: 'pages', w: 2.1, when: !walls },
@@ -1114,7 +1115,7 @@ function* patterns(e: Enemy, w: World): Script {
     else if (id === 'summon') yield* summonPages(e, w, p2 ? 3 : 2);
     else if (id === 'flood') yield* inkFlood(e, w);
     else yield* vortex(e, w);
-    yield* drift(e, w, p2 ? w.rng.range(0.7, 1.1) : w.rng.range(1.0, 1.5));
+    yield* drift(e, w, p2 ? w.rng.range(0.4, 0.6) : w.rng.range(0.55, 0.85));
   }
 }
 
@@ -1136,7 +1137,7 @@ defineBoss({
   bossTitle: '수몰된 서고의 필경사',
   bossFloors: [6],
   bossMusic: 'boss_drowned',
-  hp: 820,
+  hp: 920,
   radius: 14,
   speed: 46,
   mass: 6,

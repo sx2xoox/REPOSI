@@ -326,7 +326,7 @@ export class TwinShadow extends Familiar {
     this.x = damp(this.x, tx, 12, dt);
     this.y = damp(this.y, ty, 12, dt);
     this.frame = p.frameName();
-    this.flip = p.flip;
+    this.flip = p.spriteFlip;
     this.facing = p.facing;
     if (fx.chance(dt * 12)) {
       w.particles.spawn({ x: this.x + fx.range(-4, 4), y: this.y - fx.range(0, 12), vy: -12, life: 0.5, colors: ['#9a6aff', '#3a1a70'], size: 1 });

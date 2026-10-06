@@ -1,0 +1,315 @@
+{
+  "provider": "PixelLab",
+  "date": "2026-10-04",
+  "assets": [
+    {
+      "id": "chest",
+      "jobId": "b15cf8b6-a9e8-4133-8b4b-b6b1e518494b",
+      "tool": "create_image_pro_flash",
+      "prompt": "A SMALL ordinary treasure chest, actual object approximately 22 pixels wide, centered in 32x32 canvas with base at y28. Warm walnut wood, rounded CLOSED lid, two worn bronze bands, small clasp, thick dark outline, readable top/front/right planes. No loot, no glow. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "chest_gold",
+      "jobId": "d7e939a1-ea76-4875-ac83-48a7bb071972",
+      "tool": "create_image_pro_flash",
+      "prompt": "A SMALL key-locked treasure chest, actual object 22 pixels wide centered with base at y28. Dark honey oak, ornate brass corner caps and straps, clear large golden PADLOCK on front, CLOSED rounded lid. No loot, no glow. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "chest_gold_open",
+      "jobId": "263f2f86-ef76-4381-9858-103b78d5f804",
+      "tool": "edit_image_pro_flash",
+      "prompt": "Open this EXACT chest. Keep its bottom box, base, width, wood, metal details, perspective and position completely unchanged. Rotate the hinged lid upward behind the box, reveal a dark EMPTY interior with a thin warm rim. Remove the front padlock if present. No contents, no treasure, no glow or particles. Preserve native canvas size and crisp pixels, transparent background. The open lid must stay inside the canvas.",
+      "seed": 10205
+    },
+    {
+      "id": "chest_open",
+      "jobId": "9546c91e-6d3d-45fa-8d30-bf70760e91a6",
+      "tool": "edit_image_pro_flash",
+      "prompt": "Open this EXACT chest. Keep its bottom box, base, width, wood, metal details, perspective and position completely unchanged. Rotate the hinged lid upward behind the box, reveal a dark EMPTY interior with a thin warm rim. Remove the front padlock if present. No contents, no treasure, no glow or particles. Preserve native canvas size and crisp pixels, transparent background. The open lid must stay inside the canvas.",
+      "seed": 10205
+    },
+    {
+      "id": "device_anvil",
+      "jobId": "1ff05cba-54f0-4596-b14d-d148086e1456",
+      "tool": "create_image_pro_flash",
+      "prompt": "A dark blue iron anvil on a square oak stump. Clear projecting horn, silver worn top face, forge tongs resting beside stump. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "device_relay",
+      "jobId": "444b77e0-f46a-4c9c-b496-3f2e32fbadc7",
+      "tool": "create_image_pro_flash",
+      "prompt": "A small rail lantern cart: bronze protective cage, large teal glass lantern, warm white flame, worn oak chassis and FOUR little iron wheels. A readable tow handle. Front three-quarter view, cart on ground. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "device_valve",
+      "jobId": "e61d8e70-e182-4ed2-89de-6defb8b2d7f0",
+      "tool": "create_image_pro_flash",
+      "prompt": "A readable turquoise bronze cooling valve wheel on a short iron pipe and bolted foot. Four spokes, light top edges, rust shadows. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "device_vault",
+      "jobId": "7bf661f4-ec96-4e40-bf22-535d948cbb45",
+      "tool": "create_image_pro_flash",
+      "prompt": "A freestanding heavy violet-gray steel vault: bevelled rectangular door, bronze five-spoke wheel, chunky hinges on left, small ruby alarm lamp above, thick stone foot. Front three-quarter view, no text. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "device_vault_open",
+      "jobId": "4fb2de54-4a72-4f45-ab20-83abac9cdd86",
+      "tool": "edit_image_pro_flash",
+      "prompt": "Open the heavy vault door outward to its LEFT, hinged on left edge. Show dark empty interior and thick metal frame. Keep exact same body position, bottom base, size and style. No treasure or glow. Transparent background.",
+      "seed": 10206
+    },
+    {
+      "id": "device_workshop",
+      "jobId": "d32a6817-459a-412a-b1b7-90d955315593",
+      "tool": "create_image_pro_flash",
+      "prompt": "A compact working furnace: soot dark stone brick chimney, arched orange firebox, copper bellows pipe, iron rivets and worn stone base. Visibly layered top and front planes, no surrounding room. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "equipment_relay",
+      "jobId": "143eeb9d-b0a0-40e8-9f78-a4060c4b7240",
+      "tool": "create_image_pro_flash",
+      "prompt": "A dark oak wall rack with three small spare lanterns, coiled rope and brass hooks. Teal glass, muted bronze frames. Straight front view with a small visible top plane. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "equipment_vault",
+      "jobId": "ddad6263-e751-452e-a8c7-f5693670767f",
+      "tool": "create_image_pro_flash",
+      "prompt": "An antique alarm switchboard: dark violet steel frame, three small red/amber/green lamps, inset brass lever, ceramic fuses and copper wires. No writing or glyph text. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "equipment_workshop",
+      "jobId": "b6e117a9-758d-42c8-94d8-4f1fd98f9159",
+      "tool": "create_image_pro_flash",
+      "prompt": "A dark oak tool rack: hammer, broad blacksmith tongs, iron shovel, folded dark leather apron. Clearly distinct tools and bronze hooks. Front view. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "icon_luen_dash",
+      "jobId": "ed047402-ed8f-4d1f-9739-c060f2f990c1",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 pixel art fantasy roguelike skill icon: an orange potion flask and two small backward motion strokes. Readable compact silhouette, dark purple outline, precise single pixels, restrained warm palette, no border or text, transparent background. Same style as a cozy dark lantern-keeper animal RPG.",
+      "seed": 10207
+    },
+    {
+      "id": "icon_luen_passive",
+      "jobId": "2dca7e93-2bdd-4730-9b68-211b17e2dcf0",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 pixel art fantasy roguelike skill icon: green and orange reagent drops meeting inside a violet flask. Readable compact silhouette, dark purple outline, precise single pixels, restrained warm palette, no border or text, transparent background. Same style as a cozy dark lantern-keeper animal RPG.",
+      "seed": 10207
+    },
+    {
+      "id": "icon_luen_release",
+      "jobId": "df61f220-433e-4e09-9f50-0185a094b1ea",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 skill icon: two small alchemical glass vials crossing, one green poison one orange fire, a tiny white reaction spark between them. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "icon_mira_dash",
+      "jobId": "60f583ff-46d0-4cf8-a154-d87812bd02b3",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 pixel art fantasy roguelike skill icon: a flying cream page with a blue bookmark and two short motion strokes. Readable compact silhouette, dark purple outline, precise single pixels, restrained warm palette, no border or text, transparent background. Same style as a cozy dark lantern-keeper animal RPG.",
+      "seed": 10207
+    },
+    {
+      "id": "icon_mira_passive",
+      "jobId": "0e3efac4-07d5-42fa-8796-85da501d2234",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 pixel art fantasy roguelike skill icon: a cream parchment page with three indigo text strokes and a blue quill. Readable compact silhouette, dark purple outline, precise single pixels, restrained warm palette, no border or text, transparent background. Same style as a cozy dark lantern-keeper animal RPG.",
+      "seed": 10207
+    },
+    {
+      "id": "icon_mira_release",
+      "jobId": "bc6aaf13-f91b-41d7-8f5c-25c76ef625b4",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 skill icon: an open cream parchment book, pale blue quill, three bright blue recorded letters represented by simple dots, no readable text. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "icon_ort_dash",
+      "jobId": "607f3c94-ef54-4893-b2a6-5ffb3fa91556",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 pixel art fantasy roguelike skill icon: a small green stepping stone and a curved cream returning arrow. Readable compact silhouette, dark purple outline, precise single pixels, restrained warm palette, no border or text, transparent background. Same style as a cozy dark lantern-keeper animal RPG.",
+      "seed": 10207
+    },
+    {
+      "id": "icon_ort_passive",
+      "jobId": "c4b2cc28-2ce9-452b-b041-0852ae8600b4",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 pixel art fantasy roguelike skill icon: an emerald route marker with a small cream pennant. Readable compact silhouette, dark purple outline, precise single pixels, restrained warm palette, no border or text, transparent background. Same style as a cozy dark lantern-keeper animal RPG.",
+      "seed": 10207
+    },
+    {
+      "id": "icon_ort_release",
+      "jobId": "bab8af50-ee1c-47f4-951a-75cc8a2d337e",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 skill icon: three mint green stepping-stones leading toward a small warm lantern, a dark winding road. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "icon_tove_dash",
+      "jobId": "83274847-a2e8-4e77-9242-312cec7bf423",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 pixel art fantasy roguelike skill icon: a curved cream retrieval arrow around a tiny amber turret. Readable compact silhouette, dark purple outline, precise single pixels, restrained warm palette, no border or text, transparent background. Same style as a cozy dark lantern-keeper animal RPG.",
+      "seed": 10207
+    },
+    {
+      "id": "icon_tove_passive",
+      "jobId": "57debf5f-82ba-481f-a52a-3fcbbdde2937",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 pixel art fantasy roguelike skill icon: two small brass gears with a tiny amber targeting lens. Readable compact silhouette, dark purple outline, precise single pixels, restrained warm palette, no border or text, transparent background. Same style as a cozy dark lantern-keeper animal RPG.",
+      "seed": 10207
+    },
+    {
+      "id": "icon_tove_release",
+      "jobId": "02733600-4088-4781-8d32-baf305c6fc28",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 skill icon: a small amber brass turret with three legs and a short muzzle. Readable dark outlined silhouette. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "icon_ves_dash",
+      "jobId": "c4ee33e5-4151-4191-b84a-249eccc66bca",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 pixel art fantasy roguelike skill icon: a small silver boot with a trailing dusty rose ribbon. Readable compact silhouette, dark purple outline, precise single pixels, restrained warm palette, no border or text, transparent background. Same style as a cozy dark lantern-keeper animal RPG.",
+      "seed": 10207
+    },
+    {
+      "id": "icon_ves_passive",
+      "jobId": "50ad1726-be6b-4968-aa0e-bcb7c0f59467",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 pixel art fantasy roguelike skill icon: two short silver daggers pointing in opposite directions and a rose rhythm dot. Readable compact silhouette, dark purple outline, precise single pixels, restrained warm palette, no border or text, transparent background. Same style as a cozy dark lantern-keeper animal RPG.",
+      "seed": 10207
+    },
+    {
+      "id": "icon_ves_release",
+      "jobId": "69c32ea2-468c-45ff-9245-90ab193dc519",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native 16x16 skill icon: two crossed silver blades with burgundy grips and a pink ribbon. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "refuge_turret",
+      "jobId": "ad3ca994-f0cc-4cc2-af59-65139e1784f5",
+      "tool": "create_image_pro_flash",
+      "prompt": "A small deployable brass sentry turret, actual object about 22 pixels wide. Short copper gun barrel points RIGHT, dark steel rotating head, amber targeting lens, three splayed folding iron legs on wooden base. Compact field-engineer equipment with visible bolts. Top-front RPG view. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "town_barrel",
+      "jobId": "05bd4501-1cfd-43e5-aff4-54d376775fcb",
+      "tool": "create_image_pro_flash",
+      "prompt": "A small oak supply barrel, worn silver iron hoops, visibly round top with wooden planks, a rolled canvas sack leaning against it. Top-front RPG view. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "town_bench",
+      "jobId": "3d0fdebe-4353-43ca-b99f-fb85f1d23559",
+      "tool": "create_image_pro_flash",
+      "prompt": "A cozy worn wooden bench with a curved backrest, thick legs, dark iron supports, folded burgundy blanket on one end. Top-front RPG viewpoint. Ground footprint fits x4..35 and y16..23. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "town_counter",
+      "jobId": "dc17cff8-2bfa-48b7-8e1f-e9bc049e3342",
+      "tool": "create_image_pro_flash",
+      "prompt": "Native pixel art prop for a dark cozy animal lantern-keeper RPG: a modest worn oak preparation counter, three-quarter top-front view, 56 by 40 transparent canvas. Counter occupies about 50 by 30 pixels, feet on y37. Thick planked tabletop with a rolled map, one tiny teal bottle and spare lantern wick. Front has recessed wood panels, iron corner straps, a small burgundy cloth with a simple brass lantern emblem. Clearly visible tabletop depth, front face and small right side, legs and bottom shadow details. Restrained warm walnut bronze cream palette, crisp pixels, no glow, no background, no character, no text.",
+      "seed": 10208
+    },
+    {
+      "id": "town_dock",
+      "jobId": "bd7a3621-34ed-44bc-8bfb-369203e95fce",
+      "tool": "create_image_pro_flash",
+      "prompt": "A narrow rustic wooden landing dock viewed from above at RPG 3/4 top-down angle. Vertical plank walkway with weathered crossboards and six round mooring posts along edges, one coiled rope, no boat and NO WATER background. Worn brown wood, muted gray-green aging, subtly warm lantern light. Entire silhouette fits within canvas. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "town_dock_wide",
+      "jobId": "46b08edf-15d1-41ab-9681-9639fbf336a1",
+      "tool": "edit_image_pro_flash",
+      "prompt": "Widen this wooden dock to occupy 68 pixels of this 80 by 80 canvas, still 76 pixels tall. Broad walkable top surface of weathered oak boards, posts along both edges, rope coil at lower right. Same top-down RPG perspective and restrained warm colors. No water. Transparent background.",
+      "seed": 10206
+    },
+    {
+      "id": "town_herbs",
+      "jobId": "dfc14a20-c90c-4312-9e00-5758562d3b53",
+      "tool": "create_image_pro_flash",
+      "prompt": "A low rectangular wooden herb planter with several distinct small sage plants, pale cream flowers, tiny plant stakes, dark moist soil. Compact full planter visible. Top-front RPG view. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "town_laundry",
+      "jobId": "3e1b186d-4ad6-4acf-8c59-57daf3a77d0e",
+      "tool": "create_image_pro_flash",
+      "prompt": "Two short rustic wooden posts holding a sagging clothesline with three small cream and dusty rose cloths, a wooden wash basket at foot. Top-front RPG view, empty transparent background. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "town_shrub",
+      "jobId": "3ba8382d-b44e-4e2c-b758-c63da219983e",
+      "tool": "create_image_pro_flash",
+      "prompt": "A compact rounded wild shrub with distinct clusters of dark teal and muted olive leaves, small pale buds, visible dark branches near base. Top-front RPG view, irregular natural silhouette. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "weapon_chest",
+      "jobId": "771256f1-37ae-46de-b70b-0d86ead56647",
+      "tool": "create_image_pro_flash",
+      "prompt": "A low long weapon case, actual object 32 pixels wide centered with base at y26. Dark red-brown wood, three gunmetal bands, a small crossed-sword brass badge, CLOSED flat bevelled lid. No weapons sticking out, no glow. Crisp native pixel art for a dark cozy lantern-lit animal roguelike. Match 32px player sprites. Top-left light, near-black violet outlines, restricted warm muted palette, strong material planes, readable at original size. Exactly one object, no UI frame, no background, no floor tile, no cast shadow, no perspective grid. No smooth painting or blur.",
+      "seed": 10204
+    },
+    {
+      "id": "weapon_chest_open",
+      "jobId": "0cd6c0b2-21d4-4c55-a8a8-06c4ec188355",
+      "tool": "edit_image_pro_flash",
+      "prompt": "Open this EXACT chest. Keep its bottom box, base, width, wood, metal details, perspective and position completely unchanged. Rotate the hinged lid upward behind the box, reveal a dark EMPTY interior with a thin warm rim. Remove the front padlock if present. No contents, no treasure, no glow or particles. Preserve native canvas size and crisp pixels, transparent background. The open lid must stay inside the canvas.",
+      "seed": 10205
+    },
+    {
+      "id": "device_well",
+      "jobId": "433ff8ae-ad4e-4802-8bed-ae2c764c725f",
+      "tool": "create_map_object",
+      "prompt": "A beautifully crafted dark fantasy roguelike wishing well, stout circular weathered slate stone basin with brass rim, two short bronze posts supporting a small curved roof, luminous turquoise water, tiny gold chain and bucket. Cozy lanternkeeper dungeon prop. Clear readable silhouette, hand placed chunky pixels, purple-black outlines, restrained warm brass highlights. No ground or background, isolated transparent game prop, centered.",
+      "date": "2026-10-05",
+      "size": "48x48"
+    },
+    {
+      "id": "device_fusion",
+      "jobId": "a93d0a34-d97f-4ac4-948f-603d3a4384ae",
+      "tool": "create_map_object",
+      "prompt": "A beautifully crafted dark fantasy roguelike alchemy fusion apparatus: squat octagonal dark bronze stone plinth with two small offering trays flanking a glowing violet crystal crucible at the center, subtle gold rune inlays, symmetrical heavy base, warm copper accents. Cozy lanternkeeper dungeon prop. Clear readable silhouette and chunky pixels, purple-black outlines. No ground or background, isolated transparent game prop, centered.",
+      "date": "2026-10-05",
+      "size": "48x48"
+    },
+    {
+      "id": "device_valve_warm",
+      "jobId": "ac404834-ff5c-4074-9996-1d0a63fc1927",
+      "tool": "edit_image_pixen",
+      "prompt": "Recolor ONLY the circular handwheel rim and spokes to muted rust-red enamel with warm copper highlights. Keep the EXACT valve silhouette, size, position, perspective, holes, texture and transparent canvas. Preserve the original dark neutral iron stem, support and base, original outlines and dark shadows. A worn painted metal wheel, not a glowing or translucent object. No overall color wash, no new details. Crisp native pixels.",
+      "seed": 10606,
+      "date": "2026-10-06",
+      "source": "device_valve.png",
+      "size": "24x24"
+    },
+    {
+      "id": "device_valve_cool",
+      "jobId": "57c343b5-e866-4949-a0e3-b3687664b39d",
+      "tool": "edit_image_pixen",
+      "prompt": "Recolor ONLY the circular handwheel rim and spokes to muted slate-teal blue enamel with restrained pale steel highlights. Keep the EXACT valve silhouette, size, position, perspective, holes, texture and transparent canvas. Preserve the original dark neutral iron stem, support and base, original outlines and dark shadows. A worn painted metal wheel, not a glowing or translucent object. No overall color wash, no new details. Crisp native pixels.",
+      "seed": 10606,
+      "date": "2026-10-06",
+      "source": "device_valve.png",
+      "size": "24x24"
+    }
+  ]
+}

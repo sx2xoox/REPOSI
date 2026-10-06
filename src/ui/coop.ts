@@ -130,17 +130,21 @@ export class CoopHud {
   /** Name tags over teammates on screen, arrows at the edge for those off screen. */
   private drawTags(r: Renderer, w: World, A: number): void {
     const sa = r.uiSafe;
-    for (const tag of w.coopTags) {
+    // Self is drawn last so stacked keepers cannot cover the '나' marker.
+    for (const tag of [...w.coopTags].sort((a, b) => Number(a.slot === w.local.slot) - Number(b.slot === w.local.slot))) {
       const p = w.players.find((q) => q.slot === tag.slot);
       if (!p) continue;
       const col = slotColor(p.slot);
       const mine = p === w.local;
       if (tag.onScreen) {
-        if (!mine) r.uiText(keeperName(p), tag.x, tag.y - 12, { size: 10, font: 'small', align: 'center', color: col, outline: C.ink, alpha: A });
+        const name = mine ? `▼ 나 · ${slotLabel(p.slot)}` : `${slotLabel(p.slot)} · ${keeperName(p)}`;
+        const width = r.measureText(name, 10) + 10;
+        r.uiRect(tag.x - width / 2, tag.y - 15, width, 14, C.ink, 0.8 * A);
+        r.uiText(name, tag.x, tag.y - 12, { size: 10, font: 'small', align: 'center', color: mine ? '#fff4c8' : col, outline: C.ink, alpha: A });
         if (p.downed) {
           const f = clamp(p.reviveT / REVIVE_TIME, 0, 1);
           const label = f > 0 ? `부활 ${Math.round(f * 100)}%` : '쓰러짐';
-          r.uiText(label, tag.x, tag.y - (mine ? 12 : 24), { size: 10, font: 'small', align: 'center', color: f > 0 ? C.emberHi : '#a8d8ff', outline: C.ink, alpha: A * (0.75 + 0.25 * Math.sin(this.t * 4)) });
+          r.uiText(label, tag.x, tag.y - 27, { size: 10, font: 'small', align: 'center', color: f > 0 ? C.emberHi : '#a8d8ff', outline: C.ink, alpha: A * (0.75 + 0.25 * Math.sin(this.t * 4)) });
         }
         continue;
       }

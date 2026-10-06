@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // 망령 구슬 (wraith orbs): spectral orbs circle the wielder, grazing whatever
 // they touch. Attacking flings the orb nearest the aim; new orbs re-form over
 // time (faster with fire rate). More orbs with multishot.
@@ -80,7 +81,7 @@ function orbitBehavior(st: WeaponState): ProjBehavior {
 }
 
 function spawnOrb(w: World, p: Player, st: WeaponState): Projectile {
-  const s = p.stats;
+  const s = p.weaponStats;
   const pr = new Projectile({
     team: 'player', x: p.x, y: p.y - 4, angle: 0, speed: 0, damage: s.damage * 0.45, radius: Math.max(3, s.projSize),
     range: 99999, life: 99999, owner: p, pierce: 999, knockback: 40, color: '#b080ff', style: 'sprite',
@@ -108,7 +109,7 @@ defineWeapon({
     m.mulStat('damage', 0.8);
   },
   update(w, p, st, dt, firing, aim) {
-    const s = p.stats;
+    const s = p.weaponStats;
     let list = ORBS.get(st);
     if (!list) {
       list = [];
@@ -181,8 +182,7 @@ defineWeapon({
   },
   draw(w, p, r) {
     // no held object: a faint wisp in the casting hand
-    const x = p.x + Math.cos(p.aim) * 6;
-    const y = p.y - 5 + Math.sin(p.aim) * 5;
+    const { x, y } = visualHandPos(p, p.aim, 6);
     r.sprite(glowSprite(7 + Math.sin(w.time * 9), '#b080ff'), x, y, { alpha: 0.7, additive: true });
   },
 });

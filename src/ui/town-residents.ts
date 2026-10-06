@@ -3,14 +3,14 @@ import { PixelPainter } from '../engine/painter';
 export type ResidentFacing = 'down' | 'side' | 'up';
 const cache = new Map<string, HTMLCanvasElement>();
 /** Native pixels, like the keeper: a 24px canvas with an 18–21px silhouette, never scaled. */
-export function residentArt(i:number, facing:ResidentFacing='down', blink=false, sway=false):HTMLCanvasElement {
- const key=`${i}:${facing}:${blink}:${sway}`;const old=cache.get(key);if(old)return old;
+export function residentArt(i:number, facing:ResidentFacing='down', blink=false, sway=false, moving=false):HTMLCanvasElement {
+ const key=`${i}:${facing}:${blink}:${sway}:${moving}`;const old=cache.get(key);if(old)return old;
  const p=new PixelPainter(24,24), ink='#17121f';
  const fur=[['#9d7e83','#d6b99e','#f2d9b5','#fff0ce'],['#985732','#ce863e','#efb361','#ffdf9e'],['#4d586e','#7e90a5','#b5c4cf','#e4e7da']][i];
  const cloth=[['#2d223b','#57405f','#86617f'],['#34342b','#616045','#979171'],['#172c39','#345567','#64888c']][i];
  const side=facing==='side',back=facing==='up';
  // Feet, independently moving tail, and a compact torso below the head.
- p.rect(side?8:7,21,3,2,fur[1]);p.rect(side?12:13,21,3,2,fur[0]);
+ p.rect(side?8:7,21+(moving&&sway?-1:0),3,2,fur[1]);p.rect(side?12:13,21+(moving&&!sway?-1:0),3,2,fur[0]);
  p.line(16,20,20,20-(sway?1:0),fur[1]);p.line(20,20-(sway?1:0),21,17-(sway?1:0),fur[2]);
  p.poly(side?[9,12,14,12,16,21,7,21]:[7,12,15,12,17,21,5,21],cloth[0]);
  p.poly(side?[9,13,13,13,15,20,8,20]:[8,13,14,13,16,20,6,20],cloth[1]);
@@ -24,6 +24,8 @@ export function residentArt(i:number, facing:ResidentFacing='down', blink=false,
  p.line(side?8:7,4,side?9:8,5,'#dfa5a0');p.line(15,4,15,5,'#b97e88');
  p.ellipse(11.5,8.5,side?6:6.5,4.5,fur[1]);p.ellipse(10.5,7.5,side?5:5.5,3.5,fur[2]);
  if(!side){p.rect(6,8,11,3,fur[2]);p.rect(8,11,7,2,fur[1]);p.rect(10,13,3,1,fur[1]);p.px(5,9,fur[2]);p.px(17,9,fur[1]);}
+ p.line(side?8:7,3,side?9:8,4,fur[3]);
+ if(i===2&&!side){p.px(10,5,fur[0]);p.px(12,5,fur[0]);}
  // Compact sleeves and visible paws tie the head to the body.
  if(!back){p.line(side?8:6,15,side?8:6,18,cloth[2]);p.rect(side?7:5,18,3,2,fur[2]);p.px(side?7:5,18,fur[3]);}
  p.line(hx-3,4,hx+1,3,fur[3]);p.px(hx-6,9,fur[2]);p.px(hx+6,9,fur[1]);
@@ -35,9 +37,9 @@ export function residentArt(i:number, facing:ResidentFacing='down', blink=false,
  }else{
   p.ellipse(side?8.5:11.5,11,side?3.5:3.5,1.5,fur[3]);
   if(!side){p.px(6,10,'#dba49b');p.px(16,10,i===2?'#9da9b9':'#cc9690');}
-  const eyes=side?[8]:[8,13];for(const x of eyes){
+  const eyes=side?[8]:[7,13];for(const x of eyes){
    if(blink)p.line(x-1,8,x+1,8,ink);
-   else {p.rect(x,8,2,2,ink);p.px(x,8,'#fff6d9');}
+   else {p.rect(x,7,3,3,ink);p.rect(x+1,8,2,2,i===1?'#745239':i===2?'#43757b':'#6a546f');p.px(x,7,'#fff6d9');p.px(x+1,9,ink);}
   }
   if(i===2){for(const x of eyes)p.rectOutline(x-1,6,4,5,'#c5a368');if(!side)p.line(11,8,12,8,'#c5a368');}
   p.px(side?5:11,11,'#a96677');p.px(side?7:10,12,'#b68d87');if(!side)p.px(12,12,'#b68d87');

@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // Light one-handed casters:
 //  쌍심지 등잔총 (twin_lamp, common)   — pistol: every pull fires a quick double tap
 //  서리 지팡이   (frost_wand, common)  — ice shards that slow (sometimes freeze)
@@ -102,7 +103,7 @@ defineWeapon({
     drawGun(r, w, p, st, 'w_twin_lamp', 6, 2.2);
     const f = shotFade(st, w, 0.12);
     if (f > 0) {
-      const h = handPos(p, p.aim, 14);
+      const h = visualHandPos(p, p.aim, 14);
       r.sprite(glowSprite(8 + f * 6, '#ffb040'), h.x, h.y, { alpha: 0.6 * f, additive: true });
     }
   },
@@ -179,7 +180,7 @@ defineWeapon({
   },
   draw(w, p, r, st) {
     drawGun(r, w, p, st, 'w_frost_wand', 5, 2);
-    const h = handPos(p, p.aim, 16);
+    const h = visualHandPos(p, p.aim, 16);
     r.sprite(glowSprite(9 + Math.sin(w.time * 5) * 1.5 + shotFade(st, w, 0.15) * 6, '#7ad0ff'), h.x, h.y, { alpha: 0.4, additive: true });
   },
 });
@@ -255,7 +256,7 @@ defineWeapon({
     if (!firing || st.cooldown > 0) return;
     beginAttack(w, p, st, aim);
     st.cooldown = attackInterval(p);
-    const s = p.stats;
+    const s = p.weaponStats;
     const h = handPos(p, aim, 13);
     p.fireProjectiles(w, aim + (w.rng.next() - 0.5) * 0.12, {
       style: 'none', speed: s.shotSpeed * 0.62, accel: -170, minSpeed: 26, range: s.range * 0.85, life: 2.6,
@@ -367,7 +368,7 @@ defineWeapon({
     if (!firing || st.cooldown > 0) return;
     beginAttack(w, p, st, aim);
     st.cooldown = attackInterval(p);
-    const s = p.stats;
+    const s = p.weaponStats;
     const h = handPos(p, aim, 16);
     p.fireProjectiles(w, aim, {
       style: 'none', radius: s.projSize + 2, speed: s.shotSpeed * 0.9, color: '#ffd040', light: 22, x: h.x, y: h.y, behaviors: [starSpin],
@@ -382,7 +383,7 @@ defineWeapon({
     drawGun(r, w, p, st, 'w_star_launcher', 5, 3);
     const f = shotFade(st, w, 0.2);
     if (f > 0) {
-      const h = handPos(p, p.aim, 18);
+      const h = visualHandPos(p, p.aim, 18);
       r.ring(h.x, h.y, 2 + (1 - f) * 5, '#ffe890', 1, f * 0.75);
     }
   },

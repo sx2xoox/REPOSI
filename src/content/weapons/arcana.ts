@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // Arcane and legendary armaments:
 //  반딧불 마도서 (firefly_tome, epic)      — summons firefly spirits that hover, then
 //                                           dart at the nearest enemy
@@ -110,7 +111,7 @@ defineWeapon({
     if (!firing || st.cooldown > 0) return;
     beginAttack(w, p, st, aim);
     st.cooldown = attackInterval(p);
-    const s = p.stats;
+    const s = p.weaponStats;
     const n = 2 + Math.max(0, s.shots - 1);
     const h = handPos(p, aim, 9);
     for (let i = 0; i < n; i++) {
@@ -134,7 +135,7 @@ defineWeapon({
     const f = shotFade(st, w, 0.18);
     // pages flip on every cast
     const sprite = f > 0 && Math.floor(f * 6) % 2 === 0 ? 'w_firefly_tome_b' : 'w_firefly_tome';
-    const h = handPos(p, p.aim, 7);
+    const h = visualHandPos(p, p.aim, 7);
     r.sprite(sprite, h.x, h.y + Math.sin(w.time * 3) * 0.8, { flipX: Math.cos(p.aim) < 0 });
     r.sprite(glowSprite(10 + f * 8, '#d0ff60'), h.x, h.y - 2, { alpha: 0.2 + f * 0.4, additive: true });
   },
@@ -367,7 +368,7 @@ defineWeapon({
     if (!firing || st.cooldown > 0) return;
     beginAttack(w, p, st, aim);
     st.cooldown = attackInterval(p);
-    const s = p.stats;
+    const s = p.weaponStats;
     const h = handPos(p, aim, 8);
     const gx = h.x + Math.cos(aim) * 3;
     const gy = h.y + 7;
@@ -389,7 +390,7 @@ defineWeapon({
     w.sfx('shoot_magic', { vol: 0.5, pitch: 1.05 + w.rng.next() * 0.08 });
   },
   draw(w, p, r, st) {
-    const h = handPos(p, p.aim, 7 - st.anim);
+    const h = visualHandPos(p, p.aim, 7 - st.anim);
     const charged = st.combo === 3;
     const pulse = 0.5 + 0.5 * Math.sin(w.time * (charged ? 14 : 5));
     r.sprite(glowSprite(18 + st.anim * 10 + (charged ? 6 * pulse : 0), '#ffd060'), h.x, h.y + 7, { alpha: 0.3 + 0.15 * pulse, additive: true });
@@ -500,7 +501,7 @@ defineWeapon({
     if (!firing || st.cooldown > 0) return;
     beginAttack(w, p, st, aim);
     st.cooldown = attackInterval(p);
-    const s = p.stats;
+    const s = p.weaponStats;
     // aim point: the cursor, else the nearest enemy roughly in the aim direction, else ahead
     let d = aimDistance(w, p, 30, s.range * 0.9, s.range * 0.5);
     const near = w.nearestEnemy(p.x + Math.cos(aim) * d, p.y + Math.sin(aim) * d, 60);
@@ -533,7 +534,7 @@ defineWeapon({
     const up = -Math.PI / 2 + (Math.cos(p.aim) >= 0 ? 0.5 : -0.5);
     const a = f > 0 ? up + (p.aim - up) * (1 - f) : p.aim;
     drawHeld(r, p, 'w_meteor_staff', a, 5, { flash: f * 0.4 });
-    const h = handPos(p, a, 18);
+    const h = visualHandPos(p, a, 18);
     r.sprite(glowSprite(8 + f * 10 + Math.sin(w.time * 7), '#ff6030'), h.x, h.y, { alpha: 0.4 + f * 0.4, additive: true });
   },
 });

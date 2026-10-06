@@ -383,7 +383,7 @@ export function releaseFlashSlashes(w: World, p: Player): void {
       if (foes.length) {
         const e = foes[idx % Math.min(3, foes.length)];
         const spot = slashSpot(ww, pl, e);
-        ww.spawn(new Afterimage(pl.frameName(), pl.x, pl.y, pl.flip, '#ffffff', 0.3));
+        ww.spawn(new Afterimage(pl.frameName(), pl.x, pl.y, pl.spriteFlip, '#ffffff', 0.3));
         pl.x = spot.x;
         pl.y = spot.y;
         angle = spot.a;

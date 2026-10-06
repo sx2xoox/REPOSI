@@ -14,6 +14,7 @@ import { Entity } from '../../game/entity';
 import { Pedestal } from '../../game/pickups';
 import { RingFx } from '../../game/effects';
 import { defineDrawnSprite } from '../../engine/sprites';
+import { sceneSprite } from '../../ui/pixellab-scenery';
 import { RNG } from '../../engine/rng';
 import { dist } from '../../engine/math';
 import { glowSprite } from './common';
@@ -109,8 +110,11 @@ defineDrawnSprite('weapon_chest_open', 24, 13, (p) => {
 
 /** A long weapon crate left after a room clear; touching it opens it. */
 export class WeaponChest extends Entity {
+  override readonly worldLoot = true;
+  mem: Record<string, number> = {};
   weaponId: string;
-  opened = false;
+  get opened() { return !!this.mem.opened; }
+  set opened(v: boolean) { this.mem.opened = Number(v); }
   openT = 0;
   rarity: Rarity;
   constructor(x: number, y: number, weaponId: string) {
@@ -118,6 +122,7 @@ export class WeaponChest extends Entity {
     this.x = x;
     this.y = y;
     this.weaponId = weaponId;
+    this.mem.weaponCode = Weapons.all().findIndex(d => d.id === weaponId);
     this.rarity = Weapons.get(weaponId)?.rarity ?? 'common';
     this.r = 9;
     this.persistent = true;
@@ -132,13 +137,13 @@ export class WeaponChest extends Entity {
   override update(w: World, dt: number): void {
     this.age += dt;
     if (this.opened) {
-      // the emptied crate falls apart and fades, leaving the weapon on its pedestal
+      // The empty case fades at its original footprint, leaving the weapon on its pedestal.
       this.openT += dt;
       if (this.openT > 0.6) this.dead = true;
       return;
     }
     const p = w.player;
-    if (!p.alive || dist(this.x, this.y, p.x, p.y) > this.r + p.r + 2) return;
+    if (!p.alive || p.downed || dist(this.x, this.y, p.x, p.y) > this.r + p.r + 2) return;
     this.opened = true;
     // the weapon rises on a pedestal where the crate stood; step away to take it
     const pos = w.room.nearestFree(this.x, this.y - 2, 8);
@@ -160,13 +165,13 @@ export class WeaponChest extends Entity {
       const pulse = 0.5 + 0.5 * Math.sin(w.time * 4 + this.id);
       r.sprite(glowSprite(30, col), this.x, this.y, { alpha: 0.12 + 0.1 * pulse, additive: true, sy: 0.5 });
       const hop = this.age < 0.35 ? Math.sin((this.age / 0.35) * Math.PI) * 6 : 0;
-      r.sprite('weapon_chest', this.x, this.y - hop);
+      r.sprite(sceneSprite('weapon_chest'), this.x, this.y - hop);
       // rarity gem on the lock
       r.rect(Math.round(this.x - 1), Math.round(this.y - 1 - hop), 2, 2, col);
       if (pulse > 0.8) r.rect(Math.round(this.x - 1), Math.round(this.y - 1 - hop), 1, 1, '#ffffff');
     } else {
       const k = Math.min(1, this.openT / 0.6);
-      r.sprite('weapon_chest_open', this.x, this.y + 1 + k * 3, { alpha: 1 - k, sx: 1 + k * 0.3, sy: 1 - k * 0.4 });
+      r.sprite(sceneSprite('weapon_chest_open'), this.x, this.y, { alpha: 1 - k });
     }
   }
 
@@ -195,7 +200,7 @@ defineGlobalHooks({
     const node = w.node;
     if (!node) return;
     if (node.kind === 'shop') {
-      const key = `shopWeapon:${w.run.floor}:${node.id}`;
+      const key = `shopWeapon:${w.run.floor}:${w.run.stage}:${node.id}`;
       if (w.flags.has(key)) return;
       w.flags.add(key);
       const rng = new RNG((node.seed ^ 0x5409 ^ (w.run.floor * 104729)) >>> 0);
@@ -209,7 +214,7 @@ defineGlobalHooks({
       return;
     }
     if (node.kind === 'treasure') {
-      const key = `treasureWeapon2:${w.run.floor}:${node.id}`;
+      const key = `treasureWeapon2:${w.run.floor}:${w.run.stage}:${node.id}`;
       if (w.flags.has(key)) return;
       w.flags.add(key);
       const rng = new RNG((node.seed ^ 0x7ea5) >>> 0);
@@ -223,4 +228,3 @@ defineGlobalHooks({
     }
   },
 });
-

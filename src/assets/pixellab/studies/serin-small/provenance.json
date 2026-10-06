@@ -1,0 +1,19 @@
+{
+  "provider": "PixelLab",
+  "model": "pixen",
+  "jobId": "7b1fc9d7-7f1a-48da-8bba-00ef02329440",
+  "original": [
+    20,
+    20
+  ],
+  "export": [
+    16,
+    20
+  ],
+  "operation": "Remove two transparent columns on each side; no scaling or pixel repainting.",
+  "body": [
+    12,
+    18
+  ],
+  "status": "front-only review candidate, not installed"
+}

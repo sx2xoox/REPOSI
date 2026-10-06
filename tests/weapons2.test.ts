@@ -71,6 +71,7 @@ function makeSim(def: WeaponDef, enemyDist: number): Sim {
     items: {
       onAttack: () => s.events.push('attack'),
       onShoot: () => s.events.push('shoot'),
+      onSwing: () => {},
       onDeflect() {},
       recompute,
     },

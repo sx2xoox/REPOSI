@@ -1,6 +1,7 @@
-import riaPortraitUrl from '../assets/npc/ria-portrait.png';
+import riaPortraitUrl from '../assets/pixellab/portraits/player-common.png';
 import portraitUrl from '../assets/npc/resident-portraits.png';
 import { PixelPainter } from '../engine/painter';
+import { pixelArt } from './pixellab-art';
 
 let sheet: HTMLImageElement | null = null;
 function portraitSheet(): HTMLImageElement | null {
@@ -18,12 +19,16 @@ function rasterPortrait(image:HTMLImageElement,sx:number,sy:number,sw:number,sh:
   ctx.drawImage(image,sx,sy,sw,sh,Math.floor((PORTRAIT_W-dw)/2),PORTRAIT_H-dh,dw,dh);
   return art;
 }
-export function keeperPortrait(character:string):HTMLCanvasElement|null {
-  if(character!=='ria'||typeof Image==='undefined')return null;
+export function keeperPortrait(_character:string):HTMLCanvasElement|null {
+  if(typeof Image==='undefined')return null;
   if(!riaSheet){riaSheet=new Image();riaSheet.src=riaPortraitUrl;}
   if(!riaSheet.complete||!riaSheet.naturalWidth)return null;
   const old=cache.get('ria');if(old)return old;
-  const art=rasterPortrait(riaSheet,0,0,riaSheet.naturalWidth,riaSheet.naturalHeight);cache.set('ria',art);return art;
+  // Shared player portrait is authored at the dialogue slot's native resolution.
+  // Never shrink to the NPC grid and enlarge again: that destroys eye highlights.
+  const art=document.createElement('canvas');art.width=128;art.height=144;
+  const ctx=art.getContext('2d')!;ctx.imageSmoothingEnabled=false;ctx.drawImage(riaSheet,0,0);
+  cache.set('ria',art);return art;
 }
 export function preloadTownPortraits(): void { portraitSheet();keeperPortrait('ria'); }
 const cache = new Map<string, HTMLCanvasElement>();
@@ -35,6 +40,13 @@ export const RESIDENTS = [
 
 /** Original pixel busts using the shaded ramps and outlines of the combat art. */
 export function townPortrait(i: number, blink: boolean, talking: boolean): HTMLCanvasElement {
+  const generated=pixelArt('portraits/'+['lume','brik','orin'][i]);
+  if(generated){
+    const key='pixellab:'+i,old=cache.get(key);if(old)return old;
+    const art=document.createElement('canvas');art.width=PORTRAIT_W;art.height=PORTRAIT_H;
+    art.getContext('2d')!.drawImage(generated,Math.floor((PORTRAIT_W-generated.width)/2),PORTRAIT_H-generated.height);
+    cache.set(key,art);return art;
+  }
   const atlas = portraitSheet();
   if (atlas) {
     const key = 'approved:'+i;

@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // Blades:
 //  월영도     (moon_katana, legendary) — lightning-fast slashes; every third
 //                                      attack is an iai dash-cut through the line
@@ -83,7 +84,7 @@ class CutLine extends Entity {
 defineWeapon({
   id: 'moon_katana',
   name: '월영도',
-  desc: '달빛을 머금은 칼. 눈에 보이지 않을 만큼 빠르게 베고, 세 번째 공격마다 앞으로 질주하며 일직선을 베어 가른다.',
+  desc: '달빛을 머금은 칼. 눈에 보이지 않을 만큼 빠르게 베고, 세 번째 공격마다 앞으로 질주하며 일직선을 베어 가른다. 탄환 반사 피해는 공격력의 40%.',
   icon: 'icon_moon_katana',
   heldSprite: 'w_moon_katana',
   kind: 'melee',
@@ -98,7 +99,7 @@ defineWeapon({
   update(w, p, st, _dt, firing, aim) {
     if (!attackInput(st, w, firing) || st.cooldown > 0) return;
     consumeAttack(st);
-    const s = p.stats;
+    const s = p.weaponStats;
     const iv = attackInterval(p);
     const step = st.combo % 3;
     beginAttack(w, p, st, aim);
@@ -155,7 +156,7 @@ defineWeapon({
     drawHeld(r, p, 'w_moon_katana', pose.angle, active ? 4 : 1, { flash: pose.phase === 1 ? 0.5 : 0 });
     if (st.combo === 2 && !active) {
       // the next attack is the iai cut: a faint moon glint on the blade
-      const h = handPos(p, pose.angle, 14);
+      const h = visualHandPos(p, pose.angle, 14);
       r.sprite(glowSprite(6 + Math.sin(w.time * 10) * 1.5, '#c8d8ff'), h.x, h.y, { alpha: 0.45, additive: true });
     }
   },
@@ -191,7 +192,7 @@ export function greatswordMult(charge: number): number {
 defineWeapon({
   id: 'titan_greatsword',
   name: '거인의 대검',
-  desc: '누르고 있으면 대검을 들어 올리고, 떼면 몸을 한 바퀴 돌며 주위를 모두 벤다. 짧게 누르면 내려찍는다.',
+  desc: '누르고 있으면 대검을 들어 올리고, 떼면 몸을 한 바퀴 돌며 주위를 모두 벤다. 짧게 누르면 내려찍는다. 탄환 반사 피해는 공격력의 40%.',
   icon: 'icon_titan_greatsword',
   heldSprite: 'w_titan_sword',
   kind: 'charge',
@@ -205,7 +206,7 @@ defineWeapon({
     m.addStat('knockback', 40);
   },
   update(w, p, st, dt, firing, aim) {
-    const s = p.stats;
+    const s = p.weaponStats;
     if (firing && st.cooldown <= 0) {
       if (!st.mem.drawing) {
         st.mem.drawing = 1;
@@ -270,7 +271,7 @@ defineWeapon({
       const shake = c >= 1 ? fx.range(-0.06, 0.06) : 0;
       drawHeld(r, p, 'w_titan_sword', p.aim - side * (1.2 + c * 1.1) + shake, 3, { flash: c >= 1 ? 0.25 + 0.2 * Math.sin(w.time * 30) : 0 });
       if (c > 0.2) {
-        const h = handPos(p, p.aim - side * 2, 16);
+        const h = visualHandPos(p, p.aim - side * 2, 16);
         r.sprite(glowSprite(6 + c * 10, c >= 1 ? '#ffe8a0' : '#a0b0ff'), h.x, h.y, { alpha: 0.2 + c * 0.35, additive: true });
       }
       return;
@@ -357,7 +358,7 @@ defineWeapon({
   update(w, p, st, _dt, firing, aim) {
     if (!attackInput(st, w, firing) || st.cooldown > 0) return;
     consumeAttack(st);
-    const s = p.stats;
+    const s = p.weaponStats;
     beginAttack(w, p, st, aim);
     st.combo = (st.combo + 1) % 2;
     st.comboTimer = 1.2;
@@ -383,7 +384,7 @@ defineWeapon({
   draw(w, p, r, st) {
     const pose = swingPose(st, w, meleeRest(st, p.aim));
     drawHeld(r, p, 'w_reaper_scythe', pose.angle, pose.phase === 1 ? 3 : 1, { flash: pose.phase === 1 ? 0.35 : 0 });
-    const h = handPos(p, pose.angle, 18);
+    const h = visualHandPos(p, pose.angle, 18);
     r.sprite(glowSprite(5 + Math.sin(w.time * 6), '#80ff9a'), h.x, h.y, { alpha: 0.3, additive: true });
   },
 });

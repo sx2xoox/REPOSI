@@ -18,6 +18,7 @@ import type { RNG } from '../engine/rng';
 import type { Enemy } from './enemy';
 import type { Actor, HitInfo } from './entity';
 import type { Projectile } from './projectile';
+import type { MeleeSwing } from './melee';
 import type { Renderer } from '../engine/renderer';
 import type { Player } from './player';
 
@@ -314,6 +315,7 @@ export class ItemSystem {
   }
 
   onShoot(p: Projectile): void { this.look.applyShot(p); this.each('onShoot', (e) => e.hooks.onShoot?.(this.w, p, e.power)); }
+  onSwing(swing: MeleeSwing): void { this.each('onSwing', (e) => e.hooks.onSwing?.(this.w, swing, e.power)); }
   onAttack(angle: number): void { this.each('onAttack', (e) => e.hooks.onAttack?.(this.w, angle, e.power)); }
   modifyHit(target: Actor, hit: HitInfo): void { this.each('modifyHit', (e) => e.hooks.modifyHit?.(this.w, target, hit, e.power)); }
   onHit(target: Actor, hit: HitInfo): void {

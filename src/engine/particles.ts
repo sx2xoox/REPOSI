@@ -86,6 +86,8 @@ class P {
 const NO_COLORS: string[] = ['#ffffff'];
 
 export interface BurstOpts {
+  /** Cosmetic opacity, e.g. a teammate's projectile impact. */
+  alpha?: number;
   count: number;
   speed: [number, number];
   /** direction in radians; omit for all directions */
@@ -220,7 +222,7 @@ export class Particles {
       p.shape = o.shape ?? 'pixel';
       p.rot = fx.angle();
       p.vrot = o.vrot ? fx.range(-o.vrot, o.vrot) : 0;
-      p.alpha = 1;
+      p.alpha = o.alpha ?? 1;
       p.fade = o.fade ?? true;
       p.additive = o.additive ?? false;
       p.light = light;

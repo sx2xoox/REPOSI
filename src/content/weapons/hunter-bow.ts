@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // 사냥꾼의 장궁 (hunter's longbow): Serin's starting weapon. Hold to draw the
 // string (glow + rising pitch), release to loose an arrow. A partial draw is a
 // weak, slow arrow; a full draw flashes white and fires a fast lantern-lit
@@ -64,7 +65,7 @@ export function bowDamageMult(c: number): number {
 }
 
 function loose(w: World, p: Player, st: WeaponState, aim: number): void {
-  const s = p.stats;
+  const s = p.weaponStats;
   const c = Math.max(0.12, st.charge);
   const full = st.charge >= 1;
   w.items.onAttack(aim);
@@ -137,7 +138,7 @@ defineWeapon({
     const pull = st.mem.drawing ? st.charge : 0;
     const since = w.time - (st.mem.firedAt ?? -9);
     const snap = since < 0.12 ? 1 - since / 0.12 : 0; // string vibrates after a shot
-    const h = handPos(p, aim, 6 - pull * 1.5 + snap * 1.2);
+    const h = visualHandPos(p, aim, 6 - pull * 1.5 + snap * 1.2);
     const c = Math.cos(aim);
     const s = Math.sin(aim);
     r.sprite('w_hunter_bow', h.x, h.y, { rot: aim, flash: st.mem.drawing && st.charge >= 1 ? 0.25 + 0.25 * Math.sin(w.time * 30) : 0 });

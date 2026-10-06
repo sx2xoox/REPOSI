@@ -1,3 +1,6 @@
+import { FacilityOverlay } from './facility';
+import type { Facility } from '../game/facilities';
+import { normalizeStage } from '../game/stage-plan';
 // Gameplay scene: owns the World and the HUD, and opens overlays
 // (pause, status (Tab), full map (M), game over / victory).
 //
@@ -76,7 +79,7 @@ export class GameScene implements Scene, WorldHost {
     this.run.campaign = !coop && !seeded && save.activeSlot >= 0;
     this.run.targetFloor = this.run.campaign ? Math.min(7, Math.max(4, (save.progress.campaign?.cleared ?? 0) + 1)) : 7;
     if (this.resume) this.run.targetFloor = this.resume.targetFloor;
-    if (this.resume) { this.run.floor = this.resume.floor; this.run.stage = this.resume.stage; }
+    if (this.resume) { this.run.floor = this.resume.floor; this.run.stage = normalizeStage(this.resume.stage); }
     this.run.seeded = seeded;
     this.world = new World(app.renderer, this.run, this);
   }
@@ -143,6 +146,12 @@ export class GameScene implements Scene, WorldHost {
     }
     if (id) applyBlessing(this.world, id);
     else markBlessed(this.world);
+  }
+
+  openFacility(id: number): void {
+    if (this.overlayOpen) return;
+    const entity = this.world.entities.find(e => e.id === id);
+    if (entity) this.openOverlay(new FacilityOverlay(this, entity as Facility));
   }
 
   // WorldHost

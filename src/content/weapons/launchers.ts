@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // Launchers:
 //  천둥 박격포  (thunder_mortar, rare) — lobs a shell over enemies onto the aimed
 //                                      spot; it bounces once and bursts
@@ -51,7 +52,7 @@ defineDrawnSprite('fx_mortar_mark', 15, 7, (p) => {
 
 function shellBehavior(flight: number, radius: number, dmgMult: number): ProjBehavior {
   const lob = lobBehavior(flight, 26, (pr: Projectile, w: World) => {
-    const s = w.player.stats;
+    const s = { ...w.player.stats, damage: Number(pr.mem.weaponDamage ?? w.player.stats.damage) };
     blast(w, pr.x, pr.y, radius, s.damage * dmgMult, { colors: ['#ffffff', '#fff0a0', '#ffb030', '#605040'], knockback: 240, shake: 0.22 });
     w.particles.burst(pr.x, pr.y, { count: 10, speed: [60, 140], life: [0.3, 0.6], colors: ['#706050', '#504030'], size: [1, 2], gravity: 320, vz: [60, 140] });
     w.sfx('slam', { vol: 0.35, pitch: 1.4, x: pr.x });
@@ -93,7 +94,7 @@ defineWeapon({
     if (!firing || st.cooldown > 0) return;
     beginAttack(w, p, st, aim);
     st.cooldown = attackInterval(p);
-    const s = p.stats;
+    const s = p.weaponStats;
     const d = aimDistance(w, p, 40, s.range * 0.8, s.range * 0.5);
     const h = handPos(p, aim, 15);
     const flight = Math.max(20, d - 15);
@@ -165,7 +166,7 @@ const rocketFx: ProjBehavior = {
     if (fx.chance(0.7)) w.particles.spawn({ x: bx, y: by, vx: fx.range(-8, 8), vy: fx.range(-12, -2), life: 0.6, colors: ['#a09898', '#706868', '#50484880'], size: 2, sizeEnd: 4, drag: 2, fade: true });
   },
   onExpire(pr, w) {
-    const s = w.player.stats;
+    const s = { ...w.player.stats, damage: Number(pr.mem.weaponDamage ?? w.player.stats.damage) };
     blast(w, pr.x, pr.y, 30 + s.projSize * 2, s.damage * 2, { colors: ['#ffffff', '#fff0a0', '#ff7a2a', '#503030'], knockback: 260, shake: 0.28 });
   },
   draw(pr, r) {
@@ -193,7 +194,7 @@ defineWeapon({
     if (!firing || st.cooldown > 0) return;
     beginAttack(w, p, st, aim);
     st.cooldown = attackInterval(p);
-    const s = p.stats;
+    const s = p.weaponStats;
     const h = handPos(p, aim, 16);
     p.fireProjectiles(w, aim, {
       style: 'none', speed: 70, accel: 900, maxSpeed: 260 + s.shotSpeed, radius: s.projSize + 1, color: '#ff9a30', light: 26,
@@ -214,7 +215,7 @@ defineWeapon({
     const f = shotFade(st, w, 0.2);
     drawHeld(r, p, 'w_comet_tube', p.aim, 3 - f * 3, { flash: f > 0.7 ? 0.35 : 0 });
     if (st.cooldown <= 0) {
-      const h = handPos(p, p.aim, 15);
+      const h = visualHandPos(p, p.aim, 15);
       r.sprite(glowSprite(5 + Math.sin(w.time * 9), '#ff9a30'), h.x, h.y, { alpha: 0.35, additive: true });
     }
   },

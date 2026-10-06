@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // Bows and crossbows:
 //  연노 쇠뇌   (volley_crossbow, rare) — hold to crank bolts into the magazine
 //                                       one by one, release to loose them all
@@ -71,7 +72,7 @@ defineWeapon({
     m.mulStat('range', 1.1);
   },
   update(w, p, st, dt, firing, aim) {
-    const s = p.stats;
+    const s = p.weaponStats;
     const cap = volleyCapacity(s.shots);
     if (firing && st.cooldown <= 0) {
       if (!st.mem.drawing) {
@@ -124,7 +125,7 @@ defineWeapon({
     // loaded bolts glint along the stock
     const n = st.mem.loaded ?? 0;
     for (let i = 0; i < n; i++) {
-      const h = handPos(p, p.aim, 8 + i * 1.6);
+      const h = visualHandPos(p, p.aim, 8 + i * 1.6);
       r.rect(Math.round(h.x), Math.round(h.y - 4 - (i % 2)), 1, 1, i === n - 1 ? '#ffffff' : '#b8f080', 0.95);
     }
   },
@@ -224,7 +225,7 @@ defineWeapon({
     const a = p.aim;
     // sighting line: dotted, brightening as the next shot gets ready
     const ready = st.cooldown <= 0;
-    const h = handPos(p, a, 9);
+    const h = visualHandPos(p, a, 9);
     const len = Math.min(rayLength(w, h.x, h.y, a, p.stats.range * 0.75), 220);
     const steps = Math.floor(len / 6);
     const k = ready ? 1 : Math.max(0, 1 - st.cooldown / Math.max(0.01, attackInterval(p)));

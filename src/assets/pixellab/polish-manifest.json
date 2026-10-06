@@ -1,0 +1,182 @@
+{
+  "date": "2026-10-04",
+  "provider": "PixelLab",
+  "changes": [
+    {
+      "actor": "baekgu-fixed",
+      "part": "rotations",
+      "jobId": "0d774a35-128e-471d-9723-2ea8012d04f6"
+    },
+    {
+      "actor": "baekgu-fixed",
+      "part": "walk",
+      "jobId": "b4f426ac-9439-49c6-8b67-5c2660de040b"
+    },
+    {
+      "actor": "bern",
+      "part": "rotations",
+      "jobId": "23a070f0-dff1-4432-8796-1bbd2c3f9572"
+    },
+    {
+      "actor": "bern",
+      "part": "walk",
+      "jobId": "73ac2e41-e36c-4694-a342-bbbb9c58637f"
+    },
+    {
+      "actor": "bori",
+      "part": "rotations",
+      "jobId": "cbc83706-360e-40e3-a8d1-3b9a8c21f167"
+    },
+    {
+      "actor": "bori",
+      "part": "walk",
+      "jobId": "ee76a387-b655-4222-9a07-9999b619ca1a"
+    },
+    {
+      "actor": "brik",
+      "part": "rotations",
+      "jobId": "0e5a28da-18ad-487f-a121-0e80f0b55343"
+    },
+    {
+      "actor": "brik",
+      "part": "walk",
+      "jobId": "52f6e237-2892-4deb-884f-375e73275a9d"
+    },
+    {
+      "actor": "luen",
+      "part": "rotations",
+      "jobId": "cef042fc-ba5b-47a4-8a2b-4d95216995a3"
+    },
+    {
+      "actor": "luen",
+      "part": "walk",
+      "jobId": "9d6a0779-2753-4239-b5c3-399992c2710c"
+    },
+    {
+      "actor": "lume",
+      "part": "rotations",
+      "jobId": "049e7590-f8b4-402c-93af-aa91c2122d16"
+    },
+    {
+      "actor": "lume",
+      "part": "walk",
+      "jobId": "1d67faf0-e189-41df-a96a-23784a949cf2"
+    },
+    {
+      "actor": "mira",
+      "part": "rotations",
+      "jobId": "438fe63b-1580-4f90-9c8a-e1baa65caec8"
+    },
+    {
+      "actor": "mira",
+      "part": "walk",
+      "jobId": "3e3714f8-23ea-46d5-8355-c03f1ad146bc"
+    },
+    {
+      "actor": "mori",
+      "part": "rotations",
+      "jobId": "4577c444-d5dc-42ec-ab9d-5a4970fec3ba"
+    },
+    {
+      "actor": "mori",
+      "part": "walk",
+      "jobId": "b371d25e-dd81-4070-bc75-55afceccc2ad"
+    },
+    {
+      "actor": "niel",
+      "part": "rotations",
+      "jobId": "b20f3812-a5fb-4983-8106-d39e95e3bc57"
+    },
+    {
+      "actor": "niel",
+      "part": "walk",
+      "jobId": "f8eb2670-bfa5-40fa-ab8c-9356f49d90fa"
+    },
+    {
+      "actor": "orin",
+      "part": "rotations",
+      "jobId": "454e24c9-ab93-4449-92f4-ad6626600fac"
+    },
+    {
+      "actor": "orin",
+      "part": "walk",
+      "jobId": "f375fd8b-9722-481e-9d10-560cae84ad30"
+    },
+    {
+      "actor": "ort",
+      "part": "rotations",
+      "jobId": "c908121e-85a3-4a19-865c-096c37310830"
+    },
+    {
+      "actor": "ort",
+      "part": "walk",
+      "jobId": "8cd32a75-7f74-4309-ad24-24bf222abf8f"
+    },
+    {
+      "actor": "ria",
+      "part": "rotations",
+      "jobId": "173e8a24-e0f0-4acd-9f11-1af87a170991"
+    },
+    {
+      "actor": "ria",
+      "part": "walk",
+      "jobId": "2ad074e0-e91a-4204-8566-aa642141e8e5"
+    },
+    {
+      "actor": "serin",
+      "part": "rotations",
+      "jobId": "ade98695-b1c8-4231-932b-8d5ddb5f52f6"
+    },
+    {
+      "actor": "serin",
+      "part": "walk",
+      "jobId": "201afdc1-b7a2-4faf-a3bd-3db9eb5ac6c2"
+    },
+    {
+      "actor": "tove",
+      "part": "rotations",
+      "jobId": "ab830bba-4763-44fb-8d40-8729f4d37dd5"
+    },
+    {
+      "actor": "tove",
+      "part": "walk",
+      "jobId": "ad427c2a-986d-4276-a499-bc7f74afa65a"
+    },
+    {
+      "actor": "ves",
+      "part": "rotations",
+      "jobId": "00f3b03d-ec5e-428c-8d77-e53feaa71491"
+    },
+    {
+      "actor": "ves",
+      "part": "walk",
+      "jobId": "84ebd1af-9bd7-482b-813f-226bf9448641"
+    }
+  ],
+  "riaFrontOverride": {
+    "jobId": "447d7e29-21d6-4282-9e73-c9b7ddf2502b",
+    "reason": "Small inset pupil catchlights, rejected the prior tall eyebrow-like highlights"
+  },
+  "walkingRegenerated": [
+    "ria",
+    "bern",
+    "bori",
+    "tove",
+    "mira"
+  ],
+  "originals": "Local review backup at test-results/pixellab-polish/before",
+  "baekguBuildRefinement": {
+    "date": "2026-10-04",
+    "provider": "PixelLab",
+    "rotationJob": "ae5dfeb2-e6bd-429d-9ef4-1255682b4762",
+    "walkJob": "b5ed4c98-d3cc-46d3-90ef-a95bb61b932a",
+    "notes": "Fuller cheeks, wider navy jacket torso and paws, shorter legs; 8 rotations + 16 walk frames, unchanged native 32x32 canvas."
+  },
+  "baekguJindoRefinement": {
+    "provider": "PixelLab",
+    "date": "2026-10-04",
+    "rotationJob": "aac46378-9211-42c2-9835-14d08347f546",
+    "walkJob": "ae5ff208-cd2b-473d-8e7b-a409ef8cbc77",
+    "notes": "Wedge-shaped canine muzzle, clear dark nose, upright ears and curled tail; healthy compact body retained."
+  }
+}

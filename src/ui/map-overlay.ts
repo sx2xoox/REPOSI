@@ -18,7 +18,7 @@ import { ROOM_ICONS, ROOM_LABELS } from './logic';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
 
-const LEGEND: RoomKind[] = ['boss', 'treasure', 'shop', 'secret', 'challenge', 'shrine', 'curse', 'relay', 'workshop', 'vault'];
+const LEGEND: RoomKind[] = ['boss', 'treasure', 'shop', 'secret', 'challenge', 'shrine', 'curse', 'relay', 'workshop', 'vault', 'refinery', 'well', 'fusion', 'elite'];
 
 export class MapOverlay implements Scene {
   transparent = true;
@@ -103,7 +103,7 @@ export class MapOverlay implements Scene {
       r.uiRect(lx + 13, ly, 12, 10, fill, k);
       r.uiRect(lx + 13, ly, 12, 2, top, k);
       r.uiText(label, lx + 34, ly, { size: 10, font: 'small', color: C.textDim, alpha: k });
-      ly += 18;
+      ly += 16;
     };
     swatch('#e8dcc8', '#ffffff', '현재 위치');
     swatch('#5e5276', '#7a6e94', '방문한 방');
@@ -115,7 +115,7 @@ export class MapOverlay implements Scene {
       if (!found && kd !== 'boss' && kd !== 'treasure' && kd !== 'shop') continue;
       r.uiSprite(icon, lx + 19, ly + 5, 2, { alpha: k * (found ? 1 : 0.3) });
       r.uiText(ROOM_LABELS[kd], lx + 34, ly, { size: 10, font: 'small', color: found ? C.text : C.textMute, alpha: k });
-      ly += 18;
+      ly += 16;
     }
     const py = by + 240;
     frame(r, lx, py, lw, bh - 240, 'panel', { alpha: k });

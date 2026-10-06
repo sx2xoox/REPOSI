@@ -104,9 +104,10 @@ const BLESSINGS: Blessing[] = [
 ];
 
 export class OfferingBowl extends Prop {
+  mem: Record<string, number> = {};
   kind: 'coin' | 'heart';
   shrine: LanternShrine;
-  used = false;
+  get used(): boolean { return !!this.mem.used; }
   coolT = 0;
   constructor(x: number, y: number, kind: 'coin' | 'heart', shrine: LanternShrine) {
     super(x, y, 0);
@@ -121,8 +122,9 @@ export class OfferingBowl extends Prop {
   override update(w: World, dt: number): void {
     this.age += dt;
     this.coolT -= dt;
-    if (this.used || this.coolT > 0) return;
+    if (this.coolT > 0) return;
     const p = w.player;
+    if (this.used) return;
     if (!p.alive || dist(p.x, p.y, this.x, this.y) > 10) return;
     this.coolT = 1.2;
     if (this.kind === 'coin') this.offerCoins(w);
@@ -167,7 +169,8 @@ export class OfferingBowl extends Prop {
   }
 
   private consume(w: World): void {
-    this.used = true;
+    // One shared offering per bowl. Its benefit goes to the keeper who pays.
+    this.mem.used = 1;
     this.shrine.flare = 1;
     this.shrine.spent++;
     w.spawn(new RingFx(this.x, this.y, 26, 0.45, '#a8c0ff', 2));

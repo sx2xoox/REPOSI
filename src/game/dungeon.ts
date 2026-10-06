@@ -1,3 +1,4 @@
+import { stageRoomPlan, STAGES_PER_FLOOR } from './stage-plan';
 // Isaac-style floor generation on a MAP_W x MAP_H cell grid.
 //  1. grow rooms outward from the start cell with a BFS that refuses cells which
 //     would create loops/clumps (neighbour count > 1) -> tree-like layouts with dead ends
@@ -58,22 +59,20 @@ export interface FloorMap {
 
 /** Branching expeditions: a nearby optional exit, with rewards off the main route. */
 export function generateStage(floor: FloorDef, stage: number, rng: RNG): FloorMap {
-  const size = 12 + Math.min(2, Math.floor((floor.index - 1) / 3));
-  const map = generateFloor({ ...floor, roomCount: [size, size + 2], extraRooms: {} }, rng);
+  const plan = stageRoomPlan(rng);
+  const specials: RoomKind[] = ['boss', ...plan.filter(k => k !== 'secret')];
+  const normal = stage < STAGES_PER_FLOOR ? 6 : 7;
+  const size = 1 + specials.length + normal;
+  const map = generateFloor({ ...floor, roomCount: [size, size + 2], extraRooms: {} }, rng,
+    { fixedSpecials: specials, secret: plan.includes('secret'), minNormal: normal });
   map.floor = floor;
-  const primary: RoomKind = stage === 1 ? 'treasure' : stage === 2 ? 'shop' : rng.pick<RoomKind>(['shrine', 'curse', 'challenge']);
-  const mechanism: RoomKind = stage === 1 ? 'relay' : stage === 2 ? 'workshop' : stage === 3 ? 'vault' : rng.pick<RoomKind>(['relay', 'workshop']);
   for (const n of map.nodes) {
-    if (n.kind === 'treasure') n.kind = primary;
-    else if (n.kind === 'shop') n.kind = mechanism;
-    // Only one hidden loot room per floor; other stages gain an ordinary branch.
-    else if (n.kind === 'secret' && stage !== 3) n.kind = 'normal';
-    if (stage < 4 && n.kind === 'boss') n.kind = 'normal';
+    if (stage < STAGES_PER_FLOOR && n.kind === 'boss') n.kind = 'normal';
     n.locked = floor.index >= 2 && (n.kind === 'treasure' || n.kind === 'shop');
     n.templateId = pickTemplate(n, floor, rng)?.id ?? '';
   }
   for (const n of map.nodes) for (const d of n.doors) d.secret = n.kind === 'secret' || map.nodes[d.to].kind === 'secret';
-  if (stage < 4) {
+  if (stage < STAGES_PER_FLOOR) {
     // Depth two usually means a single fight before the exit fight. All branches stay optional.
     const exits = map.nodes.filter(n => n.kind === 'normal' && n.depth >= 2).sort((a,b) => a.depth - b.depth || a.id - b.id);
     map.exitId = exits[0].id;
@@ -98,6 +97,9 @@ function inMap(x: number, y: number): boolean {
 interface GenOpts {
   /** extra special room kinds required on this floor */
   extraKinds?: RoomKind[];
+  fixedSpecials?: RoomKind[];
+  secret?: boolean;
+  minNormal?: number;
   allowBigRooms?: boolean;
 }
 
@@ -172,8 +174,8 @@ function tryGenerate(floor: FloorDef, rng: RNG, opts: GenOpts): FloorMap | null 
     .filter(([x, y]) => !(x === sx && y === sy) && countNeighbours(x, y) === 1)
     .sort((a, b) => depth[cellIdx(b[0], b[1])] - depth[cellIdx(a[0], a[1])]);
 
-  const specials: RoomKind[] = ['boss', 'treasure', 'shop'];
-  if (floor.extraRooms) {
+  const specials: RoomKind[] = opts.fixedSpecials ? [...opts.fixedSpecials] : ['boss', 'treasure', 'shop'];
+  if (!opts.fixedSpecials && floor.extraRooms) {
     for (const [k, p] of Object.entries(floor.extraRooms) as [RoomKind, number][]) {
       if (rng.chance(p)) specials.push(k);
     }
@@ -216,6 +218,9 @@ function tryGenerate(floor: FloorDef, rng: RNG, opts: GenOpts): FloorMap | null 
     }
   }
 
+  if (opts.secret === true && !secret) return null;
+  if (opts.secret === false) secret = null;
+
   // build nodes (initially 1x1)
   const grid = new Int16Array(MAP_W * MAP_H).fill(-1);
   const nodes: RoomNode[] = [];
@@ -243,7 +248,7 @@ function tryGenerate(floor: FloorDef, rng: RNG, opts: GenOpts): FloorMap | null 
   }
 
   // merge normal cells into big rooms
-  if (opts.allowBigRooms !== false && floor.index >= 1) mergeBigRooms(nodes, grid, rng, floor.index);
+  if (opts.allowBigRooms !== false && floor.index >= 1) mergeBigRooms(nodes, grid, rng, floor.index, opts.minNormal ?? 0);
   // merging re-indexes the nodes: look the start / boss ids up again
   startId = nodes.findIndex((n) => n.kind === 'start');
   bossId = nodes.findIndex((n) => n.kind === 'boss');
@@ -287,7 +292,8 @@ function tryGenerate(floor: FloorDef, rng: RNG, opts: GenOpts): FloorMap | null 
   return { floor, nodes, grid, startId, bossId };
 }
 
-function mergeBigRooms(nodes: RoomNode[], grid: Int16Array, rng: RNG, floorIndex: number): void {
+function mergeBigRooms(nodes: RoomNode[], grid: Int16Array, rng: RNG, floorIndex: number, minNormal = 0): void {
+  let normalCount = nodes.filter(n => n.kind === 'normal').length;
   // deeper floors have more big rooms (capped: floors 6+ like floor 5)
   const chance = 0.18 + Math.min(5, floorIndex) * 0.05;
   const isNormal1x1 = (x: number, y: number) => {
@@ -310,6 +316,8 @@ function mergeBigRooms(nodes: RoomNode[], grid: Int16Array, rng: RNG, floorIndex
     if (!options.length) continue;
     // prefer 2x2 less often
     const [cw, ch] = options.length > 1 && options[0][0] === 2 && options[0][1] === 2 && rng.chance(0.6) ? options[1] : options[0];
+    if (normalCount - (cw * ch - 1) < minNormal) continue;
+    normalCount -= cw * ch - 1;
     if (!hasTemplate(`${cw}x${ch}` as RoomShape, 'normal', floorIndex)) continue;
     for (let yy = y; yy < y + ch; yy++) {
       for (let xx = x; xx < x + cw; xx++) {

@@ -3,6 +3,7 @@
 // first: deterministic Math.sin/pow/... for every mode (must precede all game modules)
 import './engine/dmath-boot';
 import './style.css';
+import { installOrientationPrompt } from './ui/orientation';
 import { app } from './game/app';
 import { input } from './engine/input';
 import { audio } from './audio/audio';
@@ -19,8 +20,13 @@ import { applyGraphics } from './ui/quality';
 import { installServiceWorker } from './net/build';
 import { perfmon } from './engine/perfmon';
 import { effectiveMaxFps, save } from './engine/save';
+import { loadPixelLabArt } from './ui/pixellab-art';
+import { loadPixelLabWeapons } from './ui/pixellab-weapons';
+import { loadPixelLabScenery } from './ui/pixellab-scenery';
+import { loadPixelLabBosses } from './ui/pixellab-bosses';
 
 async function boot(): Promise<void> {
+  installOrientationPrompt();
   const canvas = document.getElementById('game') as HTMLCanvasElement;
   loadContent();
   app.init(canvas);
@@ -45,6 +51,7 @@ async function boot(): Promise<void> {
   } catch {
     // fonts are optional
   }
+  await Promise.all([loadPixelLabArt(), loadPixelLabWeapons(), loadPixelLabScenery(), loadPixelLabBosses()]);
   warmAllSprites();
 
   // resize / rotation (mobile browsers report the new size a little late)

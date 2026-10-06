@@ -1,3 +1,4 @@
+import { scaleRewardRoom } from './room-rewards';
 // World: simulation of one run — the current floor, room, entities and the
 // player. Exposes the API used by all content (enemies, items, rooms).
 
@@ -82,6 +83,7 @@ const TARGET_STICK = 32;
 export interface WorldHost {
   /** open the collection / status overlay */
   openInventory(): void;
+  openFacility?(entity: number): void;
   onGameOver(info: GameOverInfo): void;
   onCampaignPassage?(floor: number, proceed: () => void): void;
 }
@@ -423,7 +425,7 @@ export class World {
     if (this.room) this.eachItems((it) => it.expire('room'));
     (this as { room?: Room }).room = undefined;
     this.enterRoom(start, null);
-    this.floorCard = { name: this.run.staged ? `${index}-${this.run.stage} ${floor.name.replace(/^\d+층[ ·]*/, '')}` : floor.name, subtitle: this.run.staged && this.run.stage === 4 ? '이 층의 문지기가 기다리고 있다' : floor.subtitle, t: 0 };
+    this.floorCard = { name: this.run.staged ? `${index}-${this.run.stage} ${floor.name.replace(/^\d+층[ ·]*/, '')}` : floor.name, subtitle: this.run.staged && this.run.stage === 3 ? '이 층의 문지기가 기다리고 있다' : floor.subtitle, t: 0 };
     if (!this.run.staged || this.run.stage === 1) {
       this.eachItems((it) => it.expire('floor'));
       this.eachItems((it) => it.onFloorStart());
@@ -546,7 +548,7 @@ export class World {
     this.camInit = false;
     this.eachItems((it) => it.onRoomEnter());
     // co-op: one more treasure pedestal per extra keeper (rolled with w.rng on the first visit)
-    if (this.coop && firstVisit && node.kind === 'treasure') this.coopExtraPedestals(room, room.centerX, room.centerY, 'treasure');
+    if (firstVisit) scaleRewardRoom(this, this.entities.concat(this.pending));
     // things spawned by room-enter hooks (familiars, hounds ...) must be visible
     // during the room slide, not pop in when it ends
     this.flushPending();
@@ -704,11 +706,24 @@ export class World {
   }
 
   spawn<T extends Entity>(e: T): T {
+    if (this.sfxSource?.encounterId) e.encounterId = this.sfxSource.encounterId;
+    if (this.sfxSource && this.sfxSource.enemyDamageScale > 1) e.enemyDamageScale = this.sfxSource.enemyDamageScale;
     // co-op: what a keeper's code spawns (its update, its item hooks, its familiars
     // ...) keeps running on its behalf (see ctxFor); room / enemy spawns stay unowned
-    if (this.coop && e.ctxP === null && this.spawnOwner) e.ctxP = this.spawnOwner;
+    if (this.coop && !e.worldLoot && e.ctxP === null && this.spawnOwner) e.ctxP = this.spawnOwner;
     this.pending.push(e);
     return e;
+  }
+
+  discardEncounter(id: number): void {
+    for (const list of [this.entities, this.pending]) for (const e of list)
+      if (e.enemyHazard || e instanceof Enemy || e instanceof Projectile && e.team === 'enemy' ||
+          e.encounterId === id && !(e instanceof Pickup || e instanceof Pedestal || e instanceof Chest) && !(e.constructor as typeof Entity).cosmetic) e.dead = true;
+  }
+
+  /** Direct scripted attacks use their current entity; collisions pass an origin. */
+  enemyDamageScale(origin?: { x: number; y: number }): number {
+    return (origin instanceof Entity ? origin : this.sfxSource)?.enemyDamageScale ?? 1;
   }
 
   /**
@@ -871,6 +886,7 @@ export class World {
     if (o instanceof Player) return o.left ? this.nearestPlayer(e.x, e.y) : o;
     if (o instanceof Enemy) return o.tgt && !o.tgt.left ? o.tgt : this.nearestPlayer(e.x, e.y);
     if (e instanceof Pickup) return this.pickupCtx(e);
+    if (e.worldLoot) return this.nearestPlayer(e.x, e.y);
     const c = e.ctxP;
     if (c instanceof Player && !c.left && !(e instanceof Pedestal || e instanceof Chest || e instanceof Trapdoor || e instanceof FirePlace)) return c;
     return this.nearestPlayer(e.x, e.y);
@@ -879,6 +895,7 @@ export class World {
 
   /** The keeper an entity belongs to (itself, its owner, the keeper that spawned it), if any. */
   private ownerOf(e: Entity): Player | null {
+    if (e.worldLoot) return null;
     if (e instanceof Player) return e;
     if (e instanceof Enemy) return null;
     const o = (e as { owner?: unknown }).owner;
@@ -994,7 +1011,7 @@ export class World {
     p.dead = true;
     // Owned summons and projectiles must not be reassigned to a surviving keeper.
     const retire = (entities: Entity[]) => {
-      for (const e of entities) if (e.ctxP === p || (e as { owner?: unknown }).owner === p) e.dead = true;
+      for (const e of entities) if (!e.worldLoot && (e.ctxP === p || (e as { owner?: unknown }).owner === p)) e.dead = true;
     };
     retire(this.entities);
     retire(this.pending);
@@ -1193,6 +1210,7 @@ export class World {
         const applied = target.takeHit(this, hit);
         if (!applied) return false;
         const dealt = Math.max(0, before - Math.max(0, target.hp));
+        hit.dealtDamage = dealt;
         this.run.stats.damageDealt += dealt;
         // bosses fill the gauge at half rate: a release is a burst, not the main boss-killing tool
         const secondary = hit.source instanceof Projectile && hit.source.generation > 0;
@@ -1576,7 +1594,7 @@ export class World {
   takePedestal(ped: Pedestal): void {
     const p = this.player;
     const it = ped.item;
-    if (!it) return;
+    if (!it || !ped.affordable(this)) return;
     if (ped.heartPrice > 0 && !payHeartCost(this, ped.heartPrice)) return;
     if (ped.price > 0) {
       p.coins -= ped.price;
@@ -1605,9 +1623,11 @@ export class World {
       }
       case 'weapon': {
         // two slots: an empty second slot is filled first; else the held weapon is dropped here
-        const old = p.equipWeapon(this, it.id);
+        const oldTemper = (it.id === p.weapon2Id ? p.weapon2 : p.weapon).mem.temper ?? 0;
+        const old = p.equipWeapon(this, it.id, true);
+        p.weapon.mem.temper = it.temper ?? 0;
         if (old) {
-          ped.item = { kind: 'weapon', id: old };
+          ped.item = { kind: 'weapon', id: old, temper: oldTemper };
           ped.waitForLeave = true;
           ped.price = 0;
         }
@@ -1841,7 +1861,7 @@ export class World {
   /** Go down the trapdoor (instant cut; the trapdoor itself uses `beginDescend`). */
   descend(animated = false): void {
     if (this.transitioning) return;
-    if (this.run.staged && this.run.stage < 4) {
+    if (this.run.staged && this.run.stage < 3) {
       this.run.stage++;
       this.beginTransition('fade', 0.9);
       this.startFloor(this.run.floor);
@@ -2120,6 +2140,7 @@ export class World {
 
   /** Draw-time context keeper of an entity (pure: same rule as ctxFor, without retargeting). */
   private drawCtx(e: Entity): Player {
+    if (e.worldLoot) return this.local;
     if (e instanceof Player) return e;
     if (e instanceof Enemy) return e.tgt && !e.tgt.left ? e.tgt : this.local;
     const o = (e as { owner?: unknown }).owner;

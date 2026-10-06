@@ -16,6 +16,7 @@ import { RingFx } from '../../game/effects';
 
 /** Unlock a character: sets the save flag and celebrates once. Returns true if newly unlocked. */
 export function unlockCharacter(w: World, id: string): boolean {
+  if (w.coop && w.player !== w.local) return false;
   const flag = `unlock:${id}`;
   const def = Characters.get(id);
   if (!def || def.unlocked || save.hasFlag(flag) || w.run.seeded) return false;

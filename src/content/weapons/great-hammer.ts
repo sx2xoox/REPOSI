@@ -82,7 +82,7 @@ export class Shockwave extends Entity {
 }
 
 function slam(w: World, p: Player, st: WeaponState): void {
-  const s = p.stats;
+  const s = p.weaponStats;
   const a = st.mem.windAim ?? p.aim;
   const ix = p.x + Math.cos(a) * 20;
   const iy = p.y - 1 + Math.sin(a) * 15;

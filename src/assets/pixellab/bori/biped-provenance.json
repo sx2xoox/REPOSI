@@ -1,0 +1,40 @@
+{
+  "provider": "PixelLab",
+  "date": "2026-10-04",
+  "jobs": {
+    "front": {
+      "background_job_id": "7218e4f0-2bd8-4a4a-a44c-90ae1cd77276",
+      "image_id": "eed84d53-5b31-5215-8863-b787d620dbcb",
+      "status": "processing",
+      "source_image_id": "eed84d53-5b31-5215-8863-b787d620dbcb",
+      "job_id": "7218e4f0-2bd8-4a4a-a44c-90ae1cd77276",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/7218e4f0-2bd8-4a4a-a44c-90ae1cd77276/download"
+    },
+    "character": {
+      "background_job_id": "a1172c0c-471a-4a5e-a312-11edf0c3c3e4",
+      "character_id": "06c4bc97-d85a-4eff-addf-e071ad4c2d2b",
+      "status": "processing",
+      "first_direction_generated": false,
+      "estimated_generations": 1,
+      "job_id": "a1172c0c-471a-4a5e-a312-11edf0c3c3e4",
+      "n_directions": 8,
+      "poll_tool": "get_character",
+      "status_path": "/v2/background-jobs/a1172c0c-471a-4a5e-a312-11edf0c3c3e4",
+      "download_path": "/mcp/characters/06c4bc97-d85a-4eff-addf-e071ad4c2d2b/download"
+    },
+    "walk": "character: 06c4bc97-d85a-4eff-addf-e071ad4c2d2b\nanimation: v3 custom (Walk upright on TWO booted legs like a small human adventurer. Preserve exact upright reference body, head above chest, chest above hips. Arms held beside waist and gently swing, NEVER touch floor. Alternate small left and right foot steps directly below hips, continuous grounded walk. No crouch, no crawl, no gallop. Keep face, OPEN dark eyes, feather, head size, palette and outfit identical in every frame. Torso height constant, tiny bounce only. Fixed camera and direction, loop seamlessly.)\ndirections: south, east, north, west (4 jobs)\ngroup: b565de32-cb59-4c59-9502-44cc463b2d90\nframes: 4 (reference stripped, keep_first_frame=false)\ncost: 4 generations (1/dir x 4)\neta: ~30-60s/direction\n\nhint: get_character(character_id=\"06c4bc97-d85a-4eff-addf-e071ad4c2d2b\")\nadd more directions to this group: animate_character(character_id=\"06c4bc97-d85a-4eff-addf-e071ad4c2d2b\", action_description=\"Walk upright on TWO booted legs like a small human adventurer. Preserve exact upright reference body, head above chest, chest above hips. Arms held beside waist and gently swing, NEVER touch floor. Alternate small left and right foot steps directly below hips, continuous grounded walk. No crouch, no crawl, no gallop. Keep face, OPEN dark eyes, feather, head size, palette and outfit identical in every frame. Torso height constant, tiny bounce only. Fixed camera and direction, loop seamlessly.\", animation_group_id=\"b565de32-cb59-4c59-9502-44cc463b2d90\", directions=[...])",
+    "northRefinement": "character: 06c4bc97-d85a-4eff-addf-e071ad4c2d2b\nanimation: v3 custom (Very subtle upright two-legged walk in place. Keep the HEAD and TORSO rigid and EXACTLY the same height and width in every frame. No bobbing, squashing, shrinking, stretching or leaning. Only two feet below the hips alternate small steps, arms move minimally. Steady backpack, keep exactly the reference face, ears, colors and silhouette. No turning, no crouch. Four-frame loop.)\ndirections: north (1 jobs)\ngroup: b56fe84d-baf4-492f-a06b-8f888f827958\nframes: 4 (reference stripped, keep_first_frame=false)\ncost: 1 generation (1/dir x 1)\neta: ~30-60s/direction\n\nhint: get_character(character_id=\"06c4bc97-d85a-4eff-addf-e071ad4c2d2b\")\nadd more directions to this group: animate_character(character_id=\"06c4bc97-d85a-4eff-addf-e071ad4c2d2b\", action_description=\"Very subtle upright two-legged walk in place. Keep the HEAD and TORSO rigid and EXACTLY the same height and width in every frame. No bobbing, squashing, shrinking, stretching or leaning. Only two feet below the hips alternate small steps, arms move minimally. Steady backpack, keep exactly the reference face, ears, colors and silhouette. No turning, no crouch. Four-frame loop.\", animation_group_id=\"b56fe84d-baf4-492f-a06b-8f888f827958\", directions=[...])"
+  },
+  "purpose": "Upright biped redesign with visible arms, vertical torso and two booted legs. Original pixel grids retained without resampling.",
+  "characterId": "06c4bc97-d85a-4eff-addf-e071ad4c2d2b",
+  "active": false,
+  "status": "Rolled back at user request: restore original size and design; only Serin walking is being revised separately."
+}

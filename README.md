@@ -1,12 +1,43 @@
 # 등불지기 — Lanternkeeper
 
-아이작·세피리아 감성의 탑다운 로그라이크 던전 액션. 모든 그림은 코드로 그린 픽셀 아트,
-모든 소리는 WebAudio로 합성합니다(외부 에셋 없음).
+아이작·세피리아 감성의 탑다운 로그라이크 던전 액션. 코드로 그린 픽셀 아트와
+저장소에 포함된 PixelLab 이미지를 사용하며, 소리는 WebAudio로 합성합니다.
+
+## 다른 컴퓨터에서 개발 이어가기
+
+개발 소스는 기본 브랜치 `claude/isaac-seperia-game-12hrqr`에 있습니다.
+`gh-pages`는 [공개 게임](https://sx2xoox.github.io/REPOSI/)의 실행 파일만 보관합니다.
+현재 소스에는 7층 × 3스테이지, 단조·엘리트·미션방 개편과 자유 보상 분배까지 포함됩니다.
+
+Node.js 24를 사용하세요(`.nvmrc` 포함). Mac의 Apple Silicon·Intel용 의존성은
+`package-lock.json`에 포함되어 있으며 `npm ci`가 현재 기기에 맞게 설치합니다.
+
+처음 내려받는 경우:
+
+```bash
+git clone --branch claude/isaac-seperia-game-12hrqr https://github.com/sx2xoox/REPOSI.git
+cd REPOSI
+npm ci
+npm run dev
+```
+
+이미 내려받았다면, 로컬 작업을 커밋해 보관한 뒤:
+
+```bash
+git switch claude/isaac-seperia-game-12hrqr
+git pull --ff-only origin claude/isaac-seperia-game-12hrqr
+npm ci
+npm run dev
+```
+
+현재 인수 내용은 [HANDOVER.md](HANDOVER.md) 맨 위부터 확인하세요.
+이미지·코드·테스트는 모두 저장소에 포함됩니다. `test-results/`의 과거 검증 결과와
+로컬 미리보기는 개발 실행에 필요하지 않으며 Git에 포함하지 않습니다.
 
 ## 플레이
 
 ```bash
-npm install
+npm ci
 npm run dev          # http://localhost:5173
 npm run build:single # dist-single/index.html — 파일 하나로 어디서나 실행
 ```
@@ -29,13 +60,13 @@ npm run build:single # dist-single/index.html — 파일 하나로 어디서나 
 
 ## 내용
 
-- 강아지 등불지기 4명(리아·베른·세린·니엘), 캐릭터마다 다른 무기와 등불 해방
-- 5개 층(지하묘지 · 포자 동굴 · 잿불 대장간 · 얼어붙은 성소 · 공허의 심장), 시드 기반 층 생성
-  — 층마다 적 체력 · 밀도 · 속도가 오르고, 가장 깊은 층의 보스를 쓰러뜨리면 귀환 (층 수는 `content/floors.ts` 정의만큼)
-- 일반·보물·상점·보스·비밀·시련·제단·저주의 방, 방 배치 69종 이상
-- 일반 적 40여 종, 보스 9종(최종 보스 포함)
-- 유물 73종 + 등불 공명 8종, 액티브 11종, 물약 12종, 무기 12종
-- 합성 효과음 전체와 배경음악 12곡
+- 강아지 등불지기 12명, 캐릭터별 무기·고유 능력·등불 해방과 해금 조건
+- 마을·세이브 슬롯·첫 진행 스토리, 7개 층 × 3스테이지의 시드 기반 원정
+- 각 층 3스테이지의 보스, 보스 13종과 층별 난이도
+- 보물·상점·성소·저주·비밀·시련방, 제련·우물·합성방, 엘리트 및 세 가지 미션방
+- 무기·유물·축복 조합과 등불 공명, 플레이어 수에 맞춘 전투와 보상
+- 최대 4인 협동 플레이, 자유롭게 분배할 수 있는 바닥 보상
+- 검토 중인 신규 무기 20종은 배포판에서 임시 잠금 유지 (`src/game/release-policy.ts`)
 
 ## 개발
 

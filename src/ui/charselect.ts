@@ -23,6 +23,7 @@ import { Repeater, Spring, appear } from './anim';
 import { C } from './theme';
 import { divider, fitScale, frame, gauge, glow, iconSlot, keyHintRow, spriteCentered } from './frame';
 import { characterKitRows, characterOrder, characterStatRows, characterStats, isUnlocked, DIFFICULTY_LABELS, weaponKindLabel } from './logic';
+import { AbandonExpeditionOverlay } from './abandon-expedition';
 
 const KIT_LABEL_COLORS = { passive: C.goldHi, dash: C.info, release: C.emberHi } as const;
 
@@ -85,9 +86,15 @@ export class CharacterSelectScene implements Scene {
       this.shake = 0.35;
       return;
     }
+    if (this.hasExpedition()) { this.abandon(); return; }
     sfx('ui_select');
     sfx('floor_start', { vol: 0.5 });
     this.starting = 0;
+  }
+
+  private hasExpedition(): boolean { return !this.seed && save.activeSlot >= 0 && !!save.progress.campaign?.checkpoint; }
+  private abandon(): void {
+    if (this.hasExpedition()) app.scenes.push(new AbandonExpeditionOverlay(() => save.abandonExpedition(), 'select'));
   }
 
   /** Layout that depends on the touch chrome (the strip moves up, the buttons down). */
@@ -123,11 +130,12 @@ export class CharacterSelectScene implements Scene {
       if (this.onChoose) app.goTown(); else app.goTitle();
       return;
     }
-    if (input.pressed('confirm')) this.start();
+    if (input.pressed('confirm')) { this.start(); return; }
     // mouse: click a side character to select it, click the center one to start
     const m = app.renderer.displayToUI(input.mouseX, input.mouseY);
     m.x -= uiCenterX();
     if (input.pressed('fire')) {
+      if (this.hasExpedition() && m.x >= 566 && m.x <= 756 && m.y >= 8 && m.y <= 52) { this.abandon(); return; }
       const { baseY } = this.layout();
       for (let i = 0; i < this.chars.length; i++) {
         const { x, s } = this.slotPos(i);
@@ -146,6 +154,7 @@ export class CharacterSelectScene implements Scene {
     const y = UI_H - 42 - Math.min(sa.b, 24);
     const ox = uiCenterX();
     return [
+      ...(this.hasExpedition() ? [{ x: ox + 566, y: 8, w: 190, h: 44, label: '기존 원정 포기', ghost: true, tap: () => this.abandon() }] : []),
       { x: ox + 196, y, w: 64, h: 40, icon: 'tc_arrow_l', tap: 'uiLeft' },
       { x: ox + 274, y, w: 220, h: 40, label: this.onChoose ? '이 등불지기로 준비' : '하강 시작', tap: 'confirm', primary: true },
       { x: ox + 508, y, w: 64, h: 40, icon: 'tc_arrow_r', tap: 'uiRight' },
@@ -183,7 +192,12 @@ export class CharacterSelectScene implements Scene {
     // header
     r.uiText('등불지기 선택', UI_W_BASE / 2, 16, { size: 24, bold: true, align: 'center', color: C.text, outline: C.ink, alpha: A });
     divider(r, UI_W_BASE / 2, 48, 260, C.goldDark, A);
-    if (this.seed) r.uiText(`시드  ${this.seed}`, UI_W_BASE - 16, 20, { size: 10, font: 'small', align: 'right', color: C.gold, alpha: A });
+    if (this.hasExpedition()) {
+      frame(r, 566, 8, 190, 44, 'slot', { alpha: A });
+      const cp = save.progress.campaign!.checkpoint!;
+      r.uiText(`${cp.floor}-${cp.stage} 보관 중 · 기존 원정 포기`, 661, 24, { size: 10, align: 'center', color: C.gold, alpha: A });
+    }
+    else if (this.seed) r.uiText(`시드  ${this.seed}`, UI_W_BASE - 16, 20, { size: 10, font: 'small', align: 'right', color: C.gold, alpha: A });
     else r.uiText('무작위 시드', UI_W_BASE - 16, 20, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: A });
 
     // carousel (back to front)
@@ -308,8 +322,10 @@ export class CharacterSelectScene implements Scene {
       divider(r, x + w / 2, cy, w - 40, C.goldDark, A * 0.8);
       cy += 14;
       r.uiSprite('ui_lock', tx + 10, cy + 12, 2, { alpha: A });
-      r.uiText('해금 조건', tx + 26, cy, { size: 12, color: C.textDim, alpha: A });
-      r.uiText(c.unlockHint ? '위 조건을 달성하세요' : '???', tx + 26, cy + 16, { size: 10, font: 'small', color: C.textFaint, alpha: A });
+      r.uiText(c.suspended ? '임시 잠금' : '해금 조건', tx + 26, cy, { size: 12, color: C.textDim, alpha: A });
+      const requirement = c.suspended ? '점검 중 · 해금 기록 유지' : c.unlockRequirement ?? (c.unlockHint ? '위 조건을 달성하세요' : '???');
+      r.wrapText(requirement, tw - 26, 10).forEach((line, i) =>
+        r.uiText(line, tx + 26, cy + 16 + i * 14, { size: 10, font: 'small', color: C.textFaint, alpha: A }));
       return;
     }
     // the pitch: why pick this keeper (gold, up to 2 lines)

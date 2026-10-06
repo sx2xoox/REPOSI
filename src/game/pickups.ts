@@ -12,6 +12,7 @@ import { clamp, dist } from '../engine/math';
 import { orbSprite } from './projectile';
 import { defineDrawnSprite } from '../engine/sprites';
 import { ramp } from '../engine/painter';
+import { sceneSprite } from '../ui/pixellab-scenery';
 
 export type PickupKind =
   | 'coin' | 'nickel' | 'dime'
@@ -31,6 +32,7 @@ function frac(v: number): number {
 }
 
 export class Pickup extends Entity {
+  override readonly worldLoot = true;
   kind: PickupKind;
   /** shop price (0 = free) */
   price = 0;
@@ -183,6 +185,7 @@ export function potionFlask(color: string): string {
 export type PedestalItemKind = 'artifact' | 'active' | 'weapon';
 
 export interface PedestalItem {
+  temper?: number;
   kind: PedestalItemKind;
   id: string;
 }
@@ -199,12 +202,14 @@ export function itemInfo(it: PedestalItem): { name: string; desc: string; detail
     }
     case 'weapon': {
       const d = Weapons.must(it.id);
-      return { name: d.name, desc: d.desc, icon: d.icon, rarity: d.rarity };
+      const temper = it.temper ?? 0;
+      return { name: d.name + (temper ? ` [${temper > 0 ? '+' : ''}${temper}]` : ''), desc: d.desc + (temper ? ` · 제련: 무기 피해 ${100 + temper * 10}%` : ''), icon: d.icon, rarity: d.rarity };
     }
   }
 }
 
 export class Pedestal extends Entity {
+  override readonly worldLoot = true;
   item: PedestalItem | null;
   price = 0;
   /** pedestals sharing a choice group vanish when one of them is taken */
@@ -286,6 +291,8 @@ export class Pedestal extends Entity {
 
 // ------------------------------------------------------------------ chests
 export class Chest extends Entity {
+  override readonly worldLoot = true;
+  mem: Record<string, number> = {};
   locked: boolean;
   opened = false;
   constructor(x: number, y: number, locked = false) {
@@ -301,6 +308,7 @@ export class Chest extends Entity {
     this.age += dt;
     if (this.opened) return;
     const p = w.player;
+    if (!p.alive || p.downed) return;
     if (dist(this.x, this.y, p.x, p.y) < this.r + p.r + 1) {
       if (this.locked) {
         if (p.keys <= 0) return;
@@ -314,7 +322,7 @@ export class Chest extends Entity {
   override draw(r: Renderer): void {
     r.shadow(this.x, this.y + 4, 14, 4, 0.3);
     const base = this.locked ? 'chest_gold' : 'chest';
-    r.sprite(this.opened ? `${base}_open` : base, this.x, this.y);
+    r.sprite(sceneSprite(this.opened ? `${base}_open` : base), this.x, this.y);
   }
 }
 

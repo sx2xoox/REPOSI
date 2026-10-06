@@ -46,7 +46,7 @@ defineWeapon({
   update(w, p, st, _dt, firing, aim) {
     if (!attackInput(st, w, firing) || st.cooldown > 0) return;
     consumeAttack(st);
-    const s = p.stats;
+    const s = p.weaponStats;
     const hand = st.combo % 2;
     st.sinceAttack = 0;
     w.items.onAttack(aim);

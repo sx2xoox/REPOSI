@@ -149,7 +149,7 @@ export class MeleeSwing extends Entity {
         for (const p of w.projectiles) {
           if (p.dead || p.team === this.team || p.delay > 0) continue;
           if (!this.contains(p.x, p.y, p.r)) continue;
-          if (this.o.reflect && this.team === 'player') reflectProjectile(w, p, this);
+          if (this.o.reflect && this.team === 'player') reflectProjectile(w, p, this, 0.4);
           else p.expire(w, true);
           w.particles.burst(p.x, p.y, { count: 7, speed: [40, 120], life: [0.1, 0.25], colors: ['#ffffff', '#ffe080'], shape: 'spark', size: [1, 2] });
           w.sfx('parry', { vol: 0.5 });
@@ -202,14 +202,15 @@ export class MeleeSwing extends Entity {
 }
 
 /** Turn an enemy bullet into a player shot flying away from the swing. */
-export function reflectProjectile(w: World, p: Projectile, sw: { x: number; y: number; o: { angle: number; color: string } }): void {
+export function reflectProjectile(w: World, p: Projectile, sw: { x: number; y: number; o: { angle: number; color: string } }, damageScale = 0.8): void {
   const pl = w.player;
   const a = Math.atan2(p.y - sw.y, p.x - sw.x);
   // aim mostly along the swing, nudged toward where the bullet already is
   const ang = sw.o.angle + angleDiff(sw.o.angle, a) * 0.35;
   p.team = 'player';
   p.owner = pl;
-  p.damage = pl.stats.damage * 0.8;
+  // Melee returns use 0.4 (half their former damage); timed character counters retain 0.8.
+  p.damage = pl.stats.damage * damageScale;
   p.angle = ang;
   p.speed = Math.max(220, p.speed * 1.6);
   p.syncVel();

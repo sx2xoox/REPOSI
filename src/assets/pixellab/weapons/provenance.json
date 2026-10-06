@@ -1,0 +1,502 @@
+{
+  "provider": "PixelLab",
+  "date": "2026-10-04",
+  "nativePixels": true,
+  "weapons": [
+    {
+      "id": "brass_revolver",
+      "name": "황동 리볼버",
+      "concept": "A compact six-shot brass revolver. Heavy visibly round engraved cylinder, short angular barrel shaped like a raven beak with a hooked lower tip, walnut curved pistol grip, dark steel trigger guard. A practical antique sidearm with a tiny raven-eye rivet. Warm aged brass, chestnut wood, blackened steel.",
+      "held": "pl_w_brass_revolver",
+      "icon": "pl_icon_brass_revolver",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        5,
+        20
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "0943ee06-c78e-4863-b8ac-19b9179d7541",
+        "icon": "aeaf29b4-c81b-47b3-9f52-08dcac0bbb31"
+      }
+    },
+    {
+      "id": "nail_carbine",
+      "name": "연발 못총",
+      "concept": "A short industrial repeating nail carbine. Green beetle-shell segmented receiver, exposed silver nail magazine below, narrow dark steel barrel, riveted brass lever, squat dark wooden stock. Mechanical construction tool converted into a firearm, not a living beetle. Muted jade enamel and worn iron.",
+      "held": "pl_w_nail_carbine",
+      "icon": "pl_icon_nail_carbine",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        8,
+        16
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "8ddbe501-6a55-4e9f-9612-1f9f965e5089",
+        "icon": "d46dd6e8-9d95-4a81-a528-27ba0b6251ad"
+      }
+    },
+    {
+      "id": "bell_blunderbuss",
+      "name": "종탑 산탄총",
+      "concept": "A stout antique blunderbuss with a huge flared BRONZE BELL muzzle, lip rim and a dark round mouth. Short reinforced wooden stock, brass barrel bands, tiny bell-tower arch engraving. Broad trumpet-bell silhouette, warm bronze and mahogany. No loose decorative bells.",
+      "held": "pl_w_bell_blunderbuss",
+      "icon": "pl_icon_bell_blunderbuss",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        6,
+        17
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "2bf14adb-b871-4add-af67-c25a5492731f",
+        "icon": "027c108a-8e4a-49be-8e5f-7f7e21e073e9"
+      }
+    },
+    {
+      "id": "ember_musket",
+      "name": "심지 화승총",
+      "concept": "A long slender matchlock musket with dark walnut stock, long iron barrel, brass barrel bands, a curled MATCH CORD burning orange at the side lock and a tiny powder pan. Distinct practical old firearm, charred metal at ignition point, not a modern rifle.",
+      "held": "pl_w_ember_musket",
+      "icon": "pl_icon_ember_musket",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        7,
+        17
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "ee5c9584-7ed1-43c1-b7e5-8ce1034c7a6a",
+        "icon": "3408e8bc-049e-479f-a9ac-5a9029bf8157"
+      }
+    },
+    {
+      "id": "pearl_crossbow",
+      "name": "경량 쇠뇌",
+      "concept": "A compact lightweight crossbow with two pale ivory SEASHELL limbs, delicate scallop ridges, a single luminous pearl at the central latch, blue-grey slender stock and taut fine string. A clearly recognizable crossbow, elegant and light rather than huge.",
+      "held": "pl_w_pearl_crossbow",
+      "icon": "pl_icon_pearl_crossbow",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        8,
+        16
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "0395da6b-ab22-442a-ba39-241a8eb5a978",
+        "icon": "2c230260-8799-46a5-b7fc-cc94d6d46c3f"
+      }
+    },
+    {
+      "id": "crescent_bow",
+      "name": "초승달 장궁",
+      "concept": "A tall elegant longbow whose curved limb is one slender silver-lavender CRESCENT MOON. Two tapered horn tips, dark violet wrapped central grip, a taut fine pale string on the left side and one small gold star ornament. Preserve open negative space inside the crescent. Bow faces right.",
+      "held": "pl_w_crescent_bow",
+      "icon": "pl_icon_crescent_bow",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        16,
+        15
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "8d62b060-0a12-4ee8-9027-36cc162ab116",
+        "icon": "9847cb2c-3e2e-4f35-906f-81d212eab9b6"
+      },
+      "history": [
+        {
+          "held": "5b61ff17-e485-40b9-94b4-bc4dbe520509"
+        }
+      ],
+      "refinement": "Native proportion refinement / separate animated bowstring, 2026-10-04"
+    },
+    {
+      "id": "thorn_shortbow",
+      "name": "장미 가시활",
+      "concept": "A compact bow grown from dark green thorny rose vines. Three clear angular thorn spikes, one crimson rose at the central leather grip, curved woody green limbs and a taut cream bowstring. Burgundy petals and moss greens, dangerous botanical weapon rather than a bouquet. Bow faces right.",
+      "held": "pl_w_thorn_shortbow",
+      "icon": "pl_icon_thorn_shortbow",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        15,
+        15
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "504e4844-db18-4d9a-968c-6695897bb1bc",
+        "icon": "21298a51-f036-4417-a7a1-005bca14f8b4"
+      },
+      "history": [
+        {
+          "held": "b7650043-aeeb-4500-8667-cf75720d36d1"
+        }
+      ],
+      "refinement": "Native proportion refinement / separate animated bowstring, 2026-10-04"
+    },
+    {
+      "id": "glacier_arbalest",
+      "name": "빙하 중쇠뇌",
+      "concept": "A heavy mechanical arbalest with broad jagged pale-blue ICE CRYSTAL limbs, dark steel central stock, an exposed winding gear and sturdy silver bolt rail. Thick frozen plates, angular crystalline tips, small cyan core. Heavier and wider than a light crossbow.",
+      "held": "pl_w_glacier_arbalest",
+      "icon": "pl_icon_glacier_arbalest",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        8,
+        16
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "a1c74df5-b5af-4a60-8461-5d750e6c8570",
+        "icon": "af0fa7e2-b11c-4972-814d-190e02e0ef6c"
+      }
+    },
+    {
+      "id": "copper_sabre",
+      "name": "구리 곡도",
+      "concept": "A single curved copper sabre with an elegant upward-sweeping dog-tail-like blade silhouette, warm burnished copper blade, pale sharp bevel, a modest bronze knuckle guard and dark brown wrapped hilt. Practical balanced sword, readable continuous curve, not a straight blade.",
+      "held": "pl_w_copper_sabre",
+      "icon": "pl_icon_copper_sabre",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        6,
+        17
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "60019f8c-9fe0-469f-90ad-df507dd3737f",
+        "icon": "08cdab63-4717-4da3-a61c-2197f6857bef"
+      }
+    },
+    {
+      "id": "rose_rapier",
+      "name": "장미 가시검",
+      "concept": "A slender needle-like steel rapier. Long very thin silver blade, ornate rose-shaped crimson and gold cup guard, curling thorn quillons and dark wine-colored wrapped grip. Distinct thrusting needle silhouette with a vivid rose at the hilt.",
+      "held": "pl_w_rose_rapier",
+      "icon": "pl_icon_rose_rapier",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        6,
+        16
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "9ae25e94-dea9-43d9-8362-cea4ece49519",
+        "icon": "5cf60359-d202-48cf-ae31-9fd10049088c"
+      },
+      "history": [
+        {
+          "icon": "ebd53ebd-2dd6-4621-9ab1-c89a828bb9b9"
+        }
+      ]
+    },
+    {
+      "id": "anchor_axe",
+      "name": "닻날 도끼",
+      "concept": "A hefty nautical axe forged from a SHIP ANCHOR. Dark teal weathered iron anchor-shaped axe head with two hooked flukes and a visible center spike, pale cutting bevel, salt-worn oak haft wrapped in brown rope. Clearly anchor-derived axe, asymmetrical heavy head, no chain.",
+      "held": "pl_w_anchor_axe",
+      "icon": "pl_icon_anchor_axe",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        8,
+        17
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "ddfea784-ba11-4386-8f98-7560f90ef07a",
+        "icon": "714e0a04-8cfe-47ac-90e0-2784ebd33c5b"
+      }
+    },
+    {
+      "id": "cathedral_mace",
+      "name": "성당 철퇴",
+      "concept": "A heavy mace with a miniature GOTHIC BELL TOWER as its striking head: silver-grey ribbed tower, two dark lancet arch windows, a peaked amethyst cap, small gold finial. Deep purple wrapped handle and brass collar. Solid compact architectural head, not a simple ball.",
+      "held": "pl_w_cathedral_mace",
+      "icon": "pl_icon_cathedral_mace",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        9,
+        17
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "94f1ba4d-4ffd-4fad-84a2-aacd00866afc",
+        "icon": "7f887ea9-7d3f-4491-9e37-ce67f3aa5093"
+      }
+    },
+    {
+      "id": "comet_pike",
+      "name": "혜성 장창",
+      "concept": "A long elegant pike with a luminous pale ice-blue COMET spearhead, a sharp faceted silver star point, two small blue comet-tail streamers just behind the head, long dark blue steel shaft with silver collars and wrapped dark grip. Longest slender silhouette of the set.",
+      "held": "pl_w_comet_pike",
+      "icon": "pl_icon_comet_pike",
+      "size": [
+        48,
+        16
+      ],
+      "grip": [
+        10,
+        8
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "243bb8b0-36b3-41a1-9c37-484d4a30235b",
+        "icon": "bf44d03e-a4fb-47a7-b719-4998021b3075"
+      }
+    },
+    {
+      "id": "obsidian_cleaver",
+      "name": "흑요석 대도",
+      "concept": "A broad heavy rectangular cleaver sword made from BLACK OBSIDIAN glass. Chipped angular cutting edge, dark plum-black glossy facets, two restrained violet reflections, a brass square guard and thick dark leather hilt. Weighty dark silhouette with a bright thin glass edge, no neon aura.",
+      "held": "pl_w_obsidian_cleaver",
+      "icon": "pl_icon_obsidian_cleaver",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        6,
+        17
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "5adbd6fc-022f-4ee8-8666-84df7721b90f",
+        "icon": "0098ce84-5c77-4972-9791-fcb13f972bb6"
+      }
+    },
+    {
+      "id": "moon_fan",
+      "name": "달비늘 부채",
+      "concept": "A fully opened hand fan made from overlapping silver-blue MOON SCALES. Five distinct scalloped crescent plates, deep indigo ribs converging into one small gold hand grip, ivory moon markings on two scales. Elegant open fan silhouette with visible gaps between ribs.",
+      "held": "pl_w_moon_fan",
+      "icon": "pl_icon_moon_fan",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        5,
+        16
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "d5c9ca6b-97d8-47ba-9616-4c467858ce6b",
+        "icon": "605be964-431e-4c22-9d0c-1169d339a805"
+      }
+    },
+    {
+      "id": "dusk_knives",
+      "name": "투척 단검",
+      "concept": "ONE balanced throwing dagger with a narrow violet steel blade shaped like a swallow wing, swept two-prong wing guard, dark leather short grip and a small ring pommel. Smoky purple bevel, silver cutting edge. Clearly throwable lightweight dagger, not two crossed weapons.",
+      "held": "pl_w_dusk_knives",
+      "icon": "pl_icon_dusk_knives",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        8,
+        18
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "5c4aa04e-65df-42d8-a1a6-dd3a717f7849",
+        "icon": "f1393571-8c24-4fb4-9f1b-ad23845581aa"
+      }
+    },
+    {
+      "id": "amber_wand",
+      "name": "호박석 마법봉",
+      "concept": "A short dark honeywood wand crowned with a warm golden AMBER stone. A tiny dark BEE fossil trapped visibly inside the translucent oval amber, small gold prongs holding it, one twisted wood knot on the handle. Honey gold material and warm cream pinpoint highlight, no aura.",
+      "held": "pl_w_amber_wand",
+      "icon": "pl_icon_amber_wand",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        8,
+        16
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "bd9a3b9d-5d63-41a4-be90-5c36a6ecc032",
+        "icon": "98cddf27-7534-4825-b758-0b8a07c47421"
+      },
+      "history": [
+        {
+          "held": "4dce49d4-7dc9-4cbc-bf44-035c62d4173e"
+        }
+      ],
+      "refinement": "Native proportion refinement / separate animated bowstring, 2026-10-04"
+    },
+    {
+      "id": "tide_staff",
+      "name": "소라 지팡이",
+      "concept": "A driftwood staff crowned with a large ivory spiral CONCH SHELL, visible spiral groove and flared shell opening pointing forward. Sea-green binding, two small turquoise barnacles at the collar and a restrained aqua glint in the shell. Coastal weathered materials.",
+      "held": "pl_w_tide_staff",
+      "icon": "pl_icon_tide_staff",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        8,
+        16
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "7ec0ddcc-32bf-45e4-8b16-ed96e93bdbc5",
+        "icon": "9369ff08-465c-4d8a-86bf-ebe9c4949f6b"
+      },
+      "history": [
+        {
+          "held": "61a25aac-359c-4356-8735-ab044004c364"
+        }
+      ],
+      "refinement": "Native proportion refinement / separate animated bowstring, 2026-10-04"
+    },
+    {
+      "id": "cinder_sceptre",
+      "name": "불꽃새 홀",
+      "concept": "A ceremonial sceptre with a copper FIREBIRD head and crest. Hooked pointed bird beak pointing forward, bright ember eye, three swept orange-red feather plates, charred dark wood shaft and gold feather collar. Clearly a bird-shaped weapon head, no floating flame cloud.",
+      "held": "pl_w_cinder_sceptre",
+      "icon": "pl_icon_cinder_sceptre",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        8,
+        17
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "b20be24a-93aa-41ba-9398-313b122aa686",
+        "icon": "cc8291e0-3012-475d-8dc2-5f742966dc6d"
+      }
+    },
+    {
+      "id": "stormhorn_rod",
+      "name": "폭풍 뿔지팡이",
+      "concept": "A dark indigo magic rod with TWO curved ivory RAM HORNS forming an open fork around a tiny blue lightning crystal. Brass collars, tightly wrapped navy grip, one restrained white-blue spark between the horns. Horn fork silhouette must be clear, no oversized glow.",
+      "held": "pl_w_stormhorn_rod",
+      "icon": "pl_icon_stormhorn_rod",
+      "size": [
+        32,
+        32
+      ],
+      "grip": [
+        8,
+        14
+      ],
+      "iconSize": [
+        16,
+        16
+      ],
+      "jobs": {
+        "held": "dadc6fc2-d21b-4e3c-ad98-ad77258c5a6c",
+        "icon": "5dd9676a-288a-4747-ae42-a9b6290fd189"
+      },
+      "history": [
+        {
+          "held": "e217cc49-d389-4eea-a961-8af232c7752e"
+        }
+      ],
+      "refinement": "Native proportion refinement / separate animated bowstring, 2026-10-04"
+    }
+  ]
+}

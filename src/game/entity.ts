@@ -56,6 +56,8 @@ export interface HitInfo {
   release?: boolean;
   /** Base direct-hit ember credit, computed from actual damage before onHit hooks. */
   emberCharge?: number;
+  /** Actual HP removed, excluding overkill; populated before onHit hooks. */
+  dealtDamage?: number;
 }
 
 // Entity ids are simulation state (hit lists, per-shot wobble phases ...): every
@@ -97,6 +99,12 @@ function allocId(e: Entity): number {
 }
 
 export abstract class Entity {
+  /** Loose room loot can be collected by any keeper and survives its creator leaving. */
+  readonly worldLoot: boolean = false;
+  /** Attack objects spawned during an optional room encounter are retired together. */
+  encounterId = 0;
+  /** Elite attacks carry this through projectiles and delayed floor hazards. */
+  enemyDamageScale = 1;
   /**
    * Purely visual entity (effects, ambient props, speech bubbles ...): gameplay
    * never reads it, it may depend on `fx` randomness or settings, gets a
@@ -158,7 +166,7 @@ export abstract class Entity {
    * and is the target of the 'interact' action (see game/interact.ts).
    */
   /** Optional explicit interaction, shared by keyboard, pad and touch. */
-  interactionInfo?(): { name: string; desc: string; icon: string };
+  interactionInfo?(): { name: string; desc: string; icon: string; compactHint?: string };
   interact?(_w: World): boolean;
   previewable(_w: World): boolean {
     return false;

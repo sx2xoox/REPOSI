@@ -144,6 +144,7 @@ defineCharacter({
     critChance: 0.08,
   },
   unlocked: false,
+  unlockRequirement: '보스방에서 피해를 받지 않고 보스 처치',
   unlockHint: '보스를 한 번도 맞지 않고 쓰러뜨리면, 흰 개가 당신을 알아본다.',
   lightColor: '#e8f0ff',
   release: releaseFlashSlashes,

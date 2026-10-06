@@ -17,16 +17,16 @@ const renderer = new Renderer(fakeDisplay(1280, 720));
 const host = { openInventory() {}, onGameOver() {} };
 function world(seed = 'STAGES') { const run = new RunState(seed, 'ria'); run.staged = true; const w = new World(renderer, run, host); w.start(); w.player.god = true; return w; }
 
-it('28 stage layouts are connected, deterministic, and only fourth stages have bosses', () => {
-  for (const f of Floors.all()) for (let stage = 1; stage <= 4; stage++) for (let s = 0; s < 20; s++) {
+it('21 stage layouts are connected, deterministic, and only third stages have bosses', () => {
+  for (const f of Floors.all()) for (let stage = 1; stage <= 3; stage++) for (let s = 0; s < 20; s++) {
     const m = generateStage(f, stage, new RNG(s));
     expect(m).toEqual(generateStage(f, stage, new RNG(s)));
-    expect(m.nodes.filter(n => n.kind === 'boss')).toHaveLength(stage === 4 ? 1 : 0);
+    expect(m.nodes.filter(n => n.kind === 'boss')).toHaveLength(stage === 3 ? 1 : 0);
     const seen = new Set([m.startId]), queue = [m.startId];
     while (queue.length) for (const d of m.nodes[queue.shift()!].doors) if (!seen.has(d.to)) { seen.add(d.to); queue.push(d.to); }
     expect(seen.size).toBe(m.nodes.length);
     expect(m.nodes.every(n => !!n.templateId)).toBe(true);
-    expect(stage === 4 ? m.bossId >= 0 : m.exitId !== undefined).toBe(true);
+    expect(stage === 3 ? m.bossId >= 0 : m.exitId !== undefined).toBe(true);
   }
 });
 it('clearing the last normal room creates a real passage and advances to the next stage', () => {

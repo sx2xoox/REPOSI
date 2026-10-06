@@ -1,0 +1,488 @@
+{
+  "jobs": {
+    "walk-north-0-job": {
+      "background_job_id": "65b86963-2270-4fbd-b221-276deb122528",
+      "image_id": "d80a097f-4437-5cd9-98e2-2d7401bffdd1",
+      "status": "processing",
+      "source_image_id": "d80a097f-4437-5cd9-98e2-2d7401bffdd1",
+      "job_id": "65b86963-2270-4fbd-b221-276deb122528",
+      "image_size": {
+        "width": 32,
+        "height": 48
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/65b86963-2270-4fbd-b221-276deb122528/download"
+    },
+    "walk-west-1-job": {
+      "background_job_id": "7dbb10a7-faa1-4e1e-aad5-2899bcf126eb",
+      "image_id": "871e2935-a2fd-586c-ba5c-051ea8d4ee5f",
+      "status": "processing",
+      "source_image_id": "871e2935-a2fd-586c-ba5c-051ea8d4ee5f",
+      "job_id": "7dbb10a7-faa1-4e1e-aad5-2899bcf126eb",
+      "image_size": {
+        "width": 32,
+        "height": 44
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/7dbb10a7-faa1-4e1e-aad5-2899bcf126eb/download"
+    },
+    "walk-south-1-fix-job": {
+      "background_job_id": "87b26318-50b4-432a-845a-6a2ab3f05da1",
+      "image_id": "324ad6f7-765b-56df-a301-9de317bd15fb",
+      "status": "processing",
+      "source_image_id": "324ad6f7-765b-56df-a301-9de317bd15fb",
+      "job_id": "87b26318-50b4-432a-845a-6a2ab3f05da1",
+      "image_size": {
+        "width": 32,
+        "height": 48
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/87b26318-50b4-432a-845a-6a2ab3f05da1/download"
+    },
+    "walk-east-0-job": {
+      "background_job_id": "b10291c6-a7c1-439b-bde9-e94df3292bf2",
+      "image_id": "6744de5f-87f4-51dc-adc4-aa5dcc5b02c6",
+      "status": "processing",
+      "source_image_id": "6744de5f-87f4-51dc-adc4-aa5dcc5b02c6",
+      "job_id": "b10291c6-a7c1-439b-bde9-e94df3292bf2",
+      "image_size": {
+        "width": 36,
+        "height": 44
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/b10291c6-a7c1-439b-bde9-e94df3292bf2/download"
+    },
+    "north-west-job": {
+      "background_job_id": "fd06cd3b-3137-44e5-8fcd-92730941eade",
+      "image_id": "01e61bac-524d-5d37-b03b-961fac7b62b7",
+      "status": "processing",
+      "source_image_id": "01e61bac-524d-5d37-b03b-961fac7b62b7",
+      "job_id": "fd06cd3b-3137-44e5-8fcd-92730941eade",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/fd06cd3b-3137-44e5-8fcd-92730941eade/download"
+    },
+    "south-east-job": {
+      "background_job_id": "aafcbc0d-157a-4597-abab-00fc087013bb",
+      "image_id": "70b5789d-d64a-5fea-92fe-20f537ed3050",
+      "status": "processing",
+      "source_image_id": "70b5789d-d64a-5fea-92fe-20f537ed3050",
+      "job_id": "aafcbc0d-157a-4597-abab-00fc087013bb",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/aafcbc0d-157a-4597-abab-00fc087013bb/download"
+    },
+    "east-job": {
+      "background_job_id": "86055032-c5d6-4d33-a55c-845d5d19bbca",
+      "image_id": "2920fcfc-2206-554b-aeb8-620113803bfa",
+      "status": "processing",
+      "source_image_id": "2920fcfc-2206-554b-aeb8-620113803bfa",
+      "job_id": "86055032-c5d6-4d33-a55c-845d5d19bbca",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/86055032-c5d6-4d33-a55c-845d5d19bbca/download"
+    },
+    "walk-north-2-job": {
+      "background_job_id": "31c2b7d5-85da-4c4e-86cf-983aeb337036",
+      "image_id": "bf5281e7-dcda-51a4-832d-e6b8c37feec2",
+      "status": "processing",
+      "source_image_id": "bf5281e7-dcda-51a4-832d-e6b8c37feec2",
+      "job_id": "31c2b7d5-85da-4c4e-86cf-983aeb337036",
+      "image_size": {
+        "width": 32,
+        "height": 48
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/31c2b7d5-85da-4c4e-86cf-983aeb337036/download"
+    },
+    "left-3-job": {
+      "background_job_id": "fa0bfd04-7a83-4541-b9b4-797d182cb03e",
+      "image_id": "dc483289-f299-5f2d-8e90-6c0e2f697769",
+      "status": "processing",
+      "source_image_id": "dc483289-f299-5f2d-8e90-6c0e2f697769",
+      "job_id": "fa0bfd04-7a83-4541-b9b4-797d182cb03e",
+      "image_size": {
+        "width": 36,
+        "height": 44
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/fa0bfd04-7a83-4541-b9b4-797d182cb03e/download"
+    },
+    "walk-east-2-job": {
+      "background_job_id": "b6832abb-a480-46f5-9a2c-3248443b1ba8",
+      "image_id": "5cc66e44-7f2f-54fa-93a7-d8f9becf6571",
+      "status": "processing",
+      "source_image_id": "5cc66e44-7f2f-54fa-93a7-d8f9becf6571",
+      "job_id": "b6832abb-a480-46f5-9a2c-3248443b1ba8",
+      "image_size": {
+        "width": 36,
+        "height": 44
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/b6832abb-a480-46f5-9a2c-3248443b1ba8/download"
+    },
+    "west-job": {
+      "background_job_id": "71822347-379c-4d11-8941-e02f15466241",
+      "image_id": "b97cbf8f-9d65-5a17-bc83-e28173fdfee2",
+      "status": "processing",
+      "source_image_id": "b97cbf8f-9d65-5a17-bc83-e28173fdfee2",
+      "job_id": "71822347-379c-4d11-8941-e02f15466241",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/71822347-379c-4d11-8941-e02f15466241/download"
+    },
+    "walk-south-1-job": {
+      "background_job_id": "371e8090-a7eb-43d3-9582-b6fc2fa91003",
+      "image_id": "1a2a61a7-35b1-5550-a905-96ca85efc71c",
+      "status": "processing",
+      "source_image_id": "1a2a61a7-35b1-5550-a905-96ca85efc71c",
+      "job_id": "371e8090-a7eb-43d3-9582-b6fc2fa91003",
+      "image_size": {
+        "width": 32,
+        "height": 48
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/371e8090-a7eb-43d3-9582-b6fc2fa91003/download"
+    },
+    "walk-north-3-job": {
+      "background_job_id": "be1cc9f1-e017-41d3-bce8-2ff4c2c47d17",
+      "image_id": "08904eb9-5b6e-53a0-9f31-05d83374ff92",
+      "status": "processing",
+      "source_image_id": "08904eb9-5b6e-53a0-9f31-05d83374ff92",
+      "job_id": "be1cc9f1-e017-41d3-bce8-2ff4c2c47d17",
+      "image_size": {
+        "width": 32,
+        "height": 48
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/be1cc9f1-e017-41d3-bce8-2ff4c2c47d17/download"
+    },
+    "walk-west-2-job": {
+      "background_job_id": "50b08515-32d7-448a-b00c-383cd6fea154",
+      "image_id": "167d1aed-48b3-55fc-8705-8c8d092d1fb7",
+      "status": "processing",
+      "source_image_id": "167d1aed-48b3-55fc-8705-8c8d092d1fb7",
+      "job_id": "50b08515-32d7-448a-b00c-383cd6fea154",
+      "image_size": {
+        "width": 32,
+        "height": 44
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/50b08515-32d7-448a-b00c-383cd6fea154/download"
+    },
+    "walk-north-1-job": {
+      "background_job_id": "94d8555a-c6ee-494b-bc7d-ea5521a58298",
+      "image_id": "cf264a3f-5f72-5b88-9c11-64478ab3c263",
+      "status": "processing",
+      "source_image_id": "cf264a3f-5f72-5b88-9c11-64478ab3c263",
+      "job_id": "94d8555a-c6ee-494b-bc7d-ea5521a58298",
+      "image_size": {
+        "width": 32,
+        "height": 48
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/94d8555a-c6ee-494b-bc7d-ea5521a58298/download"
+    },
+    "walk-west-0-job": {
+      "background_job_id": "7f204762-a0e3-4ce9-8040-73d3b91cded2",
+      "image_id": "33e5052e-9757-558f-8345-2203b3cf6c44",
+      "status": "processing",
+      "source_image_id": "33e5052e-9757-558f-8345-2203b3cf6c44",
+      "job_id": "7f204762-a0e3-4ce9-8040-73d3b91cded2",
+      "image_size": {
+        "width": 32,
+        "height": 44
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/7f204762-a0e3-4ce9-8040-73d3b91cded2/download"
+    },
+    "walk-west-3-job": {
+      "background_job_id": "5d1a5a44-d67a-42fc-b5c7-1e2aebc5b9b7",
+      "image_id": "1354df1f-887d-5df0-960c-32d358e502b8",
+      "status": "processing",
+      "source_image_id": "1354df1f-887d-5df0-960c-32d358e502b8",
+      "job_id": "5d1a5a44-d67a-42fc-b5c7-1e2aebc5b9b7",
+      "image_size": {
+        "width": 32,
+        "height": 44
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/5d1a5a44-d67a-42fc-b5c7-1e2aebc5b9b7/download"
+    },
+    "north-job": {
+      "background_job_id": "0d0445aa-7ec1-4152-b4d4-f7c2d6c82a13",
+      "image_id": "8ad21c70-c4ef-5f34-bd01-ece814787a66",
+      "status": "processing",
+      "source_image_id": "8ad21c70-c4ef-5f34-bd01-ece814787a66",
+      "job_id": "0d0445aa-7ec1-4152-b4d4-f7c2d6c82a13",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/0d0445aa-7ec1-4152-b4d4-f7c2d6c82a13/download"
+    },
+    "walk-east-1-job": {
+      "background_job_id": "971d8c7d-9df8-4d0d-b37b-11bb7f9b770c",
+      "image_id": "e78aa623-eee4-5eb0-994a-152022976152",
+      "status": "processing",
+      "source_image_id": "e78aa623-eee4-5eb0-994a-152022976152",
+      "job_id": "971d8c7d-9df8-4d0d-b37b-11bb7f9b770c",
+      "image_size": {
+        "width": 36,
+        "height": 44
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/971d8c7d-9df8-4d0d-b37b-11bb7f9b770c/download"
+    },
+    "north-east-job": {
+      "background_job_id": "d1d18f3d-1d1a-4662-8c8f-dc5b1e9830c4",
+      "image_id": "64fd9ec9-b8b0-5dd7-ba8f-ef542dc6f87d",
+      "status": "processing",
+      "source_image_id": "64fd9ec9-b8b0-5dd7-ba8f-ef542dc6f87d",
+      "job_id": "d1d18f3d-1d1a-4662-8c8f-dc5b1e9830c4",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/d1d18f3d-1d1a-4662-8c8f-dc5b1e9830c4/download"
+    },
+    "walk-south-0-fix-job": {
+      "background_job_id": "809a9b36-d1b3-4b34-b090-d5113de0a788",
+      "image_id": "5f8f68da-a7f5-5f61-99f8-a35e6deda8e4",
+      "status": "processing",
+      "source_image_id": "5f8f68da-a7f5-5f61-99f8-a35e6deda8e4",
+      "job_id": "809a9b36-d1b3-4b34-b090-d5113de0a788",
+      "image_size": {
+        "width": 32,
+        "height": 48
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/809a9b36-d1b3-4b34-b090-d5113de0a788/download"
+    },
+    "south-west-job": {
+      "background_job_id": "e6e8df14-c3ed-4fc9-9704-55faf22b5289",
+      "image_id": "0a2bcb13-80f8-53ec-a61c-81847655b06c",
+      "status": "processing",
+      "source_image_id": "0a2bcb13-80f8-53ec-a61c-81847655b06c",
+      "job_id": "e6e8df14-c3ed-4fc9-9704-55faf22b5289",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/e6e8df14-c3ed-4fc9-9704-55faf22b5289/download"
+    },
+    "south-job": {
+      "background_job_id": "9ef389f4-eef2-4951-ad93-6f05a396d009",
+      "image_id": "b77e8c56-8e93-57e4-a6a8-a335f2ccb31b",
+      "status": "processing",
+      "source_image_id": "b77e8c56-8e93-57e4-a6a8-a335f2ccb31b",
+      "job_id": "9ef389f4-eef2-4951-ad93-6f05a396d009",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/9ef389f4-eef2-4951-ad93-6f05a396d009/download"
+    },
+    "walk-south-2-job": {
+      "background_job_id": "fa03eba0-a41c-421e-a602-15c9403cffce",
+      "image_id": "e15ab217-e344-5fa9-bf37-b07cda04d057",
+      "status": "processing",
+      "source_image_id": "e15ab217-e344-5fa9-bf37-b07cda04d057",
+      "job_id": "fa03eba0-a41c-421e-a602-15c9403cffce",
+      "image_size": {
+        "width": 32,
+        "height": 48
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/fa03eba0-a41c-421e-a602-15c9403cffce/download"
+    },
+    "walk-south-3-job": {
+      "background_job_id": "310e8f25-3785-4a70-b63f-5467c2100f7f",
+      "image_id": "5a49ef55-0bc7-509b-946e-75cf0c4a09ed",
+      "status": "processing",
+      "source_image_id": "5a49ef55-0bc7-509b-946e-75cf0c4a09ed",
+      "job_id": "310e8f25-3785-4a70-b63f-5467c2100f7f",
+      "image_size": {
+        "width": 32,
+        "height": 48
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/310e8f25-3785-4a70-b63f-5467c2100f7f/download"
+    },
+    "left-1-job": {
+      "background_job_id": "4648dd16-7709-4d36-a280-ab5308484e39",
+      "image_id": "2ea1c0ce-9de5-5c73-beaa-14bcf3422151",
+      "status": "processing",
+      "source_image_id": "2ea1c0ce-9de5-5c73-beaa-14bcf3422151",
+      "job_id": "4648dd16-7709-4d36-a280-ab5308484e39",
+      "image_size": {
+        "width": 36,
+        "height": 44
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/4648dd16-7709-4d36-a280-ab5308484e39/download"
+    },
+    "left-2-job": {
+      "background_job_id": "0769fdbc-0f50-4d9e-bbdc-efe515c03770",
+      "image_id": "a827570c-7255-569c-ba96-d21fe4b02a9d",
+      "status": "processing",
+      "source_image_id": "a827570c-7255-569c-ba96-d21fe4b02a9d",
+      "job_id": "0769fdbc-0f50-4d9e-bbdc-efe515c03770",
+      "image_size": {
+        "width": 36,
+        "height": 44
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/0769fdbc-0f50-4d9e-bbdc-efe515c03770/download"
+    },
+    "walk-south-0-job": {
+      "background_job_id": "89e052f5-49d5-424d-ae2f-94a95014d58a",
+      "image_id": "1a9e60e6-9aea-5a95-bedb-1a8d1b957c50",
+      "status": "processing",
+      "source_image_id": "1a9e60e6-9aea-5a95-bedb-1a8d1b957c50",
+      "job_id": "89e052f5-49d5-424d-ae2f-94a95014d58a",
+      "image_size": {
+        "width": 32,
+        "height": 48
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/89e052f5-49d5-424d-ae2f-94a95014d58a/download"
+    },
+    "left-0-job": {
+      "background_job_id": "585e5491-2dce-427f-8579-2285f04d1dfc",
+      "image_id": "2da094bf-2adc-5d8e-8aa1-2e94245d7955",
+      "status": "processing",
+      "source_image_id": "2da094bf-2adc-5d8e-8aa1-2e94245d7955",
+      "job_id": "585e5491-2dce-427f-8579-2285f04d1dfc",
+      "image_size": {
+        "width": 36,
+        "height": 44
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/585e5491-2dce-427f-8579-2285f04d1dfc/download"
+    },
+    "walk-east-3-job": {
+      "background_job_id": "9d09763e-05d7-45fd-8487-0722f18076da",
+      "image_id": "a41de88b-7b9d-5c6e-b419-0398e0517efe",
+      "status": "processing",
+      "source_image_id": "a41de88b-7b9d-5c6e-b419-0398e0517efe",
+      "job_id": "9d09763e-05d7-45fd-8487-0722f18076da",
+      "image_size": {
+        "width": 36,
+        "height": 44
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/9d09763e-05d7-45fd-8487-0722f18076da/download"
+    }
+  },
+  "note": "Restore original keeper scale. Serin only: idle opaque heights26-27, walks25-28. Upright compact poses, V3 walk then native-frame Pro Flash height adjustments. Final west frames from left-0..3 jobs; final south0/1 from fix jobs. No native image resampling. Ria and Bori restored exactly to pre-resize assets.",
+  "date": "2026-10-04",
+  "provider": "PixelLab",
+  "active": true
+}

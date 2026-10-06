@@ -163,6 +163,7 @@ defineCharacter({
     dashTime: 0.1,
   },
   unlocked: false,
+  unlockRequirement: '누적 적 처치 300마리',
   unlockHint: '적을 모두 300마리 처치하면, 언덕 너머에서 휘파람이 들린다.',
   lightColor: '#bff5ea',
   release: releaseStampede,

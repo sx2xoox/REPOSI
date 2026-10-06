@@ -1,3 +1,4 @@
+import { isContentTemporarilyLocked } from './release-policy';
 // Content definition interfaces + registries.
 // Every piece of content (enemy, boss, artifact, resonance set, active item, potion,
 // weapon, character, floor, theme, room template) is a plain object registered
@@ -14,6 +15,7 @@ import type { World } from './world';
 import type { Enemy } from './enemy';
 import type { Player } from './player';
 import type { Projectile } from './projectile';
+import type { MeleeSwing } from './melee';
 import type { Actor, HitInfo } from './entity';
 import type { ArtifactLook } from './look';
 
@@ -119,6 +121,8 @@ export interface ItemHooks {
   onUpdate?(w: World, dt: number, power: number): void;
   /** a player projectile was created (by weapon or effect with fromWeapon) */
   onShoot?(w: World, p: Projectile, power: number): void;
+  /** Snapshot attack bonuses when a melee hitbox is created. */
+  onSwing?(w: World, swing: MeleeSwing, power: number): void;
   /** the player started an attack (once per attack, before projectiles) */
   onAttack?(w: World, angle: number, power: number): void;
   /** modify an outgoing player hit before it is applied */
@@ -368,7 +372,10 @@ export interface CharacterDef {
   keys?: number;
   /** unlocked from the start (otherwise needs save flag `unlock:<id>`) */
   unlocked: boolean;
+  suspended?: boolean;
   unlockHint?: string;
+  /** Explicit mechanical requirement, separate from the story hint. */
+  unlockRequirement?: string;
   /** light color of the lantern */
   lightColor?: string;
   /**
@@ -380,6 +387,7 @@ export interface CharacterDef {
   releaseDesc?: string;
   /** Korean name of the release (character select), e.g. "등불 개화" */
   releaseName?: string;
+  releaseIcon?: string;
   // ---- character kit (all optional; absent = plain keeper)
   /** signature passive, always active (see PassiveDef) */
   passive?: PassiveDef;
@@ -565,8 +573,8 @@ export const defineArtifact = (d: ArtifactDef) => Artifacts.register(d);
 export const defineSet = (d: SetDef) => Sets.register(d);
 export const defineActive = (d: ActiveDef) => Actives.register(d);
 export const definePotion = (d: PotionDef) => Potions.register(d);
-export const defineWeapon = (d: WeaponDef) => Weapons.register(d);
-export const defineCharacter = (d: CharacterDef) => Characters.register(d);
+export const defineWeapon = (d: WeaponDef) => Weapons.register(isContentTemporarilyLocked(d.id) ? { ...d, pools: [] } : d);
+export const defineCharacter = (d: CharacterDef) => Characters.register(isContentTemporarilyLocked(d.id) ? { ...d, suspended: true, unlocked: false, unlockHint: '캐릭터와 장비를 다듬는 동안 잠시 쉬어갑니다. 기존 해금 기록은 유지됩니다.' } : d);
 export const defineFloor = (d: FloorDef) => Floors.register(d);
 export const defineTheme = (d: ThemeDef) => Themes.register(d);
 export const defineRoom = (d: RoomTemplate) => RoomTemplates.register(d);

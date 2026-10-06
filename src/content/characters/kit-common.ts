@@ -56,11 +56,15 @@ export class KitTimeline extends Entity {
 }
 
 /** The protective flash every release opens with: flash, shake, rings, nearby bullets erased. */
-export function releaseOpen(w: World, p: Player, color: string, radius: number): void {
-  w.renderer.screenFlash(color, 0.3);
+export function releaseOpen(w: World, p: Player, color: string, radius: number, presentation: 'flare'|'focus' = 'flare'): void {
+  w.renderer.screenFlash(color, presentation==='focus'?.16:.3);
   w.shake(0.35);
-  w.spawn(new RingFx(p.x, p.y - 6, radius, 0.4, color, 3));
-  w.spawn(new RingFx(p.x, p.y - 6, radius * 0.6, 0.3, '#ffffff', 2));
+  if (presentation === 'focus') {
+    w.spawn(new RingFx(p.x, p.y - 6, 23, 0.22, color, 1));
+  } else {
+    w.spawn(new RingFx(p.x, p.y - 6, radius, 0.4, color, 3));
+    w.spawn(new RingFx(p.x, p.y - 6, radius * 0.6, 0.3, '#ffffff', 2));
+  }
   clearBullets(w, p.x, p.y, radius * 1.3);
 }
 

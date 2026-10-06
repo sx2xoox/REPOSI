@@ -18,6 +18,7 @@
 // buttons (`Scene.touchBack`, `Scene.touchButtons()`).
 
 import { app } from '../game/app';
+import { landscapePromptShown } from './orientation';
 import { input, type Action } from '../engine/input';
 import { isTouchDevice, save } from '../engine/save';
 import type { Renderer } from '../engine/renderer';
@@ -578,16 +579,7 @@ export class TouchControls {
       this.ret.a = 0;
     }
     // turning a phone to portrait mid-run pauses the game
-    if (g && !g.world.paused && touchUiActive() && this.portraitPhone()) input.touchTap('pause');
-  }
-
-  /** Same condition as the CSS rotate prompt (index.html / style.css). */
-  private portraitPhone(): boolean {
-    try {
-      return typeof window !== 'undefined' && !!window.matchMedia?.('(orientation: portrait) and (pointer: coarse)').matches;
-    } catch {
-      return false;
-    }
+    if (g && !g.net && !g.world.paused && touchUiActive() && landscapePromptShown()) input.touchTap('pause');
   }
 
   // ------------------------------------------------------------ drawing

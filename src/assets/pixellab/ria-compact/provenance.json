@@ -1,0 +1,8 @@
+{
+  "characterId": "61b628f9-577a-4cda-8401-4e383553cbee",
+  "sourceImageId": "25e07845-a2f4-5236-9196-4cc44253241d",
+  "provider": "PixelLab",
+  "animationGroup": "a3869b42-da74-47c6-8c5c-878183def4ad",
+  "date": "2026-10-04",
+  "note": "Native 32px rotations and 40px walking canvases. No resampling. South opaque bounds reduced from 23x27 to 20x25. Originals retained under ria."
+}

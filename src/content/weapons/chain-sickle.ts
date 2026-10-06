@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // 사슬낫 (chain sickle): a sickle on a chain swept in a huge arc around the
 // wielder. Slow, very wide, and the hooked blade drags enemies closer.
 
@@ -49,7 +50,7 @@ defineWeapon({
   update(w, p, st, _dt, firing, aim) {
     if (!attackInput(st, w, firing) || st.cooldown > 0) return;
     consumeAttack(st);
-    const s = p.stats;
+    const s = p.weaponStats;
     const dir = st.combo % 2 ? -1 : 1;
     st.sinceAttack = 0;
     w.items.onAttack(aim);
@@ -69,12 +70,12 @@ defineWeapon({
   },
   draw(w, p, r, st) {
     const pose = swingPose(st, w, meleeRest(st, p.aim));
-    const h = handPos(p, pose.angle, 4);
+    const h = visualHandPos(p, pose.angle, 4);
     // chain length: extended while swinging, short and dangling at rest
     const ext = pose.phase === 1 ? 1 : pose.phase === 2 ? 0.9 : pose.phase === 3 ? 0.9 * (1 - pose.t) : 0;
     const len = 6 + ext * ((st.mem.reach ?? 40) - 12);
-    const sx = p.x + Math.cos(pose.angle) * (4 + len);
-    const sy = p.y - 5 + Math.sin(pose.angle) * (4 + len) * 0.8 + (ext === 0 ? 3 : 0);
+    const sx = h.x + Math.cos(pose.angle) * len;
+    const sy = h.y + Math.sin(pose.angle) * len * 0.8 + (ext === 0 ? 3 : 0);
     // dotted chain
     const n = Math.max(2, Math.round(len / 3));
     for (let i = 1; i < n; i++) {
@@ -82,7 +83,7 @@ defineWeapon({
       const sag = ext === 0 ? Math.sin(k * Math.PI) * 2 : 0;
       r.rect(Math.round(h.x + (sx - h.x) * k), Math.round(h.y + (sy - h.y) * k + sag), 1, 1, i % 2 ? '#8a92ac' : '#c8d0e4');
     }
-    pixLine(r, p.x + Math.cos(pose.angle) * 2, p.y - 5, h.x, h.y, '#5a3a24');
+    pixLine(r, h.x - Math.cos(pose.angle) * 2, h.y - Math.sin(pose.angle) * 2, h.x, h.y, '#5a3a24');
     r.sprite('w_sickle', sx, sy, { rot: pose.angle + (st.mem.restSide ?? 1) * 0.6, flipY: (st.mem.restSide ?? 1) < 0 });
   },
 });

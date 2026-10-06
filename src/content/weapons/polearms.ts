@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // Reach weapons:
 //  용아창     (fang_spear, rare) — three lightning-quick stabs per attack
 //  가시 채찍  (thorn_whip, rare) — very long reach; the tip cracks for double damage
@@ -55,7 +56,7 @@ defineWeapon({
     m.mulStat('fireRate', 0.62);
   },
   update(w, p, st, dt, firing, aim) {
-    const s = p.stats;
+    const s = p.weaponStats;
     if ((st.mem.stabs ?? 0) > 0) {
       st.mem.stabT = (st.mem.stabT ?? 0) - dt;
       if (st.mem.stabT <= 0) {
@@ -136,7 +137,7 @@ defineWeapon({
   update(w, p, st, _dt, firing, aim) {
     if (!attackInput(st, w, firing) || st.cooldown > 0) return;
     consumeAttack(st);
-    const s = p.stats;
+    const s = p.weaponStats;
     beginAttack(w, p, st, aim);
     st.cooldown = attackInterval(p);
     const reach = whipReach(s.range);
@@ -170,7 +171,7 @@ defineWeapon({
   draw(w, p, r, st) {
     const t = (w.time - (st.mem.whipAt ?? -9)) / 0.24;
     const a = t >= 0 && t < 1 ? st.mem.whipA ?? p.aim : p.aim + (Math.cos(p.aim) >= 0 ? 0.6 : -0.6);
-    const h = handPos(p, a, 6);
+    const h = visualHandPos(p, a, 6);
     drawHeld(r, p, 'w_thorn_whip_handle', a, 4);
     const hx = h.x + Math.cos(a) * 5;
     const hy = h.y + Math.sin(a) * 4;
@@ -322,7 +323,7 @@ defineWeapon({
   update(w, p, st, _dt, firing, aim) {
     if (!attackInput(st, w, firing) || st.cooldown > 0) return;
     consumeAttack(st);
-    const s = p.stats;
+    const s = p.weaponStats;
     const iv = attackInterval(p);
     const step = st.combo % 3;
     beginAttack(w, p, st, aim);

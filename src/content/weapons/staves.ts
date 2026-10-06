@@ -1,3 +1,4 @@
+import { visualHandPos } from '../../game/weapon-pose';
 // Staves:
 //  수정 연사봉   (crystal_gatling, epic) — spins up into a hail of crystal shards
 //  프리즘 광선봉 (prism_staff, rare)     — instant rainbow beam that pierces all
@@ -70,7 +71,7 @@ defineWeapon({
     m.mulStat('shotSpeed', 1.3);
   },
   update(w, p, st, dt, firing, aim) {
-    const s = p.stats;
+    const s = p.weaponStats;
     const spin = st.mem.spin ?? 0;
     st.mem.spin = clamp(spin + (firing ? dt / 0.9 : -dt / 0.6), 0, 1);
     st.mem.rot = (st.mem.rot ?? 0) + dt * (2 + st.mem.spin * 26);
@@ -117,7 +118,7 @@ defineWeapon({
     const rec = shotFade(st, w, 0.05);
     drawHeld(r, p, 'w_crystal_staff', p.aim, 5 - rec * 1.2 + fx.range(-0.3, 0.3) * spin);
     // three crystals orbit the head (faster with spin-up)
-    const h = handPos(p, p.aim, 17 - rec);
+    const h = visualHandPos(p, p.aim, 17 - rec);
     const rot = st.mem.rot ?? 0;
     for (let i = 0; i < 3; i++) {
       const a = rot + (i / 3) * Math.PI * 2;
@@ -231,7 +232,7 @@ defineWeapon({
     if (!firing || st.cooldown > 0) return;
     beginAttack(w, p, st, aim);
     st.cooldown = attackInterval(p);
-    const s = p.stats;
+    const s = p.weaponStats;
     const spectral = p.flags.has('spectral');
     const width = 3 + s.projSize * 0.8;
     const count = s.shots;
@@ -269,7 +270,7 @@ defineWeapon({
   draw(w, p, r, st) {
     const f = shotFade(st, w, 0.14);
     drawHeld(r, p, 'w_prism_staff', p.aim, 5 - f * 2, { flash: f * 0.5 });
-    const h = handPos(p, p.aim, 16 - f * 2);
+    const h = visualHandPos(p, p.aim, 16 - f * 2);
     r.sprite(glowSprite(8 + f * 8, PRISM[Math.floor(w.time * 6) % 5]), h.x, h.y, { alpha: 0.3 + f * 0.4, additive: true });
   },
 });
@@ -344,7 +345,7 @@ defineWeapon({
       st.mem.on = 0;
       return;
     }
-    const s = p.stats;
+    const s = p.weaponStats;
     if (!st.mem.on) {
       st.mem.on = 1;
       w.sfx('fire', { vol: 0.5, pitch: 0.7 });
@@ -376,7 +377,7 @@ defineWeapon({
   draw(w, p, r, st) {
     const on = !!st.mem.on && w.time - p.lastAttackAt < 0.1;
     drawHeld(r, p, 'w_dragon_breath', p.aim, 5 - p.recoil + (on ? fx.range(-0.4, 0.4) : 0));
-    const h = handPos(p, p.aim, 20);
+    const h = visualHandPos(p, p.aim, 20);
     const fl = 1 + 0.25 * Math.sin(w.time * 29) + (on ? 0.6 : 0);
     r.sprite(glowSprite(7 * fl, '#ff7a20'), h.x, h.y, { alpha: on ? 0.7 : 0.35, additive: true });
   },
@@ -430,7 +431,7 @@ defineWeapon({
     if (!firing || st.cooldown > 0) return;
     beginAttack(w, p, st, aim);
     st.cooldown = attackInterval(p);
-    const s = p.stats;
+    const s = p.weaponStats;
     const o = handPos(p, aim, 17);
     const reach = s.range * 0.75;
     let target = enemyInCone(w, o.x, o.y, aim, 0.55, reach);
@@ -476,7 +477,7 @@ defineWeapon({
   draw(w, p, r, st) {
     const f = shotFade(st, w, 0.16);
     drawHeld(r, p, 'w_thunder_rod', p.aim, 5 - f * 2, { flash: f * 0.6 });
-    const h = handPos(p, p.aim, 18);
+    const h = visualHandPos(p, p.aim, 18);
     if (fx.chance(0.25 + f)) r.rect(Math.round(h.x + fx.range(-2, 2)), Math.round(h.y + fx.range(-2, 2)), 1, 1, '#ffffff');
     r.sprite(glowSprite(6 + f * 10 + Math.sin(w.time * 17), '#8ad8ff'), h.x, h.y, { alpha: 0.4 + f * 0.4, additive: true });
   },

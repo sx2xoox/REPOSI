@@ -16,6 +16,7 @@ import { TILE } from '../../game/constants';
 import { Tile, tileProps } from '../../game/tiles';
 import { defineDrawnSprite, hasSprite } from '../../engine/sprites';
 import { bayer } from '../../engine/painter';
+import { visualHandPos } from '../../game/weapon-pose';
 
 export const O = '#0c0810';
 
@@ -26,7 +27,7 @@ export function handPos(p: Player, angle: number, dist: number): { x: number; y:
 
 /** Draw a held sprite (authored pointing right, pivot at the grip) toward `angle`. */
 export function drawHeld(r: Renderer, p: Player, sprite: string, angle: number, dist: number, o: DrawOpts = {}): void {
-  const h = handPos(p, angle, dist);
+  const h = visualHandPos(p, angle, dist);
   r.sprite(sprite, h.x, h.y, { rot: angle, flipY: Math.cos(angle) < 0, ...o });
 }
 

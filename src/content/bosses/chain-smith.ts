@@ -1,3 +1,5 @@
+import { furnaceDischarge } from './laser-patterns';
+import { pickBossPattern } from './tactics';
 // Floor 3 boss: 사슬 대장장이 (the chain smith) — 식지 않는 모루.
 // A towering iron automaton in a scorched leather apron: a furnace burns in its
 // grated belly, a war hammer in one fist, a hooked chain wound round the other.
@@ -742,7 +744,7 @@ defineBoss({
   name: NAME,
   bossTitle: '식지 않는 모루',
   bossFloors: [3],
-  hp: 950,
+  hp: 1070,
   radius: 16,
   speed: 32,
   mass: 10,
@@ -763,8 +765,9 @@ defineBoss({
     while (true) {
       if (e.phase === 0 && e.hp <= e.maxHp * 0.5) yield* phaseTwo(e, w);
       const p2 = !!e.mem.p2;
-      const id = pickPattern(w.rng, [
+      const id = pickBossPattern(e, w, [
         { id: 'strike', w: 3 },
+        { id: 'furnace', w: 2.4, when: e.age - (e.mem.lastLaserAt ?? -99) > 12 },
         { id: 'hook', w: 2.2 },
         { id: 'slag', w: 2 },
         { id: 'bellows', w: 2 },
@@ -772,7 +775,8 @@ defineBoss({
         { id: 'imps', w: 1, when: p2 && minionCount(w, e) === 0 && w.enemies.length < 4 },
       ], e.mem.last as string | null);
       e.mem.last = id;
-      if (id === 'strike') yield* anvilStrike(e, w);
+      if (id === 'furnace') yield* furnaceDischarge(e, w);
+      else if (id === 'strike') yield* anvilStrike(e, w);
       else if (id === 'hook') yield* hookThrow(e, w);
       else if (id === 'slag') yield* slagLob(e, w);
       else if (id === 'bellows') yield* bellows(e, w);
@@ -788,8 +792,8 @@ defineBoss({
         yield 0.8;
       }
       anim(e, 'idle');
-      yield p2 ? 0.35 : 0.6;
-      yield* walkTo(e, w, p2 ? 0.5 : 0.8, 70);
+      yield p2 ? 0.2 : 0.3;
+      yield* walkTo(e, w, p2 ? 0.25 : 0.4, 90);
     }
   },
   update(e, w) {

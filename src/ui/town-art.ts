@@ -1,4 +1,6 @@
 import { PixelPainter } from '../engine/painter';
+import { sceneryArt } from './pixellab-scenery';
+import { pixelArt } from './pixellab-art';
 
 import { Themes } from '../game/defs';
 import { RNG } from '../engine/rng';
@@ -13,6 +15,15 @@ export { residentArt } from './town-residents';
 export function townArt(): HTMLCanvasElement {
   if (cached) return cached;
   const p = new PixelPainter(TOWN_W, TOWN_H);
+  const generated=(key:string,x:number,y:number):boolean=>{
+    const canvas=sceneryArt(key)??pixelArt('town/'+key);if(!canvas)return false;
+    const rgba=canvas.getContext('2d')!.getImageData(0,0,canvas.width,canvas.height).data;
+    const stamp=new PixelPainter(canvas.width,canvas.height);stamp.data.set(new Uint32Array(rgba.buffer));p.blit(stamp,x,y);return true;
+  };
+  const stone=pixelArt('town/stone-floor'),soil=pixelArt('town/soil-floor');
+  const stonePixels=stone?.getContext('2d')!.getImageData(0,0,stone.width,stone.height).data;
+  const soilPixels=soil?.getContext('2d')!.getImageData(0,0,soil.width,soil.height).data;
+  const stoneData=stonePixels?new Uint32Array(stonePixels.buffer):null,soilData=soilPixels?new Uint32Array(soilPixels.buffer):null;
   const n = (x: number, y: number, salt = 0) => {
     let v = Math.imul(x + salt * 71, 374761393) ^ Math.imul(y + 97, 668265263);
     v = Math.imul(v ^ (v >>> 13), 1274126177); return (v ^ (v >>> 16)) >>> 0;
@@ -22,6 +33,32 @@ export function townArt(): HTMLCanvasElement {
   const tile = new PixelPainter(TILE, TILE);
   for(let ty=0;ty<TOWN_H/TILE;ty++)for(let tx=0;tx<TOWN_W/TILE;tx++){
     theme.paintFloor!(tile,tx,ty,new RNG(tx*977+ty*7919+71));p.blit(tile,tx*TILE,ty*TILE);
+  }
+  // Worn routes connect occupied buildings; soil, moss and small gardens break up the old dungeon grid.
+  for(let y=68;y<373;y++)for(let x=29;x<TOWN_W-29;x++){
+    const lane=Math.abs(y-246)<22||Math.abs(x-383)<23||
+      (x>130&&x<220&&y>203&&y<252)||(x>552&&x<635&&y>194&&y<254)||
+      (x>543&&x<607&&y>247)||(y>312&&y<343&&x>323&&x<586);
+    if(!lane){
+      const n=vnoise(x/19,y/15,817),grain=hash2(x,y,101);
+      const c=n>.56?'#263b36':n>.43?'#293431':'#302f32';
+      if(soil&&soilData)p.data[y*p.w+x]=soilData[(y%soil.height)*soil.width+x%soil.width];else p.px(x,y,c);
+      if(grain>.996&&n>.48)p.px(x,y,'#52604b');
+    }else if(stone&&stoneData){p.data[y*p.w+x]=stoneData[(y%stone.height)*stone.width+x%stone.width];}
+    else if(hash2(Math.floor(x/4),Math.floor(y/4),418)>.82){blendPx(p,x,y,'#716558',.12);}
+  }
+  // Garden fences, hanging linen and a working forge create occupied edges around clear walking lanes.
+  if(!generated('town_laundry',62,174))for(const x of [65,105]){p.rect(x,187,3,24,'#514137');p.line(x,187,x+1,187,'#b19a72');}
+  if(!generated('forge-v2',207,180)){
+  p.rect(211,215,20,13,'#272733');p.rect(213,216,16,3,'#7d7170');
+  p.rect(215,220,10,7,'#160f1c');p.rect(217,222,6,3,'#b3633c');
+  p.poly([223,211,228,207,244,207,242,212,231,215,229,220,220,220],'#777986');
+  p.line(228,207,243,207,'#c3b7a0');p.rect(228,219,5,7,'#49404b');
+  }
+  for(const [x,y] of [[78,286],[670,270]]){
+    if(generated('town_herbs',x-2,y-10))continue;
+    p.rect(x,y,39,22,'#211f29');p.rect(x+1,y,37,2,'#79705c');
+    for(let i=0;i<4;i++){p.line(x+6+i*9,y+3,x+6+i*9,y+19,'#465847');p.ellipse(x+5+i*9,y+9,3,2,'#708361');p.px(x+7+i*9,y+7,'#bfb475');}
   }
   // Ruined sanctuary walls keep the exact masonry, bevel and dither language of the dungeon.
   paintMasonry(p,masonry,0,20,TOWN_W,37,170);
@@ -125,10 +162,11 @@ export function townArt(): HTMLCanvasElement {
       for (let j = 0; j < 5; j++) p.rect(x - 4 + j * 3, y + h, 2, 7, ['#758c83', '#9e6f59', '#c1a273'][j % 3]);
     }
   };
-  house(118, 168, 80, ['#513442', '#74505c', '#a17676', '#261b2b'], 0);
-  house(302, 95, 70, ['#35384f', '#505771', '#7c8098', '#1d1c30'], 1);
-  house(543, 156, 86, ['#32444a', '#4c6263', '#758880', '#18252f'], 2);
+  if(!generated('keeper-house',112,116))house(118, 168, 80, ['#513442', '#74505c', '#a17676', '#261b2b'], 0);
+  if(!generated('sanctuary',293,47))house(302, 95, 70, ['#35384f', '#505771', '#7c8098', '#1d1c30'], 1);
+  if(!generated('archive',536,104))house(543, 156, 86, ['#32444a', '#4c6263', '#758880', '#18252f'], 2);
   // Raised lantern court: thick stone steps, iron arch and worn bronze crest.
+  if(!generated('lantern-court',352,156)){
   shadowEllipse(p,388,222,34,12,.55);
   for(let step=0;step<3;step++){
     p.ellipse(384,215-step*4,30-step*4,10-step*2,'#34303f');
@@ -140,23 +178,28 @@ export function townArt(): HTMLCanvasElement {
   }
   p.poly([364,176,367,163,378,157,393,157,405,164,410,176,403,172,398,165,377,165,370,173],'#756678');
   p.line(371,163,398,161,'#c3aa85');p.line(384,163,384,188,'#ad8d58');p.circle(384,158,3,'#d6b87c');
+  }
   // Garden beds and benches form two lanes leading toward the cooperative dock.
   for(const [x,y,w] of [[256,275,63],[440,276,56]]){
+    if(generated('garden-v2',x,y-12))continue;
     paintMasonry(p,masonry,x,y,w,18,73);p.rect(x+2,y+1,w-4,5,'#1c1b29');
     for(let j=4;j<w-3;j+=5){p.ellipse(x+j,y+1,4,4,'#30433f');p.line(x+j-2,y-1,x+j+1,y-2,'#6c7f60');}
   }
   for(const [x,y] of [[127,241],[652,205],[285,132],[655,341]]){
+    if(generated('town_barrel',x-12,y-20))continue;
     shadowEllipse(p,x+3,y+7,9,4,.45);p.ellipse(x,y,7,4,'#9a7754');p.rect(x-7,y,14,10,'#755339');
     p.ellipse(x,y+9,7,3,'#59423a');p.ellipse(x,y,6,3,'#b39363');
     p.line(x-5,y+3,x+5,y+3,'#9f9690');p.line(x-5,y+8,x+5,y+8,'#343341');
   }
   for(const [x,y] of [[332,331],[451,131]]){
+    if(generated('town_bench',x-4,y-13))continue;
     p.poly([x,y,x+5,y-5,x+36,y-5,x+31,y],'#9e8061');p.rect(x,y,31,4,'#604838');
     p.rect(x+3,y+4,3,7,'#322934');p.rect(x+26,y+4,3,7,'#322934');
   }
   p.rect(0,386,TOWN_W,46,'#101d32');
   for(let y=389;y<TOWN_H;y+=4)for(let x=0;x<TOWN_W;x+=13){const k=n(x,y);if(k%3)p.line(x,y,x+4+k%7,y,k%2?'#23354d':'#304660');}
   for(let x=0;x<TOWN_W;x+=14){paintMasonry(p,masonry,x,376,13,11,x+17);p.line(x,375,x+12,375,'#847b8d');}
+  if(!generated('town_dock_wide',536,339)){
   for(let y=340;y<416;y+=5){
     p.rect(539,y,75,4,'#5c443c');p.line(539,y,613,y,'#a38363');
     for(let x=542;x<611;x+=15){p.px(x,y+2,'#222131');p.line(x+3,y+2,x+10,y+2,'#735444');}
@@ -164,11 +207,15 @@ export function townArt(): HTMLCanvasElement {
   for(const x of [536,613])for(const y of [346,384,411]){
     p.rect(x,y,5,13,'#45333a');p.ellipse(x+2,y,4,2,'#b69768');p.line(x+1,y+3,x+1,y+10,'#8c6b50');
   }
+  }
+  if(!generated('boat-v2',627,377)){
   p.poly([634,399,650,388,668,398,660,419,641,419],'#8c694b');
   p.poly([638,399,650,392,664,399,658,414,644,414],'#242a37');
   p.line(641,400,661,407,'#c4aa7c');p.line(655,394,645,421,'#d1b985');
+  }
   for(const [cx,cy,radius] of [[40,113,13],[714,97,16],[54,328,21],[704,323,21],[232,105,10],[489,338,11]]){
     shadowEllipse(p,cx+5,cy+9,radius+4,6,.45);
+    if(generated('town_shrub',cx-20,cy-25))continue;
     for(let j=0;j<9;j++){
       const x=cx+(hash2(j,cx,4)-.5)*radius*1.6,y=cy+(hash2(j,cy,7)-.5)*radius;
       p.ellipse(x,y,5+j%4,5+j%3,'#182730');p.shadeSphere(x,y,5+j%4,5+j%3,['#101821','#1c2c31','#30403e','#4d5b4c','#758064']);

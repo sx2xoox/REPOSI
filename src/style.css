@@ -128,10 +128,8 @@ canvas#game {
   0%, 30% { transform: rotate(0deg); }
   60%, 100% { transform: rotate(-90deg); }
 }
-@media (orientation: portrait) and (pointer: coarse) {
-  #rotate {
-    display: flex;
-  }
+.needs-landscape #rotate {
+  display: flex;
 }
 #boot {
   position: fixed;

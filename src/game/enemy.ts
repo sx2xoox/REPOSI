@@ -124,8 +124,8 @@ export class Enemy extends Actor {
       this.wantVX = d.x * this.speed;
       this.wantVY = d.y * this.speed;
     } else if (!this.hasStatus('freeze') && !this.hasStatus('stun')) {
-      this.script.update(edt);
-      this.def.update?.(this, w, edt);
+      this.script.update(edt * (this.mem.elite && this.telegraphT <= 0 && Math.hypot(this.wantVX, this.wantVY) < 1 ? 1 / .65 : 1));
+      if (!this.mem.siege) this.def.update?.(this, w, edt);
     }
 
     // accelerate toward desired velocity
@@ -350,6 +350,7 @@ export class Enemy extends Actor {
       owner: this,
       ...o,
     });
+    p.enemyDamageScale = this.enemyDamageScale;
     if (this.champion && !o.color) p.color = '#ff9a3a';
     w.spawn(p);
     return p;
@@ -398,7 +399,7 @@ export class Enemy extends Actor {
     if (this.hidden) return;
     const shadowW = this.def.shadow ?? this.r * 2;
     if (shadowW > 0) r.shadow(this.x, this.y + this.r * 0.5, shadowW * (1 - Math.min(0.5, this.z / 80)), undefined, 0.3);
-    if (this.champion) {
+    if (this.champion || this.mem.elite) {
       // A stable ground marker remains readable through hit flashes and tints.
       r.ring(this.x, this.y + 2, this.r + 4, '#140c1c', 3, 0.8);
       r.ring(this.x, this.y + 2, this.r + 4, this.championColor || '#ffba60', 1, 0.9);

@@ -1,3 +1,4 @@
+import { pickBossPattern } from './tactics';
 // Floor 6 boss: 가라앉은 등대 (the Sunken Lighthouse) — 물속에서도 꺼지지 않는 빛.
 // A living drowned lighthouse: a barnacled stone tower whose lamp still turns. Its
 // rotating beam is a lethal sweep of light — hide behind the collapsed bookshelves
@@ -1231,7 +1232,7 @@ function* patterns(e: Enemy, w: World): Script {
   while (true) {
     const p2 = !!e.mem.p2;
     const sinceDark = e.age - (e.mem.darkAt ?? -99);
-    const id = pickPattern(w.rng, [
+    const id = pickBossPattern(e, w, [
       { id: 'sweep', w: 3.2 },
       { id: 'split', w: 2.4, when: p2 },
       { id: 'blackout', w: 3.2, when: p2 && sinceDark > 22 },
@@ -1250,7 +1251,7 @@ function* patterns(e: Enemy, w: World): Script {
     else if (id === 'flash') yield* flashes(e, w);
     else if (id === 'horn') yield* foghorn(e, w);
     else yield* summonSailors(e, w, 2);
-    yield* wade(e, w, p2 ? w.rng.range(0.8, 1.2) : w.rng.range(1.1, 1.6));
+    yield* wade(e, w, p2 ? w.rng.range(0.45, 0.65) : w.rng.range(0.6, 0.9));
   }
 }
 
@@ -1292,7 +1293,7 @@ defineBoss({
   bossTitle: '물속에서도 꺼지지 않는 빛',
   bossFloors: [6],
   bossMusic: 'boss_drowned',
-  hp: 880,
+  hp: 990,
   radius: 15,
   speed: 16,
   mass: Infinity,

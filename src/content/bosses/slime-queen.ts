@@ -1,3 +1,4 @@
+import { bossIntercept, pickBossPattern } from './tactics';
 // Floor 2 boss: 점액 여왕 (the slime queen) — 왕관을 삼킨 군체.
 // A colossal amber jelly that swallowed a king's crown (and the king). Bones,
 // coins and the crown float inside it; it hops with royal disdain.
@@ -282,8 +283,8 @@ function* leap(e: Enemy, w: World): Script {
   const wind = [0.55, 0.45, 0.36][Math.min(2, ph)];
   const air = 0.78;
   const t = e.target(w);
-  const p = w.player;
-  const land = bodyFor(w, e, t.x + p.vx * 0.25, t.y + p.vy * 0.25);
+  const aim = bossIntercept(t);
+  const land = bodyFor(w, e, aim.x, aim.y);
   e.telegraph(wind);
   w.spawn(new GroundWarning(land.x, land.y + e.r * 0.45, e.r + 12, wind + air));
   w.sfx('enemy_charge', { vol: 0.5, pitch: 0.7 });
@@ -450,7 +451,7 @@ defineBoss({
   name: NAME,
   bossTitle: '왕관을 삼킨 군체',
   bossFloors: [2],
-  hp: 760,
+  hp: 850,
   radius: 20,
   speed: 0,
   mass: 6,
@@ -473,7 +474,7 @@ defineBoss({
       const want = phaseFor(e.hp / e.maxHp, [0.6, 0.3]);
       while (e.phase < want) yield* shed(e, w, e.phase + 1);
       const ph = e.phase;
-      const id = pickPattern(w.rng, [
+      const id = pickBossPattern(e, w, [
         { id: 'leap', w: 3 },
         { id: 'hops', w: 2.4 },
         { id: 'globs', w: 2.2 },
@@ -485,7 +486,7 @@ defineBoss({
       else if (id === 'globs') yield* globVolley(e, w);
       else yield* crownCrush(e, w);
       anim(e, 'idle');
-      yield [0.7, 0.5, 0.35][Math.min(2, ph)];
+      yield [0.4, 0.28, 0.2][Math.min(2, ph)];
     }
   },
   update(e, w) {

@@ -1,3 +1,4 @@
+import { pickBossPattern } from './tactics';
 // Floor 5 final boss: 무명 (無明) — 등불을 삼킨 어둠.
 // A great iron lantern whose flame was eaten by a single void eye, with two shadow
 // hands and four braziers (the last lights of the abyss) burning in the arena corners.
@@ -915,7 +916,7 @@ function* patterns(e: Enemy, w: World): Script {
   while (true) {
     const ph = e.phase;
     const since = e.age - (e.mem.devourAt ?? -99);
-    const id = pickPattern(w.rng, [
+    const id = pickBossPattern(e, w, [
       { id: 'slam', w: 3 },
       { id: 'gaze', w: 2.5 },
       { id: 'rings', w: 2.4 },
@@ -932,7 +933,7 @@ function* patterns(e: Enemy, w: World): Script {
     else if (id === 'claw') yield* claws(e, w);
     else if (id === 'spiral') yield* voidSpiral(e, w);
     else yield* devour(e, w);
-    yield* hover(e, w, ph >= 2 ? w.rng.range(0.5, 0.8) : w.rng.range(0.8, 1.3));
+    yield* hover(e, w, ph >= 2 ? w.rng.range(0.3, 0.45) : w.rng.range(0.45, 0.75));
   }
 }
 
@@ -1021,7 +1022,7 @@ defineBoss({
   bossTitle: '등불을 삼킨 어둠',
   bossFloors: [5],
   bossMusic: 'boss_final',
-  hp: 1150,
+  hp: 1290,
   radius: 22,
   speed: 40,
   mass: 30,

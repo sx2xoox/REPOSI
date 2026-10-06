@@ -1,0 +1,11 @@
+{
+  "provider": "PixelLab",
+  "tool": "edit_image",
+  "jobId": "eef96ee8-92c4-4a2c-adb5-98e9559c8cab",
+  "seed": 20261005,
+  "dimensions": [128, 144],
+  "purpose": "Shared player dialogue portrait based on Ria",
+  "reference": "src/assets/npc/ria-portrait.png",
+  "processing": "Generated PNG preserved unchanged; rendered at native 128x144 UI pixels without intermediate downsampling",
+  "date": "2026-10-04"
+}

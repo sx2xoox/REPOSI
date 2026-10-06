@@ -152,6 +152,7 @@ defineCharacter({
     invuln: 1.1,
   },
   unlocked: false,
+  unlockRequirement: '누적 사망 3회 후 다음 원정 시작',
   unlockHint: '세 번 쓰러지면, 구조견이 당신의 냄새를 찾아온다.',
   lightColor: '#ffd9b0',
   lightRadius: 105,

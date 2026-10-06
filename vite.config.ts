@@ -117,6 +117,9 @@ function stripPwaLinks(): Plugin {
 // that can be opened directly from disk or published anywhere.
 export default defineConfig(({ mode, command }) => ({
   base: './',
+  // Playtesting must survive source/art edits. Refresh explicitly between runs;
+  // a hot replacement can reset registries or reload an active co-op session.
+  server: { hmr: false, watch: { ignored: ['**/test-results/**'] } },
   define: {
     __LK_BUILD__: JSON.stringify(buildId(command)),
   },

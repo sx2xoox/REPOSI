@@ -1,3 +1,5 @@
+import { clockChime } from './laser-patterns';
+import { pickBossPattern } from './tactics';
 // Floor 7 boss: 시계장인 (the Clockmaker) — 시간을 되감는 태엽 장인.
 // A gaunt porcelain-faced automaton craftsman grown into the spire's great clock: his
 // thin body rises out of the dial, a loupe over one eye, a crown of cogs, a winding key
@@ -848,8 +850,9 @@ function* patterns(e: Enemy, w: World): Script {
     const p2 = !!e.mem.p2;
     const wells = w.entities.some((x) => x instanceof TimeWell && !x.dead);
     const sinceStop = e.age - (e.mem.stopAt ?? -99);
-    const id = pickPattern(w.rng, [
+    const id = pickBossPattern(e, w, [
       { id: 'freeze', w: 3 },
+      { id: 'chime', w: 2.6, when: e.age - (e.mem.lastLaserAt ?? -99) > 13 },
       { id: 'rewind', w: 2.6 },
       { id: 'hands', w: 2.6 },
       { id: 'wells', w: 2.0, when: !wells },
@@ -858,7 +861,8 @@ function* patterns(e: Enemy, w: World): Script {
       { id: 'stop', w: 3.2, when: p2 && sinceStop > 16 },
     ], e.mem.last as string | null);
     e.mem.last = id;
-    if (id === 'freeze') yield* frozenVolley(e, w);
+    if (id === 'chime') yield* clockChime(e, w);
+    else if (id === 'freeze') yield* frozenVolley(e, w);
     else if (id === 'rewind') yield* rewindVolley(e, w);
     else if (id === 'hands') yield* handSweep(e, w);
     else if (id === 'wells') yield* timeWells(e, w);
@@ -866,7 +870,7 @@ function* patterns(e: Enemy, w: World): Script {
     else if (id === 'summon') yield* summonSoldiers(e, w, 2);
     else yield* timeStop(e, w);
     if (w.rng.chance(p2 ? 0.8 : 0.65)) yield* skip(e, w);
-    yield p2 ? w.rng.range(0.35, 0.6) : w.rng.range(0.6, 0.9);
+    yield p2 ? w.rng.range(0.25, 0.4) : w.rng.range(0.35, 0.55);
   }
 }
 
@@ -887,7 +891,7 @@ defineBoss({
   bossTitle: '시간을 되감는 태엽 장인',
   bossFloors: [7],
   bossMusic: 'boss_clockwork',
-  hp: 920,
+  hp: 1030,
   radius: 15,
   speed: 0,
   mass: Infinity,

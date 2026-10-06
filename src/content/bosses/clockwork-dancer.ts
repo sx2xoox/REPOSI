@@ -1,3 +1,4 @@
+import { pickBossPattern } from './tactics';
 // Floor 7 boss: 태엽 무희 (the Clockwork Dancer) — 음악상자 위의 도자기 무희.
 // A porcelain ballerina automaton stepped down off a giant music box: cream porcelain
 // skin with painted cheeks, a verdigris tutu trimmed in brass, a brass bun with a
@@ -811,7 +812,7 @@ function* patterns(e: Enemy, w: World): Script {
     const p2 = !!e.mem.p2;
     const ghosts = w.entities.some((x) => x instanceof GhostDancer && !x.dead);
     const near = e.distToTarget(w) < 110;
-    const id = pickPattern(w.rng, [
+    const id = pickBossPattern(e, w, [
       { id: 'pirouette', w: 3 },
       { id: 'skirt', w: 2.4 },
       { id: 'pins', w: 2.4 },
@@ -828,7 +829,7 @@ function* patterns(e: Enemy, w: World): Script {
     else if (id === 'leap') yield* leap(e, w);
     else if (id === 'ribbons') yield* ribbons(e, w);
     else yield* pirouette(e, w, true);
-    yield* glide(e, w, p2 ? w.rng.range(0.7, 1.1) : w.rng.range(1.0, 1.5));
+    yield* glide(e, w, p2 ? w.rng.range(0.35, 0.55) : w.rng.range(0.5, 0.8));
   }
 }
 
@@ -848,7 +849,7 @@ defineBoss({
   bossTitle: '음악상자 위의 도자기 무희',
   bossFloors: [7],
   bossMusic: 'boss_clockwork',
-  hp: 860,
+  hp: 970,
   radius: 10,
   speed: 72,
   mass: 4,

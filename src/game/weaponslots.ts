@@ -1,3 +1,4 @@
+import { isContentTemporarilyLocked } from './release-policy';
 // Two weapon slots (Soul Knight style): the player holds a current weapon and
 // an optional second one, swapped instantly with the 'swap' action (C / mouse
 // wheel / R3 / touch swap button). Only the current weapon's `stats()` apply;
@@ -10,6 +11,7 @@ import type { Player } from './player';
 import type { Renderer } from '../engine/renderer';
 import { Weapons, type WeaponState } from './defs';
 import { clamp, ease } from '../engine/math';
+import { visualHandPos } from './weapon-pose';
 
 /** Seconds of the "draw" animation after a swap / pickup. */
 export const SWAP_ANIM = 0.2;
@@ -18,7 +20,7 @@ export const SWAP_GUARD = 0.12;
 /** Short draw delay before a freshly drawn weapon can attack. */
 export const SWAP_DRAW_DELAY = 0.08;
 
-function freshState(): WeaponState {
+export function freshState(): WeaponState {
   return { cooldown: 0, charge: 0, combo: 0, comboTimer: 0, sinceAttack: 99, anim: 0, mem: {} };
 }
 
@@ -59,7 +61,19 @@ function refreshStats(w: World): void {
  * filled with the previous weapon; with both slots full the current weapon is
  * replaced and its id returned (the caller drops it on a pedestal).
  */
-export function equipWeapon(w: World, p: Player, id: string): string | null {
+export function equipWeapon(w: World, p: Player, id: string, replaceExisting = false): string | null {
+  if (isContentTemporarilyLocked(id)) return null;
+  // A pedestal is an individual copy: exchanging the same model must retain
+  // the old copy on the pedestal, including its own temper and cooldown rules.
+  if (replaceExisting && (id === p.weaponId || id === p.weapon2Id)) {
+    if (id === p.weapon2Id) swapWeapons(w, p, true);
+    holsterWeapon(w, p, id, p.weapon);
+    p.weapon = freshState();
+    p.weapon.cooldown = SWAP_DRAW_DELAY;
+    p.swapAt = w.time;
+    refreshStats(w);
+    return id;
+  }
   if (id === p.weaponId) return null;
   if (id === p.weapon2Id) {
     swapWeapons(w, p, true);
@@ -83,7 +97,7 @@ export function equipWeapon(w: World, p: Player, id: string): string | null {
 
 /** Switch current and second weapon. Returns false when there is nothing to swap to. */
 export function swapWeapons(w: World, p: Player, force = false): boolean {
-  if (!p.weapon2Id) return false;
+  if (!p.weapon2Id || isContentTemporarilyLocked(p.weapon2Id)) return false;
   if (!force && (p.holdT > 0 || w.time - p.swapAt < SWAP_GUARD)) return false;
   const oldId = p.weaponId;
   holsterWeapon(w, p, oldId, p.weapon);
@@ -135,8 +149,9 @@ export function withSwapPop(r: Renderer, w: World, p: Player, draw: () => void):
     return;
   }
   const c = r.ctx;
-  const hx = Math.round(p.x + Math.cos(p.aim) * 7 - r.viewX);
-  const hy = Math.round(p.y - 5 + Math.sin(p.aim) * 5.6 - r.viewY);
+  const hand = visualHandPos(p, p.aim, 7);
+  const hx = Math.round(hand.x - r.viewX);
+  const hy = Math.round(hand.y - r.viewY);
   c.save();
   c.translate(hx, hy);
   c.rotate((1 - k) * (Math.cos(p.aim) >= 0 ? -0.9 : 0.9));

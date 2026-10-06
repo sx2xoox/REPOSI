@@ -41,7 +41,7 @@ export class FadeOut extends Entity {
     this.x = p.x;
     this.y = p.y;
     this.frame = p.frameName();
-    this.flip = p.flip;
+    this.flip = p.spriteFlip;
     this.layer = 2;
     this.tileCollide = false;
   }
@@ -64,6 +64,13 @@ export function drawCoopRings(r: Renderer, w: World): void {
     const col = slotColor(p.slot);
     const a = p.downed ? 0.35 : p === w.local ? 0.85 : 0.65;
     r.ring(p.x, p.y + 4, p === w.local ? 8.5 : 8, col, 1, a);
+    if (p === w.local) {
+      // A second pale ring and four ticks distinguish self without relying on colour.
+      r.ring(p.x, p.y + 4, 11, '#fff4c8', 1, a);
+      for (const [dx, dy] of [[-13, 0], [13, 0], [0, -13], [0, 13]]) {
+        r.rect(p.x + dx - 1, p.y + 3 + dy, 2, 2, '#fff4c8', a);
+      }
+    }
     if (p.downed && p.reviveT > 0) {
       // revive progress: a filling arc of dots around the ghost
       const f = Math.min(1, p.reviveT / REVIVE_TIME);

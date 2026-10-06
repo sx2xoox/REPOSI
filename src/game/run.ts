@@ -1,3 +1,4 @@
+import { isContentTemporarilyLocked } from './release-policy';
 // State of one run that persists across floors (seed, rng streams, pools,
 // identified potions, statistics).
 
@@ -53,7 +54,7 @@ export class RunState {
 
   constructor(seed: string, characterId: string) {
     this.seed = seed;
-    this.characterId = characterId;
+    this.characterId = isContentTemporarilyLocked(characterId) ? 'ria' : characterId;
     this.master = new RNG(seed);
     this.rng = this.master.fork('gameplay');
     this.lootRng = this.master.fork('loot');

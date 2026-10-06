@@ -1,0 +1,141 @@
+{
+  "date": "2026-10-04",
+  "characterId": "dcc8020b-9396-47bd-b947-59382cbda05c",
+  "note": "Final 8 rotations use upright compact character, south refined from ria-face reference edit, four visible side/diagonal eyes refined individually. Walks use those reviewed start frames. Native 32x32 idle, 32x40 walk, no resampling. Earlier tentative batch edits rejected.",
+  "jobs": {
+    "ria-north-walk-job": "character: dcc8020b-9396-47bd-b947-59382cbda05c\nanimation: v3 custom (Upright BIPED walk, TWO booted legs alternately step below hips, like a tiny human adventurer. Preserve exact reference compact 25 pixel figure and clear OPEN dark eyes. Head above shoulders, torso vertical above hips. Hands and lantern stay at waist, never touch floor. Short steps, slight arm swing, no crouch, no crawl, no gallop. Keep head, face, body and eyes stable without morphing or squashing. Fixed direction. Four-frame seamless loop.)\ndirections: north (1 jobs)\ngroup: ed43681d-dba2-47ec-94e0-dd8ae2ff7032\nframes: 4 (reference stripped, keep_first_frame=false)\ncost: 1 generation (1/dir x 1)\neta: ~30-60s/direction\n\nhint: get_character(character_id=\"dcc8020b-9396-47bd-b947-59382cbda05c\")\nadd more directions to this group: animate_character(character_id=\"dcc8020b-9396-47bd-b947-59382cbda05c\", action_description=\"Upright BIPED walk, TWO booted legs alternately step below hips, like a tiny human adventurer. Preserve exact reference compact 25 pixel figure and clear OPEN dark eyes. Head above shoulders, torso vertical above hips. Hands and lantern stay at waist, never touch floor. Short steps, slight arm swing, no crouch, no crawl, no gallop. Keep head, face, body and eyes stable without morphing or squashing. Fixed direction. Four-frame seamless loop.\", animation_group_id=\"ed43681d-dba2-47ec-94e0-dd8ae2ff7032\", directions=[...])",
+    "ria-south-west-eye-job": {
+      "background_job_id": "a8cbd692-0008-4e56-9d80-58482dedba48",
+      "image_id": "f6ba2dff-31c0-56fb-bdee-027eb762d29d",
+      "status": "processing",
+      "source_image_id": "f6ba2dff-31c0-56fb-bdee-027eb762d29d",
+      "job_id": "a8cbd692-0008-4e56-9d80-58482dedba48",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/a8cbd692-0008-4e56-9d80-58482dedba48/download"
+    },
+    "ria-face-job": {
+      "background_job_id": "43fe6465-561c-4ee7-933d-7f923690d986",
+      "image_id": "b468a89b-0841-5a5d-b0ac-022acb9b3f73",
+      "status": "processing",
+      "source_image_id": "b468a89b-0841-5a5d-b0ac-022acb9b3f73",
+      "job_id": "43fe6465-561c-4ee7-933d-7f923690d986",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/43fe6465-561c-4ee7-933d-7f923690d986/download"
+    },
+    "ria-west-walk-job": "character: dcc8020b-9396-47bd-b947-59382cbda05c\nanimation: v3 custom (Upright BIPED walk, TWO booted legs alternately step below hips, like a tiny human adventurer. Preserve exact reference compact 25 pixel figure and clear OPEN dark eyes. Head above shoulders, torso vertical above hips. Hands and lantern stay at waist, never touch floor. Short steps, slight arm swing, no crouch, no crawl, no gallop. Keep head, face, body and eyes stable without morphing or squashing. Fixed direction. Four-frame seamless loop.)\ndirections: west (1 jobs)\ngroup: 16647fc9-df2c-461e-a466-ad114f976f8b\nframes: 4 (reference stripped, keep_first_frame=false)\ncost: 1 generation (1/dir x 1)\neta: ~30-60s/direction\n\nhint: get_character(character_id=\"dcc8020b-9396-47bd-b947-59382cbda05c\")\nadd more directions to this group: animate_character(character_id=\"dcc8020b-9396-47bd-b947-59382cbda05c\", action_description=\"Upright BIPED walk, TWO booted legs alternately step below hips, like a tiny human adventurer. Preserve exact reference compact 25 pixel figure and clear OPEN dark eyes. Head above shoulders, torso vertical above hips. Hands and lantern stay at waist, never touch floor. Short steps, slight arm swing, no crouch, no crawl, no gallop. Keep head, face, body and eyes stable without morphing or squashing. Fixed direction. Four-frame seamless loop.\", animation_group_id=\"16647fc9-df2c-461e-a466-ad114f976f8b\", directions=[...])",
+    "ria-compact-front-job": {
+      "background_job_id": "346fef14-656d-41f7-bf5a-ac26fc658ac6",
+      "image_id": "863c30dd-02d8-5c86-8d33-a1f315f82400",
+      "status": "processing",
+      "source_image_id": "863c30dd-02d8-5c86-8d33-a1f315f82400",
+      "job_id": "346fef14-656d-41f7-bf5a-ac26fc658ac6",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/346fef14-656d-41f7-bf5a-ac26fc658ac6/download"
+    },
+    "ria-south-east-eye-job": {
+      "background_job_id": "99532ee5-b929-42f5-99d5-a28456ff6d65",
+      "image_id": "504ef1ea-1f35-5919-870b-ea53cf4d53ae",
+      "status": "processing",
+      "source_image_id": "504ef1ea-1f35-5919-870b-ea53cf4d53ae",
+      "job_id": "99532ee5-b929-42f5-99d5-a28456ff6d65",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/99532ee5-b929-42f5-99d5-a28456ff6d65/download"
+    },
+    "ria-pupils-job": "id: e62a7705-d784-4b10-87cf-50379e848fe9\njob_id: e62a7705-d784-4b10-87cf-50379e848fe9\nmode: text\nframes: 1\nsize: 32x32px\ntransparent: True\nedit: Change ONLY the two eyes to clearly OPEN large dark chocolate-brown puppy eyes, each a solid dark 2x3 pixel oval with a single tiny cream highlight pixel near top. There must be TWO separate visible dark eyes, one on each side of the nose. NO orange eyes, NO horizontal closed eyelids, NO smile lines instead of pupils. Preserve every other pixel, exact cute face shape, nose, muzzle, hood, upright body pose, lantern, canvas, outline, all colors and character scale.\nseed: 10432\nasset_id: 1de5e919-3d02-53bb-834a-39aebda1271c\nasset_status: pending (saved when generation completes)\ncost: ~20 generations\nstatus: processing (~30-90s)\n\nhint: get_image(job_id=\"e62a7705-d784-4b10-87cf-50379e848fe9\")",
+    "ria-east-walk-job": "character: dcc8020b-9396-47bd-b947-59382cbda05c\nanimation: v3 custom (Upright BIPED walk, TWO booted legs alternately step below hips, like a tiny human adventurer. Preserve exact reference compact 25 pixel figure and clear OPEN dark eyes. Head above shoulders, torso vertical above hips. Hands and lantern stay at waist, never touch floor. Short steps, slight arm swing, no crouch, no crawl, no gallop. Keep head, face, body and eyes stable without morphing or squashing. Fixed direction. Four-frame seamless loop.)\ndirections: east (1 jobs)\ngroup: a7bf31d0-020c-4898-a0a3-fe5db1a85919\nframes: 4 (reference stripped, keep_first_frame=false)\ncost: 1 generation (1/dir x 1)\neta: ~30-60s/direction\n\nhint: get_character(character_id=\"dcc8020b-9396-47bd-b947-59382cbda05c\")\nadd more directions to this group: animate_character(character_id=\"dcc8020b-9396-47bd-b947-59382cbda05c\", action_description=\"Upright BIPED walk, TWO booted legs alternately step below hips, like a tiny human adventurer. Preserve exact reference compact 25 pixel figure and clear OPEN dark eyes. Head above shoulders, torso vertical above hips. Hands and lantern stay at waist, never touch floor. Short steps, slight arm swing, no crouch, no crawl, no gallop. Keep head, face, body and eyes stable without morphing or squashing. Fixed direction. Four-frame seamless loop.\", animation_group_id=\"a7bf31d0-020c-4898-a0a3-fe5db1a85919\", directions=[...])",
+    "ria-eye-job": {
+      "background_job_id": "9219c58b-26ca-4699-83c5-9001608add72",
+      "image_id": "63fa2135-1c40-56e5-8d1c-d1b264f46fe3",
+      "status": "processing",
+      "source_image_id": "63fa2135-1c40-56e5-8d1c-d1b264f46fe3",
+      "job_id": "9219c58b-26ca-4699-83c5-9001608add72",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/9219c58b-26ca-4699-83c5-9001608add72/download"
+    },
+    "ria-compact-job": "id: 4cb6f531-4249-483d-9d0d-a358cae3274b\njob_id: 4cb6f531-4249-483d-9d0d-a358cae3274b\nmode: text\nframes: 8\nsize: 32x32px\ntransparent: True\nedit: Correct this animal adventurer into an upright ANTHROPOMORPHIC BIPED in every direction. Human-shaped upright body under the SAME dog head and SAME clothing. Head above shoulders, vertical chest above hips, TWO distinct short legs under hips, TWO arms bent at chest height; NO front paws on ground. Side view must look like a tiny person walking on two feet, never a horizontal dog body or sitting dog. Tail is a small accessory BEHIND the hips, not a leg. Keep the exact original height and compact cute proportions, outfit palette, hood, scarf, accessories and each image facing direction. Refine eyes into distinct dark pupils with a single light highlight, visibly separated from muzzle and hood outline, no smeared facial blocks, no closed smiling eyes. Crisp clean native pixel art, strong readable silhouette, transparent. Preserve identity.\nseed: 10425\nasset_id: be9a01b1-af8e-5e00-8bc1-f015d685cd94\nasset_status: pending (saved when generation completes)\ncost: ~20 generations\nstatus: processing (~30-90s)\n\nhint: get_image(job_id=\"4cb6f531-4249-483d-9d0d-a358cae3274b\")",
+    "ria-west-eye-job": {
+      "background_job_id": "eb027254-0418-4739-b750-bb4724b71180",
+      "image_id": "4379e280-23ad-5023-a0f3-7f27fb8965a8",
+      "status": "processing",
+      "source_image_id": "4379e280-23ad-5023-a0f3-7f27fb8965a8",
+      "job_id": "eb027254-0418-4739-b750-bb4724b71180",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/eb027254-0418-4739-b750-bb4724b71180/download"
+    },
+    "ria-south-walk-job": "character: dcc8020b-9396-47bd-b947-59382cbda05c\nanimation: v3 custom (Upright BIPED walk, TWO booted legs alternately step below hips, like a tiny human adventurer. Preserve exact reference compact 25 pixel figure and clear OPEN dark eyes. Head above shoulders, torso vertical above hips. Hands and lantern stay at waist, never touch floor. Short steps, slight arm swing, no crouch, no crawl, no gallop. Keep head, face, body and eyes stable without morphing or squashing. Fixed direction. Four-frame seamless loop.)\ndirections: south (1 jobs)\ngroup: 7151e6fe-3329-4b36-880c-cbd4686fdf97\nframes: 4 (reference stripped, keep_first_frame=false)\ncost: 1 generation (1/dir x 1)\neta: ~30-60s/direction\n\nhint: get_character(character_id=\"dcc8020b-9396-47bd-b947-59382cbda05c\")\nadd more directions to this group: animate_character(character_id=\"dcc8020b-9396-47bd-b947-59382cbda05c\", action_description=\"Upright BIPED walk, TWO booted legs alternately step below hips, like a tiny human adventurer. Preserve exact reference compact 25 pixel figure and clear OPEN dark eyes. Head above shoulders, torso vertical above hips. Hands and lantern stay at waist, never touch floor. Short steps, slight arm swing, no crouch, no crawl, no gallop. Keep head, face, body and eyes stable without morphing or squashing. Fixed direction. Four-frame seamless loop.\", animation_group_id=\"7151e6fe-3329-4b36-880c-cbd4686fdf97\", directions=[...])",
+    "ria-compact-walk-job": "character: dcc8020b-9396-47bd-b947-59382cbda05c\nanimation: v3 custom (Upright BIPED walk, TWO booted legs alternately step below hips, like a tiny human adventurer. Preserve exact reference compact 25 pixel figure and clear OPEN dark eyes. Head above shoulders, torso vertical above hips. Hands and lantern stay at waist, never touch floor. Short steps, slight arm swing, no crouch, no crawl, no gallop. Keep head, face, body and eyes stable without morphing or squashing. Fixed direction. Four-frame seamless loop.)\ndirections: south (1 jobs)\ngroup: 7151e6fe-3329-4b36-880c-cbd4686fdf97\nframes: 4 (reference stripped, keep_first_frame=false)\ncost: 1 generation (1/dir x 1)\neta: ~30-60s/direction\n\nhint: get_character(character_id=\"dcc8020b-9396-47bd-b947-59382cbda05c\")\nadd more directions to this group: animate_character(character_id=\"dcc8020b-9396-47bd-b947-59382cbda05c\", action_description=\"Upright BIPED walk, TWO booted legs alternately step below hips, like a tiny human adventurer. Preserve exact reference compact 25 pixel figure and clear OPEN dark eyes. Head above shoulders, torso vertical above hips. Hands and lantern stay at waist, never touch floor. Short steps, slight arm swing, no crouch, no crawl, no gallop. Keep head, face, body and eyes stable without morphing or squashing. Fixed direction. Four-frame seamless loop.\", animation_group_id=\"7151e6fe-3329-4b36-880c-cbd4686fdf97\", directions=[...])",
+    "ria-compact-character-job": {
+      "background_job_id": "c31b07e6-809c-47ef-8d57-f21cc920a9a6",
+      "character_id": "dcc8020b-9396-47bd-b947-59382cbda05c",
+      "status": "processing",
+      "first_direction_generated": false,
+      "estimated_generations": 1,
+      "job_id": "c31b07e6-809c-47ef-8d57-f21cc920a9a6",
+      "n_directions": 8,
+      "poll_tool": "get_character",
+      "status_path": "/v2/background-jobs/c31b07e6-809c-47ef-8d57-f21cc920a9a6",
+      "download_path": "/mcp/characters/dcc8020b-9396-47bd-b947-59382cbda05c/download"
+    },
+    "ria-east-eye-job": {
+      "background_job_id": "fc90d88e-4cc3-4203-bbc9-3cf45f0e7a43",
+      "image_id": "42ae6a73-f5f8-5f01-8fdb-5db195e62921",
+      "status": "processing",
+      "source_image_id": "42ae6a73-f5f8-5f01-8fdb-5db195e62921",
+      "job_id": "fc90d88e-4cc3-4203-bbc9-3cf45f0e7a43",
+      "image_size": {
+        "width": 32,
+        "height": 32
+      },
+      "output_count": 1,
+      "estimated_generations": 5,
+      "pricing_provisional": true,
+      "poll_tool": "get_image",
+      "download_path": "/mcp/images/fc90d88e-4cc3-4203-bbc9-3cf45f0e7a43/download"
+    }
+  },
+  "provider": "PixelLab",
+  "active": false,
+  "status": "Rolled back at user request: restore original size and design; only Serin walking is being revised separately."
+}
