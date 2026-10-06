@@ -13,6 +13,7 @@ import { orbSprite } from './projectile';
 import { defineDrawnSprite } from '../engine/sprites';
 import { ramp } from '../engine/painter';
 import { sceneSprite } from '../ui/pixellab-scenery';
+import { PREVIEW_RANGE } from './interact';
 
 export type PickupKind =
   | 'coin' | 'nickel' | 'dime'
@@ -94,7 +95,7 @@ export class Pickup extends Entity {
       this.vy += ((p.y - this.y) / (d || 1)) * pull * dt * 6;
     }
     this.move(w, dt);
-    if (this.grace <= 0 && !this.waitForLeave && d < this.r + p.r + 1 && this.z < 6 && !p.dead) this.tryCollect(w);
+    if (this.price === 0 && this.grace <= 0 && !this.waitForLeave && d < this.r + p.r + 1 && this.z < 6 && !p.dead) this.tryCollect(w);
   }
 
   /** shop wares and potions show a preview card when the keeper comes close */
@@ -117,8 +118,13 @@ export class Pickup extends Entity {
     }
   }
 
-  tryCollect(w: World): void {
-    if (!this.canCollect(w)) return;
+  override interact(w: World): boolean {
+    if (this.price <= 0 || !this.previewable() || this.grace > 0 || dist(this.x, this.y, w.player.x, w.player.y) >= PREVIEW_RANGE) return false;
+    return this.tryCollect(w);
+  }
+
+  tryCollect(w: World): boolean {
+    if (this.dead || !w.player.alive || w.player.downed || !this.canCollect(w)) return false;
     const p = w.player;
     if (this.price > 0) {
       if (p.coins < this.price) {
@@ -126,7 +132,7 @@ export class Pickup extends Entity {
           w.sfx('no_money');
           this.mem.noMoneyT = w.time;
         }
-        return;
+        return false;
       }
       p.coins -= this.price;
       w.sfx('buy');
@@ -134,6 +140,7 @@ export class Pickup extends Entity {
     }
     this.dead = true;
     w.collectPickup(this);
+    return true;
   }
 
   mem: Record<string, number> = {};

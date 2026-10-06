@@ -59,16 +59,22 @@ it('shrine bowls are shared single uses, with the benefit going to the offering 
   w.players[0].coins = 100; p.red = 2; const soul = p.soul, otherSoul = second.soul;
   p.x = coin.x; p.y = coin.y;
   w.asPlayer(p, () => coin.update(w, 1 / 60));
+  expect(coin.used).toBe(false); expect(p.coins).toBe(100);
+  expect(w.asPlayer(p, () => coin.interact(w))).toBe(true);
   expect(coin.used).toBe(true); expect(p.coins).toBe(85); expect(p.red).toBe(p.maxRed); expect(p.soul).toBe(soul + 2);
   second.x = coin.x; second.y = coin.y;
   w.asPlayer(second, () => coin.update(w, 2));
+  expect(w.asPlayer(second, () => coin.interact(w))).toBe(false);
   expect(second.coins).toBe(85); expect(second.soul).toBe(otherSoul); expect(coin.shrine.spent).toBe(1);
   const heart = bowls.find(b => b.kind === 'heart')!;
   p.x = heart.x; p.y = heart.y;
   w.asPlayer(p, () => heart.update(w, 1 / 60));
+  expect(heart.used).toBe(false);
+  expect(w.asPlayer(p, () => heart.interact(w))).toBe(true);
   expect(heart.used).toBe(true);
   const max = second.maxRed; second.x = heart.x; second.y = heart.y;
   w.asPlayer(second, () => heart.update(w, 2));
+  expect(w.asPlayer(second, () => heart.interact(w))).toBe(false);
   expect(second.maxRed).toBe(max); expect(heart.shrine.spent).toBe(2);
 });
 
@@ -99,11 +105,11 @@ it('one keeper can take all four challenge choices, with one grant per pair and 
 it('any keeper can open multiple crates, then another keeper can claim the contents', () => {
   const w=setup('refinery',4),opener=w.players[2],taker=w.players[1];
   for(const p of w.players){p.x=50+p.slot*12;p.y=45;}
-  encounterRewards(w,15,'elite');w.update(1/60);
+  encounterRewards(w,15,'challenge');w.update(1/60);
   const crates=w.entities.filter(e=>e instanceof WeaponChest) as WeaponChest[];
   expect(crates).toHaveLength(4);
   for(const c of crates){opener.x=c.x;opener.y=c.y;w.update(1/60);expect(c.opened).toBe(true);}
-  const contents=w.entities.filter(e=>e instanceof Pedestal) as Pedestal[];
+  const contents=w.entities.filter(e=>e instanceof Pedestal && e.item?.kind==='weapon') as Pedestal[];
   expect(contents).toHaveLength(4);expect(contents.every(e=>e.mem.ownerSlot===undefined&&e.ctxP===null)).toBe(true);
   const untouched=w.players.filter(p=>p!==taker).map(p=>[p.weaponId,p.weapon2Id]);
   for(const e of contents){const id=e.item!.id;expect(w.asPlayer(taker,()=>w.tryTakePedestal(e))).toBe(true);expect(taker.weaponId).toBe(id);}

@@ -29,7 +29,7 @@ import { clamp } from '../engine/math';
 import { Actives, Weapons } from '../game/defs';
 import type { Enemy } from '../game/enemy';
 import { EMBER_MAX } from '../game/player';
-import { Pedestal, itemInfo, potionSpriteFor } from '../game/pickups';
+import { Pedestal, Pickup, PICKUP_SPRITE, itemInfo, potionSpriteFor } from '../game/pickups';
 import type { World } from '../game/world';
 import { GameScene } from './game-scene';
 import { minimapBlockRect } from './hud';
@@ -337,7 +337,10 @@ export class TouchControls {
     if (id === 'active') return !!p.activeId;
     if (id === 'consumable') return !!p.potionId;
     if (id === 'swap') return !!p.weapon2Id;
-    if (id === 'interact') return (w.focus instanceof Pedestal && !!w.focus.item) || !!w.focus?.interact;
+    if (id === 'interact') {
+      if (w.focus instanceof Pickup) return w.focus.price > 0 && w.focus.previewable();
+      return (w.focus instanceof Pedestal && !!w.focus.item) || !!w.focus?.interact;
+    }
     return true;
   }
 
@@ -938,7 +941,16 @@ export class TouchControls {
       const label = f.price > 0 || f.heartPrice > 0 ? '구매' : '줍기';
       this.drawBtn(r, 'interact', A, held.has('interact'), itemInfo(f.item).icon, ok, ok, 1, '', label);
     }
-    if (f?.interact && f.interactionInfo) this.drawBtn(r, 'interact', A, held.has('interact'), f.interactionInfo().icon, true, true, 1, '', '사용');
+    if (f instanceof Pickup && f.price > 0) {
+      const ok = p.coins >= f.price && f.canCollect(w);
+      const icon = f.kind === 'potion' ? potionSpriteFor(w, f.potionId) : PICKUP_SPRITE[f.kind];
+      this.drawBtn(r, 'interact', A, held.has('interact'), icon, ok, ok, 1, '', '구매');
+    }
+    if (f?.interact && f.interactionInfo) {
+      const info = f.interactionInfo(w);
+      const ok = info.available ?? true;
+      this.drawBtn(r, 'interact', A, held.has('interact'), info.icon, ok, ok, 1, '', info.actionLabel ?? '사용');
+    }
     // system
     this.drawBtn(r, 'pause', A, held.has('pause'), 'tc_pause');
     this.drawBtn(r, 'map', A, held.has('map'), 'tc_map');

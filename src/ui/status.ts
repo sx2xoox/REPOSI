@@ -40,6 +40,7 @@ const TABS = [
   { label: '유물', icon: 'ui_gem' },
   { label: '축복', icon: 'ui_flame' },
   { label: '캐릭터', icon: 'st_dash' },
+  { label: '장비', icon: 'hud_power' },
 ] as const;
 /** seconds the discard stays armed ("한 번 더 눌러 버리기") */
 const ARM_TIME = 3;
@@ -61,7 +62,7 @@ export class StatusOverlay implements Scene {
   private rep = { l: new Repeater(), r: new Repeater(), u: new Repeater(), d: new Repeater() };
   private resScroll = 0;
   private hover = -1;
-  /** 0 = 유물, 1 = 축복, 2 = 캐릭터 */
+  /** 0 = 유물, 1 = 축복, 2 = 캐릭터, 3 = 장비 */
   private tab = 0;
   private tabT = 9;
   /** artifact id armed for discarding (second press discards) and when */
@@ -90,7 +91,7 @@ export class StatusOverlay implements Scene {
 
   /** Entries of the current tab (artifacts incl. innate traits, or blessings). */
   private list(): ComputedArtifact[] {
-    if (this.tab === 2) return [];
+    if (this.tab >= 2) return [];
     const all = this.game.world.items.computed?.artifacts ?? [];
     return all.filter((a) => !!a.def.blessing === (this.tab === 1));
   }
@@ -190,6 +191,7 @@ export class StatusOverlay implements Scene {
     if (input.pressed('tabPrev')) this.setTab(this.tab - 1);
     else if (input.pressed('tabNext')) this.setTab(this.tab + 1);
     if (click) for (let i = 0; i < TABS.length; i++) if (inRect(this.tabRect(i))) this.setTab(i);
+    if (click && inRect({ x: 472, y: 79, w: 254, h: 76 })) this.setTab(3);
     const n = this.list().length;
     const old = this.sel;
     if (n > 0) {
@@ -287,6 +289,7 @@ export class StatusOverlay implements Scene {
       keyHintRow(r, hints, GX + COLS * CELL - 2 - total / 2, 407 + oy, { alpha: k * 0.8, pad, gap: 12 });
     }
     if (this.tab === 2) { this.drawCharacter(r, k, oy); return; }
+    if (this.tab === 3) { this.drawWeaponDetails(r, k, oy); return; }
     const tk = k * appear(this.tabT, 0.2);
     const d = r.dctx;
     d.save();
@@ -438,6 +441,33 @@ export class StatusOverlay implements Scene {
       r.wrapText(card.desc, 366, 10, false, 'small').forEach((line, j) => r.uiText(line, GX + 12, y + 29 + j * 12, { size: 10, font: 'small', color: C.textDim, alpha: k }));
       if (card.hint) r.uiText(card.hint, GX + 384, y + 58, { size: 10, font: 'small', align: 'right', color: C.gold, alpha: k });
     });
+  }
+
+  // Both descriptions stay visible, including on touch and controller: no hover-only text.
+  private drawWeaponDetails(r: Renderer, k: number, oy: number): void {
+    const p = this.game.world.player;
+    const width = COLS * CELL - 2;
+    let y = GY + oy;
+    const slots = [
+      { id: p.weaponId, state: p.weapon, label: '주무기 · 사용 중' },
+      { id: p.weapon2Id, state: p.weapon2, label: '보조무기 · 보관 중' },
+    ];
+    for (const slot of slots) {
+      const def = slot.id ? Weapons.get(slot.id) : undefined;
+      const lines = r.wrapText(def?.desc ?? '다른 무기를 주우면 현재 무기가 이 칸에 보관됩니다.', width - 28, 10, false, 'small');
+      const nameLines = r.wrapText(def?.name ?? '장착하지 않음', width - 76, 14, true);
+      const temper = Number(slot.state.mem.temper ?? 0);
+      const textY = Math.max(59, 38 + nameLines.length * 16);
+      const height = textY + lines.length * 13 + (temper ? 23 : 12);
+      frame(r, GX, y, width, height, 'panel', { alpha: k });
+      iconSlot(r, def?.icon ?? null, GX + 32, y + 31, 38, { alpha: k, scale: def ? fitScale(def.icon, 30, 2) : 1 });
+      r.uiText(slot.label, GX + 62, y + 10, { size: 10, font: 'small', color: C.textFaint, alpha: k });
+      nameLines.forEach((line, i) => r.uiText(line, GX + 62, y + 24 + i * 16, { size: 14, bold: true, color: def ? RARITY_COLOR[def.rarity] : C.textMute, alpha: k }));
+      if (def) r.uiText(`${RARITY_NAME[def.rarity]} · ${def.archetype ?? WEAPON_KIND[def.kind] ?? ''}`, GX + 62, y + 26 + nameLines.length * 16, { size: 10, font: 'small', color: C.textDim, alpha: k });
+      lines.forEach((line, i) => r.uiText(line, GX + 14, y + textY + i * 13, { size: 10, font: 'small', color: C.text, alpha: k }));
+      if (temper) r.uiText(`제련 ${temper > 0 ? '+' : ''}${temper} · 무기 피해 ${100 + temper * 10}%`, GX + 14, y + textY + lines.length * 13 + 4, { size: 10, font: 'small', color: temper > 0 ? C.good : C.bad, alpha: k });
+      y += height + 10;
+    }
   }
 
   // ---------------------------------------------------------------- equipment

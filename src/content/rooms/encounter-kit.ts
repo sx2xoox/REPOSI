@@ -29,14 +29,20 @@ export function rewardRarity(kind: string, floor: number): Rarity {
 export function encounterRewards(w: World, mask: number, kind: string) {
   const rarity = rewardRarity(kind, w.floor.index);
   const weapons = Weapons.all().filter(d => d.rarity === rarity && d.pools.length && !isContentTemporarilyLocked(d.id));
+  const artifacts = Artifacts.all().filter(d => !d.hidden && !d.blessing && d.pools.length && d.rarity === rarity && !isContentTemporarilyLocked(d.id));
+  const mixed = ['relay', 'workshop', 'vault', 'elite'].includes(kind);
   const n=partySize(mask);
   for(let i=0;i<n;i++) {
     const x=w.room.centerX+(i-(n-1)/2)*58,y=w.room.centerY+30;
     const pos=w.room.nearestFree(x,y,9);
-    if(weapons.length){const id=w.run.lootRng.pick(weapons).id;w.spawn(new WeaponChest(pos.x,pos.y,id));w.run.seenOnPedestal.add(id);}
+    // Roll the category first, so pool sizes do not skew the 50/50 split.
+    if(artifacts.length && (!weapons.length || mixed && w.run.lootRng.chance(.5))){
+      const id=w.run.lootRng.pick(artifacts).id;
+      const reward=w.spawn(new Pedestal(pos.x,pos.y,{kind:'artifact',id}));reward.waitForLeave=true;
+      w.run.seenOnPedestal.add(id);
+    }else if(weapons.length){const id=w.run.lootRng.pick(weapons).id;w.spawn(new WeaponChest(pos.x,pos.y,id));w.run.seenOnPedestal.add(id);}
     if(kind==='challenge'){
-      const pool=Artifacts.all().filter(d=>!d.hidden&&!d.blessing&&d.pools.length&&!isContentTemporarilyLocked(d.id)&&d.rarity===rarity);
-      const choices=w.run.lootRng.shuffle([...pool]).slice(0,2);
+      const choices=w.run.lootRng.shuffle([...artifacts]).slice(0,2);
       for(let j=0;j<choices.length;j++){const p=w.spawn(new Pedestal(pos.x+(j?13:-13),pos.y-43,{kind:'artifact',id:choices[j].id}));p.group=100000+i;p.waitForLeave=true;}
     }
   }

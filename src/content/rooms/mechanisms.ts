@@ -108,7 +108,7 @@ export class RoomDevice extends Prop {
    w.run.stats.damageTaken++;w.floatText(p.x,p.y-22,'-0.5♥','#ff8b99');
    if(!p.alive)w.asPlayer(p,()=>w.playerDied('등불 호위 실패'));
   }
-  w.banner(success?'임무 완료':'임무 실패',success?'무기 상자를 확인하세요':'위험이 멎고 출구가 열렸습니다. 이 장치는 다시 가동할 수 없습니다.',{small:true,color:success?COLORS[this.kind]:'#e9988d'});
+  w.banner(success?'임무 완료':'임무 실패',success?'보상을 확인하세요':'위험이 멎고 출구가 열렸습니다. 이 장치는 다시 가동할 수 없습니다.',{small:true,color:success?COLORS[this.kind]:'#e9988d'});
  }
  override update(w:World,dt:number){
   this.age+=dt;if(this.root!==this||this.mem.used)return;

@@ -24,6 +24,7 @@ function setup(kind:'relay'|'workshop'|'vault'|'elite'|'challenge',players=1){
 }
 function use(w:World,d:RoomDevice|TrialAltar){w.player.x=d.x;w.player.y=d.y;return d.interact(w);}
 function clearMobs(w:World){for(const e of w.enemies)e.dead=true;}
+const isReward = (e:Entity): e is WeaponChest | Pedestal => e instanceof WeaponChest || e instanceof Pedestal && e.item?.kind === 'artifact';
 for(const players of [1,4])it(`elite auto-starts once on entry for ${players} players and stays cleared on return`,()=>{
  const w=setup('elite',players),node=w.node,d=w.entities.find(e=>e instanceof TrialAltar) as TrialAltar;
  expect(d.state).toBe('active');expect(d.wave).toBe(1);expect(d.mem.pending).toBe(players===1?2:5);
@@ -34,10 +35,10 @@ for(const players of [1,4])it(`elite auto-starts once on entry for ${players} pl
  for(let i=0;i<1800&&!d.mem.used;i++){clearMobs(w);w.update(1/60);}
  w.update(1/60);expect(d.mem.used).toBe(true);expect(d.wave).toBe(3);expect(node.cleared).toBe(true);
  expect(w.room.doors.every(door=>door.state!=='closed')).toBe(true);
- const rewardIds=w.entities.filter(e=>e instanceof WeaponChest).map(e=>e.id);expect(rewardIds).toHaveLength(players);
+ const rewardIds=w.entities.filter(isReward).map(e=>e.id);expect(rewardIds).toHaveLength(players);
  w.enterRoom(w.map.nodes[w.map.startId],null);w.enterRoom(node,null);w.update(1/60);
  expect(d.state).toBe('done');expect(d.wave).toBe(3);expect(d.mem.pending).toBe(0);expect(w.enemies.filter(e=>e.alive)).toHaveLength(0);
- expect(w.entities.filter(e=>e instanceof WeaponChest).map(e=>e.id)).toEqual(rewardIds);
+ expect(w.entities.filter(isReward).map(e=>e.id)).toEqual(rewardIds);
  expect(w.room.doors.every(door=>door.state!=='closed')).toBe(true);
 });
 it('relay has grace, drains outside, restores inside and fails for exactly half a heart once',()=>{
@@ -46,13 +47,13 @@ it('relay has grace, drains outside, restores inside and fails for exactly half 
  d.update(w,.9);expect(d.mem.charge).toBe(100);d.update(w,1);expect(d.mem.charge).toBe(88);
  w.player.x=d.x;d.update(w,.5);expect(d.mem.charge).toBe(91);
  w.player.x=d.x+90;d.update(w,10);expect(d.mem.phase).toBe(5);expect(w.player.red+w.player.soul).toBe(hp-1);d.update(w,20);expect(w.player.red+w.player.soul).toBe(hp-1);
- expect(use(w,d)).toBe(false);expect(w.entities.filter(e=>e instanceof WeaponChest)).toHaveLength(0);
+ expect(use(w,d)).toBe(false);expect(w.entities.filter(isReward)).toHaveLength(0);
 });
 it('relay succeeds at all three stops and pays each participant exactly once',()=>{
  const w=setup('relay',4),d=w.entities.find(e=>e instanceof RoomDevice) as RoomDevice;use(w,d);
  for(let i=0;i<4500&&!d.mem.used;i++){w.players[0].x=d.x;w.players[0].y=d.y+12;clearMobs(w);w.update(1/60);}
  expect(d.mem.phase).toBe(4);expect(d.mem.progress).toBe(3);w.update(1/60);
- const crates=w.entities.filter(e=>e instanceof WeaponChest) as WeaponChest[];expect(crates).toHaveLength(4);expect(crates.every(c=>c.mem.ownerSlot===undefined)).toBe(true);
+ const rewards=w.entities.filter(isReward);expect(rewards).toHaveLength(4);expect(rewards.every(c=>c.mem.ownerSlot===undefined)).toBe(true);
 });
 it('workshop needs the correct colored valve within three seconds and no final-five-second event',()=>{
  const w=setup('workshop'),ds=w.entities.filter(e=>e instanceof RoomDevice) as RoomDevice[],d=ds[0],left=ds.find(e=>e.mem.index===1)!,right=ds.find(e=>e.mem.index===2)!;use(w,d);
@@ -65,7 +66,7 @@ it('workshop needs the correct colored valve within three seconds and no final-f
 it('three errors end workshop, disable both valves and cannot grant a reward',()=>{
  const w=setup('workshop'),d=w.entities.find(e=>e instanceof RoomDevice) as RoomDevice;use(w,d);
  for(let i=0;i<3;i++){d.mem.event=1;d.mem.deadline=.01;d.update(w,.02);}
- expect(d.mem.phase).toBe(5);expect(d.previewable()).toBe(false);w.update(1/60);expect(w.entities.some(e=>e instanceof WeaponChest)).toBe(false);
+ expect(d.mem.phase).toBe(5);expect(d.previewable()).toBe(false);w.update(1/60);expect(w.entities.some(isReward)).toBe(false);
 });
 it('vault laser counts escalate, warning is harmless, and active lanes cover distant room edges',()=>{
  expect(vaultLanes(2,168,104).lanes).toHaveLength(2);expect(vaultLanes(22,168,104).lanes).toHaveLength(3);expect(vaultLanes(42,168,104).lanes).toHaveLength(4);
@@ -89,7 +90,8 @@ for(const kind of ['elite','challenge'] as const)it(kind+' runs every wave and g
   clearMobs(w);w.update(1/60);
  }
  expect(d.wave).toBe(kind==='elite'?3:5);expect(d.mem.used).toBe(true);if(kind==='elite')expect(eliteChecked).toBe(true);w.update(1/60);
- expect(w.entities.filter(e=>e instanceof WeaponChest)).toHaveLength(2);if(kind==='challenge')expect(w.entities.filter(e=>e instanceof Pedestal)).toHaveLength(4);
+ if(kind==='challenge'){expect(w.entities.filter(e=>e instanceof WeaponChest)).toHaveLength(2);expect(w.entities.filter(e=>e instanceof Pedestal)).toHaveLength(4);}
+ else expect(w.entities.filter(isReward)).toHaveLength(2);
 });
 it('rendering missions and valves never changes simulation hashes and no combat card hides enemies',async()=>{
  const {buildCard}=await import('../src/ui/item-tooltip');
@@ -135,7 +137,7 @@ it('four peers finish the full sixty-second workshop with matching free rewards'
  }});
  for(const peer of result.peers){
   expect(peer.desyncs).toEqual([]);const d=peer.world.entities.find(e=>e instanceof RoomDevice) as RoomDevice;
-  expect(d.mem.phase).toBe(4);const crates=peer.world.entities.filter(e=>e instanceof WeaponChest);
+  expect(d.mem.phase).toBe(4);const crates=peer.world.entities.filter(isReward);
   expect(crates).toHaveLength(4);expect(crates.every(e=>e.mem.ownerSlot===undefined)).toBe(true);
  }
  const first=result.peers[0];for(const peer of result.peers.slice(1))for(let i=0;i<Math.min(first.hashes.length,peer.hashes.length);i++)if(first.hashes[i]!==undefined&&peer.hashes[i]!==undefined)expect(first.hashes[i]).toBe(peer.hashes[i]);

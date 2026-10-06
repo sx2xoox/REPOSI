@@ -67,7 +67,7 @@ export class TrialAltar extends Prop {
   s.gap-=dt;if(s.gap>0)return;
   const waves=this.elite?3:5;
   if(s.wave<waves)this.nextWave(w);
-  else{encounterRewards(w,s.members,this.elite?'elite':'challenge');endEncounter(w,this,true);w.banner(this.elite?'엘리트 소탕 완료':'시련 극복','무기 상자'+(this.elite?'':'와 유물 선택 보상')+'를 확인하세요',{small:true,color:'#ffd894'});}
+  else{encounterRewards(w,s.members,this.elite?'elite':'challenge');endEncounter(w,this,true);w.banner(this.elite?'엘리트 소탕 완료':'시련 극복',this.elite?'보상을 확인하세요':'무기 상자와 유물 선택 보상을 확인하세요',{small:true,color:'#ffd894'});}
  }
  override draw(r:Renderer){
   if(this.elite)return;

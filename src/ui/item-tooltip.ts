@@ -110,10 +110,10 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
   // '' on touch screens: the card then shows the hand of the on-screen "줍기" button
   const keyOf = () => actionLabel(input.bindings, 'interact', pad);
   if (e.interactionInfo) {
-    const info = e.interactionInfo();
+    const info = e.interactionInfo(w);
     if (info.compactHint) return null;
     return { icon:info.icon, name:info.name, color:C.gold, sub:[], desc:info.desc, extra:[],
-      action:{ key:touchUiActive() ? '' : keyOf(), label:'사용', pad, ok:true }, note:'', price:null };
+      action:{ key:touchUiActive() ? '' : keyOf(), label:info.actionLabel ?? '사용', pad, ok:info.available ?? true }, note:'', price:info.price ?? null };
   }
   if (e instanceof Pedestal && e.item) {
     const it = e.item;
@@ -193,9 +193,9 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
         color: '#e0c0ff',
         sub: [{ t: known ? '물약 · 감정됨' : '물약 · 미감정', c: C.textDim }],
         desc: known ? def!.desc : '마셔 봐야 정체를 안다',
-        extra: [],
-        action: null,
-        note: p.potionId ? '닿으면 들고 있는 물약과 교체' : '닿으면 줍기',
+        extra: e.price > 0 && p.potionId ? [[{ t:'들고 있는 물약과 교체', c:C.textFaint }]] : [],
+        action: e.price > 0 ? { key:touchUiActive() ? '' : keyOf(), label:'구매', pad, ok:p.coins >= e.price && e.canCollect(w) } : null,
+        note: e.price > 0 ? (p.potionId ? '들고 있는 물약과 교체' : '') : (p.potionId ? '닿으면 들고 있는 물약과 교체' : '닿으면 줍기'),
         price: e.price > 0 ? { icon: 'hud_coin', text: `${e.price}`, ok: p.coins >= e.price } : null,
       };
     }
@@ -206,9 +206,9 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
       color: C.text,
       sub: [{ t: '상점 물건', c: C.textDim }],
       desc: tx[1],
-      extra: [],
-      action: null,
-      note: e.canCollect(w) ? '닿으면 구매' : '지금은 살 필요가 없다',
+      extra: e.canCollect(w) ? [] : [[{ t:'지금은 살 필요가 없다', c:C.textFaint }]],
+      action: { key:touchUiActive() ? '' : keyOf(), label:'구매', pad, ok:p.coins >= e.price && e.canCollect(w) },
+      note: e.canCollect(w) ? '' : '지금은 살 필요가 없다',
       price: { icon: 'hud_coin', text: `${e.price}`, ok: p.coins >= e.price },
     };
   }
@@ -236,7 +236,7 @@ function signature(w: World, e: Entity): string {
   let s = `${e.id}|${p.weaponId}|${p.weapon2Id ?? ''}|${p.activeId ?? ''}|${p.potionId ?? ''}|${input.aimMode === 'pad' ? 1 : 0}|${touchUiActive() ? 1 : 0}`;
   if (e instanceof Pedestal) s += `|${e.item?.kind}:${e.item?.id}|${e.price}|${e.heartPrice}|${e.affordable(w) ? 1 : 0}|${p.coins >= e.price ? 1 : 0}|${e.item ? w.items.powerOf(e.item.id) : 0}`;
   else if (e instanceof Pickup) s += `|${e.kind}|${e.potionId}|${w.run.identified.has(e.potionId) ? 1 : 0}|${e.price}|${p.coins >= e.price ? 1 : 0}|${e.canCollect(w) ? 1 : 0}`;
-  return `${s}|${w.items.revision}|${p.maxRed}|${p.soul}`;
+  return `${s}|${w.items.revision}|${p.maxRed}|${p.soul}|${p.coins}`;
 }
 
 export class ItemTooltip {
@@ -285,13 +285,13 @@ export class ItemTooltip {
   draw(r: Renderer, w: World, alpha = 1): void {
     const e = this.cur;
     if (!e || this.a <= 0.01 || alpha <= 0.01) return;
-    const compact=e.interactionInfo?.().compactHint;
+    const compact=e.interactionInfo?.(w).compactHint;
     if(compact){
       const key=touchUiActive()?'사용':actionLabel(input.bindings,'interact',input.aimMode==='pad');
       r.uiText(`${key} · ${compact}`,UI_W/2,UI_H-28,{size:10,align:'center',color:C.gold,outline:C.ink,alpha});
       return;
     }
-    const sig = signature(w, e) + (e.interactionInfo?.().desc ?? '');
+    const sig = signature(w, e) + (e.interactionInfo?.(w).desc ?? '');
     if (sig !== this.sig || !this.card) {
       this.sig = sig;
       this.card = buildCard(w, e);

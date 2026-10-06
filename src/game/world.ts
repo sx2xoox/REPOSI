@@ -5,6 +5,7 @@ import { scaleRewardRoom } from './room-rewards';
 import type { Renderer } from '../engine/renderer';
 import { attackEmber } from './ember';
 import { payHeartCost } from './heart-cost';
+import { isContentTemporarilyLocked } from './release-policy';
 import { VIEW_H, VIEW_W } from '../engine/renderer';
 import { Lighting } from '../engine/lighting';
 import { Particles } from '../engine/particles';
@@ -1577,7 +1578,7 @@ export class World {
   /** Take a pedestal's item if its price can be paid (feedback when it cannot). */
   tryTakePedestal(ped: Pedestal): boolean {
     const p = this.player;
-    if (!ped.item || ped.dead || !p.alive) return false;
+    if (!ped.item || ped.dead || !p.alive || ped.item.kind === 'weapon' && isContentTemporarilyLocked(ped.item.id)) return false;
     if (!ped.affordable(this)) {
       playSfx('no_money');
       if (!ped.mem.t || this.time - ped.mem.t > 0.6) {
@@ -1594,7 +1595,7 @@ export class World {
   takePedestal(ped: Pedestal): void {
     const p = this.player;
     const it = ped.item;
-    if (!it || !ped.affordable(this)) return;
+    if (!it || !ped.affordable(this) || it.kind === 'weapon' && isContentTemporarilyLocked(it.id)) return;
     if (ped.heartPrice > 0 && !payHeartCost(this, ped.heartPrice)) return;
     if (ped.price > 0) {
       p.coins -= ped.price;

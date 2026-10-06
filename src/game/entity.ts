@@ -166,7 +166,11 @@ export abstract class Entity {
    * and is the target of the 'interact' action (see game/interact.ts).
    */
   /** Optional explicit interaction, shared by keyboard, pad and touch. */
-  interactionInfo?(): { name: string; desc: string; icon: string; compactHint?: string };
+  interactionInfo?(_w?: World): {
+    name: string; desc: string; icon: string; compactHint?: string;
+    actionLabel?: string; available?: boolean;
+    price?: { icon: string; text: string; ok: boolean };
+  };
   interact?(_w: World): boolean;
   previewable(_w: World): boolean {
     return false;

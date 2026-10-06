@@ -13,7 +13,7 @@ import { dist } from '../../engine/math';
 import { RingFx } from '../../game/effects';
 import { Prop } from '../props/prop';
 import { roundRug, withDecals } from './decor';
-import { HintLabel } from './label';
+import { PREVIEW_RANGE } from '../../game/interact';
 import { heartCostKind, heartCostText, payHeartCost } from '../../game/heart-cost';
 
 defineDrawnSprite('shrine_lantern', 24, 40, (p) => {
@@ -108,7 +108,6 @@ export class OfferingBowl extends Prop {
   kind: 'coin' | 'heart';
   shrine: LanternShrine;
   get used(): boolean { return !!this.mem.used; }
-  coolT = 0;
   constructor(x: number, y: number, kind: 'coin' | 'heart', shrine: LanternShrine) {
     super(x, y, 0);
     this.kind = kind;
@@ -121,22 +120,35 @@ export class OfferingBowl extends Prop {
 
   override update(w: World, dt: number): void {
     this.age += dt;
-    this.coolT -= dt;
-    if (this.coolT > 0) return;
-    const p = w.player;
-    if (this.used) return;
-    if (!p.alive || dist(p.x, p.y, this.x, this.y) > 10) return;
-    this.coolT = 1.2;
-    if (this.kind === 'coin') this.offerCoins(w);
-    else this.offerHeart(w);
   }
 
-  private offerCoins(w: World): void {
+  override previewable(): boolean { return !this.used && !this.dead; }
+
+  override interactionInfo(w?: World) {
+    const coin = this.kind === 'coin', p = w?.player;
+    const affordable = !!p && (coin ? p.coins >= this.cost : !!heartCostKind(p, this.cost));
+    const cost = coin ? '동전 15개' : p ? heartCostText(p, this.cost) : '최대 빨간 체력 1칸 감소 · 부족하면 영혼 하트 1칸 소모';
+    return {
+      name: coin ? '등불의 온기' : '등불의 맹약', icon: coin ? 'hud_coin' : 'pk_heart',
+      desc: coin ? `${cost}를 바칩니다. 빨간 체력을 모두 회복하고 영혼 하트 1칸을 얻습니다. 그릇은 한 번만 사용할 수 있습니다.`
+        : `${cost}. 무작위 능력치 하나가 이번 도전 동안 증가합니다. 그릇은 한 번만 사용할 수 있습니다.`,
+      actionLabel: '봉헌', available: this.previewable() && affordable,
+      price: { icon: coin ? 'hud_coin' : 'pk_heart', text: String(this.cost), ok: affordable },
+    };
+  }
+
+  override interact(w: World): boolean {
+    const p = w.player;
+    if (!this.previewable() || !p.alive || p.downed || dist(p.x, p.y, this.x, this.y) >= PREVIEW_RANGE) return false;
+    return this.kind === 'coin' ? this.offerCoins(w) : this.offerHeart(w);
+  }
+
+  private offerCoins(w: World): boolean {
     const p = w.player;
     if (p.coins < this.cost) {
       w.sfx('no_money');
       w.floatText(this.x, this.y - 16, '동전 부족', '#ff8080');
-      return;
+      return false;
     }
     p.coins -= this.cost;
     w.run.stats.coinsSpent += this.cost;
@@ -145,14 +157,15 @@ export class OfferingBowl extends Prop {
     this.consume(w);
     w.sfx('heal');
     w.banner('등불의 온기', '체력이 모두 회복되고 영혼 심장을 얻었다.', { color: '#9ac0ff', small: true });
+    return true;
   }
 
-  private offerHeart(w: World): void {
+  private offerHeart(w: World): boolean {
     const costText = heartCostText(w.player, 1);
     if (!payHeartCost(w, 1)) {
       w.sfx('ui_error');
       w.floatText(this.x, this.y - 16, '바칠 심장이 없다', '#ff8080');
-      return;
+      return false;
     }
     w.sfx('player_hurt', { vol: 0.5, pitch: 0.8 });
     const b = w.rng.pick(BLESSINGS);
@@ -166,6 +179,7 @@ export class OfferingBowl extends Prop {
     this.consume(w);
     w.sfx('power_up');
     w.banner('등불의 맹약', `${costText} · ${b.desc}`, { color: '#b8ccff' });
+    return true;
   }
 
   private consume(w: World): void {
@@ -186,9 +200,6 @@ export class OfferingBowl extends Prop {
     r.sprite(icon, this.x, this.y - 11 + bob);
     const afford = this.kind === 'coin' ? w.player.coins >= this.cost : !!heartCostKind(w.player, 1);
     r.pixelText(`${this.cost}`, this.x, this.y + 5, afford ? '#ffffff' : '#ff7070', { align: 'center', outline: '#140c1c' });
-    if (this.kind === 'heart' && dist(w.local.x, w.local.y, this.x, this.y) < 72) {
-      r.pixelText(heartCostText(w.local, 1), this.x, this.y + 18, '#ffb0b8', { align: 'center', outline: '#140c1c' });
-    }
   }
 
   override light(w: World): void {
@@ -203,10 +214,8 @@ registerRoomHandler('shrine', {
     const cy = m ? m.y : room.centerY;
     withDecals(room, (p) => roundRug(p, cx, cy + 10, 52, 26, ['#0e1430', '#1a2450', '#2a3a78', '#4a5aa8'], '#a8c0ff'));
     const shrine = w.spawn(new LanternShrine(cx, cy - 2));
-    const left = w.spawn(new OfferingBowl(cx - 34, cy + 22, 'coin', shrine));
-    const right = w.spawn(new OfferingBowl(cx + 34, cy + 22, 'heart', shrine));
-    w.spawn(new HintLabel(left.x, left.y - 24, '온기: 체력 회복', () => !left.used, '#ffe8a0', 40));
-    w.spawn(new HintLabel(right.x, right.y - 24, '맹약: 이번 도전 능력치 증가', () => !right.used, '#ffb0b8', 65));
+    w.spawn(new OfferingBowl(cx - 34, cy + 22, 'coin', shrine));
+    w.spawn(new OfferingBowl(cx + 34, cy + 22, 'heart', shrine));
   },
   spawnEnemies() {
     return false;

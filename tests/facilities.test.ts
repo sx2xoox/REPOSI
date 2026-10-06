@@ -69,7 +69,7 @@ it('well produces another legal weapon, resets temper, and treats legendary as s
 it('facility allowances remain per keeper while encounter rewards have no personal claims',()=>{
  const {w,f}=setup('refinery',4);
  for(const p of w.players){p.x=f.x;p.y=f.y;const cmd=w.asPlayer(p,()=>command(w,f));expect(applyCoopCommand(w,p.slot,cmd)).toBe(true);expect(applyCoopCommand(w,p.slot,cmd)).toBe(false);}
- expect(w.player.coins).toBe(60);encounterRewards(w,15,'vault');w.update(1/60);const crates=w.entities.filter(e=>e instanceof WeaponChest) as WeaponChest[];expect(crates).toHaveLength(4);
+ expect(w.player.coins).toBe(60);encounterRewards(w,15,'vault');w.update(1/60);const rewards=w.entities.filter(e=>e instanceof WeaponChest || e instanceof Pedestal && e.item?.kind==='artifact');expect(rewards).toHaveLength(4);
  const ped=new Pedestal(f.x,f.y,{kind:'artifact',id:'fallen_star'});ped.mem.ownerSlot=1;const n=w.players[0].inv.size,other=w.players[1].inv.size;w.asPlayer(w.players[0],()=>w.takePedestal(ped));expect(w.players[0].inv.size).toBe(n+1);expect(ped.item).toBeNull();w.asPlayer(w.players[1],()=>w.takePedestal(ped));expect(w.players[1].inv.size).toBe(other);
 });
 it('malformed facility network messages are rejected',()=>{
