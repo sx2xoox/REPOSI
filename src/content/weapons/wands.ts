@@ -161,8 +161,8 @@ defineWeapon({
   tags: ['arcane'],
   pools: ['treasure', 'shop'],
   stats(m) {
-    m.mulStat('damage', 0.88);
-    m.mulStat('shotSpeed', 1.15);
+    m.mulStat('damage', 0.95);
+    m.mulStat('shotSpeed', 1.3);
   },
   update(w, p, st, _dt, firing, aim) {
     if (!firing || st.cooldown > 0) return;
@@ -249,7 +249,7 @@ defineWeapon({
   tags: ['arcane'],
   pools: ['treasure', 'shop'],
   stats(m) {
-    m.mulStat('damage', 1.25);
+    m.mulStat('damage', 1.3);
     m.mulStat('fireRate', 0.75);
   },
   update(w, p, st, _dt, firing, aim) {
@@ -259,7 +259,7 @@ defineWeapon({
     const s = p.weaponStats;
     const h = handPos(p, aim, 13);
     p.fireProjectiles(w, aim + (w.rng.next() - 0.5) * 0.12, {
-      style: 'none', speed: s.shotSpeed * 0.62, accel: -170, minSpeed: 26, range: s.range * 0.85, life: 2.6,
+      style: 'none', speed: s.shotSpeed * 0.75, accel: -170, minSpeed: 40, range: s.range * 0.85, life: 2.6,
       radius: s.projSize + 3, color: '#bfe8ff', light: 14, knockback: 40, x: h.x, y: h.y, behaviors: [bubbleFx],
     });
     w.particles.burst(h.x, h.y, { count: 4, speed: [10, 40], angle: aim, spread: 0.8, life: [0.2, 0.4], colors: ['#ffffff', '#ffd0f0'], size: [1, 1] });

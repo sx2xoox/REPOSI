@@ -16,7 +16,7 @@ export const FOUNDRY_WEAPONS: readonly ArsenalSpec[] = [
     desc: '산탄 여섯 발을 두 번 빠르게 쏜 뒤 재장전한다. 가까이서 탄을 모아 맞히면 강하다.' },
   { id: 'dawn_pike', name: '여명 관통창', rarity: 'epic', shape: 'spear', color: '#e9d196', rate: .72, damage: 1.23,
     desc: '긴 사거리로 일직선의 적을 꿰뚫는다. 세 번째 찌르기는 더 멀리 뻗고 두 배의 피해를 준다. 적 탄환을 막거나 반사하지 못한다.' },
-  { id: 'gatebreaker_maul', name: '성문 파쇄추', rarity: 'rare', shape: 'mace', color: '#c9b1d7', rate: .5, damage: 3.1,
+  { id: 'gatebreaker_maul', name: '성문 파쇄추', rarity: 'rare', shape: 'mace', color: '#c9b1d7', rate: .5, damage: 2.85,
     desc: '짧게 들어 올린 뒤 넓게 후려친다. 느리지만 강한 충격으로 적을 크게 밀어낸다. 적 탄환을 막거나 반사하지 못한다.' },
   { id: 'silvermoon_longbow', name: '은월 장궁', rarity: 'epic', shape: 'bow', color: '#cbd4f2', rate: 1, damage: 2.6, charge: .76,
     desc: '누르면 당기고 떼면 쏜다. 완충 시 자동 발사하는 은빛 화살은 강해지고 적 네 마리를 관통한다.' },
@@ -87,8 +87,8 @@ function shotgun(w: World, p: Player, st: WeaponState, firing: boolean, aim: num
   // Each of the six native pellets receives the ordinary multishot fan.
   // The proc gate treats them as one owner's shared additional-effect budget.
   for (let i = 0; i < 6; i++) {
-    const shots = p.fireProjectiles(w, aim + (i - 2.5) * .075, {
-      damageMult: .295, speed: s.shotSpeed * 1.4, range: s.range * .64,
+    const shots = p.fireProjectiles(w, aim + (i - 2.5) * .06, {
+      damageMult: .295, speed: s.shotSpeed * 1.4, range: s.range * .75,
       radius: Math.max(1.1, s.projSize * .65), style: 'sprite', sprite: 'shot_bell_blunderbuss',
       spriteRotates: true, color: '#d4ac7b', knockback: s.knockback * 1.3,
       spreadMult: .6, behaviors: [foundryTrail, shotgunImpact],
@@ -127,7 +127,7 @@ function maul(w: World, p: Player, st: WeaponState, firing: boolean, aim: number
     recordShot(w, p, st, a);
     const side = st.combo % 2 ? 1 : -1;
     p.swing(w, {
-      angle: a, damage: p.weaponStats.damage * 3.1, reach: 48 + p.weaponStats.range * .02,
+      angle: a, damage: p.weaponStats.damage * 2.85, reach: 48 + p.weaponStats.range * .02,
       arc: 2.55, knockback: p.weaponStats.knockback * 4, visual: .27, duration: .1,
       color: '#d9c7e4', swingDir: side, deflect: false, hitKick: 2.1,
       onHit(ww, target) { foundryImpact(ww, p, target.x, target.y - target.z, a, 'maul'); },

@@ -162,7 +162,7 @@ function pinwheelBehavior(dir: number): ProjBehavior {
       }
       // grazing re-hits while looping
       if (w.time > (pr.mem.reset ?? 0)) {
-        pr.mem.reset = w.time + 0.35;
+        pr.mem.reset = w.time + 0.3;
         pr.hitIds.clear();
       }
       if (Math.floor(pr.mem.spin / 4) !== Math.floor((pr.mem.spin - dt * 24) / 4)) w.sfx('whoosh', { vol: 0.08, pitch: 2 });
@@ -191,7 +191,7 @@ defineWeapon({
   pools: ['treasure', 'shop'],
   stats(m) {
     m.mulStat('damage', 0.66);
-    m.mulStat('fireRate', 0.8);
+    m.mulStat('fireRate', 0.9);
   },
   update(w, p, st, _dt, firing, aim) {
     // count the pinwheels still in the air (lost ones come back after a room change)
@@ -205,7 +205,7 @@ defineWeapon({
     const dir = st.combo === 0 ? 1 : -1;
     const h = handPos(p, aim, 8);
     const shots = p.fireProjectiles(w, aim - dir * 0.7, {
-      style: 'none', speed: 210, range: 99999, life: 2.6, pierce: 999, radius: p.stats.projSize + 3, color: '#e0a040', light: 12,
+      style: 'none', speed: 245, range: 99999, life: 2.6, pierce: 999, radius: p.stats.projSize + 4, color: '#e0a040', light: 12,
       knockback: p.stats.knockback * 0.7, x: h.x, y: h.y, behaviors: [pinwheelBehavior(dir)],
     });
     st.mem.live = live + shots.length;
@@ -298,7 +298,7 @@ defineWeapon({
   rarity: 'rare',
   pools: ['treasure', 'shop', 'boss'],
   stats(m) {
-    m.mulStat('damage', 0.75);
+    m.mulStat('damage', 0.7);
     m.mulStat('fireRate', 0.71);
     m.addStat('bounce', 2);
   },
@@ -312,7 +312,7 @@ defineWeapon({
       style: 'none', speed: s.shotSpeed * 1.2, radius: s.projSize + 2.5, pierce: s.pierce + 3, color: '#e0c060', light: 14,
       x: h.x, y: h.y, behaviors: [chakramFx], range: s.range * 1.3,
     });
-    for (const pr of shots) pr.mem.leaps = 3 + Math.floor(s.pierce / 2);
+    for (const pr of shots) pr.mem.leaps = 2 + Math.floor(s.pierce / 2);
     kick(w, aim, 0.8);
     w.sfx('whoosh', { vol: 0.45, pitch: 1.5 });
     w.sfx('swing', { vol: 0.2, pitch: 1.9 });

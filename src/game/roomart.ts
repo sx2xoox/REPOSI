@@ -1206,6 +1206,11 @@ const SPECIAL_DOOR: Partial<Record<DoorKind, DoorLook>> = {
   challenge: { frame: ['#1e1e28', '#4a4a5a', '#8a8aa0', '#dcdcf0'], leaf: '#3a3a48', metal: '#c8c8e0', inner: '#08080e' },
   shrine: { frame: ['#101838', '#2a3a80', '#5a78d0', '#b8ccff'], leaf: '#1e2a5a', metal: '#a8c0ff', inner: '#040820' },
   curse: { frame: ['#14040e', '#3a0e2a', '#7a2a5a', '#d060a0'], leaf: '#2a0a20', metal: '#e070b0', inner: '#0a0208' },
+  // mission rooms: the frame carries the room's own colour so it reads from the corridor
+  relay: { frame: ['#0c1e20', '#24504e', '#4e8c86', '#a8e8e0'], leaf: '#1c3a38', metal: '#8de4dc', inner: '#040c0c' },
+  workshop: { frame: ['#1e1208', '#4e3218', '#8a5e2e', '#f6cf88'], leaf: '#3a2614', metal: '#ffb058', inner: '#0c0602' },
+  vault: { frame: ['#160e22', '#3a2a52', '#6a5290', '#cdb4f4'], leaf: '#2a1e3e', metal: '#bf9dea', inner: '#08040e' },
+  elite: { frame: ['#200a06', '#5a2010', '#a0482a', '#f0a868'], leaf: '#401a0e', metal: '#efab68', inner: '#0e0402' },
 };
 
 function doorLook(room: Room, kind: DoorKind): DoorLook {
@@ -1453,6 +1458,43 @@ function paintDoorOrnament(p: PixelPainter, kind: DoorKind, look: DoorLook): voi
       p.ellipse(DOX, 4, 4, 2.5, '#f0d0e0');
       p.ellipse(DOX, 4, 1.6, 2.2, '#c02060');
       p.px(DOX, 4, '#140008');
+      break;
+    }
+    case 'relay': {
+      // a small lantern on a cart wheel
+      p.ring(DOX, 5, 3, 1, '#c1a96d');
+      p.px(DOX, 5, '#5a4630');
+      p.rect(DOX - 1, 0, 3, 3, '#8de4dc');
+      p.px(DOX, 1, '#ffffff');
+      for (const x of [DOX - 13, DOX + 12]) { p.px(x, 14, '#8de4dc'); p.px(x, 13, '#e8fffb'); }
+      break;
+    }
+    case 'workshop': {
+      // anvil with a spark
+      p.rect(DOX - 4, 3, 9, 2, '#a8a3ac');
+      p.rect(DOX - 1, 5, 3, 2, '#6a6470');
+      p.rect(DOX - 3, 7, 7, 1, '#4a4450');
+      p.px(DOX + 3, 1, '#ffd27a');
+      p.px(DOX + 4, 0, '#fff4c8');
+      for (const x of [DOX - 13, DOX + 12]) { p.px(x, 14, '#ffb058'); p.px(x, 13, '#fff0c0'); }
+      break;
+    }
+    case 'vault': {
+      // round lock dial
+      p.circle(DOX, 4, 3.4, '#2a2238');
+      p.ring(DOX, 4, 3.4, 1, '#bf9dea');
+      p.line(DOX - 1, 3, DOX + 1, 5, '#e8d8ff');
+      p.px(DOX, 4, '#ffffff');
+      for (const x of [DOX - 13, DOX + 12]) { p.px(x, 14, '#bf9dea'); p.px(x, 13, '#f4ecff'); }
+      break;
+    }
+    case 'elite': {
+      // horned skull
+      p.rect(DOX - 2, 2, 5, 4, '#f0e6d0');
+      p.px(DOX - 1, 3, '#2a0a04'); p.px(DOX + 1, 3, '#2a0a04');
+      p.line(DOX - 3, 2, DOX - 5, 0, '#efab68');
+      p.line(DOX + 3, 2, DOX + 5, 0, '#efab68');
+      for (const x of [DOX - 13, DOX + 12]) { p.px(x, 14, '#efab68'); p.px(x, 13, '#fff0d8'); }
       break;
     }
     default: {

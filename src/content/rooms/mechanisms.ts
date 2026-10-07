@@ -1,5 +1,7 @@
 import { MISSION_DIFFICULTY } from '../../game/mission-difficulty';
-import { participants, partySize, encounterCount, encounterWave, encounterRewards, endEncounter, updateSiege, vaultLanes, roomLabel } from './encounter-kit';
+import { participants, partySize, encounterCount, encounterWave, encounterRewards, endEncounter, updateSiege, roomLabel } from './encounter-kit';
+import { ALARM_CYCLE, ALARM_FIRE, ALARM_WARN, VaultAlarmFx, alarmStage, inBeam, vaultAlarm, type AlarmBox } from './vault-alarm';
+import { fx } from '../../engine/rng';
 import { sceneSprite } from '../../ui/pixellab-scenery';
 import { defineRoom } from '../../game/defs';
 import { defineDrawnSprite, definePixelSprite } from '../../engine/sprites';
@@ -73,14 +75,14 @@ for(const [kind,rows] of Object.entries({relay:['..p..','.ppp.','.p.p.','.ppp.',
 
 /** The controller and both valves share primitive, hashable encounter state. */
 export class RoomDevice extends Prop {
- mem={progress:0,used:false,index:0,phase:0,pending:0,gap:0,clock:0,anchorX:0,anchorY:0,members:1,charge:100,outside:0,stability:3,event:0,deadline:0,nextEvent:7,nextWave:0,vaultHP:24,vaultMax:24};
+ mem={progress:0,used:false,index:0,phase:0,pending:0,gap:0,clock:0,anchorX:0,anchorY:0,members:1,charge:100,outside:0,stability:3,event:0,deadline:0,nextEvent:7,nextWave:0,vaultHP:24,vaultMax:24,alarmSeed:0,alarmStage:0,vaultHit:0,r0x:0,r0y:0,r1x:0,r1y:0,r2x:0,r2y:0,moving:0,lowWarned:0,heat:0};
  root:RoomDevice=this;
  constructor(x:number,y:number,readonly kind:MechanismKind,index=0){super(x,y,1);this.mem.index=index;this.mem.anchorX=x;this.mem.anchorY=y;}
  override previewable(){const s=this.root.mem;return !s.used&&(s.phase===0?this.mem.index===0:this.kind==='workshop'&&this.mem.index>0&&s.event>0);}
  override interactionInfo(){
   const s=this.root.mem;
   if(s.phase>0)return {name:TITLES[this.kind],icon:'map_'+this.kind,desc:'',compactHint:'밸브 조작'};
-  return {name:TITLES[this.kind]+' · '+MISSION_DIFFICULTY[this.kind].label,icon:'map_'+this.kind,desc:(this.kind==='relay'?'세 정거장을 호위합니다. 원 안에 한 명도 없으면 안정도가 떨어지며, 0이 되면 실패하고 각자 체력 반 칸을 잃습니다.':this.kind==='workshop'?'60초 동안 설비를 지키세요. 온도 이상이 생기면 맞는 밸브를 3초 안에 조작하세요. 오조작·시간 초과 3번이면 실패합니다.':'60초 동안 중앙 금고를 지키세요. 경비병은 금고를 공격하며, 방 전체를 가로지르는 광선이 점점 늘어납니다. 금고 내구도가 0이면 실패합니다.')+' 한 번만 도전할 수 있습니다.'};
+  return {name:TITLES[this.kind]+' · '+MISSION_DIFFICULTY[this.kind].label,icon:'map_'+this.kind,desc:(this.kind==='relay'?'세 정거장을 호위합니다. 원 안에 한 명도 없으면 안정도가 떨어지며, 0이 되면 실패하고 각자 체력 반 칸을 잃습니다.':this.kind==='workshop'?'60초 동안 버티며 대장간 온도를 지키세요. 온도 이상이 생기면 맞는 색의 밸브를 3초 안에 조작하세요. 오조작·시간 초과 3번이면 실패합니다.':'60초 동안 중앙 금고를 지키세요. 경비병은 금고를 공격합니다. 경보 광선은 매번 다른 자리에서 켜지고 금고 위로도 지나가니, 경고선을 보고 비켜서세요. 광선은 침입자도 태웁니다. 금고 내구도가 0이면 실패합니다.')+' 한 번만 도전할 수 있습니다.'};
  }
  override interact(w:World):boolean{
   const root=this.root,s=root.mem,p=w.player;
@@ -92,12 +94,26 @@ export class RoomDevice extends Prop {
   if(s.phase!==0||this.mem.index!==0)return false;
   s.members=participants(w);s.phase=this.kind==='relay'?2:1;s.gap=.8;s.clock=0;s.nextWave=0;
   s.vaultMax=s.vaultHP=Math.round(24*(1+.3*(partySize(s.members)-1)));
+  if(this.kind==='vault'){s.alarmSeed=w.rng.int(1,999999);s.alarmStage=1;}
+  if(this.kind==='workshop')s.nextEvent=6+w.rng.range(0,3);
   w.room.setDoorsClosed(true);w.sfx('door_close');
   w.banner(TITLES[this.kind],this.kind==='relay'?'원 안에 한 명 이상 머물며 수레를 호위하세요':this.kind==='workshop'?'60초 · 온도 이상이 생기면 3초 안에 밸브를 조작하세요':'60초 · 금고를 공격하는 적을 먼저 저지하세요',{small:true,color:COLORS[this.kind]});
   return true;
  }
  private miss(w:World,label:string){this.mem.stability--;w.floatText(this.x,this.y-42,label+' · 내구도 -1','#ef8b7b');w.sfx('warn',{vol:.5});if(this.mem.stability<=0)this.finish(w,false);}
- damageVault(w:World,amount:number){if(this.mem.used||this.mem.phase!==1)return;this.mem.vaultHP=Math.max(0,this.mem.vaultHP-amount);if(this.mem.vaultHP<=0)this.finish(w,false);}
+ damageVault(w:World,amount:number){
+  if(this.mem.used||this.mem.phase!==1)return;
+  this.mem.vaultHP=Math.max(0,this.mem.vaultHP-amount);this.mem.vaultHit=.3;
+  w.floatText(this.x+fx.range(-6,6),this.y-36,'-'+amount,'#e8a0f0');w.sfx('hit_metal',{vol:.5,pitch:.8});
+  w.particles.burst(this.x,this.y-20,{count:6,speed:[30,90],life:[.15,.35],colors:['#ffffff','#e2c8ff','#8a6aa8'],size:[1,2],shape:'spark'});
+  if(this.mem.vaultHP>0&&this.mem.vaultHP<=Math.ceil(this.mem.vaultMax/3)&&this.mem.vaultHP+amount>Math.ceil(this.mem.vaultMax/3)){w.floatText(this.x,this.y-64,'금고가 위험합니다','#ff8a8a');w.sfx('warn',{vol:.5,pitch:1.3});}
+  if(this.mem.vaultHP<=0)this.finish(w,false);
+ }
+ /** Relay stop i (absolute room px; chosen per room when it is built). */
+ stopX(i:number){const s=this.mem;return i===0?s.r0x:i===1?s.r1x:s.r2x;}
+ stopY(i:number){const s=this.mem;return i===0?s.r0y:i===1?s.r1y:s.r2y;}
+ /** Interior span of the alarm beams. */
+ alarmBox(w:World):AlarmBox{return {x0:32,y0:32,x1:w.room.pxW-32,y1:w.room.pxH-32,vx:this.mem.anchorX,vy:this.mem.anchorY};}
  private finish(w:World,success=true){
   if(this.mem.used)return;
   if(success)encounterRewards(w,this.mem.members,this.kind);
@@ -118,14 +134,25 @@ export class RoomDevice extends Prop {
    const near=(w.coop?w.players:[w.player]).some(p=>(s.members&(1<<p.slot))&&p.alive&&!p.downed&&Math.hypot(p.x-this.x,p.y-this.y)<=40);
    if(near){s.outside=0;s.charge=Math.min(100,s.charge+6*dt);}else{s.outside+=dt;if(s.outside>1)s.charge=Math.max(0,s.charge-12*dt);}
    if(s.charge<=0){this.finish(w,false);return;}
+   if(s.charge<30&&!s.lowWarned){s.lowWarned=1;w.floatText(this.x,this.y-64,'수레 등불이 꺼져 갑니다','#f19182');w.sfx('warn',{vol:.4,pitch:1.2});}
+   else if(s.charge>50)s.lowWarned=0;
    const living=w.enemies.some(e=>e.alive&&e.encounterId===this.id);
+   s.moving=0;
    if(s.phase===2){
     if(!near||living||s.pending)return;
-    const tx=s.anchorX+[-64,0,64][s.progress],ty=s.anchorY+[16,-24,16][s.progress];
+    const tx=this.stopX(s.progress),ty=this.stopY(s.progress);
     const dx=tx-this.x,dy=ty-this.y,d=Math.hypot(dx,dy);
-    if(d<1){s.phase=1;s.gap=.7;encounterWave(w,this,Math.ceil((3+Math.floor((w.floor.index-1)/3)+(s.progress>0?1:0))*1.25));}
-    else{const k=Math.min(d,26*dt)/d;this.x+=dx*k;this.y+=dy*k;}
-   }else if(!living&&!s.pending){s.gap-=dt;if(s.gap<=0){s.progress++;if(s.progress===3)this.finish(w);else s.phase=2;}}
+    if(d<1){
+     s.phase=1;s.gap=.7;
+     w.floatText(this.x,this.y-64,'정거장 '+(s.progress+1)+'/3 · 습격!','#8de4dc');w.sfx('clock_chime',{vol:.5,pitch:1.1});
+     encounterWave(w,this,Math.ceil((3+Math.floor((w.floor.index-1)/3)+(s.progress>0?1:0))*1.25));
+    }
+    else{
+     const k=Math.min(d,26*dt)/d;this.x+=dx*k;this.y+=dy*k;s.moving=1;
+     // wheels grind and kick up dust while the cart rolls
+     if(fx.chance(.25))w.particles.burst(this.x+fx.pick([-14,14]),this.y-2,{count:1,speed:[6,20],life:[.4,.7],colors:['#8a7a66','#6a5c4e'],size:[1,2],sizeEnd:3,drag:3,fade:true});
+    }
+   }else if(!living&&!s.pending){s.gap-=dt;if(s.gap<=0){s.progress++;if(s.progress===3)this.finish(w);else{s.phase=2;w.floatText(this.x,this.y-64,'출발','#c9efe9');w.sfx('door_open',{vol:.3,pitch:1.4});}}}
    return;
   }
   if(s.clock>=60){this.finish(w);return;}
@@ -137,34 +164,46 @@ export class RoomDevice extends Prop {
   }
   if(this.kind==='workshop'){
    if(s.event){s.deadline-=dt;if(s.deadline<=0){s.event=0;this.miss(w,'조작 시간 초과');}}
-   if(s.clock>=s.nextEvent&&s.nextEvent<55){s.nextEvent+=7;if(w.rng.chance(.4)){s.event=w.rng.chance(.5)?1:2;s.deadline=3;w.floatText(this.x,this.y-42,s.event===1?'대장간이 차가워집니다':'대장간이 뜨거워집니다',s.event===1?'#8cd5ee':'#ffb079');w.sfx('warn',{vol:.45});}}
+   if(s.clock>=s.nextEvent&&s.nextEvent<55){
+    if(s.event)s.nextEvent+=1;
+    else{s.nextEvent+=10+w.rng.range(0,3);s.event=w.rng.chance(.5)?1:2;s.deadline=3;w.floatText(this.x,this.y-42,s.event===1?'대장간이 차가워집니다':'대장간이 뜨거워집니다',s.event===1?'#8cd5ee':'#ffb079');w.sfx('warn',{vol:.45});}
+   }
+   // the furnace drifts toward the alarm colour while an event is open, and settles after
+   s.heat+=((s.event===1?-1:s.event===2?1:0)-s.heat)*Math.min(1,dt*3);
+   if(s.event&&fx.chance(.35))w.particles.burst(this.x+fx.range(-8,8),this.y-24,s.event===1?{count:1,speed:[6,18],life:[.6,1],colors:['#e6f8ff','#9fd8ee'],size:[1,1],gravity:30}:{count:1,speed:[20,60],life:[.3,.6],colors:['#fff0b0','#ffb050','#e05a20'],size:[1,1],shape:'spark',gravity:-60,additive:true});
   }else{
    for(const e of w.enemies)if(e.alive&&e.mem.siege===this.id)updateSiege(e,w,dt);
-   const alarm=vaultLanes(s.clock,s.anchorX,s.anchorY);
-   if(alarm.active)for(const p of w.coop?w.players:[w.player])if(p.alive&&!p.downed&&alarm.lanes.some(l=>Math.abs((l.axis==='x'?p.x:p.y)-l.offset)<p.r+3))p.hurt(w,1,'금고 경보 광선');
+   s.vaultHit=Math.max(0,s.vaultHit-dt);
+   const stage=alarmStage(s.clock);
+   if(stage>s.alarmStage){s.alarmStage=stage;w.banner('경보 '+stage+'단계',stage===2?'광선이 좁혀 들어오고 금고 위로도 지나갑니다':'금고를 축으로 광선이 돌기 시작합니다',{small:true,color:COLORS.vault});w.sfx('warn',{vol:.6});}
+   const alarm=vaultAlarm(s.alarmSeed,s.clock,this.alarmBox(w));
+   const phase=s.clock-alarm.cycle*ALARM_CYCLE,before=phase-dt;
+   if(before<ALARM_WARN&&phase>=ALARM_WARN)w.sfx('beam_charge',{vol:.3,pitch:1.25});
+   if(before<ALARM_FIRE&&phase>=ALARM_FIRE){w.sfx('laser',{vol:.5,pitch:1.15});w.shake(.1);}
+   if(alarm.active){
+    for(const p of w.coop?w.players:[w.player])if(p.alive&&!p.downed&&inBeam(alarm,p.x,p.y,p.r))p.hurt(w,1,'금고 경보 광선');
+    // the alarm burns intruders too, once per volley
+    for(const e of w.enemies)if(e.alive&&!e.hidden&&e.mem.alarmHit!==alarm.cycle+1&&inBeam(alarm,e.x,e.y,e.r)){e.mem.alarmHit=alarm.cycle+1;w.applyHit(e,{damage:8*w.floor.hpMult,kind:'laser',source:this,attacker:null,noProc:true,light:true});}
+   }
   }
  }
  override draw(r:Renderer,w:World){
   const s=this.root.mem,c=COLORS[this.kind];
-  if(this===this.root&&this.kind==='vault'&&s.phase===1){
-   const alarm=vaultLanes(s.clock,s.anchorX,s.anchorY);
-   if(alarm.warning)for(const l of alarm.lanes){const color=alarm.active?'#fff0cb':'#e57a89',width=alarm.active?6:1;
-    if(l.axis==='x'){r.line(l.offset,32,l.offset,w.room.pxH-32,color,width,alarm.active?.9:.65);if(alarm.active)r.line(l.offset,32,l.offset,w.room.pxH-32,'#ee6e89',12,.2);}
-    else{r.line(32,l.offset,w.room.pxW-32,l.offset,color,width,alarm.active?.9:.65);if(alarm.active)r.line(32,l.offset,w.room.pxW-32,l.offset,'#ee6e89',12,.2);}
-   }
-  }
+  if(this===this.root&&this.kind==='vault'&&s.phase===1&&!s.used&&s.vaultHP<=Math.ceil(s.vaultMax/3))r.ring(this.x,this.y-14,26+Math.sin(w.time*8)*2,'#ff6a7a',1,.45+.25*Math.sin(w.time*8));
   r.shadow(this.x,this.y,24,6,.35);
   const valve=this.mem.index>0;
   const sprite=valve?'device_valve_'+(this.mem.index===1?'warm':'cool'):'device_'+this.kind+(this.kind==='vault'&&s.phase===4?'_open':'');
   // Color belongs to the painted handwheel. Keep iron supports and highlights neutral.
-  r.sprite(sceneSprite(sprite,valve?sceneSprite('device_valve'):'device_'+this.kind),this.x,this.y);
+  const bob=this.kind==='relay'&&s.moving?Math.round(Math.sin(w.time*18)*.6):0;
+  r.sprite(sceneSprite(sprite,valve?sceneSprite('device_valve'):'device_'+this.kind),this.x,this.y+bob,this.kind==='vault'&&s.vaultHit>0?{flash:Math.min(1,s.vaultHit*3)}:undefined);
+  if(this.kind==='workshop'&&!valve&&Math.abs(s.heat)>.05)r.ring(this.x,this.y-18,14+Math.abs(s.heat)*4,s.heat<0?'#9fe2f6':'#ffa24a',1,Math.abs(s.heat)*(.45+.25*Math.sin(w.time*10)));
   if(valve){
    const vc=this.mem.index===1?'#ffc184':'#8bdff3';
    if(s.event&&s.phase===1){const selected=s.event===this.mem.index;r.ring(this.x,this.y,16,vc,1,selected?.85:.15);if(selected)r.pixelText(s.deadline.toFixed(1),this.x,this.y-29,vc,{align:'center',outline:'#110c1b'});}
    return;
   }
   if(this.kind==='relay'){
-   for(let i=0;i<3;i++)r.rect(s.anchorX+[-64,0,64][i]-3,s.anchorY+[16,-24,16][i]+9,6,2,i<s.progress?'#f4dfad':'#517675');
+   for(let i=0;i<3;i++){const lit=i<s.progress,next=i===s.progress&&s.phase===2;r.rect(this.stopX(i)-3,this.stopY(i)+9,6,2,lit?'#f4dfad':next?'#8de4dc':'#517675',next?.6+.4*Math.sin(w.time*6):1);}
    if(s.phase>0&&!s.used)r.ring(this.x,this.y,40,s.charge<30?'#f19182':c,1,.5);
   }
   if(s.phase>0&&!s.used){
@@ -176,17 +215,70 @@ export class RoomDevice extends Prop {
   if(s.used)roomLabel(r,s.phase===4?'완료':'실패',this.x,this.y-42,s.phase===4?c:'#db8a87');
   if(this.kind==='workshop'&&s.event&&!s.used)roomLabel(r,s.event===1?'대장간이 차가워집니다':'대장간이 뜨거워집니다',this.x,this.y-67,s.event===1?'#a6e4f2':'#ffc390');
  }
- override light(w:World){const valve=this.mem.index>0;w.lights.add(this.x,this.y-18,valve?24:55,valve?'#e2d8c9':COLORS[this.kind],{intensity:this.root.mem.used?.3:valve?.35:.7});}
+ override light(w:World){
+  const valve=this.mem.index>0,heat=this.kind==='workshop'&&!valve?this.mem.heat:0;
+  w.lights.add(this.x,this.y-18,valve?24:55+Math.abs(heat)*12,valve?'#e2d8c9':heat<-.3?'#9fd8f0':heat>.3?'#ff9a40':COLORS[this.kind],{intensity:this.root.mem.used?.3:valve?.35:.7});
+  const s=this.mem;
+  if(this.kind!=='vault'||this.root!==this||s.phase!==1||s.used)return;
+  const alarm=vaultAlarm(s.alarmSeed,s.clock,this.alarmBox(w));
+  if(!alarm.warning)return;
+  for(const l of alarm.beams)for(let t=0;t<=1;t+=.25)w.lights.add(l.x0+(l.x1-l.x0)*t,l.y0+(l.y1-l.y0)*t,alarm.active?30:14,'#ff5a74',{intensity:alarm.active?.55:.25});
+ }
+}
+
+// Escort routes (offsets from the room centre); each room picks one, possibly mirrored,
+// that the cart can roll along without crossing pillars or pots.
+const RELAY_ROUTES:[number,number][][]=[
+ [[-64,16],[0,-24],[64,16]],
+ [[-64,-22],[0,24],[64,-22]],
+ [[-58,-26],[58,-26],[0,30]],
+ [[-72,24],[-8,-28],[68,18]],
+ [[0,-34],[-70,8],[54,30]],
+ [[-40,30],[40,-30],[74,24]],
+];
+function relayRoute(w:World,room:import('../../game/room').Room,rng:import('../../engine/rng').RNG):[number,number][]{
+ const cx=room.centerX,cy=room.centerY;
+ const fits=(pts:[number,number][])=>{
+  let [ax,ay]=[cx,cy];
+  for(const [bx,by] of pts){
+   if(bx<56||by<52||bx>room.pxW-56||by>room.pxH-48)return false;
+   const d=Math.hypot(bx-ax,by-ay);
+   for(let t=0;t<=d;t+=6){const x=ax+(bx-ax)*t/Math.max(1,d),y=ay+(by-ay)*t/Math.max(1,d);if(room.boxBlocked(x,y,12,false,false))return false;}
+   [ax,ay]=[bx,by];
+  }
+  return true;
+ };
+ for(const i of rng.shuffle(RELAY_ROUTES.map((_,i)=>i))){
+  const fx0=rng.chance(.5)?-1:1,fy0=rng.chance(.5)?-1:1;
+  const pts=RELAY_ROUTES[i].map(([x,y])=>[Math.round(cx+x*fx0),Math.round(cy+y*fy0)] as [number,number]);
+  if(fits(pts))return pts;
+ }
+ return RELAY_ROUTES[0].map(([x,y])=>[cx+x,cy+y] as [number,number]);
+}
+// Workshop valve stands: warm (index 1) and cool (index 2) swap sides between rooms.
+const VALVE_LAYOUTS:[number,number][][]=[[[-42,22],[42,22]],[[-72,-2],[72,-2]],[[-56,26],[56,-30]],[[-30,34],[30,34]]];
+function valveLayout(room:import('../../game/room').Room,rng:import('../../engine/rng').RNG):[number,number][]{
+ const cx=room.centerX,cy=room.centerY;
+ const order=rng.shuffle(VALVE_LAYOUTS.map((_,i)=>i));
+ for(const i of order){
+  const swap=rng.chance(.5);
+  const pts=VALVE_LAYOUTS[i].map(([x,y])=>[Math.round(cx+x),Math.round(cy+y)] as [number,number]);
+  if(swap)pts.reverse();
+  if(pts.every(([x,y])=>!room.boxBlocked(x,y,8,false,false)))return pts;
+ }
+ return [[cx-42,cy+22],[cx+42,cy+22]];
 }
 
 for(const kind of ['relay','workshop','vault'] as const)registerRoomHandler(kind,{
  clearOnEnter:false,
- populate(w,room){
+ populate(w,room,rng){
   const cx=room.centerX,cy=room.centerY;
+  const route=kind==='relay'?relayRoute(w,room,rng):[];
+  const valves=kind==='workshop'?valveLayout(room,rng):[];
   withDecals(room,p=>{
    const c=COLORS[kind];
    if(kind==='relay'){
-    const stops=[[cx,cy],[cx-64,cy+16],[cx,cy-24],[cx+64,cy+16]];
+    const stops=[[cx,cy],...route];
     for(let i=1;i<stops.length;i++){const [ax,ay]=stops[i-1],[bx,by]=stops[i],dx=bx-ax,dy=by-ay,d=Math.hypot(dx,dy),nx=-dy/d*4,ny=dx/d*4;
      for(let t=0;t<d;t+=9){const x=ax+dx*t/d,y=ay+dy*t/d;p.line(x-nx*1.5,y-ny*1.5,x+nx*1.5,y+ny*1.5,'#594635');}
      for(const sign of [-1,1]){p.line(ax+nx*sign,ay+ny*sign,bx+nx*sign,by+ny*sign,'#8a8373');p.line(ax+nx*sign,ay+ny*sign+1,bx+nx*sign,by+ny*sign+1,'#35323c');}
@@ -196,16 +288,23 @@ for(const kind of ['relay','workshop','vault'] as const)registerRoomHandler(kind
    if(kind==='workshop'){
     p.rect(cx-42,cy-28,84,54,'#302630');
     for(let y=cy-28;y<cy+26;y+=9)for(let x=cx-42;x<cx+42;x+=12){p.rectOutline(x,y,12,9,'#53454b');p.line(x+2,y+1,x+9,y+1,'#6b5757');p.px(x+2,y+2,'#9b8069');}
-    for(const x of [cx-75,cx+75]){p.line(cx,cy+22,x,cy+22,'#302733');p.line(cx,cy+23,x,cy+23,'#827461');}
+    // feed pipes from the furnace to wherever the valves stand
+    for(const [vx,vy] of valves){p.line(cx,cy+22,vx,cy+22,'#302733');p.line(cx,cy+23,vx,cy+23,'#827461');p.line(vx,cy+22,vx,vy,'#302733');p.line(vx+1,cy+22,vx+1,vy,'#827461');}
     for(let i=0;i<16;i++){const x=cx-30+i*4,y=cy+18+(i*7%11);p.rect(x,y,2,1,i%3?'#51433d':'#b58650');}
    }
-   if(kind==='vault'){p.rectOutline(cx-100,cy-52,200,104,'#695571');p.rectOutline(cx-96,cy-48,192,96,'#33283e');for(const x of [cx-48,cx+48]){p.rect(x-4,cy-66,8,6,c);p.rect(x-4,cy+60,8,6,c);}}
+   if(kind==='vault'){p.rectOutline(cx-100,cy-52,200,104,'#695571');p.rectOutline(cx-96,cy-48,192,96,'#33283e');
+    // emitter rails run along all four walls: the alarm can fire from anywhere on them
+    const x0=32,y0=32,x1=room.pxW-32,y1=room.pxH-32;
+    for(const [ax,ay,bx,by] of [[x0,y0,x1,y0],[x0,y1-1,x1,y1-1],[x0,y0,x0,y1],[x1-1,y0,x1-1,y1]]){p.line(ax,ay,bx,by,'#4a3a5a');}
+    for(let x=x0+8;x<x1;x+=16){p.px(x,y0,c);p.px(x,y1-1,c);}for(let y=y0+8;y<y1;y+=16){p.px(x0,y,c);p.px(x1-1,y,c);}}
   });
   const root=w.spawn(new RoomDevice(cx,cy,kind));
+  if(kind==='relay')route.forEach(([x,y],i)=>{const m=root.mem as Record<string,number|boolean>;m['r'+i+'x']=x;m['r'+i+'y']=y;});
+  if(kind==='vault')w.spawn(new VaultAlarmFx(root,root.alarmBox(w)));
   // Hang above the floor lanes, leaving doors and enemy spawn space readable.
   for(const x of [cx-74,cx+74])w.spawn(new EquipmentRack(x,cy-65,kind));
-  if(kind==='workshop')for(const index of [1,2]){const valve=w.spawn(new RoomDevice(cx+(index===1?-42:42),cy+22,kind,index));valve.root=root;}
+  if(kind==='workshop')for(const index of [1,2]){const [vx,vy]=valves[index-1];const valve=w.spawn(new RoomDevice(vx,vy,kind,index));valve.root=root;}
  },
  spawnEnemies(){return false;},
- onEnter(w){if(!w.node.cleared)w.holdClear=Math.max(w.holdClear,1);w.banner(TITLES[w.node.kind as MechanismKind]+' · '+MISSION_DIFFICULTY[w.node.kind as MechanismKind].label,'장치 가까이에서 진행 방법을 확인하세요 · 시작 전에는 자유롭게 나갈 수 있습니다',{small:true});},
+ onEnter(w){if(w.node.cleared)return;w.holdClear=Math.max(w.holdClear,1);w.banner(TITLES[w.node.kind as MechanismKind]+' · '+MISSION_DIFFICULTY[w.node.kind as MechanismKind].label,'장치 가까이에서 진행 방법을 확인하세요 · 시작 전에는 자유롭게 나갈 수 있습니다',{small:true});},
 });

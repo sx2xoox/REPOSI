@@ -94,7 +94,7 @@ defineWeapon({
   rarity: 'rare',
   pools: ['treasure', 'shop'],
   stats(m) {
-    m.mulStat('damage', 1.37);
+    m.mulStat('damage', 1.45);
   },
   update(w: World, p, st, _dt, firing, aim) {
     // safety: blades lost to a room change / timeout come back to the hand

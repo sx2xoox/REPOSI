@@ -10,7 +10,8 @@ import { TrialAltar } from '../src/content/rooms/challenge';
 import { WeaponChest } from '../src/content/weapons/drops';
 import { Pedestal, Pickup } from '../src/game/pickups';
 import { stateHash } from '../src/game/statehash';
-import { vaultLanes, endEncounter } from '../src/content/rooms/encounter-kit';
+import { endEncounter } from '../src/content/rooms/encounter-kit';
+import { inBeam, vaultAlarm, beamDistance } from '../src/content/rooms/vault-alarm';
 import { Entity } from '../src/game/entity';
 import { runCoop } from './coopsim';
 loadContent();
@@ -68,12 +69,22 @@ it('three errors end workshop, disable both valves and cannot grant a reward',()
  for(let i=0;i<3;i++){d.mem.event=1;d.mem.deadline=.01;d.update(w,.02);}
  expect(d.mem.phase).toBe(5);expect(d.previewable()).toBe(false);w.update(1/60);expect(w.entities.some(isReward)).toBe(false);
 });
-it('vault laser counts escalate, warning is harmless, and active lanes cover distant room edges',()=>{
- expect(vaultLanes(2,168,104).lanes).toHaveLength(2);expect(vaultLanes(22,168,104).lanes).toHaveLength(3);expect(vaultLanes(42,168,104).lanes).toHaveLength(4);
+it('vault alarm: seeded per run, warning is harmless, a live beam hurts keepers and burns intruders, and it stops after the end',()=>{
  const w=setup('vault'),d=w.entities.find(e=>e instanceof RoomDevice) as RoomDevice;use(w,d);w.player.god=false;w.player.invuln=0;
- const p=w.player,hp=p.red+p.soul;p.x=d.x-70;p.y=34;d.mem.clock=1;d.update(w,.01);expect(p.red+p.soul).toBe(hp);
- d.mem.clock=1.9;d.update(w,.01);expect(p.red+p.soul).toBeLessThan(hp);
+ expect(d.mem.alarmSeed).toBeGreaterThan(0);
+ const p=w.player,hp=p.red+p.soul;
+ // stand on a beam of the cycle that fires at 1.8 s
+ const fire=vaultAlarm(d.mem.alarmSeed,1.9,d.alarmBox(w)),l=fire.beams[0];
+ p.x=(l.x0+l.x1)/2;p.y=(l.y0+l.y1)/2;
+ d.mem.clock=1;d.update(w,.01);expect(p.red+p.soul).toBe(hp);
+ for(const e of [...w.enemies])e.dead=true;
+ const e=w.spawnEnemy('bone_walker',p.x+(l.y1-l.y0?0:24),p.y+(l.y1-l.y0?24:0))!;e.dormant=0;e.x=p.x;e.y=p.y;const ehp=e.hp;
+ d.mem.clock=1.84;w.update(1/60);
+ expect(inBeam(vaultAlarm(d.mem.alarmSeed,d.mem.clock,d.alarmBox(w)),p.x,p.y,p.r)).toBe(true);
+ expect(p.red+p.soul).toBeLessThan(hp);expect(e.hp).toBeLessThan(ehp);
+ const burned=e.hp;e.hp=Math.max(e.hp,1);w.update(1/60);expect(e.hp).toBe(burned);
  d.damageVault(w,100);expect(d.mem.phase).toBe(5);const after=p.red+p.soul;p.invuln=0;d.update(w,1);expect(p.red+p.soul).toBe(after);
+ expect(beamDistance(l,(l.x0+l.x1)/2,(l.y0+l.y1)/2)).toBeLessThan(1);
 });
 it('vault enemies damage the objective and never require a bomb to operate',()=>{
  const w=setup('vault'),d=w.entities.find(e=>e instanceof RoomDevice) as RoomDevice;use(w,d);
@@ -142,3 +153,41 @@ it('four peers finish the full sixty-second workshop with matching free rewards'
  }
  const first=result.peers[0];for(const peer of result.peers.slice(1))for(let i=0;i<Math.min(first.hashes.length,peer.hashes.length);i++)if(first.hashes[i]!==undefined&&peer.hashes[i]!==undefined)expect(first.hashes[i]).toBe(peer.hashes[i]);
 },60000);
+
+it('relay routes and workshop valves change from room to room and stay on open floor',()=>{
+ const routes=new Set<string>(),valves=new Set<string>();
+ for(let i=0;i<14;i++){
+  const run=new RunState('ROUTES-'+i,'ria');run.staged=true;
+  const w=new World(new Renderer(fakeDisplay(1280,720)),run,{openInventory(){},onGameOver(){}});w.start();
+  for(const kind of ['relay','workshop'] as const){
+   const n=w.map.nodes.find(n=>n.id!==w.map.startId&&n.id!==w.node.id&&!n.visited)!;n.kind=kind;n.templateId=kind+(i%2?'_gallery':'_alcove');n.visited=false;n.cleared=false;w.enterRoom(n,null);
+   const ds=w.entities.filter(e=>e instanceof RoomDevice) as RoomDevice[],d=ds.find(e=>e.mem.index===0)!;
+   if(kind==='relay'){
+    const stops=[0,1,2].map(k=>[d.stopX(k),d.stopY(k)]);
+    for(const [x,y] of stops)expect(w.room.boxBlocked(x,y,12,false,false)).toBe(false);
+    routes.add(stops.map(s=>s.map(v=>Math.round(v-([w.room.centerX,w.room.centerY][s.indexOf(v)]))).join(',')).join('|'));
+   }else valves.add(ds.filter(e=>e.mem.index>0).sort((a,b)=>a.mem.index-b.mem.index).map(v=>Math.round(v.x-w.room.centerX)+','+Math.round(v.y-w.room.centerY)).join('|'));
+  }
+ }
+ expect(routes.size).toBeGreaterThan(5);expect(valves.size).toBeGreaterThan(3);
+});
+
+it('a workshop shift always brings temperature events, spaced and never in the last five seconds',()=>{
+ for(const seed of ['EV-A','EV-B','EV-C']){
+  const run=new RunState(seed,'ria');run.staged=true;
+  const w=new World(new Renderer(fakeDisplay(1280,720)),run,{openInventory(){},onGameOver(){}});w.start();
+  const n=w.map.nodes.find(n=>n.id!==w.map.startId)!;n.kind='workshop';n.templateId='workshop_alcove';n.visited=false;n.cleared=false;w.enterRoom(n,null);
+  for(const p of w.players)p.god=true;
+  const ds=w.entities.filter(e=>e instanceof RoomDevice) as RoomDevice[],d=ds[0];use(w,d);
+  const starts:number[]=[];let open=0;
+  for(let i=0;i<3700&&!d.mem.used;i++){
+   clearMobs(w);w.update(1/60);
+   if(d.mem.event&&!open){starts.push(d.mem.clock);const v=ds.find(e=>e.mem.index===d.mem.event)!;w.player.x=v.x;w.player.y=v.y;v.interact(w);}
+   open=d.mem.event;
+  }
+  expect(starts.length,seed).toBeGreaterThanOrEqual(4);
+  for(let i=1;i<starts.length;i++)expect(starts[i]-starts[i-1]).toBeGreaterThan(9);
+  expect(Math.max(...starts)).toBeLessThan(55);
+  expect(d.mem.phase).toBe(4);
+ }
+});

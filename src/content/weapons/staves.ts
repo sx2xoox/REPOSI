@@ -409,7 +409,7 @@ defineDrawnSprite('icon_thunder_rod', 16, 16, (p) => {
 
 /** Damage multiplier of the k-th jump of a chain (exported for tests). */
 export function chainFalloff(k: number): number {
-  return Math.pow(0.82, k);
+  return Math.pow(0.72, k);
 }
 
 defineWeapon({
@@ -424,7 +424,7 @@ defineWeapon({
   tags: ['arcane'],
   pools: ['treasure', 'boss', 'secret'],
   stats(m) {
-    m.mulStat('damage', 1.18);
+    m.mulStat('damage', 1.05);
     m.mulStat('fireRate', 0.9);
   },
   update(w, p, st, _dt, firing, aim) {
@@ -452,7 +452,7 @@ defineWeapon({
       const ty = target.y - target.z - 4;
       w.spawn(new Zap(fx0, fy0, tx, ty, k === 0 ? '#8ad8ff' : '#6ab0ff', '#ffffff', 0.16 + k * 0.02, 5));
       const d = Math.hypot(tx - fx0, ty - fy0) || 1;
-      strike(w, target, s.damage * chainFalloff(k), (tx - fx0) / d, (ty - fy0) / d, 40, { kind: 'laser', statuses: [{ kind: 'stun', duration: 0.35, chance: 0.12 }] });
+      strike(w, target, s.damage * chainFalloff(k), (tx - fx0) / d, (ty - fy0) / d, 40, { kind: 'laser', statuses: [{ kind: 'stun', duration: 0.35, chance: 0.08 }] });
       w.particles.burst(tx, ty, { count: 6, speed: [40, 110], life: [0.1, 0.25], colors: ['#ffffff', '#8ad8ff'], size: [1, 2], shape: 'spark', additive: true });
       fx0 = tx;
       fy0 = ty;

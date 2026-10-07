@@ -69,11 +69,15 @@ export class EncounterSummon extends Prop {
   }
   override draw(r:Renderer){r.ring(this.x,this.y,12,this.elite?'#f0a25e':'#dc827f',1,.85);r.ring(this.x,this.y,Math.max(2,12-this.mem.time*10),'#ffe6b6',1,.6);}
 }
-export function encounterWave(w:World,root:EncounterRoot,count:number,elite=false,siege=false){
+/** Where the i-th of n summons appears (null = anywhere away from the centre). */
+export type WavePlacer=(i:number,n:number)=>{x:number;y:number}|null;
+export function encounterWave(w:World,root:EncounterRoot,count:number,elite=false,siege=false,place?:WavePlacer){
   const pool=Object.entries(w.enemyPool()).map(([id,weight])=>({def:Enemies.get(id),weight})).filter(x=>x.def&&!x.def.boss);
-  for(let i=0;i<Math.ceil(count*encounterCount(partySize(root.mem.members)));i++){
+  const n=Math.ceil(count*encounterCount(partySize(root.mem.members)));
+  for(let i=0;i<n;i++){
     const pick=w.rng.weighted(pool,x=>x.weight/Math.max(1,(x.def?.cost??1)*(elite?.55:1)));if(!pick?.def)continue;
-    const pos=w.room.randomFreePos(w.rng,10,{x:w.room.centerX,y:w.room.centerY,dist:65});
+    const want=place?.(i,n);
+    const pos=want?w.room.nearestFree(want.x,want.y,10):w.room.randomFreePos(w.rng,10,{x:w.room.centerX,y:w.room.centerY,dist:65});
     const summon=new EncounterSummon(pos.x,pos.y,pick.def.id,root,.85+i*.1,elite,siege);summon.ctxP=null;w.spawn(summon);
   }
 }
@@ -100,16 +104,4 @@ export function endEncounter(w:World,root:EncounterRoot,success:boolean){
   w.room.setDoorsClosed(false);
   if(success)w.roomCleared();else{w.node.cleared=true;w.mapVersion++;}
   w.sfx(success?'secret_found':'warn');
-}
-
-/** Full interior lanes, with a connected 64px refuge deliberately excluded. */
-export function vaultLanes(clock:number,cx:number,cy:number){
-  const cycle=Math.floor(clock/2.4),phase=clock-cycle*2.4;
-  const count=clock<20?2:clock<40?3:4;
-  const lanes:{axis:'x'|'y';offset:number}[]=[];
-  const right=cycle%2===0;
-  lanes.push({axis:'x',offset:cx+(right?-70:70)},{axis:'y',offset:cy+(cycle%3===0?35:-35)});
-  if(count>=3)lanes.push({axis:'x',offset:cx+(right?-30:30)});
-  if(count>=4)lanes.push({axis:'y',offset:cy+(cycle%3===0?0:-60)});
-  return {lanes,warning:phase>=.8,active:phase>=1.8};
 }

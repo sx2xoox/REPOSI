@@ -69,7 +69,7 @@ defineWeapon({
   stats(m) {
     m.mulStat('damage', 0.89);
     m.mulStat('fireRate', 0.55);
-    m.mulStat('range', 0.55);
+    m.mulStat('range', 0.7);
   },
   update(w, p, st, _dt, firing, aim) {
     if (!firing || st.cooldown > 0) return;
@@ -82,14 +82,14 @@ defineWeapon({
     for (let i = 0; i < n; i++) {
       const a = aim + (i / Math.max(1, n - 1) - 0.5) * cone + (w.rng.next() - 0.5) * 0.12;
       p.fireProjectiles(w, a, {
-        count: 1, style: 'none', speed: s.shotSpeed * (1.1 + w.rng.next() * 0.35), accel: -420, minSpeed: 90,
-        range: s.range * (0.85 + w.rng.next() * 0.3), damageMult: 0.36, radius: Math.max(2, s.projSize - 0.5),
+        count: 1, style: 'none', speed: s.shotSpeed * (1.1 + w.rng.next() * 0.35), accel: -420, minSpeed: 120,
+        range: s.range * (0.85 + w.rng.next() * 0.3), damageMult: 0.43, radius: Math.max(2, s.projSize - 0.5),
         knockback: s.knockback * 0.6, color: '#ffc050', light: 8, x: h.x, y: h.y, behaviors: [pelletFx],
       });
     }
     muzzle(w, h.x, h.y, aim, ['#ffffff', '#ffe080', '#ff9a30', '#a04010'], 12, [60, 200]);
     w.particles.burst(h.x, h.y, { count: 6, speed: [10, 40], angle: aim, spread: 0.6, life: [0.4, 0.8], colors: ['#706060', '#504848'], size: [2, 3], sizeEnd: 5, drag: 3, fade: true });
-    p.knock(-Math.cos(aim), -Math.sin(aim), 70);
+    p.knock(-Math.cos(aim), -Math.sin(aim), 40);
     kick(w, aim + Math.PI, 2.6);
     w.shake(0.08);
     w.sfx('shoot', { vol: 0.65, pitch: 0.55 });

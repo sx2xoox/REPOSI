@@ -83,7 +83,7 @@ defineWeapon({
       }
       if (st.mem.loaded < cap) {
         st.mem.loadT += dt;
-        const per = chargeTime(p, 0.2);
+        const per = chargeTime(p, 0.16);
         if (st.mem.loadT >= per) {
           st.mem.loadT -= per;
           st.mem.loaded++;
@@ -106,7 +106,7 @@ defineWeapon({
     for (let i = 0; i < n; i++) {
       const a = aim + (i - (n - 1) / 2) * spread + (w.rng.next() - 0.5) * 0.03;
       p.fireProjectiles(w, a, {
-        count: 1, style: 'sprite', sprite: 'proj_volley_bolt', damageMult: 0.72, color: '#b8f080', light: 12, x: h.x, y: h.y,
+        count: 1, style: 'sprite', sprite: 'proj_volley_bolt', damageMult: 0.78, color: '#b8f080', light: 12, x: h.x, y: h.y,
         speed: s.shotSpeed * (1 + i * 0.04), statuses: [{ kind: 'poison', duration: 2.5, power: s.damage * 0.25, chance: 0.2 }],
       });
     }

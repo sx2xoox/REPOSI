@@ -186,7 +186,7 @@ defineWeapon({
   rarity: 'epic',
   pools: ['treasure', 'boss'],
   stats(m) {
-    m.mulStat('damage', 0.68);
+    m.mulStat('damage', 0.74);
     m.mulStat('fireRate', 0.52);
     m.mulStat('range', 1.3);
   },
@@ -197,7 +197,7 @@ defineWeapon({
     const s = p.weaponStats;
     const h = handPos(p, aim, 16);
     p.fireProjectiles(w, aim, {
-      style: 'none', speed: 70, accel: 900, maxSpeed: 260 + s.shotSpeed, radius: s.projSize + 1, color: '#ff9a30', light: 26,
+      style: 'none', speed: 110, accel: 900, maxSpeed: 260 + s.shotSpeed, radius: s.projSize + 1, color: '#ff9a30', light: 26,
       knockback: 60, x: h.x, y: h.y, behaviors: [rocketFx],
     });
     // back-blast out of the rear of the tube
