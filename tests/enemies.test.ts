@@ -41,6 +41,8 @@ const FLOOR_ENEMIES: Record<string, number[]> = {
   slag_golem: [3],
   slag_lump: [3],
   anvil_mortar: [3],
+  welder_automaton: [3],
+  powder_porter: [3],
 };
 
 function spriteDefined(name: string): boolean {
@@ -206,6 +208,7 @@ function fakeWorld(seed: string): FakeWorld {
     targets: () => [player],
     room,
     enemies,
+    get entities() { return fw.entities; },
     flow: { dirAt: () => null },
     particles: { burst: () => {}, spawn: () => {} },
     lights: { add: () => {}, glow: () => {} },
