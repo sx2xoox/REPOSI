@@ -44,6 +44,8 @@ const LATE_ENEMIES: Record<string, number[]> = {
   abyss_maw: [5],
   star_eater: [5],
   abyss_larva: [5],
+  rift_lantern: [5],
+  void_brood: [5],
 };
 /** Spawned only by scripts. */
 const MINIONS = ['choir_acolyte'];

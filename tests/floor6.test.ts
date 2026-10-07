@@ -37,6 +37,8 @@ const ENEMIES: Record<string, number[]> = {
   shelf_golem: [6],
   lantern_wraith: [6, 7],
   ink_jelly: [6, 7],
+  lamp_angler: [6],
+  ghost_typewriter: [6],
 };
 /** Spawned only by scripts. */
 const MINIONS = ['ink_bead'];
@@ -458,7 +460,8 @@ describe('floor 6 enemy AI (headless simulation)', () => {
       });
       expect(dangerous, id).toBeGreaterThan(0);
       // every dangerous attack is telegraphed on the floor (lanes / circles)
-      if (id !== 'ink_jelly' && id !== 'drowned_scribe') expect(warnings, `${id} warning`).toBeGreaterThan(0);
+      // (the angler's searchlight cone and '!' and the typewriter's swept warning arc are their own telegraphs)
+      if (!['ink_jelly', 'drowned_scribe', 'lamp_angler', 'ghost_typewriter'].includes(id)) expect(warnings, `${id} warning`).toBeGreaterThan(0);
     }
   });
 
