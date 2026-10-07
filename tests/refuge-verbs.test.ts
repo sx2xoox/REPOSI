@@ -61,6 +61,18 @@ describe('refuge keeper verbs', () => {
     expect(total).toBeCloseTo(40, 4);
   });
 
+  for (const id of ['luen', 'mira']) it(`${id}: a crowd of five shares the 40x budget too`, () => {
+    const { world: w, dummies } = sim(id, 65);
+    const p = w.player, base = p.stats.damage;
+    const all = [dummies[0], ...[[16, 0], [-16, 0], [0, 16], [0, -16]].map(([dx, dy]) => dummy(w, dummies[0].x + dx, dummies[0].y + dy))];
+    idle(w, 1);
+    const hp = all.map(e => e.hp);
+    release(w);
+    idle(w, 180);
+    const total = all.reduce((sum, e, i) => sum + lost(e, hp[i], base), 0);
+    expect(total).toBeCloseTo(40, 4);
+  });
+
   it('토브: charges and mines already placed go off first at double power', () => {
     const { world: w, dummies } = sim('tove');
     const p = w.player;

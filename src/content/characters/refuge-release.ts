@@ -12,10 +12,10 @@ import { drawBlast, drawCharge, drawThreadKnot, drawWovenThread, drawThreadCut, 
 import { blastImpact, pageImpact, shieldDust, shieldImpact, stasisClose, strikeImpact, threadImpact } from './refuge-impact-fx';
 
 // Five releases, one verb each. Every one deals about eleven base damage to a
-// single unobstructed target with no preparation; preparation or reading the
-// fight adds something on top instead of being required:
-//   토브 연쇄 기폭  charges thrown onto every enemy in sight burst in a chain (a crowd
-//                  shares the budget); charges and mines already placed go off first at double power
+// single unobstructed target with no preparation (a crowd shares 40x, see
+// crowdShare); preparation or reading the fight adds something on top:
+//   토브 연쇄 기폭  charges thrown onto every enemy in sight burst in a chain; charges
+//                  and mines already placed go off first at double power
 //   루엔 매듭 끌어당기기  linked enemies are hauled to one knot and bound, then cut
 //   베스 교차 습격  blink behind up to three enemies in turn, invulnerable meanwhile
 //   오르트 되받아치는 방패  a tower shield sends enemy shots back, then bashes forward
@@ -25,12 +25,15 @@ import { blastImpact, pageImpact, shieldDust, shieldImpact, stasisClose, strikeI
 const TOVE_RANGE = 170;
 const TOVE_MAX = 6;
 /**
- * A lone target takes the full 11x; a crowd shares a 40x budget (so three or
- * more targets get 40/n each), in line with the other keepers' crowd releases.
- * Each enemy's total from the chain, splash included, is capped at its share.
+ * Crowd rule shared by the releases that reach many enemies at once (토브,
+ * 루엔, 미라): a lone target takes the full 11x, a crowd of n shares a 40x
+ * budget (min(11, 40 / n) each), in line with the other keepers' releases.
  */
-const TOVE_SINGLE = 11;
-const TOVE_CROWD = 40;
+const SINGLE = 11;
+const CROWD = 40;
+/** each enemy's share of the release (in base damage) when `n` enemies are caught */
+const crowdShare = (n: number): number => Math.min(SINGLE, CROWD / Math.max(1, n));
+/** a Tove charge's splash on neighbours (each enemy's total stays capped at its share) */
 const TOVE_SPLASH = 3;
 const TOVE_THROW = .26;
 const LUEN_TIMES = [.25, .55, .9];
@@ -78,6 +81,8 @@ export class RefugeRelease extends RefugeOwned {
     if (mode === 1) {
       const targets = nearby(w, point.x, point.y, 110).filter(e => visible(w, p.x, p.y, e.x, e.y, e.r)).slice(0, 6);
       for (let i = 0; i < targets.length; i++) this.mem['target' + i] = targets[i].id;
+      // the cuts keep their 2 / 3 / 6 rhythm, scaled down when a crowd shares them
+      this.mem.scale = crowdShare(targets.length) / SINGLE;
     }
     if (mode === 2) p.invuln = Math.max(p.invuln, VES_TIMES[2] + .25);
     if (mode === 4) {
@@ -134,7 +139,7 @@ export class RefugeRelease extends RefugeOwned {
     if (m.phase >= m.count || this.age < this.fuse(m.phase)) return;
     runProc(w, 'keeper:tove:release:impact', () => {
       const i = m.phase, x = m['lastX' + i], y = m['lastY' + i];
-      const share = Math.min(TOVE_SINGLE, TOVE_CROWD / m.count), cap = m.damage * share;
+      const share = crowdShare(m.count), cap = m.damage * share;
       m['blastAt' + i] = this.age;
       for (const target of nearby(w, x, y, 34)) {
         const key = 'dealt:' + target.id, dealt = m[key] ?? 0;
@@ -158,7 +163,7 @@ export class RefugeRelease extends RefugeOwned {
       for (let i = 0; i < 6; i++) {
         const target = w.enemies.find(e => e.id === m['target' + i]);
         if (!target || !visible(w, m.ax, m.ay, target.x, target.y, target.r) || Math.hypot(target.x - m.ax, target.y - m.ay) > 240) continue;
-        refugeHit(w, this.owner, target, m.damage * LUEN_DAMAGE[m.phase], this, true);
+        refugeHit(w, this.owner, target, m.damage * LUEN_DAMAGE[m.phase] * (m.scale ?? 1), this, true);
         if (m.phase === 0 && target.alive && !target.isBoss) {
           // hauled to the knot (wall-stopped by its own movement) and bound there
           const dx = knotX - target.x, dy = knotY - target.y, d = Math.hypot(dx, dy);
@@ -345,10 +350,12 @@ export class RefugeRelease extends RefugeOwned {
     if (m.phase >= times.length || this.age < times[m.phase]) return;
     runProc(w, 'keeper:mira:release:page', () => {
       const closing = m.phase === 4;
-      for (const target of w.enemies) {
-        if (!alive(target) || !this.inside(w, target.x, target.y, target.r)) continue;
+      const caught = w.enemies.filter(target => alive(target) && this.inside(w, target.x, target.y, target.r));
+      // pulses and closing follow the crowd rule; what Mira wrote down is paid in full
+      const scale = crowdShare(caught.length) / SINGLE;
+      for (const target of caught) {
         const stored = closing ? m['store:' + target.id] ?? 0 : 0;
-        refugeHit(w, this.owner, target, m.damage * (closing ? 8 : .75) + stored, this, true);
+        refugeHit(w, this.owner, target, m.damage * (closing ? 8 : .75) * scale + stored, this, true);
       }
       if (closing) stasisClose(w, this.owner, m.kx, m.ky, MIRA_RADIUS);
       else pageImpact(w, this.owner, m.kx, m.ky - 4, false);
