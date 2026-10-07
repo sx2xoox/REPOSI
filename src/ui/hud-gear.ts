@@ -74,12 +74,35 @@ const LANTERN_PAL = {
   health: { k: C.ink, Y: '#f0c87a', y: '#b8843c', d: '#6a4218', G: '#1a0c10', R: '#ffb0b0', r: '#d0283c' },
 } as const;
 
-/** PixelLab frames, when generated: canvas + its glass rect (art px). */
-const lanternArt = new Map<LanternKind, { canvas: HTMLCanvasElement; spec: LanternSpec }>();
+/**
+ * PixelLab frames, when generated, split at the glass window: `back` holds the
+ * panes' own pixels (dark glass, wick cup) and is drawn under the ember / life,
+ * so the light covers what sits behind the glass; `front` is the frame with the
+ * panes cleared, drawn over the light. `bars` are the art columns inside the
+ * window that stay in front (the posts between the panes of a many-sided
+ * lantern), so the light shows through the panes rather than as one block.
+ */
+const lanternArt = new Map<LanternKind, { front: HTMLCanvasElement; back: HTMLCanvasElement; spec: LanternSpec }>();
 
-/** Install a generated lantern frame (its glass window must be transparent; the HUD paints the contents under it). */
-export function setLanternArt(kind: LanternKind, canvas: HTMLCanvasElement, glass: LanternSpec['glass']): void {
-  lanternArt.set(kind, { canvas, spec: { w: canvas.width, h: canvas.height, glass } });
+/** Install a generated lantern (whole image, native pixels), its glass window and the posts inside it (art px). */
+export function setLanternArt(kind: LanternKind, canvas: HTMLCanvasElement, glass: LanternSpec['glass'], bars: readonly number[] = []): void {
+  const make = () => {
+    const cv = document.createElement('canvas');
+    cv.width = canvas.width;
+    cv.height = canvas.height;
+    return cv;
+  };
+  const front = make();
+  const fx = front.getContext('2d')!;
+  fx.drawImage(canvas, 0, 0);
+  const back = make();
+  const bx = back.getContext('2d')!;
+  for (let x = glass.x; x < glass.x + glass.w; x++) {
+    if (bars.includes(x)) continue;
+    fx.clearRect(x, glass.y, 1, glass.h);
+    bx.drawImage(canvas, x, glass.y, 1, glass.h, x, glass.y, 1, glass.h);
+  }
+  lanternArt.set(kind, { front, back, spec: { w: canvas.width, h: canvas.height, glass } });
 }
 
 /** Active spec (art px) for a lantern kind. */
@@ -132,10 +155,19 @@ export function lanternCanvas(kind: LanternKind | boolean, lit = false): HTMLCan
   return cached(`lantern|${k}|${isLit ? 1 : 0}`, () => paintLantern(k, isLit));
 }
 
-/** Frame of a lantern: generated art when installed, else the procedural one. Returns whether it is art. */
+/** Frame of a lantern: generated art (front layer) when installed, else the procedural one. */
 function blitFrame(r: Renderer, kind: LanternKind, lit: boolean, x: number, y: number, alpha: number): void {
   const art = lanternArt.get(kind);
-  blitArt(r, art ? art.canvas : lanternCanvas(kind, lit), x, y, alpha);
+  blitArt(r, art ? art.front : lanternCanvas(kind, lit), x, y, alpha);
+}
+
+/** Generated art only: dark glass and the window's own pixels, under the light. */
+function blitBack(r: Renderer, kind: LanternKind, x: number, y: number, alpha: number): void {
+  const art = lanternArt.get(kind);
+  if (!art) return;
+  const g = art.spec.glass;
+  r.uiRect(x + g.x * PX, y + g.y * PX, g.w * PX, g.h * PX, '#160d14', alpha);
+  blitArt(r, art.back, x, y, alpha);
 }
 
 // ---------------------------------------------------------------- plates
@@ -267,6 +299,7 @@ export function drawLantern(r: Renderer, x: number, y: number, s: LanternState, 
   if (alpha <= 0.01) return;
   const art = lanternArt.has('release');
   if (!art) blitFrame(r, 'release', s.ready, x, y, alpha);
+  else blitBack(r, 'release', x, y, alpha);
   const { gx, gy, gw, gh, rows: glassRows } = glassRect('release', x, y);
   const f = clamp(s.fill, 0, 1);
   const rows = Math.round(glassRows * f);
@@ -329,6 +362,7 @@ export function drawHealthLantern(r: Renderer, x: number, y: number, s: HealthSt
   if (alpha <= 0.01) return;
   const art = lanternArt.has('health');
   if (!art) blitFrame(r, 'health', false, x, y, alpha);
+  else blitBack(r, 'health', x, y, alpha);
   const { gx, gy, gw, gh } = glassRect('health', x, y);
   const unit = gh / Math.max(2, s.scale);
   const bottom = gy + gh;
@@ -380,6 +414,9 @@ export function drawHealthLantern(r: Renderer, x: number, y: number, s: HealthSt
   if (!art && capY > gy) {
     r.uiRect(gx + gw, capY - PX, 2 * PX, PX * 2, C.ink, alpha);
     r.uiRect(gx + gw, capY - PX, PX, PX, '#ffe09a', alpha);
+  } else if (art && capY > gy && capY < redTop) {
+    // generated frame: a brass tick inside the glass where the red capacity ends
+    r.uiRect(gx + gw - 2 * PX, capY - PX, 2 * PX, PX, '#ffe09a', alpha * 0.85);
   }
   // bars only: a band across the middle would read as a layer boundary
   if (!art) glassCage(r, gx, gy, gw, gh, false, alpha, false);

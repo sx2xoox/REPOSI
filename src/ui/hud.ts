@@ -61,7 +61,8 @@ const HEART_VALUE: Record<HeartKind, number> = { full: 2, half: 1, empty: 0, sou
 /** release lantern (left) and health lantern (right) share a baseline */
 const LANTERN_BASE = 74;
 const REL_X = 8;
-const HP_X = 48;
+/** gap (UI units) between the release lantern and the health lantern */
+const LANTERN_GAP = 4;
 
 /** Purse (coins / bombs / keys) row under the minimap block: its height (UI). */
 const PURSE_H = 20;
@@ -324,7 +325,8 @@ export class Hud {
   /** Top-left of a lantern (UI units inside the safe area). */
   private lanternPos(kind: 'release' | 'health'): { x: number; y: number } {
     const sp = lanternSpec(kind);
-    return { x: kind === 'release' ? REL_X : HP_X, y: LANTERN_BASE - sp.h * PX };
+    const x = kind === 'release' ? REL_X : REL_X + lanternSpec('release').w * PX + LANTERN_GAP;
+    return { x, y: LANTERN_BASE - sp.h * PX };
   }
 
   /** Where hit shards leave from: the top of the health lantern's life stack. */

@@ -1,4 +1,7 @@
-# HUD lanterns — PixelLab art (next session)
+# HUD lanterns — PixelLab art
+
+**Done 2026-10-07** (see HANDOVER.md and `src/assets/pixellab/hud/provenance.json`). Kept as the record of the
+brief; regenerate with the same rules if the lanterns are redone.
 
 User request (2026-10-07): health becomes a lantern like the ember gauge. Make **two lanterns with
 PixelLab** that look like a natural pair: the **health lantern** where the ember lantern used to be,

@@ -1,0 +1,65 @@
+{
+ "provider": "PixelLab",
+ "date": "2026-10-07",
+ "nativePixels": true,
+ "note": "Two HUD lanterns made as a pair: the health lantern first, then the release lantern generated with the chosen health lantern as its reference and style image. Native pixels, no resampling or repainting. The game splits each frame at its glass window (layout.json): the window's own pixels are drawn under the ember / life light, the rest of the frame over it.",
+ "assets": [
+  {
+   "id": "lantern_health",
+   "file": "lantern_health.png",
+   "size": [
+    18,
+    32
+   ],
+   "tool": "create_image_pro",
+   "jobId": "df483346-b8b7-456b-b3e1-8a95fcbca5e6",
+   "candidate": 16,
+   "candidates": 64,
+   "canvas": [
+    28,
+    40
+   ],
+   "seed": 7102,
+   "styleImage": "src/assets/pixellab/scenery/device_relay.png (color_palette, outline, shading)",
+   "prompt": "A single small standing brass lantern, front view, symmetric, about 22 px wide and 36 px tall, centered with its base at the bottom of the canvas. Small ring handle on top, stepped domed cap with a tiny red heart-shaped gem in the middle, four thin dark iron posts framing ONE tall rectangular glass window, stepped square base. The glass window is completely EMPTY and dark inside: no candle, no flame, no light. Crisp native pixel art for a dark cozy lantern-lit animal roguelike HUD. Top-left light, 1px near-black violet outline, aged warm brass and blackened iron, restricted warm muted palette, strong material planes, readable at original size. No background, no floor, no cast shadow, no outer glow, no text, no UI frame. No smooth painting or blur.",
+   "operation": "The downloaded candidate tile is shifted by one column (its left edge wrapped to x=27); rolled one column right, then cropped to its 18x32 bounds. No other pixel change.",
+   "original": "originals/lantern_health-candidate16.png",
+   "sha256": "e5b0881f08105a9ef428402eecdc2d8d5984732c1a65257efd6e0a6906e1da9b"
+  },
+  {
+   "id": "lantern_release",
+   "file": "lantern_release.png",
+   "size": [
+    18,
+    32
+   ],
+   "tool": "create_image_pro",
+   "jobId": "d3fbf8e6-0527-4071-a1fd-265011117c9e",
+   "candidate": 0,
+   "candidates": 64,
+   "canvas": [
+    24,
+    36
+   ],
+   "seed": 7201,
+   "referenceImage": "lantern_health.png (the chosen health lantern; reference + style image)",
+   "prompt": "A companion lantern from the SAME set as the reference health lantern: identical aged brass and dark plum-black iron, same ring handle, same domed stepped cap, same dark posts around a tall glass window, same stepped round brass base, same outline and shading. It is slightly SMALLER and slimmer: about 16 px wide and 28 px tall, front view, symmetric, base at the bottom of the canvas. Instead of the red heart gem, its cap holds a tiny glowing AMBER ember gem shaped like a small flame. The glass window is completely EMPTY: no candle, no flame, no light inside. Crisp native pixel art for a dark cozy lantern-lit animal roguelike HUD. Top-left light, 1px dark plum outline, restricted warm brass palette, readable at original size. Exactly one lantern, no background, no floor, no cast shadow, no outer glow, no text. No smooth painting or blur.",
+   "operation": "Cropped to its 18x32 bounds. No other pixel change.",
+   "original": "originals/lantern_release-candidate0.png",
+   "sha256": "eabba8daa39be9fc548fb88862a408c4d1ce551f41e74f7320f2ee20e12381b2"
+  }
+ ],
+ "rejected": [
+  {
+   "jobId": "db7c7046-e056-47a9-9e6e-37ea9650b35e",
+   "tool": "create_image_pro",
+   "canvas": [
+    42,
+    40
+   ],
+   "seed": 7101,
+   "prompt": "A matched PAIR of small standing brass lanterns side by side on one baseline, front view, both symmetric, same family and materials. LEFT: a slimmer lantern about 16 px wide and 28 px tall with a tiny amber ember gem on its cap. RIGHT: a slightly larger lantern about 22 px wide and 36 px tall with a tiny red heart-shaped gem on its cap. Each has a small ring handle on top, a stepped domed cap, four thin dark iron posts framing ONE tall rectangular glass window, and a stepped square base. The glass windows are completely EMPTY and dark inside: no candle, no flame, no light. A 2 px gap between the two lanterns. Crisp native pixel art for a dark cozy lantern-lit animal roguelike HUD. Top-left light, 1px near-black violet outline, aged warm brass and blackened iron, restricted warm muted palette, strong material planes, readable at original size. No background, no floor, no cast shadow, no outer glow, no text, no UI frame. No smooth painting or blur.",
+   "reason": "Pair in one canvas: outlines vanished against dark floors in most candidates; the crisp ones were heavier and off-palette next to the rest of the game's PixelLab art."
+  }
+ ]
+}
