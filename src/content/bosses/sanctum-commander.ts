@@ -523,7 +523,7 @@ function* leapSlam(e: Enemy, w: World): Script {
     const a = off + (i / dirs) * TAU;
     spikeLine(w, e.x + Math.cos(a) * 20, gy + Math.sin(a) * 16, a, 7, 15, 0.35, 0.07, 'ice', { radius: 8, source: NAME, linger: 0.35 });
   }
-  yield p2 ? 0.7 : 0.95;
+  yield recover(e, p2 ? 0.7 : 0.95);
   anim(e, 'idle');
   swordTo(e, 2.3);
 }
@@ -599,7 +599,7 @@ function* glacierWall(e: Enemy, w: World): Script {
       w.spawn(new Spike(e.x + Math.cos(a) * 34, gy + Math.sin(a) * 26, 'ice', 1.3, { radius: 8, source: NAME, linger: 0.4 }));
     }
   }
-  yield p2 ? 1.6 : 1.3;
+  yield recover(e, p2 ? 1.6 : 1.3);
   anim(e, 'idle');
   swordTo(e, 2.3);
 }
@@ -619,7 +619,7 @@ function* rally(e: Enemy, w: World): Script {
       ww.sfx('freeze', { vol: 0.6, pitch: 0.8 });
     }, '#8cf2ff'));
   }
-  yield 1.0;
+  yield recover(e, 1.0);
   anim(e, 'idle');
   swordTo(e, 2.3);
 }
@@ -647,7 +647,7 @@ function* icicleStorm(e: Enemy, w: World): Script {
     w.spawn(new Faller(s.x, s.y, { sprite: icicleSprite(), time: 0.95, radius: 10, source: NAME, color: '#8cc8f8' }));
     yield 0.16;
   }
-  yield 0.8;
+  yield recover(e, 0.8);
   anim(e, 'idle');
   swordTo(e, 2.3);
 }
@@ -679,6 +679,11 @@ function* phaseTwo(e: Enemy, w: World): Script {
   if (minionCount(w, e) === 0) yield* rally(e, w);
 }
 
+/** Floor 4: the pause after an attack, a little shorter than the shallower floors' (shorter still in phase 2). */
+function recover(e: Enemy, t: number): number {
+  return t * (e.mem.p2 ? 0.6 : 0.72);
+}
+
 function* patterns(e: Enemy, w: World): Script {
   while (true) {
     const p2 = !!e.mem.p2;
@@ -698,7 +703,7 @@ function* patterns(e: Enemy, w: World): Script {
     else if (id === 'wall') yield* glacierWall(e, w);
     else if (id === 'rally') yield* rally(e, w);
     else yield* icicleStorm(e, w);
-    yield* approach(e, w, p2 ? w.rng.range(0.3, 0.5) : w.rng.range(0.45, 0.7));
+    yield* approach(e, w, p2 ? w.rng.range(0.22, 0.38) : w.rng.range(0.32, 0.5));
   }
 }
 

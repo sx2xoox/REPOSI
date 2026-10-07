@@ -548,6 +548,16 @@ function tickPeriod(e: Enemy): number {
   return e.mem.p2 ? 0.55 : 0.8;
 }
 
+/** Floor 7 keeps up the pressure: the pause after an attack, shortened (shorter still in phase 2). */
+function recover(e: Enemy, t: number): number {
+  return t * (e.mem.p2 ? 0.35 : 0.5);
+}
+
+/** A sweeping hand is still on the dial. */
+function handLive(w: World): boolean {
+  return w.entities.some((x) => x instanceof ClockHand && !x.dead);
+}
+
 /** World position of the dial centre (the hands' hub, where shots are born). */
 function dialPos(e: Enemy): { x: number; y: number } {
   return { x: e.x, y: e.y + CK_DIAL_DY + (e.mem.bob ?? 0) };
@@ -609,8 +619,8 @@ function* frozenVolley(e: Enemy, w: World): Script {
   for (let k = 0; k < n; k++) {
     const t = e.target(w);
     const base = Math.atan2(t.y - d.y, t.x - d.x);
-    const count = p2 ? 7 : 6;
-    const spread = 0.2;
+    const count = p2 ? 9 : 7;
+    const spread = p2 ? 0.17 : 0.19;
     for (let i = 0; i < count; i++) {
       const off = (i - (count - 1) / 2) * spread;
       const pr = e.shoot(w, base + off, bullet7('verd', 3, {
@@ -631,7 +641,7 @@ function* frozenVolley(e: Enemy, w: World): Script {
   if (wait > 0) yield wait;
   w.sfx('clockboss_tick', { vol: 1, pitch: 0.75 });
   w.shake(0.12);
-  yield 0.9;
+  yield recover(e, 0.9);
 }
 
 /** 되감기: fast amber fans fly past the keeper, then rewind along their own paths. */
@@ -645,7 +655,7 @@ function* rewindVolley(e: Enemy, w: World): Script {
   const period = tickPeriod(e);
   const at = nextTick(w.time, e.mem.tickAt ?? w.time, period, p2 ? 1.5 : 1.7);
   const d = dialPos(e);
-  const fans = p2 ? 3 : 2;
+  const fans = p2 ? 4 : 3;
   for (let k = 0; k < fans; k++) {
     const t = e.target(w);
     const base = Math.atan2(t.y - 4 - d.y, t.x - d.x);
@@ -667,9 +677,9 @@ function* rewindVolley(e: Enemy, w: World): Script {
   if (at > w.time) yield at - w.time;
   w.sfx('clockboss_tick', { vol: 0.9, pitch: 0.7 });
   anim(e, 'wind', true);
-  yield 1.4;
+  yield recover(e, 1.4);
   anim(e, 'idle');
-  yield 0.3;
+  yield 0.1;
 }
 
 /** 시침 베기: the dial shows where the hand starts and which way it turns, then it sweeps. */
@@ -692,9 +702,11 @@ function* handSweep(e: Enemy, w: World): Script {
   e.mem.hand = hand;
   yield warn;
   anim(e, 'idle');
-  for (let el = 0; el < duration; el += w.dt) yield;
+  // floor 7: the blade keeps turning on its own while he goes on with the next figure
+  const watch = duration * (p2 ? 0.3 : 0.42);
+  for (let el = 0; el < watch; el += w.dt) yield;
   e.mem.hand = null;
-  yield 0.6;
+  yield recover(e, 0.6);
 }
 
 /** 굼뜬 시간: pools of slowed time, the first under the keeper. */
@@ -718,7 +730,7 @@ function* timeWells(e: Enemy, w: World): Script {
     yield 0.18;
   }
   anim(e, 'idle');
-  yield 1.0;
+  yield recover(e, 1.0);
 }
 
 /** 톱니 굴리기: heavy cogs roll out in a fan and bounce once off the walls. */
@@ -729,11 +741,11 @@ function* gears(e: Enemy, w: World): Script {
   e.telegraph(0.55);
   w.sfx('clockboss_gear', { vol: 0.5, pitch: 1.3 });
   yield 0.55;
-  const n = p2 ? 5 : 3;
+  const n = p2 ? 6 : 4;
   const t = e.target(w);
   const base = Math.atan2(t.y - e.y, t.x - e.x);
   for (let i = 0; i < n; i++) {
-    const a = base + (i - (n - 1) / 2) * 0.32;
+    const a = base + (i - (n - 1) / 2) * (p2 ? 0.28 : 0.3);
     const pr = e.shoot(w, a, {
       color: BUL_BRASS, radius: 5, speed: 92, bounce: 1, life: 5.5, range: 900, light: 22, style: 'none',
       behaviors: [spinDraw(gearSprite(13, true), 6)],
@@ -746,7 +758,7 @@ function* gears(e: Enemy, w: World): Script {
   w.sfx('clockboss_gear', { vol: 0.8, pitch: 0.9 });
   w.shake(0.12);
   anim(e, 'idle');
-  yield 1.2;
+  yield recover(e, 1.2);
 }
 
 /** 태엽 병정: tin soldiers wind themselves up at the room's edge. */
@@ -763,7 +775,7 @@ function* summonSoldiers(e: Enemy, w: World, n: number): Script {
       ww.sfx('clockboss_gear', { vol: 0.4, pitch: 1.5 });
     }, BRASS7[4]));
   }
-  yield 0.9;
+  yield recover(e, 0.9);
   anim(e, 'idle');
 }
 
@@ -818,7 +830,7 @@ function* timeStop(e: Enemy, w: World): Script {
   w.sfx('clockboss_tick', { vol: 1, pitch: 0.55 });
   w.sfx('clockboss_gear', { vol: 0.7, pitch: 0.7 });
   w.shake(0.3);
-  yield 1.2;
+  yield recover(e, 1.2);
 }
 
 function* phaseTwo(e: Enemy, w: World): Script {
@@ -854,7 +866,7 @@ function* patterns(e: Enemy, w: World): Script {
       { id: 'freeze', w: 3 },
       { id: 'chime', w: 2.6, when: e.age - (e.mem.lastLaserAt ?? -99) > 13 },
       { id: 'rewind', w: 2.6 },
-      { id: 'hands', w: 2.6 },
+      { id: 'hands', w: 2.6, when: !handLive(w) },
       { id: 'wells', w: 2.0, when: !wells },
       { id: 'gears', w: 2.2 },
       { id: 'summon', w: 1.1, when: minionCount(w, e) === 0 && w.enemies.length < 4 },
@@ -869,8 +881,9 @@ function* patterns(e: Enemy, w: World): Script {
     else if (id === 'gears') yield* gears(e, w);
     else if (id === 'summon') yield* summonSoldiers(e, w, 2);
     else yield* timeStop(e, w);
-    if (w.rng.chance(p2 ? 0.8 : 0.65)) yield* skip(e, w);
-    yield p2 ? w.rng.range(0.25, 0.4) : w.rng.range(0.35, 0.55);
+    // (never while a hand is still sweeping: the blade turns on his dial)
+    if (!handLive(w) && w.rng.chance(p2 ? 0.8 : 0.65)) yield* skip(e, w);
+    yield p2 ? w.rng.range(0.1, 0.2) : w.rng.range(0.18, 0.3);
   }
 }
 

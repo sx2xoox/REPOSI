@@ -175,6 +175,16 @@ function fakeWorld(seed: string): FakeWorld {
     interiorX: IX, interiorY: IY, interiorW: IW, interiorH: IH, centerX: IX + IW / 2, centerY: IY + IH / 2,
     boxBlocked: (x: number, y: number, r: number) => !inside(x, y, r) || tileAt(Math.floor(x / 16), Math.floor(y / 16)) === Tile.BLOCK,
     isFree: (x: number, y: number, r = 6) => inside(x, y, r) && tileAt(Math.floor(x / 16), Math.floor(y / 16)) === Tile.FLOOR,
+    randomFreePos: (rng: RNG, r = 6, avoid?: { x: number; y: number; dist: number }) => {
+      let best = { x: IX + IW / 2, y: IY + IH / 2 };
+      for (let i = 0; i < 60; i++) {
+        const x = IX + r + rng.next() * (IW - r * 2);
+        const y = IY + r + rng.next() * (IH - r * 2);
+        best = { x, y };
+        if (room.isFree(x, y, r) && (!avoid || Math.hypot(x - avoid.x, y - avoid.y) >= avoid.dist)) break;
+      }
+      return best;
+    },
     nearestFree: (x: number, y: number, r = 6) => ({ x: Math.min(IX + IW - r, Math.max(IX + r, x)), y: Math.min(IY + IH - r, Math.max(IY + r, y)) }),
     lineOfSight: () => true,
     tileAt,
@@ -203,6 +213,8 @@ function fakeWorld(seed: string): FakeWorld {
     player,
     targets: () => [player],
     room,
+    flags: new Set<string>(),
+    entityById: (id: number) => fw.entities.find((e) => e.id === id && !e.dead),
     enemies,
     get entities() { return fw.entities; },
     get projectiles() { return fw.entities.filter((e) => e instanceof Projectile) as Projectile[]; },

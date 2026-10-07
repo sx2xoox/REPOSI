@@ -363,7 +363,10 @@ export class ImugiPart extends Actor {
     const wasVuln = head.vulnerable;
     head.hidden = false;
     head.vulnerable = true;
+    // tells the boss skill (식은 껍질, wards-forge-sanctum.ts) the hit landed on the body
+    head.mem.viaSeg = 1;
     const ok = w.applyHit(head, { ...hit, attacker: hit.attacker ?? w.player, knockback: 0 });
+    head.mem.viaSeg = 0;
     head.hidden = wasHidden;
     head.vulnerable = wasVuln || head.dead;
     if (ok) w.particles.burst(this.x, this.y - 2, { count: 4, speed: [30, 80], life: [0.15, 0.3], colors: EMBERS, size: [1, 2] });

@@ -836,6 +836,11 @@ function quillInk(w: World, x: number, y: number, n = 4): void {
 }
 
 /** Drift to a spot at mid range from the keeper, mostly above it. */
+/** Floor 6 keeps up the pressure: the pause after an attack, shortened (shorter still in phase 2). */
+function recover(e: Enemy, t: number): number {
+  return t * (e.mem.p2 ? 0.35 : 0.5);
+}
+
 function* drift(e: Enemy, w: World, time: number): Script {
   anim(e, 'float');
   const room = w.room;
@@ -866,7 +871,7 @@ function* moveTo(e: Enemy, w: World, x: number, y: number, time: number): Script
  * 필사: the quill writes `rows` rows of glyphs across the room (back and forth).
  * Every glyph holds where it was written, then they fly at the keeper in reading order.
  */
-function* transcribe(e: Enemy, w: World, rows: number, hold = 0.85): Script {
+function* transcribe(e: Enemy, w: World, rows: number, hold = 0.65): Script {
   const p2 = !!e.mem.p2;
   const room = w.room;
   e.halt();
@@ -899,7 +904,8 @@ function* transcribe(e: Enemy, w: World, rows: number, hold = 0.85): Script {
     if (r + 1 < rows) yield 0.2;
   }
   anim(e, 'float');
-  yield Math.max(0.4, total - 0.3);
+  // the glyphs fire on their own: it goes on writing while the last row is still in flight
+  yield Math.max(0.3, total - (p2 ? 0.9 : 0.6));
 }
 
 /** 밑줄: lane warnings across the room at the keeper's height, then ink strokes sweep along them. */
@@ -927,7 +933,7 @@ function* underline(e: Enemy, w: World): Script {
     w.shake(0.25);
     if (i + 1 < ys.length) yield 0.25;
   }
-  yield 0.5;
+  yield recover(e, 0.5);
   if (p2) {
     // a vertical margin line through the keeper's column
     const t2 = e.target(w);
@@ -964,7 +970,7 @@ function* pageWalls(e: Enemy, w: World): Script {
     yield 0.1;
   }
   anim(e, 'float');
-  yield 0.6;
+  yield recover(e, 0.6);
 }
 
 /** 먹물 방울: lobbed ink blots at and around the keeper, each leaving a luminous puddle. */
@@ -975,7 +981,7 @@ function* inkDrops(e: Enemy, w: World): Script {
   e.telegraph(0.45);
   w.sfx('quill_write', { vol: 0.4, pitch: 0.7 });
   yield 0.45;
-  const n = p2 ? 6 : 4;
+  const n = p2 ? 7 : 5;
   for (let k = 0; k < n; k++) {
     const t = e.target(w);
     const spread = k === 0 ? 0 : 28 + k * 6;
@@ -993,7 +999,7 @@ function* inkDrops(e: Enemy, w: World): Script {
     yield p2 ? 0.16 : 0.22;
   }
   anim(e, 'float');
-  yield 1.1;
+  yield recover(e, 1.1);
 }
 
 /** 낱장 소환: torn pages tear themselves out of the tome and hunt the keeper. */
@@ -1011,7 +1017,7 @@ function* summonPages(e: Enemy, w: World, n: number): Script {
     yield 0.14;
   }
   anim(e, 'float');
-  yield 0.5;
+  yield recover(e, 0.5);
 }
 
 /** 먹물 범람 (P2): the ink rises; islands of floating books are the only safe floor, and it keeps writing. */
@@ -1068,7 +1074,7 @@ function* vortex(e: Enemy, w: World): Script {
   }
   e.mem.spin = 1;
   anim(e, 'float');
-  yield 0.7;
+  yield recover(e, 0.7);
 }
 
 function* phaseTwo(e: Enemy, w: World): Script {
@@ -1108,14 +1114,14 @@ function* patterns(e: Enemy, w: World): Script {
       { id: 'vortex', w: 2.2, when: p2 },
     ], e.mem.last as string | null);
     e.mem.last = id;
-    if (id === 'write') yield* transcribe(e, w, p2 ? 2 : 1);
+    if (id === 'write') yield* transcribe(e, w, p2 ? 3 : 2);
     else if (id === 'underline') yield* underline(e, w);
     else if (id === 'pages') yield* pageWalls(e, w);
     else if (id === 'drops') yield* inkDrops(e, w);
     else if (id === 'summon') yield* summonPages(e, w, p2 ? 3 : 2);
     else if (id === 'flood') yield* inkFlood(e, w);
     else yield* vortex(e, w);
-    yield* drift(e, w, p2 ? w.rng.range(0.4, 0.6) : w.rng.range(0.55, 0.85));
+    yield* drift(e, w, p2 ? w.rng.range(0.2, 0.35) : w.rng.range(0.3, 0.5));
   }
 }
 

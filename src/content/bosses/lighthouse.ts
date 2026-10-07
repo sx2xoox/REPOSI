@@ -1006,6 +1006,23 @@ function lobWisp(e: Enemy, w: World, spread: number): void {
 }
 
 /** 등불 회전: the lamp charges, then the beam sweeps a full turn (P2: it halts and reverses). */
+/** Floor 6 keeps up the pressure: the pause after an attack, shortened (shorter still in phase 2). */
+function recover(e: Enemy, t: number): number {
+  return t * (e.mem.p2 ? 0.35 : 0.5);
+}
+
+/** One foghorn blast: a gapped ring of lamp-gold shots (gaps at `g` and opposite). */
+function hornRing(e: Enemy, w: World, g: number, count: number, speed: number): void {
+  w.sfx('foghorn', { vol: 0.7, pitch: 1.05 });
+  w.shake(0.12);
+  w.spawn(new RingFx(e.x, e.y - 30, 30, 0.4, '#ffffff', 2));
+  for (const a of gapRing(count, w.rng.range(0, 0.3), [g, g + Math.PI], 0.78)) {
+    const pr = e.shoot(w, a, bullet6('gold', 3, { speed, z: 6 }));
+    pr.x = e.x + Math.cos(a) * 14;
+    pr.y = e.y + 2 + Math.sin(a) * 10;
+  }
+}
+
 function* sweep(e: Enemy, w: World, split: boolean): Script {
   const p2 = !!e.mem.p2;
   e.halt();
@@ -1018,25 +1035,33 @@ function* sweep(e: Enemy, w: World, split: boolean): Script {
   const a0 = Math.atan2(t.y - e.y, t.x - e.x) - dir * (split ? 0.7 : 1.0);
   const warn = 0.9;
   const omega = dir * (split ? 0.95 : p2 ? 1.2 : 1.0);
-  const duration = split ? 5.6 : p2 ? 6.0 : 6.6;
+  const duration = split ? 5.2 : p2 ? 5.4 : 5.6;
   const beam = w.spawn(new LampBeam(e, a0, {
     source: NAME, warn, duration, omega, half: 0.15, split, reverseAt: p2 && !split ? w.rng.range(2.2, 3.2) : undefined, damage: 1, rehit: 0.7,
   }));
   e.mem.beam = beam;
   yield warn;
   anim(e, 'idle');
-  // wisps keep coming while the lamp turns
-  let next = 1.4;
+  // wisps keep coming while the lamp turns, and the horn sounds between them
+  let next = 1.0;
+  let horn = p2 ? 1.6 : 2.0;
   for (let el = 0; el < duration; el += w.dt) {
     next -= w.dt;
+    horn -= w.dt;
     if (next <= 0) {
-      next = p2 ? 1.6 : 2.2;
+      next = p2 ? 1.1 : 1.4;
       lobWisp(e, w, 36);
+    }
+    if (horn <= 0) {
+      horn = p2 ? 1.7 : 2.3;
+      // the gaps open toward the keeper's side of the beam, a little off them
+      const t2 = e.target(w);
+      hornRing(e, w, Math.atan2(t2.y - e.y, t2.x - e.x) + w.rng.range(-0.4, 0.4), p2 ? 18 : 14, p2 ? 70 : 62);
     }
     yield;
   }
   e.mem.beam = null;
-  yield 0.6;
+  yield recover(e, 0.6);
 }
 
 /** 익사한 혼불: a volley of wisps around the keeper. */
@@ -1047,13 +1072,13 @@ function* wisps(e: Enemy, w: World): Script {
   e.telegraph(0.5);
   w.sfx('orb', { vol: 0.5, pitch: 0.7 });
   yield 0.5;
-  const n = p2 ? 5 : 3;
+  const n = p2 ? 6 : 4;
   for (let k = 0; k < n; k++) {
     lobWisp(e, w, k === 0 ? 0 : 30 + k * 8);
     yield 0.2;
   }
   anim(e, 'idle');
-  yield 1.4;
+  yield recover(e, 1.4);
 }
 
 /** 조류 고리: the tower lurches up and slams down — a gapped tidal ring (P2: two, and a shelf topples). */
@@ -1093,7 +1118,7 @@ function* tidalSlam(e: Enemy, w: World): Script {
       }
     }
   }
-  yield 0.9;
+  yield recover(e, 0.9);
 }
 
 /** 섬광: the lens aims (fan telegraph) and flashes, several times. */
@@ -1102,7 +1127,7 @@ function* flashes(e: Enemy, w: World): Script {
   e.halt();
   anim(e, 'charge', true);
   w.sfx('lamp_hum', { vol: 0.5, pitch: 1.2 });
-  const n = p2 ? 4 : 3;
+  const n = p2 ? 5 : 4;
   const warn = p2 ? 0.55 : 0.65;
   for (let k = 0; k < n; k++) {
     e.telegraph(warn);
@@ -1113,10 +1138,10 @@ function* flashes(e: Enemy, w: World): Script {
     w.sfx('warn', { vol: 0.3, pitch: 1.3 });
     yield warn + 0.2;
     e.mem.flash = null;
-    yield p2 ? 0.25 : 0.35;
+    yield p2 ? 0.2 : 0.28;
   }
   anim(e, 'idle');
-  yield 0.5;
+  yield recover(e, 0.5);
 }
 
 /** 무적: the foghorn — gapped rings of lamp-gold shots roll out with every blast. */
@@ -1135,7 +1160,7 @@ function* foghorn(e: Enemy, w: World): Script {
     w.sfx('foghorn', { vol: 0.9, pitch: 1 + k * 0.04 });
     w.shake(0.18);
     for (let i = 0; i < 2; i++) w.spawn(new RingFx(e.x, e.y - 30, 30 + i * 26, 0.4 + i * 0.15, i ? LAMP[2] : '#ffffff', 2));
-    const count = p2 ? 22 : 18;
+    const count = p2 ? 26 : 20;
     for (const a of gapRing(count, w.rng.range(0, 0.3), [g, g + Math.PI], 0.78)) {
       const pr = e.shoot(w, a, bullet6('gold', 3, { speed: k % 2 ? 78 : 62, z: 6 }));
       pr.x = e.x + Math.cos(a) * 14;
@@ -1145,7 +1170,7 @@ function* foghorn(e: Enemy, w: World): Script {
     yield p2 ? 0.4 : 0.5;
   }
   anim(e, 'idle');
-  yield 0.8;
+  yield recover(e, 0.8);
 }
 
 /** 가라앉은 선원: drowned sailors wade out of the water at the room's edge. */
@@ -1162,7 +1187,7 @@ function* summonSailors(e: Enemy, w: World, n: number): Script {
       splash(ww, s.x, s.y, 1.2);
     }, TEAL[5]));
   }
-  yield 0.9;
+  yield recover(e, 0.9);
   anim(e, 'idle');
 }
 
@@ -1189,11 +1214,11 @@ function* blackout(e: Enemy, w: World): Script {
   e.mem.beam = beam;
   yield 0.9;
   anim(e, 'idle');
-  let next = 1.2;
+  let next = 1.0;
   for (let el = 0; el < duration; el += w.dt) {
     next -= w.dt;
     if (next <= 0) {
-      next = 1.9;
+      next = 1.3;
       lobWisp(e, w, 40);
     }
     yield;
@@ -1201,7 +1226,7 @@ function* blackout(e: Enemy, w: World): Script {
   e.mem.beam = null;
   dark.lift();
   e.mem.dark = null;
-  yield 0.7;
+  yield recover(e, 0.7);
 }
 
 function* phaseTwo(e: Enemy, w: World): Script {
@@ -1251,7 +1276,7 @@ function* patterns(e: Enemy, w: World): Script {
     else if (id === 'flash') yield* flashes(e, w);
     else if (id === 'horn') yield* foghorn(e, w);
     else yield* summonSailors(e, w, 2);
-    yield* wade(e, w, p2 ? w.rng.range(0.45, 0.65) : w.rng.range(0.6, 0.9));
+    yield* wade(e, w, p2 ? w.rng.range(0.25, 0.4) : w.rng.range(0.35, 0.55));
   }
 }
 

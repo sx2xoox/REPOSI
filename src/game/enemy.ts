@@ -27,6 +27,16 @@ export interface ShootOpts extends Partial<ProjectileOpts> {
   damage?: number;
 }
 
+/**
+ * Boss-wide damage rules installed by content (src/content/bosses/resolve.ts):
+ * `filter` may reduce or block a hit before it lands, `update` runs every step
+ * while the boss is alive. Both are gameplay (deterministic) code.
+ */
+export const bossRules: {
+  filter?(e: Enemy, w: World, hit: HitInfo, dmg: number): number;
+  update?(e: Enemy, w: World, dt: number): void;
+} = {};
+
 export class Enemy extends Actor {
   def: EnemyDef;
   script: ScriptRunner;
@@ -106,6 +116,7 @@ export class Enemy extends Actor {
   override update(w: World, dt: number): void {
     this.age += dt;
     this.animT += dt;
+    if (this.isBoss && this.alive && bossRules.update) bossRules.update(this, w, dt);
     if (this.flash > 0) this.flash -= dt;
     if (this.telegraphT > 0) this.telegraphT -= dt;
     this.updateStatuses(w, dt);
@@ -184,6 +195,7 @@ export class Enemy extends Actor {
     let dmg = hit.damage;
     if (this.hasStatus('weak')) dmg *= 1.35;
     if (this.hasStatus('freeze') && hit.kind !== 'status') dmg *= 1.2;
+    if (this.isBoss && bossRules.filter) dmg = bossRules.filter(this, w, hit, dmg);
     this.hp -= dmg;
     this.lastHurtAt = w.time;
     if (hit.kind !== 'status') {

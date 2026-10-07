@@ -80,16 +80,16 @@ Commands:
 
   | floor | hpMult | bossHpMult | hit [regular, heavy] ½♥ | move / shot speed | budget | champion | rooms |
   |---|---|---|---|---|---|---|---|
-  | 1 | 1.3 | 1.35 | 1, 2 | 1.00 / 1.00 | 3–5 | 3% | 8–10 |
-  | 2 | 1.75 | 2.05 | 1, 2 | 1.02 / 1.02 | 4–6 | 6% | 10–12 |
-  | 3 | 2.4 | 2.9 | 1, 2 | 1.03 / 1.04 | 5–7 | 8% | 11–13 |
-  | 4 | 3.6 | 3.7 | 1, 2 | 1.05 / 1.06 | 6–8 | 10% | 12–14 |
-  | 5 | 4.9 | 5.6 | 1, 2 | 1.06 / 1.08 | 7–9 | 12% | 12–15 |
-  | 6 | 6.3 | 9.5 | 1, 3 | 1.08 / 1.10 | 7–10 | 14% | 13–15 |
-  | 7 | 7.7 | 11.9 | 2, 3 | 1.09 / 1.12 | 8–10 | 16% | 13–16 |
-  | 8 | 9.4 | 14.9 | 2, 3 | 1.10 / 1.14 | 8–11 | 18% | 14–16 |
-  | 9 | 11.5 | 18.6 | 2, 4 | 1.12 / 1.16 | 9–11 | 20% | 14–17 |
-  | 10 | 14 | 23.2 | 2, 4 | 1.13 / 1.18 | 9–12 | 22% | 15–17 |
+  | 1 | 1.3 | 2.0 | 1, 2 | 1.00 / 1.00 | 3–5 | 3% | 8–10 |
+  | 2 | 1.75 | 3.1 | 1, 2 | 1.02 / 1.02 | 4–6 | 6% | 10–12 |
+  | 3 | 2.4 | 4.35 | 1, 2 | 1.03 / 1.04 | 5–7 | 8% | 11–13 |
+  | 4 | 3.6 | 5.55 | 1, 2 | 1.05 / 1.06 | 6–8 | 10% | 12–14 |
+  | 5 | 4.9 | 8.4 | 1, 2 | 1.06 / 1.08 | 7–9 | 12% | 12–15 |
+  | 6 | 6.3 | 14.25 | 1, 3 | 1.08 / 1.10 | 7–10 | 14% | 13–15 |
+  | 7 | 7.7 | 17.85 | 2, 3 | 1.09 / 1.12 | 8–10 | 16% | 13–16 |
+  | 8 | 9.4 | 22.35 | 2, 3 | 1.10 / 1.14 | 8–11 | 18% | 14–16 |
+  | 9 | 11.5 | 27.9 | 2, 4 | 1.12 / 1.16 | 9–11 | 20% | 14–17 |
+  | 10 | 14 | 34.8 | 2, 4 | 1.13 / 1.18 | 9–12 | 22% | 15–17 |
 
   Floors 1–6 are measured (QA bot median: rooms ~6–10 s, bosses ~30–50 s, humans ~1.3x longer; the
   bot's boss dps grows ~1.45x per floor; boss def.hp ~700–1150); 7–10 are extrapolated — re-measure with
@@ -99,6 +99,7 @@ Commands:
   their own enemies (`EnemyDef.floors`), bosses (`bossFloors`), music ids (`MUSIC_IDS`) and room
   templates (`RoomTemplate.floors` lists that stop at 5 are skipped deeper down). Keep `def.speed x
   enemySpeed` under the keeper's 92 px/s for regular enemies.
+- **Bosses resist being melted** (`content/bosses/resolve.ts`, hooked through `bossRules` in game/enemy.ts; user request 2026-10-07, together with boss HP ×1.5 in `DIFFICULTY.bossHpMult`). Invisible common rules: damage never skips a phase (a hit stops just under the next phase line; the boss is untouchable until its own phase change has played, then a 1.6 s guard) and damage beyond a per-second budget (4 % of max HP on floors 1–2, 3.5 % on 3–4, 3 % from 5) lands at 25 %; releases are exempt from both. On top, **every boss has its own skill** (`defineBossWard(bossId, …)` in `content/bosses/wards-*.ts`, user choice "보스별 고유 버티기 기술"): each asks for a different verb (bell: number of hits; colossus: strike from the flank/back; spore mother: break the healing cocoons; slime queen: catch the crown; chain smith: break anchors or shoot across chains; imugi: hit the head; saint: wait out / melee the ice mirror; commander: lure him off his banner; 무명: come into lantern reach; archivist: stand on the seal glyphs; lighthouse: strike when the lamp flares in the fog; clockmaker: burst during the rewind wind-up; dancer: hit on the beat). Releases pierce every skill; breaking one the intended way dazes the boss (+25 % damage). Deeper skills are harsher and stay up longer. A new boss needs its own ward (tests/boss-resolve.test.ts checks every boss has one) and its phase lines in `GATES` (default one change at half HP). Do not add new attack patterns to bosses for this — the user rejected generic boss patterns twice; deeper bosses get their pressure from tighter pacing of their own patterns (`recover()` in the floor 4/6/7 boss files; floors 6–7 must clearly out-press 1–5 — user 2026-10-07: "6~7층은 6~7층인 이유가 있어야", measure with `BOSS_GAPS=1 npx vitest run tests/boss-bench`).
 - **등불 해방** balance: a release is a burst / crowd-control moment worth ~10–15x `stats.damage` on a
   single target (multi-hit releases use `HitFalloff`), ≤ ~20% of a run's damage.
 - Enemy AI = generator `script(e, w)`: `yield 0.5` waits 0.5s, `yield` waits a frame.

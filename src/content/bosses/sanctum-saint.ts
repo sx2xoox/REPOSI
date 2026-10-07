@@ -596,7 +596,7 @@ function* requiem(e: Enemy, w: World): Script {
     yield 0.11;
   }
   anim(e, 'idle');
-  yield 0.7;
+  yield recover(e, 0.7);
 }
 
 function* phaseTwo(e: Enemy, w: World): Script {
@@ -626,6 +626,11 @@ function* phaseTwo(e: Enemy, w: World): Script {
   if (minionCount(w, e) === 0) yield* choir(e, w);
 }
 
+/** Floor 4: the pause after an attack, a little shorter than the shallower floors' (shorter still in phase 2). */
+function recover(e: Enemy, t: number): number {
+  return t * (e.mem.p2 ? 0.6 : 0.72);
+}
+
 function* patterns(e: Enemy, w: World): Script {
   while (true) {
     const p2 = !!e.mem.p2;
@@ -647,7 +652,7 @@ function* patterns(e: Enemy, w: World): Script {
     else if (id === 'choir') yield* choir(e, w);
     else if (id === 'blizzard') yield* blizzard(e, w);
     else yield* requiem(e, w);
-    yield* glide(e, w, p2 ? w.rng.range(0.4, 0.6) : w.rng.range(0.55, 0.85));
+    yield* glide(e, w, p2 ? w.rng.range(0.3, 0.45) : w.rng.range(0.4, 0.6));
   }
 }
 

@@ -69,7 +69,7 @@ describe('floor 1–3 boss definitions', () => {
     }
   });
 
-  it('boss hp scales so fights last ~30–60 s on their floor', () => {
+  it('boss hp scales so fights last ~40–90 s on their floor (HP x1.5, 2026-10-07)', () => {
     // median boss dps of the QA bot on each floor (scripts/qa-run.mjs --suite balance: blessings,
     // items, releases and dodging included; a human is ~1.3x slower), see BOT_BOSS_DPS in floors.test
     const dps: Record<number, number> = { 1: 31, 2: 44, 3: 71 };
@@ -77,8 +77,8 @@ describe('floor 1–3 boss definitions', () => {
       const d = Enemies.must(id);
       const f = Floors.all().find((x) => x.index === b.floor);
       const seconds = (d.hp * (f?.bossHpMult ?? f?.hpMult ?? 1)) / dps[b.floor];
-      expect(seconds, id).toBeGreaterThan(25);
-      expect(seconds, id).toBeLessThan(60);
+      expect(seconds, id).toBeGreaterThan(35);
+      expect(seconds, id).toBeLessThan(95);
     }
   });
 
@@ -185,6 +185,16 @@ function fakeWorld(seed: string): FakeWorld {
     interiorX: IX, interiorY: IY, interiorW: IW, interiorH: IH, centerX: IX + IW / 2, centerY: IY + IH / 2,
     boxBlocked: (x: number, y: number, r: number) => !inside(x, y, r),
     isFree: (x: number, y: number, r = 6) => inside(x, y, r),
+    randomFreePos: (rng: RNG, r = 6, avoid?: { x: number; y: number; dist: number }) => {
+      let best = { x: IX + IW / 2, y: IY + IH / 2 };
+      for (let i = 0; i < 60; i++) {
+        const x = IX + r + rng.next() * (IW - r * 2);
+        const y = IY + r + rng.next() * (IH - r * 2);
+        best = { x, y };
+        if (room.isFree(x, y, r) && (!avoid || Math.hypot(x - avoid.x, y - avoid.y) >= avoid.dist)) break;
+      }
+      return best;
+    },
     nearestFree: (x: number, y: number, r = 6) => ({ x: Math.min(IX + IW - r, Math.max(IX + r, x)), y: Math.min(IY + IH - r, Math.max(IY + r, y)) }),
     lineOfSight: () => true,
     tileAt: (tx: number, ty: number) => (inside(tx * 16 + 8, ty * 16 + 8, 0) ? 0 : 1),
@@ -210,6 +220,9 @@ function fakeWorld(seed: string): FakeWorld {
     player,
     targets: () => [player],
     room,
+    flags: new Set<string>(),
+    entityById: (id: number) => fw.entities.find((e) => e.id === id && !e.dead),
+    banner: () => {},
     enemies,
     get entities() { return fw.entities; },
     get projectiles() { return fw.entities.filter((e) => e instanceof Projectile) as Projectile[]; },

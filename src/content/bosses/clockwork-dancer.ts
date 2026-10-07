@@ -524,6 +524,11 @@ function tempo(e: Enemy): number {
   return e.mem.p2 ? 0.8 : 1;
 }
 
+/** Floor 7 keeps up the pressure: the pause after a figure, shortened (shorter still in phase 2). */
+function recover(e: Enemy, t: number): number {
+  return t * (e.mem.p2 ? 0.35 : 0.5);
+}
+
 function chime(w: World, step: number, vol = 0.4, detuned = false): void {
   const notes = [0, 4, 7, 12, 7, 4];
   w.sfx('clockboss_chime', { vol, pitch: Math.pow(2, notes[step % notes.length] / 12) * (detuned ? 0.955 : 1) });
@@ -602,10 +607,10 @@ function* pirouette(e: Enemy, w: World, ghosts = false): Script {
       for (const b of gapRing(8, w.rng.range(0, 0.4), [], 0)) e.shoot(w, b, bullet7('rose', 3, { speed: 76 }));
       w.sfx('enemy_shoot', { vol: 0.35, pitch: 1.4 });
     }
-    yield 0.28 * T;
+    yield 0.22 * T;
   }
   anim(e, 'idle');
-  yield 0.5 * T;
+  yield recover(e, 0.5);
 }
 
 /** 회전 치마: she pirouettes in place and the skirt sheds a spiral of rose shots. */
@@ -621,7 +626,7 @@ function* skirt(e: Enemy, w: World): Script {
   anim(e, 'spin', true);
   e.mem.spinning = 1;
   const arms = p2 ? 4 : 3;
-  const steps = p2 ? 26 : 22;
+  const steps = p2 ? 30 : 26;
   const dir = w.rng.sign();
   const base = w.rng.angle();
   for (let k = 0; k < steps; k++) {
@@ -639,7 +644,7 @@ function* skirt(e: Enemy, w: World): Script {
   e.halt();
   e.mem.spinning = 0;
   anim(e, 'idle');
-  yield 0.7 * T;
+  yield recover(e, 0.7);
 }
 
 /** 실린더 핀: a row of pins appears along a wall, holds, then marches across in unison — one gap. */
@@ -676,7 +681,8 @@ function* pins(e: Enemy, w: World): Script {
     yield 0.25 * T;
   }
   anim(e, 'idle');
-  yield 1.4 * T;
+  // the pins march on their own while she starts the next figure
+  yield recover(e, 1.0);
 }
 
 /** 거울 무희: ghost dancers appear on opposite sides of the keeper and dash through their spot. */
@@ -706,7 +712,8 @@ function* mirrors(e: Enemy, w: World): Script {
     yield 0.3 * T;
   }
   anim(e, 'idle');
-  yield 1.4 * T;
+  // the ghosts dash on their own while she goes on dancing
+  yield recover(e, 0.9);
 }
 
 /** 그랑 주테: a leap onto the keeper — gapped shock ring and a burst of petals on landing. */
@@ -743,9 +750,9 @@ function* leap(e: Enemy, w: World): Script {
       pr.y = e.y - 4 + Math.sin(a) * 6;
     }
     w.sfx('enemy_shoot', { vol: 0.4, pitch: 1.1 });
-    yield 0.6 * T;
+    yield 0.5 * T;
   }
-  yield 0.5 * T;
+  yield recover(e, 0.5);
 }
 
 /** 리본: two (three) serpentine ribbons of shots stream from her hands toward the keeper. */
@@ -760,7 +767,7 @@ function* ribbons(e: Enemy, w: World): Script {
   anim(e, 'spin', true);
   e.mem.spinning = 1;
   const streams = p2 ? 3 : 2;
-  const perStream = p2 ? 11 : 9;
+  const perStream = p2 ? 13 : 11;
   for (let i = 0; i < perStream; i++) {
     const t = e.target(w);
     const base = Math.atan2(t.y - 4 - e.y, t.x - e.x);
@@ -777,7 +784,7 @@ function* ribbons(e: Enemy, w: World): Script {
   }
   e.mem.spinning = 0;
   anim(e, 'idle');
-  yield 1.1 * T;
+  yield recover(e, 1.1);
 }
 
 function* phaseTwo(e: Enemy, w: World): Script {
@@ -829,7 +836,7 @@ function* patterns(e: Enemy, w: World): Script {
     else if (id === 'leap') yield* leap(e, w);
     else if (id === 'ribbons') yield* ribbons(e, w);
     else yield* pirouette(e, w, true);
-    yield* glide(e, w, p2 ? w.rng.range(0.35, 0.55) : w.rng.range(0.5, 0.8));
+    yield* glide(e, w, p2 ? w.rng.range(0.2, 0.32) : w.rng.range(0.28, 0.45));
   }
 }
 
