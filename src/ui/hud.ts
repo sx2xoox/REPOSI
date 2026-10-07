@@ -1,12 +1,11 @@
 // In-game HUD (UI space 768x432), laid out as the keeper's own gear:
-//   top-left   two PixelLab lanterns standing side by side: the health lantern
-//              in front (red hearts, soul hearts and one-hit wards each fill its
-//              glass from the bottom, the one spent first drawn in front: wards,
-//              then soul, then red; a flame on the highest level; a short readout
-//              under it) and, right of it, the release lantern (ember gauge: ember
-//              rises in its glass, glows with the release key under it when
-//              등불 해방 is ready, shutters while it recovers); temporary buffs
-//              hang below the readout
+//   top-left   the life gauge (hud-fire.ts): one cell of fire per heart in a slim
+//              brass frame, no numbers; soul hearts as translucent blue fire over
+//              it, one-hit wards as light-grey plates; temporary buffs hang below
+//   bottom-left  the PixelLab release lantern (ember gauge: ember rises in its
+//              glass, glows with the release key beside it when 등불 해방 is
+//              ready, shutters while it recovers); hidden with touch controls,
+//              which have their own release button
 //   top-right  minimap · floor name · objective / seed · purse (coins / bombs / keys)
 //   bottom-right  equipment slots (no backing): secondary + swap key, primary
 //              (rarity rim + gem), active item + charge wick, potion
@@ -15,7 +14,7 @@
 // The UI space widens with the screen (UI_W = 2 * VIEW_W); corner elements are
 // anchored to the edges of the device safe area (`Renderer.uiSafe`). With the
 // touch controls shown, the weapon / active / potion live on their buttons, so
-// the equipment slots are hidden (the lanterns stay: they are status, not buttons).
+// the equipment slots and the release lantern are hidden (the life gauge stays).
 
 import type { Renderer } from '../engine/renderer';
 import { UI_H, UI_W } from '../engine/renderer';
@@ -33,10 +32,9 @@ import { MinimapView } from './minimap';
 import { drawBanners, drawBossIntro, drawFloorCard, drawRoomClear } from './cards';
 import { HintSystem } from './hints';
 import { fitScale, frame, gauge, glow, keycap, spriteCentered } from './frame';
-import { blitArt, drawHealthLantern, drawLantern, healthStackTop, lanternSpec, plateCanvas, rarityAccent } from './hud-gear';
-import { FireGaugeFx, drawFireGauge, fireGaugeFront, fireGaugeLayout } from './hud-fire';
+import { blitArt, drawLantern, lanternSpec, plateCanvas, rarityAccent } from './hud-gear';
+import { FireGaugeFx, drawFireGauge, fireGaugeLayout } from './hud-fire';
 import { C, PX, splitFloorName } from './theme';
-import { heartSlots, type HeartKind } from './logic';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
 import { ItemTooltip } from './item-tooltip';
@@ -57,24 +55,13 @@ export function minimapBlockRect(uiW: number, safe: { l: number; r: number; t: n
   return { x: uiW - safe.r - MINIMAP_W - MINIMAP_MARGIN, y: safe.t + MINIMAP_MARGIN, w: MINIMAP_W, h: MINIMAP_H + 30 };
 }
 
-const HEART_VALUE: Record<HeartKind, number> = { full: 2, half: 1, empty: 0, soul: 2, soulHalf: 1 };
-
-// ---- lantern geometry (UI units, from the safe-area top-left; even = on the art grid)
-/** health lantern (front, left) and release lantern (right of it) share a baseline */
-const LANTERN_BASE = 74;
-const HP_X = 8;
-/** gap (UI units) between the health lantern and the release lantern */
-const LANTERN_GAP = 4;
-/** health readout lines under the health lantern (UI) */
-const READOUT_LINE = 12;
-/**
- * Draft under review: life as a flame gauge right of the release lantern
- * (hud-fire.ts), shown only with `?fireGauge` in the page URL. UI only.
- */
-const FIRE_GAUGE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('fireGauge');
-/** fire gauge draft: gap after the release lantern and top (UI) */
-const GAUGE_GAP = 6;
-const GAUGE_Y = 10;
+// ---- life gauge and release lantern (UI units, from the safe-area corners; even = on the art grid)
+/** the life gauge's top-left */
+const GAUGE_X = 8;
+const GAUGE_Y = 8;
+/** the release lantern stands in the bottom-left corner (desktop; touch has its own release button) */
+const LANTERN_X = 8;
+const LANTERN_BOTTOM = 10;
 
 /** Purse (coins / bombs / keys) row under the minimap block: its height (UI). */
 const PURSE_H = 20;
@@ -99,16 +86,6 @@ interface RackLayout {
   div: number;
 }
 
-interface Shard {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  age: number;
-  life: number;
-  color: string;
-}
-
 /** A counter is animating (pop / floating delta) */
 function counterBusy(tr: ChangeTracker): boolean {
   return tr.pop > 0 || (tr.age < 1.1 && tr.delta !== 0);
@@ -116,10 +93,6 @@ function counterBusy(tr: ChangeTracker): boolean {
 
 export class Hud {
   t = 0;
-  private slots: HeartKind[] = [];
-  private slotPop: number[] = [];
-  private slotDir: number[] = [];
-  private shards: Shard[] = [];
   private coins = new ChangeTracker(0, 2.5);
   private bombs = new ChangeTracker(0, 2.5);
   private keys = new ChangeTracker(0, 2.5);
@@ -152,8 +125,6 @@ export class Hud {
   private lastCleared = true;
   private lastFloor = -1;
   private clearT = -1;
-  private hurtFlash = 0;
-  private lastHp = -1;
   readonly minimap = new MinimapView();
   readonly hints = new HintSystem();
   /** collected artifacts / blessings row + power readout + proc pops */
@@ -166,12 +137,10 @@ export class Hud {
   private W = UI_W;
   private H = UI_H;
   // ---- cached layers (static HUD parts are painted once and blitted until their inputs change)
-  private heartsKey = '';
   private readonly lyPurse = new UiLayer();
   private readonly lyMap = new UiLayer();
   private readonly lySlots = new UiLayer();
-  /** health lantern scale (red capacity, or soul / wards when they reach higher; half hearts), eased */
-  private hpScale = -1;
+  /** life gauge: turns losses / gains into fire going out / flaring up */
   private fire = new FireGaugeFx();
   /** left edge of the gear rack this frame (UI units inside the safe area; W when hidden) */
   private rackLeft = UI_W;
@@ -197,35 +166,8 @@ export class Hud {
     this.t += dt;
     const p = w.player;
     if (!p) return;
-    // ---- hearts
-    const slots = heartSlots(p.red, p.maxRed, p.soul);
-    for (let i = 0; i < Math.max(slots.length, this.slots.length); i++) {
-      const before = this.slots[i];
-      const now = slots[i];
-      this.slotPop[i] = Math.max(0, (this.slotPop[i] ?? 0) - dt * 2.6);
-      if (before === now || this.t < 0.05) continue;
-      const bv = before ? HEART_VALUE[before] : -1;
-      const nv = now ? HEART_VALUE[now] : -1;
-      this.slotPop[i] = 1;
-      this.slotDir[i] = nv >= bv ? 1 : -1;
-      if (nv < bv) this.spawnShards(i, before === 'soul' || before === 'soulHalf' ? C.soul : C.heart);
-    }
-    if (slots.length !== this.slots.length || slots.some((k, i) => k !== this.slots[i])) this.heartsKey = slots.join(',');
-    this.slots = slots;
-    const hp = p.red + p.soul;
-    if (this.lastHp >= 0 && hp < this.lastHp) this.hurtFlash = 1;
-    this.lastHp = hp;
-    this.hurtFlash = Math.max(0, this.hurtFlash - dt * 2.5);
-    const cap = Math.max(2, p.maxRed, p.red, p.soul, p.shields * 2);
-    this.hpScale = this.hpScale < 0 ? cap : this.hpScale + (cap - this.hpScale) * Math.min(1, dt * 6);
-    if (FIRE_GAUGE) this.fire.update(p.red, p.soul, p.shields, dt);
-    for (const s of this.shards) {
-      s.age += dt;
-      s.vy += 420 * dt;
-      s.x += s.vx * dt;
-      s.y += s.vy * dt;
-    }
-    if (this.shards.length) this.shards = this.shards.filter((s) => s.age < s.life);
+    // ---- life gauge
+    this.fire.update(p.red, p.soul, p.shields, dt);
     // ---- counters
     this.coins.update(p.coins, dt);
     this.bombs.update(p.bombs, dt);
@@ -325,45 +267,19 @@ export class Hud {
     if (w.coop) this.coop.update(w, dt);
   }
 
-  private spawnShards(slot: number, color: string): void {
-    const { x, y } = this.heartPos(slot);
-    for (let i = 0; i < 6; i++) {
-      this.shards.push({
-        x: x + (Math.random() - 0.5) * 8, y: y + (Math.random() - 0.5) * 8,
-        vx: (Math.random() - 0.5) * 120, vy: -60 - Math.random() * 90,
-        age: 0, life: 0.45 + Math.random() * 0.3, color: i % 3 === 0 ? '#ffffff' : color,
-      });
-    }
+  /** Top-left of the release lantern (UI units inside the safe area): bottom-left corner. */
+  private lanternPos(): { x: number; y: number } {
+    return { x: LANTERN_X, y: this.H - LANTERN_BOTTOM - lanternSpec('release').h * PX };
   }
 
-  /** Top-left of a lantern (UI units inside the safe area). */
-  private lanternPos(kind: 'release' | 'health'): { x: number; y: number } {
-    const sp = lanternSpec(kind);
-    if (FIRE_GAUGE) return { x: HP_X, y: LANTERN_BASE - sp.h * PX };
-    const x = kind === 'health' ? HP_X : HP_X + lanternSpec('health').w * PX + LANTERN_GAP;
-    return { x, y: LANTERN_BASE - sp.h * PX };
-  }
-
-  /** Where hit shards leave from: the top of the health lantern's life stack. */
-  private heartPos(_i: number): { x: number; y: number } {
-    const p = this.cw?.player;
-    if (FIRE_GAUGE && p) return fireGaugeFront(this.gaugePos().x, this.gaugePos().y, p);
-    const { x, y } = this.lanternPos('health');
-    if (!p) return { x: x + 22, y: y + 30 };
-    return healthStackTop(x, y, { red: p.red, soul: p.soul, shields: p.shields, scale: this.hpScale });
-  }
-
-  /** Bottom edge of the lantern block and the health readout under it (UI units inside the safe area). */
-  /** Top-left of the fire gauge draft (UI units inside the safe area). */
+  /** Top-left of the life gauge (UI units inside the safe area). */
   private gaugePos(): { x: number; y: number } {
-    return { x: HP_X + lanternSpec('release').w * PX + GAUGE_GAP, y: GAUGE_Y };
+    return { x: GAUGE_X, y: GAUGE_Y };
   }
 
+  /** Bottom edge of the life gauge (UI units inside the safe area). */
   private plateBottom(w: World): number {
-    if (FIRE_GAUGE) return LANTERN_BASE + 2;
-    const p = w.player;
-    const lines = 1 + (p.soul > 0 ? 1 : 0) + (p.shields > 0 ? 1 : 0);
-    return LANTERN_BASE + 3 + lines * READOUT_LINE;
+    return GAUGE_Y + fireGaugeLayout(w.player).h * PX;
   }
 
   // ================================================================ draw
@@ -402,11 +318,11 @@ export class Hud {
   /** Corner HUD: cached layers while nothing animates, live drawing during animations. */
   private drawCorners(r: Renderer, w: World, A: number, ox: number, oy: number, touchUi: boolean): void {
     const p = w.player;
-    // ---- the two lanterns (drawn live: their flames flicker)
+    // ---- life gauge and release lantern (drawn live: their flames flicker)
     this.drawHealth(r, w, A);
-    this.drawLanternGauge(r, w, A);
+    if (!touchUi) this.drawLanternGauge(r, w, A);
     const pb = this.plateBottom(w);
-    this.drawBuffs(r, w, A, pb + 6);
+    this.drawBuffs(r, w, A, pb + 8);
     // purse under the minimap block
     if (counterBusy(this.coins) || counterBusy(this.bombs) || counterBusy(this.keys)) this.drawConsumables(r, w, A);
     else this.lyPurse.draw(r, `${p.coins}|${p.bombs}|${p.keys}|${this.W}`, ox, oy, this.W - 150, this.purseY() - 4, 150, PURSE_H + 18, A, this.paintPurse);
@@ -435,60 +351,20 @@ export class Hud {
     }
   }
 
-  /** The health lantern, a glow that throbs at low health, and a short readout under it. */
+  /** The life gauge (no numbers: cells, half cells and empty glass tell what is left) and a glow that throbs at low health. */
   private drawHealth(r: Renderer, w: World, A: number): void {
-    if (FIRE_GAUGE) return this.drawFireHealth(r, w, A);
-    const p = w.player;
-    const { x, y } = this.lanternPos('health');
-    const sp = lanternSpec('health');
-    const low = p.red + p.soul <= 2 && p.alive;
-    const cx = x + (sp.w * PX) / 2;
-    const cy = y + (sp.h * PX) / 2 + 6;
-    if (low) glow(r, cx, cy, 40, '#ff2030', (0.18 + 0.3 * heartbeat(this.t, 0.85)) * A);
-    let flash = this.hurtFlash * 0.8;
-    for (let i = 0; i < this.slotPop.length; i++) flash = Math.max(flash, (this.slotPop[i] ?? 0) * 0.45);
-    drawHealthLantern(r, x, y, { red: p.red, maxRed: p.maxRed, soul: p.soul, shields: p.shields, scale: this.hpScale, t: this.t, flash, low }, A);
-    for (const s of this.shards) {
-      const a = 1 - s.age / s.life;
-      r.uiRect(s.x - 1.5, s.y - 1.5, 3, 3, s.color, a * A);
-    }
-    // readout under the lantern: hearts as "3.5/4", soul and wards only when held
-    const tx = x + (sp.w * PX) / 2;
-    let ty = LANTERN_BASE + 3;
-    const hearts = (n: number) => (n % 2 ? (n / 2).toFixed(1) : String(n / 2));
-    const line = (text: string, color: string) => {
-      r.uiText(text, tx, ty, { size: 10, font: 'small', align: 'center', color, alpha: A, outline: C.ink });
-      ty += READOUT_LINE;
-    };
-    line(`${hearts(p.red)}/${hearts(p.maxRed)}`, low ? '#ff8a8a' : '#ffb0a8');
-    if (p.soul > 0) line(`+${hearts(p.soul)}`, '#a8c0ff');
-    if (p.shields > 0) line(`방패 ${p.shields}`, '#e4eaf6');
-  }
-
-  /** Fire gauge draft: the gauge, a glow that throbs at low health, and a one-line readout under it. */
-  private drawFireHealth(r: Renderer, w: World, A: number): void {
     const p = w.player;
     const { x, y } = this.gaugePos();
     const L = fireGaugeLayout(p);
     const low = p.red + p.soul <= 2 && p.alive;
-    if (low) glow(r, x + 24, y + L.h, 46, '#ff2030', (0.16 + 0.26 * heartbeat(this.t, 0.85)) * A);
+    if (low) glow(r, x + 16, y + (L.h * PX) / 2, 40, '#ff2030', (0.16 + 0.26 * heartbeat(this.t, 0.85)) * A);
     drawFireGauge(r, x, y, { red: p.red, maxRed: p.maxRed, soul: p.soul, shields: p.shields, t: this.t, low }, this.fire, A);
-    const hearts = (n: number) => (n % 2 ? (n / 2).toFixed(1) : String(n / 2));
-    let tx = x + 2;
-    const ty = y + L.h * PX + 2;
-    const part = (text: string, color: string) => {
-      r.uiText(text, tx, ty, { size: 10, font: 'small', color, alpha: A, outline: C.ink });
-      tx += text.length * 6 + 8;
-    };
-    part(`${hearts(p.red)}/${hearts(p.maxRed)}`, low ? '#ff8a8a' : '#ffb0a8');
-    if (p.soul > 0) part(`+${hearts(p.soul)}`, '#a8c0ff');
-    if (p.shields > 0) part(`방패 ${p.shields}`, '#e4eaf6');
   }
 
   /** The release lantern: ember gauge, ready glow + key, release burst, cooldown shutters. */
   private drawLanternGauge(r: Renderer, w: World, A: number): void {
     const p = w.player;
-    const { x, y } = this.lanternPos('release');
+    const { x, y } = this.lanternPos();
     const sp = lanternSpec('release');
     const ready = this.emberFull && p.releaseCooldown <= 0;
     const pulse = 0.5 + 0.5 * Math.sin(this.t * 7);
@@ -505,7 +381,8 @@ export class Hud {
         r.uiRect(Math.round(sx), Math.round(y + 8 - k * 14), PX, PX, i % 2 ? '#ffd060' : '#ff8a30', A * (1 - k));
       }
       const pad = input.aimMode === 'pad';
-      keycap(r, actionLabel(input.bindings, 'special', pad), cx, y + sp.h * PX + 6, { align: 'center', alpha: A, down: pulse > 0.5, pad });
+      // the key beside the lantern's base (there is no room under it in the corner)
+      keycap(r, actionLabel(input.bindings, 'special', pad), x + sp.w * PX + 6, y + sp.h * PX - 22, { alpha: A, down: pulse > 0.5, pad });
     }
     if (p.releaseCooldown > 0) {
       r.uiText(p.releaseCooldown.toFixed(1), cx, cy - 6, { size: 10, font: 'small', align: 'center', color: '#ffe8c0', alpha: A, outline: C.ink });
@@ -515,7 +392,7 @@ export class Hud {
   private drawBuffs(r: Renderer, w: World, A: number, y: number): void {
     const buffs = w.items.buffs;
     if (!buffs.length) return;
-    let x = HP_X;
+    let x = GAUGE_X;
     let newest: { label: string; t: number } | null = null;
     for (const b of buffs) {
       const seen = this.buffSeen.get(b.key) ?? this.t;

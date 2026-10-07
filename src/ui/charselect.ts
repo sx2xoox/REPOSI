@@ -20,17 +20,19 @@ import { animFrame, hasAnim, hasSprite } from '../engine/sprites';
 import { clamp, ease } from '../engine/math';
 import { backdrop } from './backdrop';
 import { Repeater, Spring, appear } from './anim';
-import { C } from './theme';
+import { C, PX } from './theme';
 import { divider, fitScale, frame, gauge, glow, iconSlot, keyHintRow, spriteCentered } from './frame';
 import { characterKitRows, characterOrder, characterStatRows, characterStats, isUnlocked, DIFFICULTY_LABELS, weaponKindLabel } from './logic';
 import { AbandonExpeditionOverlay } from './abandon-expedition';
-import { CELL_H, CELL_STEP, drawLifeCell } from './hud-gear';
+import { FireGaugeFx, drawFireGauge, fireGaugeLayout } from './hud-fire';
 
 const KIT_LABEL_COLORS = { passive: C.goldHi, dash: C.info, release: C.emberHi } as const;
 
 export class CharacterSelectScene implements Scene {
   private idx = 0;
   private t = 0;
+  /** never fed: the stats panel shows a steady gauge */
+  private readonly lifeFx = new FireGaugeFx();
   private sel = new Spring(0, 180, 22);
   private selT = 0;
   private starting = -1;
@@ -374,12 +376,10 @@ export class CharacterSelectScene implements Scene {
     const hy = y + 34;
     r.uiText('체력', tx + 22, hy - 6, { size: 12, color: C.textDim, alpha: A });
     r.uiSprite('st_heart', tx + 6, hy, 2, { alpha: A });
-    const hearts = open ? c.hearts : 0;
-    // life cells, as on the in-run keeper plate
-    for (let i = 0; i < Math.max(hearts, open ? 0 : 3); i++) {
-      drawLifeCell(r, tx + 79 + i * CELL_STEP, hy - CELL_H / 2, open ? 'full' : 'empty', { alpha: A, t: this.t });
-    }
-    for (let i = 0; i < (open ? c.soulHearts ?? 0 : 0); i++) drawLifeCell(r, tx + 79 + (hearts + i) * CELL_STEP, hy - CELL_H / 2, 'soul', { alpha: A, t: this.t });
+    // the same life gauge as in a run (locked keepers: three dark cells)
+    const red = open ? c.hearts * 2 : 0;
+    const life = { red, maxRed: open ? red : 6, soul: open ? (c.soulHearts ?? 0) * 2 : 0, shields: 0, t: this.t, low: false };
+    drawFireGauge(r, tx + 56, hy - (fireGaugeLayout(life).h * PX) / 2, life, this.lifeFx, A);
     const st = characterStats(c);
     const rows = characterStatRows(st);
     const rowH = Math.min(24, Math.floor((h - 34 - 30 - 22) / rows.length));
