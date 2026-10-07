@@ -1,3 +1,8 @@
+## 2026-10-07 — Draft under review: life as a flame gauge (source pushed, off by default, NOT deployed)
+- User asked to turn health into a gauge in the lantern-keeper spirit: soft blurred gaps between hearts, fire that gutters and goes out when hit (the lamp is out when life is gone), soul hearts as translucent blue fire laid over it that goes out the same way, wards as sturdy riveted iron plates over both; asked to see a draft first.
+- `src/ui/hud-fire.ts`: `drawFireGauge` + `FireGaugeFx` (loss → shrinking, charring flame, ember line, embers and smoke; soul loss in blue; ward plate splits and drops; heal flares white). Same overlay order as the lantern (wards → soul → red, all from the left). Procedural placeholder frame and plates; final frame / plates should come from PixelLab once the direction is approved.
+- Shown only with `?fireGauge` in the URL (`FIRE_GAUGE` in hud.ts): release lantern at the left, gauge right of it, readout under it. Default HUD is unchanged (two lanterns). Waiting on the user's answers: layout, whether to keep the PixelLab health lantern as the gauge's head, how strong the extinguish should be.
+
 ## 2026-10-07 — Refuge keepers: one verb each (source pushed, NOT deployed)
 - User: the five keepers felt the same (every release = area damage); asked for distinct identities without making them needlessly hard or inefficient, and without simply varying damage. Every release still deals ~11x to a lone target with no preparation; preparation adds on top.
   - 토브 연쇄 기폭: charges thrown at every visible enemy within 170 px (max 6) burst in a chain; a lone target takes 11x, a crowd shares 40x (min(11, 40/n) each, splash included). Placed charges / mines go off first at double power (`RefugeCharge.prime`).

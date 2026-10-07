@@ -34,6 +34,7 @@ import { drawBanners, drawBossIntro, drawFloorCard, drawRoomClear } from './card
 import { HintSystem } from './hints';
 import { fitScale, frame, gauge, glow, keycap, spriteCentered } from './frame';
 import { blitArt, drawHealthLantern, drawLantern, healthStackTop, lanternSpec, plateCanvas, rarityAccent } from './hud-gear';
+import { FireGaugeFx, drawFireGauge, fireGaugeFront, fireGaugeLayout } from './hud-fire';
 import { C, PX, splitFloorName } from './theme';
 import { heartSlots, type HeartKind } from './logic';
 import { actionLabel } from './keys';
@@ -66,6 +67,14 @@ const HP_X = 8;
 const LANTERN_GAP = 4;
 /** health readout lines under the health lantern (UI) */
 const READOUT_LINE = 12;
+/**
+ * Draft under review: life as a flame gauge right of the release lantern
+ * (hud-fire.ts), shown only with `?fireGauge` in the page URL. UI only.
+ */
+const FIRE_GAUGE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('fireGauge');
+/** fire gauge draft: gap after the release lantern and top (UI) */
+const GAUGE_GAP = 6;
+const GAUGE_Y = 10;
 
 /** Purse (coins / bombs / keys) row under the minimap block: its height (UI). */
 const PURSE_H = 20;
@@ -163,6 +172,7 @@ export class Hud {
   private readonly lySlots = new UiLayer();
   /** health lantern scale (red capacity, or soul / wards when they reach higher; half hearts), eased */
   private hpScale = -1;
+  private fire = new FireGaugeFx();
   /** left edge of the gear rack this frame (UI units inside the safe area; W when hidden) */
   private rackLeft = UI_W;
   /** world / renderer of the current draw call (for the prebound paint callbacks) */
@@ -208,6 +218,7 @@ export class Hud {
     this.hurtFlash = Math.max(0, this.hurtFlash - dt * 2.5);
     const cap = Math.max(2, p.maxRed, p.red, p.soul, p.shields * 2);
     this.hpScale = this.hpScale < 0 ? cap : this.hpScale + (cap - this.hpScale) * Math.min(1, dt * 6);
+    if (FIRE_GAUGE) this.fire.update(p.red, p.soul, p.shields, dt);
     for (const s of this.shards) {
       s.age += dt;
       s.vy += 420 * dt;
@@ -328,6 +339,7 @@ export class Hud {
   /** Top-left of a lantern (UI units inside the safe area). */
   private lanternPos(kind: 'release' | 'health'): { x: number; y: number } {
     const sp = lanternSpec(kind);
+    if (FIRE_GAUGE) return { x: HP_X, y: LANTERN_BASE - sp.h * PX };
     const x = kind === 'health' ? HP_X : HP_X + lanternSpec('health').w * PX + LANTERN_GAP;
     return { x, y: LANTERN_BASE - sp.h * PX };
   }
@@ -335,13 +347,20 @@ export class Hud {
   /** Where hit shards leave from: the top of the health lantern's life stack. */
   private heartPos(_i: number): { x: number; y: number } {
     const p = this.cw?.player;
+    if (FIRE_GAUGE && p) return fireGaugeFront(this.gaugePos().x, this.gaugePos().y, p);
     const { x, y } = this.lanternPos('health');
     if (!p) return { x: x + 22, y: y + 30 };
     return healthStackTop(x, y, { red: p.red, soul: p.soul, shields: p.shields, scale: this.hpScale });
   }
 
   /** Bottom edge of the lantern block and the health readout under it (UI units inside the safe area). */
+  /** Top-left of the fire gauge draft (UI units inside the safe area). */
+  private gaugePos(): { x: number; y: number } {
+    return { x: HP_X + lanternSpec('release').w * PX + GAUGE_GAP, y: GAUGE_Y };
+  }
+
   private plateBottom(w: World): number {
+    if (FIRE_GAUGE) return LANTERN_BASE + 2;
     const p = w.player;
     const lines = 1 + (p.soul > 0 ? 1 : 0) + (p.shields > 0 ? 1 : 0);
     return LANTERN_BASE + 3 + lines * READOUT_LINE;
@@ -418,6 +437,7 @@ export class Hud {
 
   /** The health lantern, a glow that throbs at low health, and a short readout under it. */
   private drawHealth(r: Renderer, w: World, A: number): void {
+    if (FIRE_GAUGE) return this.drawFireHealth(r, w, A);
     const p = w.player;
     const { x, y } = this.lanternPos('health');
     const sp = lanternSpec('health');
@@ -443,6 +463,26 @@ export class Hud {
     line(`${hearts(p.red)}/${hearts(p.maxRed)}`, low ? '#ff8a8a' : '#ffb0a8');
     if (p.soul > 0) line(`+${hearts(p.soul)}`, '#a8c0ff');
     if (p.shields > 0) line(`방패 ${p.shields}`, '#e4eaf6');
+  }
+
+  /** Fire gauge draft: the gauge, a glow that throbs at low health, and a one-line readout under it. */
+  private drawFireHealth(r: Renderer, w: World, A: number): void {
+    const p = w.player;
+    const { x, y } = this.gaugePos();
+    const L = fireGaugeLayout(p);
+    const low = p.red + p.soul <= 2 && p.alive;
+    if (low) glow(r, x + 24, y + L.h, 46, '#ff2030', (0.16 + 0.26 * heartbeat(this.t, 0.85)) * A);
+    drawFireGauge(r, x, y, { red: p.red, maxRed: p.maxRed, soul: p.soul, shields: p.shields, t: this.t, low }, this.fire, A);
+    const hearts = (n: number) => (n % 2 ? (n / 2).toFixed(1) : String(n / 2));
+    let tx = x + 2;
+    const ty = y + L.h * PX + 2;
+    const part = (text: string, color: string) => {
+      r.uiText(text, tx, ty, { size: 10, font: 'small', color, alpha: A, outline: C.ink });
+      tx += text.length * 6 + 8;
+    };
+    part(`${hearts(p.red)}/${hearts(p.maxRed)}`, low ? '#ff8a8a' : '#ffb0a8');
+    if (p.soul > 0) part(`+${hearts(p.soul)}`, '#a8c0ff');
+    if (p.shields > 0) part(`방패 ${p.shields}`, '#e4eaf6');
   }
 
   /** The release lantern: ember gauge, ready glow + key, release burst, cooldown shutters. */
