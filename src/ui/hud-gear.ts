@@ -12,34 +12,85 @@ import type { Renderer } from '../engine/renderer';
 import { clamp, mixColor } from '../engine/math';
 import { C, PX } from './theme';
 
-// ---------------------------------------------------------------- lantern
-/** Lantern housing in art pixels: k ink, Y/y/d brass ramp, G glass back. */
-const LANTERN = [
-  '......kkkkkk......',
-  '.....kYyyyydk.....',
-  '.....kyk..kdk.....',
-  '.....kyk..kdk.....',
-  '.....kkkkkkkk.....',
-  '....kYYYyyyydk....',
-  '..kkYyyyyyyyyddkk.',
-  '.kkkkkkkkkkkkkkkk.',
-  ...Array.from({ length: 15 }, () => '.kYkGGGGGGGGGGkdk.'),
-  '.kkkkkkkkkkkkkkkk.',
-  '.kYYYYYyyyyyyyydk.',
-  '..kyyyyyyyyyyyyk..',
-  '...kdddddddddddk..',
-  '....kkkkkkkkkk....',
-];
+// ---------------------------------------------------------------- lanterns
+/**
+ * Two lanterns sit in the top-left corner: the release lantern (ember gauge)
+ * and, to its right, the larger health lantern whose glass holds the keeper's
+ * life. Both are framed procedurally from the same parts (ring handle, stepped
+ * cap, posts around the glass, stepped base) so they read as a pair; generated
+ * PixelLab art can replace either frame (see setLanternArt / pixellab-hud.ts).
+ */
+export type LanternKind = 'release' | 'health';
 
-/** Lantern size and its glass chamber (art pixels, relative to the lantern's top-left). */
-export const LANTERN_W = 18;
-export const LANTERN_H = LANTERN.length;
-export const LANTERN_GLASS = { x: 4, y: 8, w: 10, h: 15 } as const;
+export interface LanternSpec {
+  /** art size (px) */
+  w: number;
+  h: number;
+  /** glass chamber, art px relative to the lantern's top-left */
+  glass: { x: number; y: number; w: number; h: number };
+}
+
+/** Lantern frame rows (art px): k ink, Y/y/d brass ramp, G glass back, R/r cap jewel. */
+function lanternRows(w: number, glassH: number, jewel: boolean): string[] {
+  const c = w / 2;
+  const row = (fill: (x: number) => string) => Array.from({ length: w }, (_, x) => fill(x)).join('');
+  const rows: string[] = [];
+  rows.push(row((x) => (x >= c - 3 && x <= c + 2 ? 'k' : '.')));
+  rows.push(row((x) => (x === c - 4 || x === c + 3 ? 'k' : x === c - 3 ? 'Y' : x === c + 2 ? 'd' : x > c - 3 && x < c + 2 ? 'y' : '.')));
+  for (let i = 0; i < 2; i++) rows.push(row((x) => (x === c - 4 || x === c - 2 || x === c + 1 || x === c + 3 ? 'k' : x === c - 3 ? 'y' : x === c + 2 ? 'd' : '.')));
+  rows.push(row((x) => (x >= c - 4 && x <= c + 3 ? 'k' : '.')));
+  rows.push(row((x) => {
+    if (x === c - 5 || x === c + 4) return 'k';
+    if (jewel && (x === c - 1 || x === c)) return x === c - 1 ? 'R' : 'r';
+    if (x >= c - 4 && x <= c - 2) return 'Y';
+    if (x >= c - 1 && x <= c + 2) return 'y';
+    return x === c + 3 ? 'd' : '.';
+  }));
+  rows.push(row((x) => (x === 1 || x === 2 || x === w - 3 || x === w - 2 ? 'k' : x === 3 ? 'Y' : x >= w - 5 && x <= w - 4 ? 'd' : x > 3 && x < w - 5 ? 'y' : '.')));
+  rows.push(row((x) => (x >= 1 && x <= w - 2 ? 'k' : '.')));
+  for (let i = 0; i < glassH; i++) {
+    rows.push(row((x) => (x === 1 || x === 3 || x === w - 4 || x === w - 2 ? 'k' : x === 2 ? 'Y' : x === w - 3 ? 'd' : x > 3 && x < w - 4 ? 'G' : '.')));
+  }
+  rows.push(row((x) => (x >= 1 && x <= w - 2 ? 'k' : '.')));
+  rows.push(row((x) => (x === 1 || x === w - 2 ? 'k' : x >= 2 && x <= 6 ? 'Y' : x === w - 3 ? 'd' : x > 6 && x < w - 3 ? 'y' : '.')));
+  rows.push(row((x) => (x === 2 || x === w - 3 ? 'k' : x > 2 && x < w - 3 ? 'y' : '.')));
+  rows.push(row((x) => (x === 3 || x === w - 3 ? 'k' : x > 3 && x < w - 3 ? 'd' : '.')));
+  rows.push(row((x) => (x >= 4 && x <= w - 5 ? 'k' : '.')));
+  return rows;
+}
+
+function makeSpec(w: number, glassH: number): LanternSpec {
+  return { w, h: glassH + 13, glass: { x: 4, y: 8, w: w - 8, h: glassH } };
+}
+
+const PROC_SPEC: Record<LanternKind, LanternSpec> = {
+  release: makeSpec(18, 15),
+  health: makeSpec(22, 22),
+};
 
 const LANTERN_PAL = {
-  dim: { k: C.ink, Y: '#f0c87a', y: '#b8843c', d: '#6a4218', G: '#160d14' },
-  lit: { k: C.ink, Y: '#fff4c8', y: '#ffc860', d: '#b07028', G: '#2a140c' },
+  dim: { k: C.ink, Y: '#f0c87a', y: '#b8843c', d: '#6a4218', G: '#160d14', R: '#ff8a8a', r: '#b81830' },
+  lit: { k: C.ink, Y: '#fff4c8', y: '#ffc860', d: '#b07028', G: '#2a140c', R: '#ff8a8a', r: '#b81830' },
+  health: { k: C.ink, Y: '#f0c87a', y: '#b8843c', d: '#6a4218', G: '#1a0c10', R: '#ffb0b0', r: '#d0283c' },
 } as const;
+
+/** PixelLab frames, when generated: canvas + its glass rect (art px). */
+const lanternArt = new Map<LanternKind, { canvas: HTMLCanvasElement; spec: LanternSpec }>();
+
+/** Install a generated lantern frame (its glass window must be transparent; the HUD paints the contents under it). */
+export function setLanternArt(kind: LanternKind, canvas: HTMLCanvasElement, glass: LanternSpec['glass']): void {
+  lanternArt.set(kind, { canvas, spec: { w: canvas.width, h: canvas.height, glass } });
+}
+
+/** Active spec (art px) for a lantern kind. */
+export function lanternSpec(kind: LanternKind): LanternSpec {
+  return lanternArt.get(kind)?.spec ?? PROC_SPEC[kind];
+}
+
+/** Back-compat sizes of the release lantern. */
+export const LANTERN_W = PROC_SPEC.release.w;
+export const LANTERN_H = PROC_SPEC.release.h;
+export const LANTERN_GLASS = PROC_SPEC.release.glass;
 
 // ---------------------------------------------------------------- canvas cache
 const cache = new Map<string, HTMLCanvasElement>();
@@ -64,15 +115,27 @@ export function blitArt(r: Renderer, cv: HTMLCanvasElement, x: number, y: number
   d.globalAlpha = 1;
 }
 
-/** Pure painter for the lantern housing (tests / cache). */
-export function paintLantern(lit: boolean): PixelPainter {
-  const p = new PixelPainter(LANTERN_W, LANTERN_H);
-  p.stamp(0, 0, LANTERN, lit ? LANTERN_PAL.lit : LANTERN_PAL.dim);
+/** Pure painter for a procedural lantern frame (tests / cache). */
+export function paintLantern(kind: LanternKind | boolean, lit = false): PixelPainter {
+  const k: LanternKind = typeof kind === 'boolean' ? 'release' : kind;
+  const isLit = typeof kind === 'boolean' ? kind : lit;
+  const spec = PROC_SPEC[k];
+  const p = new PixelPainter(spec.w, spec.h);
+  const pal = k === 'health' ? LANTERN_PAL.health : isLit ? LANTERN_PAL.lit : LANTERN_PAL.dim;
+  p.stamp(0, 0, lanternRows(spec.w, spec.glass.h, k === 'health'), pal);
   return p;
 }
 
-export function lanternCanvas(lit: boolean): HTMLCanvasElement {
-  return cached(`lantern|${lit ? 1 : 0}`, () => paintLantern(lit));
+export function lanternCanvas(kind: LanternKind | boolean, lit = false): HTMLCanvasElement {
+  const k: LanternKind = typeof kind === 'boolean' ? 'release' : kind;
+  const isLit = typeof kind === 'boolean' ? kind : lit;
+  return cached(`lantern|${k}|${isLit ? 1 : 0}`, () => paintLantern(k, isLit));
+}
+
+/** Frame of a lantern: generated art when installed, else the procedural one. Returns whether it is art. */
+function blitFrame(r: Renderer, kind: LanternKind, lit: boolean, x: number, y: number, alpha: number): void {
+  const art = lanternArt.get(kind);
+  blitArt(r, art ? art.canvas : lanternCanvas(kind, lit), x, y, alpha);
 }
 
 // ---------------------------------------------------------------- plates
@@ -166,23 +229,49 @@ export interface LanternState {
   flash: number;
 }
 
+/** Glass rect of a lantern drawn at UI (x, y), in UI units. */
+function glassRect(kind: LanternKind, x: number, y: number): { gx: number; gy: number; gw: number; gh: number; rows: number } {
+  const g = lanternSpec(kind).glass;
+  return { gx: x + g.x * PX, gy: y + g.y * PX, gw: g.w * PX, gh: g.h * PX, rows: g.h };
+}
+
+/** Cage bars, a brass band round the glass's middle and the gleam (procedural frames only). */
+function glassCage(r: Renderer, gx: number, gy: number, gw: number, gh: number, bright: boolean, alpha: number, band = true): void {
+  const cols = gw / PX;
+  r.uiRect(gx + Math.floor(cols / 3) * PX, gy, PX, gh, C.ink, alpha * 0.5);
+  r.uiRect(gx + Math.ceil((cols * 2) / 3 - 1) * PX, gy, PX, gh, C.ink, alpha * 0.5);
+  if (band) {
+    const by = gy + Math.floor(gh / PX / 2) * PX;
+    r.uiRect(gx - PX, by, gw + 2 * PX, PX, bright ? '#ffc860' : '#b8843c', alpha);
+    r.uiRect(gx - PX, by + PX, gw + 2 * PX, PX, C.ink, alpha * 0.8);
+  }
+  r.uiRect(gx + PX, gy + PX, PX, PX * 4, '#ffffff', alpha * 0.3);
+}
+
+/** A small flame (art px grid) whose base sits on `surf`, centered on cx. */
+function flame(r: Renderer, cx: number, surf: number, top: number, rows: number, outer: string, mid: string, core: string, alpha: number): void {
+  const fh = rows * PX;
+  const fy = Math.max(top, surf - fh);
+  r.uiRect(cx - 2 * PX, surf - Math.min(fh, 2 * PX), PX * 4, Math.min(fh, 2 * PX), outer, alpha * 0.9);
+  r.uiRect(cx - PX, fy + PX, PX * 2, surf - fy - PX, mid, alpha);
+  r.uiRect(cx - PX, fy + 2 * PX, PX, Math.max(0, surf - fy - 3 * PX), core, alpha);
+  r.uiRect(cx - PX, fy, PX, PX, mid, alpha);
+}
+
 /**
- * Draw the lantern at UI (x, y): housing, ember filling the glass from the
- * bottom with a flame riding its surface, the cage bars and the glass gleam.
+ * Release lantern at UI (x, y): ember filling the glass from the bottom (hottest
+ * in the middle) with a flame riding its surface; bright glow when ready;
+ * shutters while the release recovers.
  */
 export function drawLantern(r: Renderer, x: number, y: number, s: LanternState, alpha: number): void {
   if (alpha <= 0.01) return;
-  blitArt(r, lanternCanvas(s.ready), x, y, alpha);
-  const g = LANTERN_GLASS;
-  const gx = x + g.x * PX;
-  const gy = y + g.y * PX;
-  const gw = g.w * PX;
-  const gh = g.h * PX;
+  const art = lanternArt.has('release');
+  if (!art) blitFrame(r, 'release', s.ready, x, y, alpha);
+  const { gx, gy, gw, gh, rows: glassRows } = glassRect('release', x, y);
   const f = clamp(s.fill, 0, 1);
-  const rows = Math.round(g.h * f);
+  const rows = Math.round(glassRows * f);
   const pulse = 0.5 + 0.5 * Math.sin(s.t * 7);
   if (rows > 0) {
-    // the ember glows hottest in the middle of the glass and darkest at its rim
     const fh = rows * PX;
     const top = gy + gh - fh;
     const ramp = s.ready
@@ -191,35 +280,122 @@ export function drawLantern(r: Renderer, x: number, y: number, s: LanternState, 
     r.uiRect(gx, top, gw, fh, ramp[2], alpha);
     r.uiRect(gx + PX, top, gw - 2 * PX, fh, ramp[1], alpha);
     r.uiRect(gx + 3 * PX, top, gw - 6 * PX, fh, ramp[0], alpha);
-    // embers settle darker at the bottom; the surface line is the brightest
     r.uiRect(gx, gy + gh - PX, gw, PX, s.ready ? '#c86a18' : '#6a1e0c', alpha);
     r.uiRect(gx + PX, top, gw - 2 * PX, PX, s.ready ? '#ffffff' : '#ffd080', alpha * 0.9);
   }
-  // the flame: a small teardrop riding the ember surface (a wick flame when empty)
   if (!s.ready && s.cooldown <= 0) {
     const surf = gy + gh - rows * PX;
-    const flick = Math.sin(s.t * 13) > 0.2 ? PX : 0;
+    const flick = Math.sin(s.t * 13) > 0.2 ? 1 : 0;
     const sway = Math.sin(s.t * 5) > 0.6 ? PX : 0;
-    const cx = gx + gw / 2 + sway;
-    const fh = (rows > 0 ? 4 : 3) * PX + flick;
-    const fy = Math.max(gy, surf - fh);
-    r.uiRect(cx - 2 * PX, surf - Math.min(fh, 2 * PX), PX * 4, Math.min(fh, 2 * PX), '#ff7a2a', alpha * 0.9);
-    r.uiRect(cx - PX, fy + PX, PX * 2, surf - fy - PX, '#ffb848', alpha);
-    r.uiRect(cx - PX, fy + 2 * PX, PX, Math.max(0, surf - fy - 3 * PX), '#fff0b8', alpha);
-    r.uiRect(cx - PX, fy, PX, PX, '#ffd070', alpha);
+    flame(r, gx + gw / 2 + sway, surf, gy, (rows > 0 ? 4 : 3) + flick, '#ff7a2a', '#ffb848', '#fff0b8', alpha);
   }
-  // cage: two thin bars and a brass band around the glass's middle, then the gleam
-  r.uiRect(gx + 3 * PX, gy, PX, gh, C.ink, alpha * 0.5);
-  r.uiRect(gx + 6 * PX, gy, PX, gh, C.ink, alpha * 0.5);
-  const band = gy + 7 * PX;
-  r.uiRect(gx - PX, band, gw + 2 * PX, PX, s.ready ? '#ffc860' : '#b8843c', alpha);
-  r.uiRect(gx - PX, band + PX, gw + 2 * PX, PX, C.ink, alpha * 0.8);
-  r.uiRect(gx + PX, gy + PX, PX, PX * 4, '#ffffff', alpha * 0.3);
+  if (!art) glassCage(r, gx, gy, gw, gh, s.ready, alpha);
   if (s.flash > 0) r.uiRect(gx, gy, gw, gh, '#ffffff', alpha * s.flash * 0.7);
-  if (s.cooldown > 0) {
-    // shutter hatch while the release recovers
-    for (let i = 0; i < g.h; i += 3) r.uiRect(gx, gy + i * PX, gw, PX, '#05030a', alpha * 0.55);
+  if (s.cooldown > 0) for (let i = 0; i < glassRows; i += 3) r.uiRect(gx, gy + i * PX, gw, PX, '#05030a', alpha * 0.55);
+  if (art) blitFrame(r, 'release', s.ready, x, y, alpha);
+}
+
+// ---------------------------------------------------------------- health lantern
+export interface HealthState {
+  /** half hearts */
+  red: number;
+  maxRed: number;
+  soul: number;
+  /** one-hit wards */
+  shields: number;
+  /** smoothed red + soul capacity the glass is scaled to (half hearts) */
+  scale: number;
+  t: number;
+  /** white flash 0..1 after a hit / gain */
+  flash: number;
+  /** low health: the flame gutters */
+  low: boolean;
+}
+
+const RED = { hi: '#ff8a7a', body: '#d81f34', shade: '#8a0e1e', deep: '#5a0812', top: '#ffc0b0' };
+const SOUL = { hi: '#d6e2ff', body: '#6a8cf6', shade: '#2c3c9c', deep: '#1e2a70', top: '#f0f4ff' };
+/** art px of glass each ward band takes */
+const WARD_ROWS = 3;
+
+/**
+ * Health lantern at UI (x, y). The glass holds the keeper's life as layers that
+ * stack upward in the order they are spent, so a hit always takes the top
+ * layer first: red lamp-oil (hearts) at the bottom, blue spirit-light (soul
+ * hearts) on it, silver ward bands (one-hit shields) on top, and a flame on
+ * the very top of the stack. Faint lines split the liquid into whole hearts; a
+ * brass notch on the right post marks the red capacity.
+ */
+export function drawHealthLantern(r: Renderer, x: number, y: number, s: HealthState, alpha: number): void {
+  if (alpha <= 0.01) return;
+  const art = lanternArt.has('health');
+  if (!art) blitFrame(r, 'health', false, x, y, alpha);
+  const { gx, gy, gw, gh, rows: glassRows } = glassRect('health', x, y);
+  const wards = Math.max(0, Math.min(s.shields, Math.floor((glassRows - 8) / WARD_ROWS)));
+  const lifeRows = glassRows - wards * WARD_ROWS;
+  const unit = (lifeRows * PX) / Math.max(2, s.scale);
+  const bottom = gy + gh;
+  const redTop = bottom - Math.round((s.red * unit) / PX) * PX;
+  const soulTop = bottom - Math.round(((s.red + s.soul) * unit) / PX) * PX;
+  const layer = (top: number, bot: number, c: typeof RED) => {
+    if (bot - top <= 0) return;
+    r.uiRect(gx, top, gw, bot - top, c.body, alpha);
+    r.uiRect(gx, top, PX, bot - top, c.hi, alpha);
+    r.uiRect(gx + gw - PX, top, PX, bot - top, c.shade, alpha);
+    r.uiRect(gx + PX, top, gw - 2 * PX, PX, c.top, alpha * 0.9);
+  };
+  layer(redTop, bottom, RED);
+  if (redTop < bottom) r.uiRect(gx, bottom - PX, gw, PX, RED.deep, alpha);
+  layer(soulTop, redTop, SOUL);
+  if (s.soul > 0 && soulTop < redTop) {
+    // motes of spirit-light rising through the blue layer
+    for (let i = 0; i < 2; i++) {
+      const k = ((s.t * 0.6 + i * 0.5) % 1 + 1) % 1;
+      const my = Math.round(redTop - PX - k * Math.max(0, redTop - soulTop - 2 * PX));
+      r.uiRect(gx + (i ? gw - 3 * PX : 2 * PX), my, PX, PX, '#ffffff', alpha * (1 - k) * 0.85);
+    }
   }
+  // whole-heart lines across the liquid
+  for (let k = 2; k < s.red + s.soul; k += 2) {
+    const ly = bottom - Math.round((k * unit) / PX) * PX;
+    if (ly > soulTop && ly < bottom) r.uiRect(gx + PX, ly, gw - 2 * PX, PX, C.ink, alpha * 0.32);
+  }
+  // ward bands stacked on top
+  let top = soulTop;
+  for (let i = 0; i < wards; i++) {
+    const bt = top - WARD_ROWS * PX;
+    r.uiRect(gx, bt, gw, WARD_ROWS * PX, '#c8d2e6', alpha);
+    r.uiRect(gx, bt, gw, PX, '#ffffff', alpha);
+    r.uiRect(gx, bt + (WARD_ROWS - 1) * PX, gw, PX, '#7a86a0', alpha);
+    const glint = 0.5 + 0.5 * Math.sin(s.t * 4 + i * 1.7);
+    r.uiRect(gx + gw / 2 - PX, bt + PX, PX * 2, PX, '#ffd060', alpha * (0.5 + 0.5 * glint));
+    top = bt;
+  }
+  // the flame burns on top of whatever the keeper has left
+  if (s.red + s.soul > 0) {
+    const sway = Math.sin(s.t * 5) > 0.6 ? PX : 0;
+    const gutter = s.low ? (Math.sin(s.t * 17) > 0 ? 2 : 3) : 4 + (Math.sin(s.t * 13) > 0.2 ? 1 : 0);
+    const kind = wards > 0 ? 'ward' : s.soul > 0 ? 'soul' : 'red';
+    const tone = kind === 'ward' ? ['#c8d2e6', '#fff4c8', '#ffffff'] : kind === 'soul' ? ['#6a8cf6', '#b8ccff', '#f0f6ff'] : ['#ff5a2a', '#ffb848', '#fff0b8'];
+    flame(r, gx + gw / 2 + sway, top, gy, gutter, tone[0], tone[1], tone[2], alpha);
+  }
+  // red capacity notch on the right post
+  const capY = bottom - Math.round((s.maxRed * unit) / PX) * PX;
+  if (!art && capY >= gy) {
+    r.uiRect(gx + gw, capY - PX, 2 * PX, PX * 2, C.ink, alpha);
+    r.uiRect(gx + gw, capY - PX, PX, PX, '#ffe09a', alpha);
+  }
+  // bars only: a band across the middle would read as a layer boundary
+  if (!art) glassCage(r, gx, gy, gw, gh, false, alpha, false);
+  if (s.flash > 0) r.uiRect(gx, gy, gw, gh, '#ffffff', alpha * Math.min(1, s.flash) * 0.65);
+  if (art) blitFrame(r, 'health', false, x, y, alpha);
+}
+
+/** Top of the health lantern's life stack (UI y), for effects that leave from it. */
+export function healthStackTop(x: number, y: number, s: Pick<HealthState, 'red' | 'soul' | 'shields' | 'scale'>): { x: number; y: number } {
+  const { gx, gw, gh, gy, rows } = glassRect('health', x, y);
+  const wards = Math.max(0, Math.min(s.shields, Math.floor((rows - 8) / WARD_ROWS)));
+  const unit = ((rows - wards * WARD_ROWS) * PX) / Math.max(2, s.scale);
+  return { x: gx + gw / 2, y: Math.max(gy, gy + gh - (s.red + s.soul) * unit - wards * WARD_ROWS * PX) };
 }
 
 // ---------------------------------------------------------------- life cells

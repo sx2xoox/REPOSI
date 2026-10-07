@@ -13,6 +13,7 @@ const urls = import.meta.glob([
  '!../assets/pixellab/weapons/**/*.png',
  '!../assets/pixellab/scenery/*.png',
  '!../assets/pixellab/bosses/**/*.png',
+ '!../assets/pixellab/hud/**/*.png',
 ], { eager: true, query: '?url', import: 'default' }) as Record<string,string>;
 const art = new Map<string,HTMLCanvasElement>();
 export const PIXEL_DIRECTIONS = ['east','south-east','south','south-west','west','north-west','north','north-east'] as const;

@@ -25,6 +25,7 @@ import { loadPixelLabWeapons } from './ui/pixellab-weapons';
 import { loadPixelLabScenery } from './ui/pixellab-scenery';
 import { loadPixelLabBosses } from './ui/pixellab-bosses';
 import { loadPixelLabSkills } from './ui/pixellab-skills';
+import { loadPixelLabHud } from './ui/pixellab-hud';
 
 async function boot(): Promise<void> {
   installOrientationPrompt();
@@ -52,7 +53,7 @@ async function boot(): Promise<void> {
   } catch {
     // fonts are optional
   }
-  await Promise.all([loadPixelLabArt(), loadPixelLabWeapons(), loadPixelLabScenery(), loadPixelLabBosses()]);
+  await Promise.all([loadPixelLabArt(), loadPixelLabWeapons(), loadPixelLabScenery(), loadPixelLabBosses(), loadPixelLabHud()]);
   // Legacy scenery also wires skill icons; the replacement pack owns the final pointers.
   await loadPixelLabSkills();
   warmAllSprites();

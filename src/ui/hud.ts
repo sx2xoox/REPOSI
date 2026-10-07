@@ -1,19 +1,20 @@
 // In-game HUD (UI space 768x432), laid out as the keeper's own gear:
-//   top-left   the keeper plate — a brass lantern whose glass fills with ember
-//              (등불 해방 gauge, flame riding the surface, shutters while it
-//              recovers) beside a plate holding the hearts (pop on gain/loss,
-//              heartbeat at low HP) and the purse (coins / bombs / keys);
-//              temporary buffs hang below it (stats live in the Tab screen)
-//   top-right  minimap (smooth recentering) · floor name · objective / seed
-//   bottom-right  the gear rack: primary weapon (rarity gem + name tag),
-//              secondary weapon with the swap key, active item with its charge
-//              wick, potion
+//   top-left   two lanterns standing side by side: the release lantern (ember
+//              gauge: ember rises in its glass, glows when 등불 해방 is ready,
+//              shutters while it recovers) and, right of it, the larger health
+//              lantern whose glass stacks the keeper's life upward in the order
+//              it is spent — red hearts, then soul hearts, then one-hit wards,
+//              with a flame on top — and a short readout beside it; temporary
+//              buffs hang below
+//   top-right  minimap · floor name · objective / seed · purse (coins / bombs / keys)
+//   bottom-right  equipment slots (no backing): secondary + swap key, primary
+//              (rarity rim + gem), active item + charge wick, potion
 //   bottom     boss bar with name and damage trail (center)
 // plus banners, floor / boss cards, room-clear feedback and first-run hints.
 // The UI space widens with the screen (UI_W = 2 * VIEW_W); corner elements are
 // anchored to the edges of the device safe area (`Renderer.uiSafe`). With the
 // touch controls shown, the weapon / active / potion live on their buttons, so
-// the gear rack is hidden (the lantern stays: it is the status, not a button).
+// the equipment slots are hidden (the lanterns stay: they are status, not buttons).
 
 import type { Renderer } from '../engine/renderer';
 import { UI_H, UI_W } from '../engine/renderer';
@@ -31,7 +32,7 @@ import { MinimapView } from './minimap';
 import { drawBanners, drawBossIntro, drawFloorCard, drawRoomClear } from './cards';
 import { HintSystem } from './hints';
 import { fitScale, frame, gauge, glow, keycap, spriteCentered } from './frame';
-import { CELL_H, CELL_STEP, CELL_W, FLAME_H, LANTERN_H, LANTERN_W, blitArt, drawLantern, drawLifeCell, plateCanvas, rarityAccent } from './hud-gear';
+import { blitArt, drawHealthLantern, drawLantern, healthStackTop, lanternSpec, plateCanvas, rarityAccent } from './hud-gear';
 import { C, PX, splitFloorName } from './theme';
 import { heartSlots, type HeartKind } from './logic';
 import { actionLabel } from './keys';
@@ -56,28 +57,11 @@ export function minimapBlockRect(uiW: number, safe: { l: number; r: number; t: n
 
 const HEART_VALUE: Record<HeartKind, number> = { full: 2, half: 1, empty: 0, soul: 2, soulHalf: 1 };
 
-// ---- keeper plate geometry (UI units, from the safe-area top-left; even = on the art grid)
-/** lantern top-left */
-const LX = 8;
-const LY = 6;
-/** plate top-left (the lantern's right post overlaps its left edge) */
-const PL_X = 38;
-const PL_Y = 12;
-/** life cells: per row, the first lamp body's top-left, row step (a flame burns above each body) */
-const CELLS_PER_ROW = 7;
-const CELL_X0 = 50;
-const CELL_Y0 = PL_Y + 4 + FLAME_H;
-const CELL_ROW = 30;
-
-/** Plate height (UI) for `rows` rows of life cells. */
-function plateHeight(rows: number): number {
-  return 8 + rows * CELL_ROW;
-}
-
-/** Plate width (UI) for `cols` cells in its widest row (it hugs the cells). */
-function plateWidth(cols: number): number {
-  return Math.max(3, cols) * CELL_STEP + 18;
-}
+// ---- lantern geometry (UI units, from the safe-area top-left; even = on the art grid)
+/** release lantern (left) and health lantern (right) share a baseline */
+const LANTERN_BASE = 74;
+const REL_X = 8;
+const HP_X = 48;
 
 /** Purse (coins / bombs / keys) row under the minimap block: its height (UI). */
 const PURSE_H = 20;
@@ -173,6 +157,8 @@ export class Hud {
   private readonly lyPurse = new UiLayer();
   private readonly lyMap = new UiLayer();
   private readonly lySlots = new UiLayer();
+  /** health lantern scale (red + soul capacity, half hearts), eased so the glass never jumps */
+  private hpScale = -1;
   /** left edge of the gear rack this frame (UI units inside the safe area; W when hidden) */
   private rackLeft = UI_W;
   /** world / renderer of the current draw call (for the prebound paint callbacks) */
@@ -216,6 +202,8 @@ export class Hud {
     if (this.lastHp >= 0 && hp < this.lastHp) this.hurtFlash = 1;
     this.lastHp = hp;
     this.hurtFlash = Math.max(0, this.hurtFlash - dt * 2.5);
+    const cap = Math.max(2, Math.max(p.maxRed, p.red) + p.soul);
+    this.hpScale = this.hpScale < 0 ? cap : this.hpScale + (cap - this.hpScale) * Math.min(1, dt * 6);
     for (const s of this.shards) {
       s.age += dt;
       s.vy += 420 * dt;
@@ -333,30 +321,23 @@ export class Hud {
     }
   }
 
-  /** Top-left of life cell `i` (UI units inside the safe area). */
-  private cellPos(i: number): { x: number; y: number } {
-    return { x: CELL_X0 + (i % CELLS_PER_ROW) * CELL_STEP, y: CELL_Y0 + Math.floor(i / CELLS_PER_ROW) * CELL_ROW };
+  /** Top-left of a lantern (UI units inside the safe area). */
+  private lanternPos(kind: 'release' | 'health'): { x: number; y: number } {
+    const sp = lanternSpec(kind);
+    return { x: kind === 'release' ? REL_X : HP_X, y: LANTERN_BASE - sp.h * PX };
   }
 
-  /** Center of life cell `i` (for the breaking-glass shards). */
-  private heartPos(i: number): { x: number; y: number } {
-    const c = this.cellPos(i);
-    return { x: c.x + CELL_W / 2, y: c.y + CELL_H / 2 };
+  /** Where hit shards leave from: the top of the health lantern's life stack. */
+  private heartPos(_i: number): { x: number; y: number } {
+    const p = this.cw?.player;
+    const { x, y } = this.lanternPos('health');
+    if (!p) return { x: x + 22, y: y + 30 };
+    return healthStackTop(x, y, { red: p.red, soul: p.soul, shields: p.shields, scale: this.hpScale });
   }
 
-  /** Rows of life cells (and one-hit wards) on the plate. */
-  private plateRows(w: World): number {
-    return Math.max(1, Math.ceil((this.slots.length + Math.max(0, w.player.shields)) / CELLS_PER_ROW));
-  }
-
-  /** Cells in the plate's widest row. */
-  private plateCols(w: World): number {
-    return Math.min(CELLS_PER_ROW, this.slots.length + Math.max(0, w.player.shields));
-  }
-
-  /** Bottom edge of the keeper plate / lantern block (UI units inside the safe area). */
-  private plateBottom(w: World): number {
-    return Math.max(LY + LANTERN_H * PX, PL_Y + plateHeight(this.plateRows(w)));
+  /** Bottom edge of the lantern block (UI units inside the safe area). */
+  private plateBottom(_w: World): number {
+    return LANTERN_BASE;
   }
 
   // ================================================================ draw
@@ -395,24 +376,11 @@ export class Hud {
   /** Corner HUD: cached layers while nothing animates, live drawing during animations. */
   private drawCorners(r: Renderer, w: World, A: number, ox: number, oy: number, touchUi: boolean): void {
     const p = w.player;
-    // ---- keeper plate (life lamps); the lantern is drawn on top of its left edge
-    const rows = this.plateRows(w);
-    const ph = plateHeight(rows);
-    const pw = plateWidth(this.plateCols(w));
-    const low = p.red + p.soul <= 2 && p.alive;
-    // drawn live: the lamp flames flicker (the cells are cached bitmaps, so this stays cheap)
-    this.drawPlate(r, w, A);
-    if (low) {
-      // the plate's rim flushes red with the heartbeat
-      const beat = heartbeat(this.t, 0.85);
-      const a = (0.25 + 0.55 * beat) * A;
-      r.uiRect(PL_X + 2, PL_Y, pw - 4, PX, '#ff4050', a);
-      r.uiRect(PL_X + 2, PL_Y + ph - PX, pw - 4, PX, '#ff4050', a);
-      r.uiRect(PL_X + pw - PX, PL_Y + 2, PX, ph - 4, '#ff4050', a);
-    }
+    // ---- the two lanterns (drawn live: their flames flicker)
+    this.drawHealth(r, w, A);
     this.drawLanternGauge(r, w, A);
     const pb = this.plateBottom(w);
-    this.drawBuffs(r, w, A, pb + 6);
+    this.drawBuffs(r, w, A, pb + 18);
     // purse under the minimap block
     if (counterBusy(this.coins) || counterBusy(this.bombs) || counterBusy(this.keys)) this.drawConsumables(r, w, A);
     else this.lyPurse.draw(r, `${p.coins}|${p.bombs}|${p.keys}|${this.W}`, ox, oy, this.W - 150, this.purseY() - 4, 150, PURSE_H + 18, A, this.paintPurse);
@@ -424,7 +392,7 @@ export class Hud {
       this.minimap.drawPulse(r, w, this.W - MINIMAP_W - MINIMAP_MARGIN, MINIMAP_MARGIN, MINIMAP_W, MINIMAP_H, this.t, A);
     }
     if (touchUi) return; // the touch buttons carry the weapon, active item and potion
-    // ---- gear rack
+    // ---- equipment slots
     const L = this.rackLayout(w);
     this.rackLeft = L.x;
     const def = p.activeId ? Actives.get(p.activeId) : undefined;
@@ -441,74 +409,68 @@ export class Hud {
     }
   }
 
-  /** Plate background, hearts and purse (cached as one layer while idle). */
-  private drawPlate(r: Renderer, w: World, A: number): void {
-    const rows = this.plateRows(w);
-    const ph = plateHeight(rows);
-    blitArt(r, plateCanvas(plateWidth(this.plateCols(w)) / PX, ph / PX), PL_X, PL_Y, A);
-    this.drawHearts(r, w, A);
+  /** The health lantern, a glow that throbs at low health, and a short readout beside it. */
+  private drawHealth(r: Renderer, w: World, A: number): void {
+    const p = w.player;
+    const { x, y } = this.lanternPos('health');
+    const sp = lanternSpec('health');
+    const low = p.red + p.soul <= 2 && p.alive;
+    const cx = x + (sp.w * PX) / 2;
+    const cy = y + (sp.h * PX) / 2 + 6;
+    if (low) glow(r, cx, cy, 40, '#ff2030', (0.18 + 0.3 * heartbeat(this.t, 0.85)) * A);
+    let flash = this.hurtFlash * 0.8;
+    for (let i = 0; i < this.slotPop.length; i++) flash = Math.max(flash, (this.slotPop[i] ?? 0) * 0.45);
+    drawHealthLantern(r, x, y, { red: p.red, maxRed: p.maxRed, soul: p.soul, shields: p.shields, scale: this.hpScale, t: this.t, flash, low }, A);
+    for (const s of this.shards) {
+      const a = 1 - s.age / s.life;
+      r.uiRect(s.x - 1.5, s.y - 1.5, 3, 3, s.color, a * A);
+    }
+    // readout: hearts as "3.5/4", soul and wards only when held
+    const tx = x + sp.w * PX + 6;
+    let ty = y + 16;
+    const hearts = (n: number) => (n % 2 ? (n / 2).toFixed(1) : String(n / 2));
+    r.uiText(`${hearts(p.red)}/${hearts(p.maxRed)}`, tx, ty, { size: 10, font: 'small', color: low ? '#ff8a8a' : '#ffb0a8', alpha: A, outline: C.ink });
+    if (p.soul > 0) {
+      ty += 13;
+      r.uiText(`+${hearts(p.soul)}`, tx, ty, { size: 10, font: 'small', color: '#a8c0ff', alpha: A, outline: C.ink });
+    }
+    if (p.shields > 0) {
+      ty += 13;
+      r.uiText(`방패 ${p.shields}`, tx, ty, { size: 10, font: 'small', color: '#e4eaf6', alpha: A, outline: C.ink });
+    }
   }
 
-  /** The lantern: ember gauge, ready glow + key, release burst, cooldown shutters. */
+  /** The release lantern: ember gauge, ready glow + key, release burst, cooldown shutters. */
   private drawLanternGauge(r: Renderer, w: World, A: number): void {
     const p = w.player;
+    const { x, y } = this.lanternPos('release');
+    const sp = lanternSpec('release');
     const ready = this.emberFull && p.releaseCooldown <= 0;
     const pulse = 0.5 + 0.5 * Math.sin(this.t * 7);
-    const cx = LX + (LANTERN_W * PX) / 2;
-    const cy = LY + 30;
+    const cx = x + (sp.w * PX) / 2;
+    const cy = y + (sp.h * PX) / 2 + 2;
     if (ready) glow(r, cx, cy, 30 + 6 * pulse, '#ff9a3a', (0.32 + 0.2 * pulse) * A);
     if (this.releaseFlash > 0) glow(r, cx, cy, 100 * (1.4 - this.releaseFlash * 0.4), '#ffe080', this.releaseFlash * 0.7 * A);
-    drawLantern(r, LX, LY, { fill: this.emberShown, ready, cooldown: p.releaseCooldown, t: this.t, flash: this.emberFlash }, A);
+    drawLantern(r, x, y, { fill: this.emberShown, ready, cooldown: p.releaseCooldown, t: this.t, flash: this.emberFlash }, A);
     if (ready) {
       // sparks drifting off the cap (time-driven, no RNG)
       for (let i = 0; i < 3; i++) {
         const k = (this.t * 0.9 + i / 3) % 1;
         const sx = cx - 4 + Math.sin(this.t * 3 + i * 2.1) * 6;
-        r.uiRect(Math.round(sx), Math.round(LY + 8 - k * 14), PX, PX, i % 2 ? '#ffd060' : '#ff8a30', A * (1 - k));
+        r.uiRect(Math.round(sx), Math.round(y + 8 - k * 14), PX, PX, i % 2 ? '#ffd060' : '#ff8a30', A * (1 - k));
       }
       const pad = input.aimMode === 'pad';
-      keycap(r, actionLabel(input.bindings, 'special', pad), LX + LANTERN_W * PX - 4, LY + LANTERN_H * PX - 4, { align: 'center', alpha: A, down: pulse > 0.5, pad });
+      keycap(r, actionLabel(input.bindings, 'special', pad), cx, y + sp.h * PX + 6, { align: 'center', alpha: A, down: pulse > 0.5, pad });
     }
     if (p.releaseCooldown > 0) {
-      r.uiText(p.releaseCooldown.toFixed(1), cx, LY + 26, { size: 10, font: 'small', align: 'center', color: '#ffe8c0', alpha: A, outline: C.ink });
-    }
-  }
-
-  /** Life cells: red lamp-oil per heart container, blue spirit-light, silver wards. */
-  private drawHearts(r: Renderer, w: World, A: number): void {
-    const p = w.player;
-    const total = p.red + p.soul;
-    const low = total <= 2 && p.alive;
-    const beat = low ? heartbeat(this.t, 0.85) : 0;
-    this.slots.forEach((k, i) => {
-      const { x, y } = this.cellPos(i);
-      const pop = this.slotPop[i] ?? 0;
-      const dir = this.slotDir[i] ?? 1;
-      let sc = popScale(pop, dir > 0 ? 0.5 : 0.28);
-      if (low && k !== 'empty') sc *= 1 + 0.18 * beat;
-      const shakeX = dir < 0 && pop > 0 ? Math.sin(pop * 50) * 2.5 * pop : 0;
-      drawLifeCell(r, x + shakeX, y, k, {
-        alpha: A,
-        scale: sc,
-        flash: (dir < 0 ? pop * 0.9 : pop * 0.5) + (this.hurtFlash > 0 ? this.hurtFlash * 0.3 : 0),
-        t: this.t,
-      });
-    });
-    // one-hit wards follow the cells
-    for (let i = 0; i < p.shields; i++) {
-      const { x, y } = this.cellPos(this.slots.length + i);
-      drawLifeCell(r, x, y, 'ward', { alpha: A, t: this.t + i });
-    }
-    for (const s of this.shards) {
-      const a = 1 - s.age / s.life;
-      r.uiRect(s.x - 1.5, s.y - 1.5, 3, 3, s.color, a * A);
+      r.uiText(p.releaseCooldown.toFixed(1), cx, cy - 6, { size: 10, font: 'small', align: 'center', color: '#ffe8c0', alpha: A, outline: C.ink });
     }
   }
 
   private drawBuffs(r: Renderer, w: World, A: number, y: number): void {
     const buffs = w.items.buffs;
     if (!buffs.length) return;
-    let x = LX;
+    let x = REL_X;
     let newest: { label: string; t: number } | null = null;
     for (const b of buffs) {
       const seen = this.buffSeen.get(b.key) ?? this.t;
@@ -612,11 +574,6 @@ export class Hud {
     const p = w.player;
     const L = this.rackLayout(w);
     const pad = input.aimMode === 'pad';
-    blitArt(r, plateCanvas(L.w / PX, RACK_H / PX), L.x, L.y, A);
-    if (L.div >= 0) {
-      r.uiRect(L.div, L.y + 8, PX, RACK_H - 16, C.ink, A * 0.9);
-      r.uiRect(L.div + PX, L.y + 8, PX, RACK_H - 16, '#4a3622', A * 0.9);
-    }
     // ---- weapons: the held one big with its rarity, the other smaller; a swap trades the icons
     const wdef = Weapons.get(p.weaponId);
     const w2 = p.weapon2Id ? Weapons.get(p.weapon2Id) : undefined;
@@ -640,13 +597,6 @@ export class Hud {
       const cy = mcy + (scy - mcy) * (1 - k);
       const box = 32 - 10 * (1 - k);
       spriteCentered(r, wdef.icon, cx, cy, fitScale(wdef.icon, box, 2) * (live ? popScale(this.weaponPop, 0.4) : 1), { alpha: A, flash: this.swapAnim * 0.6 });
-      // name tag hanging over the rack's left end, in the weapon's rarity color
-      const col = RARITY_COLOR[wdef.rarity];
-      const tw = r.measureText(wdef.name, 10, false, 'small');
-      const tagW = Math.ceil((tw + 14) / PX) * PX;
-      const tagX = Math.max(L.x, Math.min(L.sub.x, L.main.x + MAIN_S - tagW));
-      frame(r, tagX, L.y - 12, tagW, 16, 'ribbon', { color: col, alpha: A });
-      r.uiText(wdef.name, tagX + 7, L.y - 9, { size: 10, font: 'small', color: mixHi(col), alpha: A, outline: C.ink });
     }
     if (this.swapAnim > 0) glow(r, mcx, mcy, 30, '#ffe8a0', this.swapAnim * 0.35 * A);
     // ---- active item + its charge wick
