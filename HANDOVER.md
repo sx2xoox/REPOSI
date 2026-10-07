@@ -1,3 +1,6 @@
+## 2026-10-07 — Floor 1–2 bosses: HP ×1.3 instead of ×1.5
+- User: "1~2단계는 1.5배에서 1.3배로 줄여" — `DIFFICULTY.bossHpMult` floor 1 2.0 → 1.75, floor 2 3.1 → 2.65 (original 1.35 / 2.05 × 1.3); floors 3+ keep ×1.5. CLAUDE.md table and boss duration test labels updated; bounds still hold (floor-1 bosses ≥ ~39 s of baseline QA damage). Then deployed (see the next entry).
+
 ## 2026-10-07 — Bosses: HP ×1.5, a skill of their own each, tighter deep bosses (source pushed, NOT deployed)
 - User: past a power threshold bosses melt; raise boss HP a lot and give them things that must be gone through (invulnerability, reflection, tricky parts) that get harder deeper; then "보스들 스킬은 그래도 달라야해" → chose 보스별 고유 버티기 기술; then "올라갈수록 어려워져야하고, 6~7층은 6~7층인 이유가 있어야돼 지금은 공격도 빈틈이 많아". No new attack patterns (rejected twice before).
 - `DIFFICULTY.bossHpMult` ×1.5 on every floor (CLAUDE.md table updated). tests/bosses13 + floors duration bounds widened.

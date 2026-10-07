@@ -24,8 +24,8 @@ export type FloorDifficulty = Required<Pick<FloorDef, 'hpMult' | 'bossHpMult' | 
  * Re-measure with `node scripts/qa-run.mjs --suite balance --seeds 3`.
  */
 export const DIFFICULTY: Record<number, FloorDifficulty> = {
-  1: { hpMult: 1.3, bossHpMult: 2.0, enemyDamage: [1, 2], enemySpeed: 1.0, shotSpeed: 1.0, budget: [3, 5], championChance: 0.03, roomCount: [8, 10] },
-  2: { hpMult: 1.75, bossHpMult: 3.1, enemyDamage: [1, 2], enemySpeed: 1.02, shotSpeed: 1.02, budget: [4, 6], championChance: 0.06, roomCount: [10, 12] },
+  1: { hpMult: 1.3, bossHpMult: 1.75, enemyDamage: [1, 2], enemySpeed: 1.0, shotSpeed: 1.0, budget: [3, 5], championChance: 0.03, roomCount: [8, 10] },
+  2: { hpMult: 1.75, bossHpMult: 2.65, enemyDamage: [1, 2], enemySpeed: 1.02, shotSpeed: 1.02, budget: [4, 6], championChance: 0.06, roomCount: [10, 12] },
   3: { hpMult: 2.4, bossHpMult: 4.35, enemyDamage: [1, 2], enemySpeed: 1.03, shotSpeed: 1.04, budget: [5, 7], championChance: 0.08, roomCount: [11, 13] },
   4: { hpMult: 3.6, bossHpMult: 5.55, enemyDamage: [1, 2], enemySpeed: 1.05, shotSpeed: 1.06, budget: [6, 8], championChance: 0.1, roomCount: [12, 14] },
   5: { hpMult: 4.9, bossHpMult: 8.4, enemyDamage: [1, 2], enemySpeed: 1.06, shotSpeed: 1.08, budget: [7, 9], championChance: 0.12, roomCount: [12, 15] },
