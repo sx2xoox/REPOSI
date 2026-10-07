@@ -1,3 +1,7 @@
+## 2026-10-07 — Deployed 4deb329 to gh-pages
+- User asked to deploy after the floor 1–2 boss HP change. Built 4deb329 (vite base './') and pushed dist to gh-pages 3504ad1 (parent b3ae3ed, no force; bundle index-Drhveh-D.js). Pages run 37648695327 succeeded. The production build was checked in Chromium (title → village, no errors). github.io itself is not reachable from this container (proxy 403), so the public files were not hashed this time.
+- Now public: 14 new floor enemies, weapon balance pass + mission-room details, 16 new weapons, 바람깃 라켓, boss HP (×1.3 floors 1–2, ×1.5 deeper), the 13 boss skills and the tighter floor 4/6/7 bosses.
+
 ## 2026-10-07 — Floor 1–2 bosses: HP ×1.3 instead of ×1.5
 - User: "1~2단계는 1.5배에서 1.3배로 줄여" — `DIFFICULTY.bossHpMult` floor 1 2.0 → 1.75, floor 2 3.1 → 2.65 (original 1.35 / 2.05 × 1.3); floors 3+ keep ×1.5. CLAUDE.md table and boss duration test labels updated; bounds still hold (floor-1 bosses ≥ ~39 s of baseline QA damage). Then deployed (see the next entry).
 
