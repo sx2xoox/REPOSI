@@ -42,6 +42,8 @@ const ENEMIES: Record<string, number[]> = {
   time_anchor: [7],
   steam_golem: [7],
   rewind_ghost: [7, 8],
+  alarm_bomber: [7],
+  hand_guardian: [7],
 };
 const ALL = Object.keys(ENEMIES);
 
