@@ -24,6 +24,7 @@ import { C } from './theme';
 import { divider, fitScale, frame, gauge, glow, iconSlot, keyHintRow, spriteCentered } from './frame';
 import { characterKitRows, characterOrder, characterStatRows, characterStats, isUnlocked, DIFFICULTY_LABELS, weaponKindLabel } from './logic';
 import { AbandonExpeditionOverlay } from './abandon-expedition';
+import { CELL_H, CELL_STEP, drawLifeCell } from './hud-gear';
 
 const KIT_LABEL_COLORS = { passive: C.goldHi, dash: C.info, release: C.emberHi } as const;
 
@@ -374,10 +375,11 @@ export class CharacterSelectScene implements Scene {
     r.uiText('체력', tx + 22, hy - 6, { size: 12, color: C.textDim, alpha: A });
     r.uiSprite('st_heart', tx + 6, hy, 2, { alpha: A });
     const hearts = open ? c.hearts : 0;
+    // life cells, as on the in-run keeper plate
     for (let i = 0; i < Math.max(hearts, open ? 0 : 3); i++) {
-      r.uiSprite(open ? 'hud_heart_full' : 'hud_heart_empty', tx + 84 + i * 18, hy, 2, { alpha: A });
+      drawLifeCell(r, tx + 79 + i * CELL_STEP, hy - CELL_H / 2, open ? 'full' : 'empty', { alpha: A, t: this.t });
     }
-    for (let i = 0; i < (open ? c.soulHearts ?? 0 : 0); i++) r.uiSprite('hud_soul_full', tx + 84 + (hearts + i) * 18, hy, 2, { alpha: A });
+    for (let i = 0; i < (open ? c.soulHearts ?? 0 : 0); i++) drawLifeCell(r, tx + 79 + (hearts + i) * CELL_STEP, hy - CELL_H / 2, 'soul', { alpha: A, t: this.t });
     const st = characterStats(c);
     const rows = characterStatRows(st);
     const rowH = Math.min(24, Math.floor((h - 34 - 30 - 22) / rows.length));
