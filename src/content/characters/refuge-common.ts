@@ -95,7 +95,7 @@ export function supportFamily(id: string | null): SupportFamily {
   const weapon = Weapons.get(id);
   if (!weapon) return 0;
   if (weapon.kind === 'melee' || weapon.kind === 'charge' && weapon.tags?.some(t => t === 'blade' || t === 'heavy')) return 0;
-  if (weapon.kind === 'beam' || ['dragon_breath', 'flame_staff', 'thunder_rod', 'prism_staff', 'crystal_gatling'].includes(id)) return 3;
-  if (['meteor_staff', 'firefly_tome', 'thunder_mortar', 'comet_tube', 'star_launcher', 'bubble_wand'].includes(id) || weapon.tags?.includes('explosive')) return 2;
+  if (weapon.kind === 'beam' || ['dragon_breath', 'flame_staff', 'thunder_rod', 'prism_staff', 'crystal_gatling', 'tesla_stake', 'constellation_staff'].includes(id)) return 3;
+  if (['meteor_staff', 'firefly_tome', 'thunder_mortar', 'comet_tube', 'star_launcher', 'bubble_wand', 'gravity_orb'].includes(id) || weapon.tags?.includes('explosive')) return 2;
   return 1;
 }

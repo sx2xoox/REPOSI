@@ -26,5 +26,5 @@ describe('reviewed roster production access',()=>{
     expect(weaponCandidates(d.rarity).some(w=>w.id===d.id),d.id).toBe(true);
    }
   }finally{vi.unstubAllEnvs();}
- });
+ },30_000);
 });

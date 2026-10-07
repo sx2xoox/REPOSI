@@ -109,15 +109,29 @@ describe('online co-op: lockstep worlds stay identical', () => {
   }
 
   it('the discard command removes the artifact on every peer at the same tick', () => {
-    const sc: CoopScenario = { name: 'discard', seed: 'COOP-D', chars: ['ria', 'bern'], ms: 9000, link: LINK, bossAt: 0, downAt: 0, leaveAt: 0, discardAt: 120 };
+    // the first tick slot 1's inventory shrinks, per peer (the bot may later walk back over the pedestal)
+    const seen = new Map<World, { count: number; drop?: { tick: number; count: number; blessings: number; innate: number } }>();
+    const sc: CoopScenario = {
+      name: 'discard', seed: 'COOP-D', chars: ['ria', 'bern'], ms: 9000, link: LINK, bossAt: 0, downAt: 0, leaveAt: 0, discardAt: 120,
+      extraStep: (w, tick) => {
+        const k = w.players.find((q) => q.slot === 1);
+        if (!k) return;
+        const s = seen.get(w) ?? { count: k.inv.items.length };
+        if (!s.drop && k.inv.items.length < s.count) {
+          s.drop = { tick, count: k.inv.items.length, innate: k.character.artifacts?.length ?? 0, blessings: Object.keys(k.vars).filter((x) => x.startsWith('blessedAt:')).length };
+        }
+        s.count = k.inv.items.length;
+        seen.set(w, s);
+      },
+    };
     const res = runCoop(sc);
     expectSameHashes(res);
-    for (const p of res.peers) {
-      const k = p.world.players.find((q) => q.slot === 1)!;
+    const drops = res.peers.map((p) => seen.get(p.world)?.drop);
+    for (const d of drops) {
+      expect(d).toBeDefined();
       // gifts gave 3 artifacts; one went back onto a pedestal
-      const innate = k.character.artifacts?.length ?? 0;
-      const blessings = Object.keys(k.vars).filter((x) => x.startsWith('blessedAt:')).length;
-      expect(k.inv.items.length).toBe(innate + 3 - 1 + blessings);
+      expect(d!.count).toBe(d!.innate + 3 - 1 + d!.blessings);
+      expect(d!.tick).toBe(drops[0]!.tick);
     }
   }, 60_000);
 });
