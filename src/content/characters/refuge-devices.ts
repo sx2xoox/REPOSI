@@ -7,14 +7,22 @@ import { runProc, runProcStatus } from '../../game/procs';
 import { proc } from '../items/lib';
 import { rayLength, segDist } from '../weapons/common';
 import { RefugeOwned, nearby, visible, refugeHit, onLane, refugeVisualOpacity, type SupportFamily } from './refuge-common';
-import { drawBlast, drawThreadKnot, drawShield, drawSeal, drawSupport } from './refuge-burst-fx';
+import { drawBlast, drawCharge, drawThreadKnot, drawShield, drawSeal, drawSupport } from './refuge-burst-fx';
 import { blastImpact, pageImpact, shieldImpact, strikeImpact, threadPulse } from './refuge-impact-fx';
 
 export class RefugeCharge extends RefugeOwned {
   constructor(w: World, p: Player, x: number, y: number, damage: number, targetId = 0, mine = false) {
     super(w, p);
     this.x = x; this.y = y;
-    Object.assign(this.mem, { damage, targetId, mine: Number(mine), fired: 0, firedAt: 0, life: mine ? 3.2 : .68 });
+    Object.assign(this.mem, { damage, targetId, mine: Number(mine), fired: 0, firedAt: 0, life: mine ? 3.2 : .68, primed: 0 });
+  }
+  /** Tove's release: go off `delay` s from now at double power (once). */
+  prime(delay: number): boolean {
+    const m = this.mem;
+    if (this.dead || m.fired || m.primed > 0) return false;
+    m.primed = this.age + delay;
+    m.damage *= 2;
+    return true;
   }
   override update(w: World, dt: number): void {
     if (!this.valid(w)) return;
@@ -23,9 +31,10 @@ export class RefugeCharge extends RefugeOwned {
     if (m.fired) { if (this.age > m.firedAt + .38) this.dead = true; return; }
     const target = w.enemies.find(e => e.id === m.targetId && e.alive && !e.hidden);
     if (target) { this.x = target.x; this.y = target.y; }
-    const triggered = m.mine && this.age >= .2 && nearby(w, this.x, this.y, 17).length > 0;
+    // m.primed: Tove's release set this charge / mine off early, at double power
+    const triggered = m.mine && (m.primed > 0 && this.age >= m.primed || this.age >= .2 && nearby(w, this.x, this.y, 17).length > 0);
     if (m.mine && !triggered) { if (this.age >= m.life) this.dead = true; return; }
-    if (!m.mine && this.age < m.life) return;
+    if (!m.mine && this.age < (m.primed > 0 ? Math.min(m.life, m.primed) : m.life)) return;
     runProc(w, m.mine ? 'keeper:tove:mine:burst' : 'keeper:tove:charge:burst', () => {
       m.fired = 1; m.firedAt = this.age;
       for (const enemy of nearby(w, this.x, this.y, m.mine ? 35 : 30)) refugeHit(w, this.owner, enemy, m.damage, this, false, 45);
@@ -58,23 +67,7 @@ export class RefugeCharge extends RefugeOwned {
       r.rect(this.x - 2, this.y + 1, Math.max(1, Math.ceil(remaining * 4)), 1, '#f4d5a0', .7);
       return;
     }
-    const y = this.y - 12, pop = Math.max(0, 1 - this.age / .12);
-    // Three bound sticks and a shortening fuse read as an attached timed charge.
-    r.rect(this.x - 5, y - 4, 10, 8, '#282332');
-    for (let i = 0; i < 3; i++) {
-      const x = this.x - 4 + i * 3;
-      r.rect(x, y - 3, 2, 6, i === 1 ? '#c58250' : '#9d573e');
-      r.rect(x, y - 3, 1, 4, '#e2ae71');
-    }
-    r.rect(this.x - 4, y - 1, 8, 2, '#e8c793');
-    r.rect(this.x - 1, y - 1, 2, 2, '#9d7556');
-    const fuseX = this.x + 4 + remaining * 5, fuseY = y - 3 - remaining * 3;
-    r.pixelLine(this.x + 3, y - 2, fuseX, fuseY, '#231d2b', 3);
-    r.pixelLine(this.x + 3, y - 2, fuseX, fuseY, '#e5cfa6', 1);
-    r.rect(fuseX - 1, fuseY - 1, 2, 2, '#fff3c8', pulse);
-    r.rect(fuseX + 2, fuseY - 3, 1, 1, '#f6a35a', pulse * .8);
-    if (pop > 0) for (const side of [-1, 1])
-      r.pixelLine(this.x + side * (6 + pop * 3), y - 2, this.x + side * (8 + pop * 5), y - 4, '#fff0be', 1, pop);
+    drawCharge(r, this.x, this.y - 12, remaining, this.age, pulse);
   }
   override light(w: World): void {
     const flash = this.mem.fired ? Math.max(0, 1 - (this.age - this.mem.firedAt) / .24) : .15;
@@ -222,6 +215,11 @@ export class RefugeGuard extends RefugeOwned {
     p.vars.rfOrtRefill ??= w.time + 2.4;
   }
   park(w: World): void { this.mem.parkUntil = w.time + 1.1; }
+  /** Ort's release raises the tower shield: the small one stands aside meanwhile. */
+  towerUp(w: World): boolean {
+    const tower = w.entityById(this.owner.vars.rfOrtTower);
+    return !!tower && !tower.dead && tower.age < 1.5 && (tower as { owner?: unknown }).owner === this.owner;
+  }
   override update(w: World, dt: number): void {
     if (!this.valid(w)) return;
     this.age += dt;
@@ -237,7 +235,7 @@ export class RefugeGuard extends RefugeOwned {
       this.x = p.x + Math.cos(p.aim) * length;
       this.y = p.y + Math.sin(p.aim) * length;
     }
-    if (p.vars.rfOrtCharges <= 0) return;
+    if (p.vars.rfOrtCharges <= 0 || this.towerUp(w)) return;
     const nx = Math.cos(m.angle), ny = Math.sin(m.angle);
     for (const bullet of w.projectiles) {
       if (bullet.dead || bullet.team !== 'enemy' || bullet.delay > 0 || bullet.z > 18) continue;
@@ -256,6 +254,8 @@ export class RefugeGuard extends RefugeOwned {
         p.vars.rfOrtCharges--;
         m.flash = w.time;
         shieldImpact(w, p, bullet.x, bullet.y, m.angle, false);
+        // a held line builds toward the release
+        p.addEmber(4);
         w.sfx('parry', { vol: .3, pitch: .9, x: this.x });
         proc(w, 'passive:ort', true);
         return true;
@@ -263,6 +263,7 @@ export class RefugeGuard extends RefugeOwned {
     }
   }
   protected paint(r: Renderer, w: World): void {
+    if (this.towerUp(w) && this.mem.parkUntil <= w.time) return;
     const lit = Math.max(0, 1 - (w.time - this.mem.flash) / .24), parked = this.mem.parkUntil > w.time;
     const nx = Math.cos(this.mem.angle), ny = Math.sin(this.mem.angle), sx = -ny, sy = nx;
     if (parked) for (const side of [-1, 1]) {

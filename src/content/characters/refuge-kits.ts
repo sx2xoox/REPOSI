@@ -7,7 +7,9 @@ import { runProc } from '../../game/procs';
 import { proc } from '../items/lib';
 import { RefugeRelease } from './refuge-release';
 import { releaseOpen } from './kit-common';
-import { aimPoint, directContribution, REFUGE_COLORS, supportFamily, refugeVisualOpacity } from './refuge-common';
+import { aimPoint, directContribution, REFUGE_COLORS, supportFamily, refugeVisualOpacity, refugeHit, visible } from './refuge-common';
+import { segDist } from '../weapons/common';
+import { strikeImpact } from './refuge-impact-fx';
 import { RefugeCharge, RefugeWeave, RefugeSupport, RefugeGuard, RefugeSeal, RefugeFootwork } from './refuge-devices';
 export { REFUGE_COLORS } from './refuge-common';
 export { RefugeCharge, RefugeWeave, RefugeSupport, RefugeGuard, RefugeSeal } from './refuge-devices';
@@ -144,20 +146,24 @@ export const REFUGE_PASSIVES: PassiveDef[] = [
   },
   {
     name: '전방 방벽', icon: 'icon_ort_passive',
-    summary: '전방 일반 적탄 2발 차단. 2.4초마다 내구 1 회복, 차단 간격 0.2초.',
-    desc: '조준 방향의 방패가 일반 적탄을 2발 막는다. 2.4초마다 내구 1 회복, 차단 간격 0.2초. 접촉·장판·광선은 막지 못한다.',
+    summary: '전방 일반 적탄 2발 차단, 막을 때마다 해방 게이지 충전. 2.4초마다 내구 1 회복.',
+    desc: '조준 방향의 방패가 일반 적탄을 2발 막고, 막을 때마다 해방 게이지가 4 찬다. 2.4초마다 내구 1 회복, 차단 간격 0.2초. 접촉·장판·광선은 막지 못한다.',
     onUpdate(w) { if (w.player.alive && !w.player.downed && !w.transitioning) guard(w, w.player); },
-    onRoomEnter(w) { w.vars.rfOrtGuard = 0; },
+    onRoomEnter(w) { w.vars.rfOrtGuard = 0; w.vars.rfOrtTower = 0; },
   },
   {
     name: '머무는 인장', icon: 'icon_mira_passive',
     summary: '적중 지점에 감속·피해 결계. 2.8초 지속, 설치 간격 1.6초, 최대 1개.',
     desc: '직접 적중 지점에 2.8초 결계를 펼친다. 적의 이동과 일반 적탄을 30% 늦추고 약하게 타격한다. 보스 이동은 12% 감속. 설치 간격 1.6초, 최대 1개.',
     onHit(w, target, hit) {
-      if (!(target instanceof Enemy) || directContribution(w, hit) <= 0) return;
+      const contribution = directContribution(w, hit);
+      if (!(target instanceof Enemy) || contribution <= 0) return;
+      // inside the release dome, Mira's own hits are written down for its closing
+      const stasis = w.entityById(w.player.vars.rfMiraStasis);
+      if (stasis instanceof RefugeRelease && stasis.owner === w.player) stasis.record(w, target, contribution);
       runProc(w, 'keeper:mira:place', () => { placeSeal(w, w.player, target.x, target.y); return true; }, 1.6);
     },
-    onRoomEnter(w) { w.vars.rfMiraSeal = 0; },
+    onRoomEnter(w) { w.vars.rfMiraSeal = 0; w.vars.rfMiraStasis = 0; },
   },
 ];
 
@@ -182,14 +188,30 @@ export const REFUGE_DASHES: DashDef[] = [
     start(w, p) { runProc(w, 'keeper:luen:retie', () => { p.vars.rfLuenRetie = 1; w.spawn(new RefugeFootwork(w, p, 1)); return true; }); },
   },
   {
-    name: '교차 발걸음', desc: '대시하면 다음 지원 기술이 0.5초 빨리 준비된다. 지원 기술 간격은 최소 0.2초.',
-    summary: '다음 지원 기술을 0.5초 앞당긴다. 지원 기술 간격은 최소 0.2초.',
+    name: '교차 발걸음', desc: '대시로 지나친 적을 기본 피해 80%로 벤다. 다음 지원 기술이 0.5초 빨리 준비된다(지원 기술 간격은 최소 0.2초).',
+    summary: '지나친 적을 기본 피해 80%로 베고, 다음 지원 기술을 0.5초 앞당긴다.',
     icon: 'icon_ves_dash', color: REFUGE_COLORS[2], iframes: .09,
     start(w, p) {
       runProc(w, 'keeper:ves:advance', () => {
         p.vars.rfVesNext = Math.max((p.vars.rfVesLast ?? -99) + .2, (p.vars.rfVesNext ?? w.time) - .5);
         w.spawn(new RefugeFootwork(w, p, 2));
         return true;
+      });
+    },
+    end(w, p) {
+      // every enemy the dash passed through is cut once
+      runProc(w, 'keeper:ves:dash-cut', () => {
+        let hit = false;
+        for (const target of w.enemies) {
+          if (!target.alive || target.hidden || !target.vulnerable) continue;
+          if (segDist(target.x, target.y, p.dashX0, p.dashY0, p.x, p.y).d > target.r + 7 || !visible(w, p.x, p.y, target.x, target.y, target.r)) continue;
+          if (refugeHit(w, p, target, p.stats.damage * .8, p)) {
+            hit = true;
+            strikeImpact(w, p, target.x, target.y - 4, Math.atan2(p.y - p.dashY0, p.x - p.dashX0), 1, false);
+          }
+        }
+        if (hit) { w.sfx('swing', { vol: .3, pitch: 1.4 }); proc(w, 'passive:ves', true); }
+        return hit;
       });
     },
   },
@@ -210,7 +232,9 @@ export const REFUGE_DASHES: DashDef[] = [
 export const REFUGE_RELEASES = ids.map((id, mode) => (w: World, p: Player): void => {
   runProc(w, 'keeper:' + id + ':release', () => {
     releaseOpen(w, p, REFUGE_COLORS[mode], 48, 'focus');
-    w.spawn(new RefugeRelease(p, mode, w));
+    const release = w.spawn(new RefugeRelease(p, mode, w));
+    if (mode === 4) p.vars.rfMiraStasis = release.id;
+    if (mode === 3) p.vars.rfOrtTower = release.id;
     return true;
   });
 });

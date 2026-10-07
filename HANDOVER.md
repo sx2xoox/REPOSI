@@ -1,10 +1,21 @@
+## 2026-10-07 — Refuge keepers: one verb each (source pushed, NOT deployed)
+- User: the five keepers felt the same (every release = area damage); asked for distinct identities without making them needlessly hard or inefficient, and without simply varying damage. Every release still deals ~11x to a lone target with no preparation; preparation adds on top.
+  - 토브 연쇄 기폭: charges thrown at every visible enemy within 170 px (max 6) burst in a chain; a lone target takes 11x, a crowd shares 40x (min(11, 40/n) each, splash included). Placed charges / mines go off first at double power (`RefugeCharge.prime`).
+  - 루엔 매듭 끌어당기기: same cuts (2/3/6x per target) plus the first cut hauls non-boss targets to the knot (knockback impulse, walls stop it) and stuns 0.9 s (bosses get the capped stagger).
+  - 베스 교차 습격: three strikes at the old times (.22/.53/.86, 3/3/5x) each blink Ves behind the nearest unstruck enemy within 140 px (free, visible landing; else near side; else stay), hitting it and neighbours; invulnerable for the release; with nobody near it lunges along the aim. Dash 교차 발걸음 now also cuts enemies passed through (0.8x).
+  - 오르트 되받아치는 방패: tower shield follows the aim for 1.5 s; slam 3x in front at 0.14 s; enemy shots striking its face are returned at the nearest enemy ahead (1.2x each, max 10, batched per step); bash forward 8x at 1.5 s. The passive shield stands aside meanwhile; a passive block now gives 4 ember.
+  - 미라 멈춘 책장: 2 s dome (r 58) at the aim point; non-boss enemies inside freeze, bosses get one capped stagger then slow; enemy shots inside stand still (velocity behavior); 4 pulses 0.75x + closing 8x, plus 30% of Mira's own direct damage inside (cap 6x per enemy) via the passive's `record`.
+- Crowd check vs the original seven (5 dummies, clustered / spread, x base damage): originals 17–50 / 5–27; now 토브 40/40, 루엔 55/55 (unchanged numbers), 베스 52/16, 오르트 20/14 (+ returned shots), 미라 55/44.
+- Texts (names, summaries, descs, pitch, tags, two flavour lines) updated. New tests: tests/refuge-verbs.test.ts. The determinism scenario in refuge-expansion explores a little longer (stronger release shortened its run below the 2500-step floor).
+- QA bot (`qa-run --char ...`) gets stuck on seed QA-S1's floor-1 challenge_pillars room ("no-hop") for every keeper; not caused by this change, not investigated.
+
 ## 2026-10-07 — Health lantern first; refuge keeper effects made crisp and punchy (source pushed, NOT deployed)
 - HUD: user put the health lantern in front (top-left, x=8) and the release lantern right of it; the health readout ("3.5/4", "+1.5", "방패 n") moved under the health lantern, F keycap stays under the release lantern, buffs hang under the readout (y follows the readout's line count).
 - User: the five refuge keepers' skill effects (made in the Codex period) looked poorly designed. Cause found in captures: every stroke used the anti-aliased round-capped `Renderer.line` at low alpha, so effects read as blurry scribbles, explosions as scattered sticks, and nothing marked the moment of impact.
 - Engine (backward compatible, additive): `Renderer.pixelLine` (Bresenham + square brush, single fill so alpha doesn't stack), `pixelDisc`, `pixelRing`. All refuge effect drawing now uses them.
 - `refuge-burst-fx.ts`: new chunky fireball for Tove (soot outline, three heat bands, rising core, spiked flash, shock ring, embers); crescent slashes and Ves's release now a crescent wave that leaves the keeper and runs out to its real reach (wall clipped); ranged supports are lances with a bright core.
 - New `refuge-impact-fx.ts`: cosmetic impact feedback spawned at the simulation moment a skill lands (particles via fx RNG, cosmetic `RefugeRing`, decal, per-peer shake, teammate opacity respected): blasts, thread cuts / pulses, strikes and release waves, shield blocks / rams / dust, seal and corridor pages, corridor closure. Timings, damage, targets and state are unchanged (refuge tests, determinism and full suite pass).
-- Open: user says the five keepers still feel alike (every release = area damage). A mechanics proposal giving each a different verb was sent for approval; not implemented yet.
+- Follow-up: the keepers' mechanics were redesigned in the next entry.
 
 ## 2026-10-07 — HUD lanterns generated with PixelLab (source pushed, NOT deployed)
 - User connected PixelLab to the cloud environment as an API credential (the agent proxy adds the key for api.pixellab.ai; no key in the session, repo or bundle) and asked to make the two lanterns.

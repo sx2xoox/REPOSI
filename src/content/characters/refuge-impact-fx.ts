@@ -87,19 +87,6 @@ export function strikeImpact(w: World, owner: Player, x: number, y: number, angl
   if (heavy) ring(w, owner, x, y, 26, .22, '#fff4f8', 1);
 }
 
-/** Ves (release): sparks spray along the leading edge of a crescent wave. */
-export function waveImpact(w: World, owner: Player, x: number, y: number, angle: number, reach: number, hand: number, final: boolean): void {
-  const alpha = refugeVisualOpacity(w, owner);
-  if (alpha <= 0) return;
-  const tint = hand < 0 ? ['#ffffff', '#ffd6e0', '#ee9fb6'] : hand > 0 ? ['#ffffff', '#d6ecff', '#9fcbe8'] : ['#ffffff', '#fff0f6', '#d9e8f6'];
-  const n = final ? 7 : 4;
-  for (let i = 0; i < n; i++) {
-    const a = angle + (i / (n - 1) - .5) * 2.2, d = reach * (final ? .9 : .82);
-    w.particles.burst(x + Math.cos(a) * d, y + Math.sin(a) * d, { alpha, count: final ? 3 : 2, speed: [30, 90], life: [.12, .26], colors: tint, shape: 'spark', size: [1, 2], additive: true, angle: a, spread: .7 });
-  }
-  if (final) w.shake(.28);
-}
-
 /** Ort: something struck the shield face (blocked bullet / rammed enemy). */
 export function shieldImpact(w: World, owner: Player, x: number, y: number, angle: number, heavy: boolean): void {
   const alpha = refugeVisualOpacity(w, owner);
@@ -123,14 +110,15 @@ export function pageImpact(w: World, owner: Player, x: number, y: number, final:
   w.particles.burst(x, y, { alpha, count: final ? 10 : 4, speed: [30, final ? 140 : 80], life: [.12, .28], colors: ['#ffffff', '#dfe8fa', '#9fb6e0'], shape: 'spark', size: [1, 2], additive: true, light: 4 });
 }
 
-/** Mira (release): the corridor slams shut along its length. */
-export function corridorClose(w: World, owner: Player, ax: number, ay: number, angle: number, length: number): void {
+/** Mira (release): the dome snaps shut; pages fly in from its rim. */
+export function stasisClose(w: World, owner: Player, x: number, y: number, radius: number): void {
   const alpha = refugeVisualOpacity(w, owner);
   if (alpha <= 0) return;
-  const nx = Math.cos(angle), ny = Math.sin(angle);
-  for (let i = 0; i < 6; i++) {
-    const d = length * (i + .5) / 6;
-    pageImpact(w, owner, ax + nx * d, ay + ny * d, i % 2 === 0);
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4;
+    w.particles.burst(x + Math.cos(a) * radius, y + Math.sin(a) * radius, { alpha, count: 2, speed: [60, 110], angle: a + Math.PI, spread: .4, life: [.2, .35], colors: ['#fff8e8', '#ece0bb', '#c8d4ee'], size: [2, 2], drag: 2 });
   }
+  pageImpact(w, owner, x, y, true);
+  ring(w, owner, x, y, radius, .3, '#eef2ff', 2);
   w.shake(.3);
 }

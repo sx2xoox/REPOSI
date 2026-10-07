@@ -74,23 +74,68 @@ export function drawBlast(r: Renderer, x: number, y: number, t: number, radius: 
   }
 }
 
-/** An artillery survey mark tightens, then a physical shell enters the impact point. */
-export function drawShellWarning(r: Renderer, x: number, y: number, timeToImpact: number, index: number): void {
-  if (timeToImpact < 0) return;
-  const tension = 1 - clamp01(timeToImpact / .28), size = 14 + (1 - tension) * 6, alpha = .24 + tension * .52;
-  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
-    r.pixelLine(x + sx * size, y + sy * (size - 5), x + sx * size, y + sy * size, '#e6bb7e', 1, alpha);
-    r.pixelLine(x + sx * size, y + sy * size, x + sx * (size - 5), y + sy * size, '#e6bb7e', 1, alpha);
+/** Tove's charge: three bound sticks and a shortening fuse (remaining 1 → 0), at (x, y) = its center. */
+export function drawCharge(r: Renderer, x: number, y: number, remaining: number, age: number, pulse = 1, alpha = 1): void {
+  const pop = Math.max(0, 1 - age / .12);
+  r.rect(x - 5, y - 4, 10, 8, '#282332', alpha);
+  for (let i = 0; i < 3; i++) {
+    const sx = x - 4 + i * 3;
+    r.rect(sx, y - 3, 2, 6, i === 1 ? '#c58250' : '#9d573e', alpha);
+    r.rect(sx, y - 3, 1, 4, '#e2ae71', alpha);
   }
-  r.pixelLine(x - 3, y, x + 3, y, '#f3d29b', 1, alpha);
-  r.pixelLine(x, y - 3, x, y + 3, '#f3d29b', 1, alpha);
-  for (let i = 0; i <= index; i++) r.rect(x - index * 2 + i * 4 - 1, y + size + 4, 2, 1, '#b98556', alpha);
-  if (timeToImpact > .2) return;
-  const flight = clamp01(timeToImpact / .2), px = x - flight * 15, py = y - flight * 55;
-  line(r, px, py, 1.3, -12, 0, -3, 0, '#e1ba7c', 2, .45 * (1 - flight));
-  line(r, px, py, 1.3, -5, 0, 4, 0, '#382f3a', 5, .95);
-  line(r, px, py, 1.3, -4, -1, 3, -1, '#d7a367', 3, .95);
-  glint(r, px + 1, py + 2, 1.3, 3, .85);
+  r.rect(x - 4, y - 1, 8, 2, '#e8c793', alpha);
+  r.rect(x - 1, y - 1, 2, 2, '#9d7556', alpha);
+  const fuseX = x + 4 + remaining * 5, fuseY = y - 3 - remaining * 3;
+  r.pixelLine(x + 3, y - 2, fuseX, fuseY, '#231d2b', 3, alpha);
+  r.pixelLine(x + 3, y - 2, fuseX, fuseY, '#e5cfa6', 1, alpha);
+  r.rect(fuseX - 1, fuseY - 1, 2, 2, '#fff3c8', pulse * alpha);
+  r.rect(fuseX + 2, fuseY - 3, 1, 1, '#f6a35a', pulse * .8 * alpha);
+  if (pop > 0) for (const side of [-1, 1]) r.pixelLine(x + side * (6 + pop * 3), y - 2, x + side * (8 + pop * 5), y - 4, '#fff0be', 1, pop * alpha);
+}
+
+/** Ves: a streak from where the keeper was to where she lands, and a cross cut on the target. */
+export function drawBlinkStrike(r: Renderer, fx: number, fy: number, tx: number, ty: number, cx: number, cy: number, t: number, hand: number, final: boolean): void {
+  if (t < 0 || t > .36) return;
+  const fade = out(t, .36), streak = out(t, .18);
+  const color = hand < 0 ? '#ee9fb6' : hand > 0 ? '#9fcbe8' : '#f4e6f0';
+  if (streak > 0) {
+    r.pixelLine(fx, fy - 6, tx, ty - 6, '#3a2440', 5, streak * .5);
+    r.pixelLine(fx, fy - 6, tx, ty - 6, color, 3, streak * .9);
+    r.pixelLine(fx, fy - 6, tx, ty - 6, '#ffffff', 1, streak);
+  }
+  const size = (final ? 17 : 12) * (.7 + .3 * clamp01(t / .06)), a = Math.atan2(ty - fy, tx - fx);
+  for (const side of [-1, 1]) {
+    const k = a + side * .78;
+    line(r, cx, cy - 6, k, -size, 0, size, 0, '#3a2440', final ? 5 : 4, fade * .6);
+    line(r, cx, cy - 6, k, -size, 0, size, 0, side < 0 ? '#ee9fb6' : '#9fcbe8', final ? 3 : 2, fade);
+    line(r, cx, cy - 6, k, -size + 2, 0, size - 2, 0, '#ffffff', 1, fade);
+  }
+  glint(r, cx, cy - 6, a, final ? 9 : 6, out(t, .12));
+}
+
+/** Mira: a dome of stopped time: pale floor, a ring of pages and a clock whose hands stand still. */
+export function drawStasis(r: Renderer, x: number, y: number, radius: number, t: number, alpha: number, pulse: number, closing: number): void {
+  if (alpha <= 0) return;
+  const shrink = 1 - closing * .85, rad = radius * shrink;
+  r.pixelDisc(x, y, rad, '#b3c9ee', alpha * (.1 + pulse * .06));
+  r.pixelRing(x, y, rad, '#3c415b', 3, alpha * .55);
+  r.pixelRing(x, y, rad, '#d5e1f3', 1, alpha * (.75 + pulse * .25));
+  // twelve hour ticks, then two hands frozen at a fixed hour
+  for (let i = 0; i < 12; i++) {
+    const a = i * Math.PI / 6, inner = rad - (i % 3 === 0 ? 7 : 4);
+    r.pixelLine(x + Math.cos(a) * inner, y + Math.sin(a) * inner, x + Math.cos(a) * (rad - 1), y + Math.sin(a) * (rad - 1), i % 3 === 0 ? '#eef2ff' : '#9fb4d8', 1, alpha * .8);
+  }
+  const hand = -Math.PI / 2 + Math.sin(t * 40) * .02 * (1 - closing);
+  line(r, x, y, hand, 0, 0, rad * .55, 0, '#3c415b', 3, alpha * .7);
+  line(r, x, y, hand, 0, 0, rad * .55, 0, '#eef2ff', 1, alpha);
+  line(r, x, y, hand + 2.1, 0, 0, rad * .38, 0, '#3c415b', 3, alpha * .7);
+  line(r, x, y, hand + 2.1, 0, 0, rad * .38, 0, '#c8d4ee', 1, alpha);
+  r.pixelDisc(x, y, 2, '#ffffff', alpha);
+  // pages pinned round the rim (they fly in when the dome closes)
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4 + t * .15 * (1 - closing), d = rad + 2;
+    bookMark(r, x + Math.cos(a) * d, y + Math.sin(a) * d, a + Math.PI / 2, alpha * .9, .8, .8);
+  }
 }
 
 /** Woven loops cross over and under a small ivory shuttle, never an orbiting orb. */
@@ -257,103 +302,5 @@ export function drawSupport(r: Renderer, ax: number, ay: number, tx: number, ty:
     r.pixelLine(ax, ay, tx, ty, '#f1dceb', 1, .9 * pulse);
     for (const q of [.18, .55, .84]) diamond(r, ax + (tx - ax) * q, ay + (ty - ay) * q, 3 + pulse * 2, '#c2dbe8', pulse * .8, angle);
     glint(r, tx, ty, angle + .8, 7, pulse);
-  }
-}
-
-/** A crisp crescent wave that leaves the keeper and runs out to `reach` (clipped by walls). */
-function wave(r: Renderer, x: number, y: number, angle: number, reach: number, t: number, span: number, edge: string, body: string,
-  clip?: (angle: number, radius: number) => number): void {
-  if (t < 0 || t > .3) return;
-  const travel = 1 - Math.pow(1 - clamp01(t / .16), 2), fade = out(t - .12, .18);
-  const radius = 14 + (reach - 14) * travel, thick = 3 + Math.round((1 - travel) * 3);
-  const steps = 22;
-  for (let i = 0; i < steps; i++) {
-    const u = i / steps - .5, v = (i + 1) / steps - .5;
-    const a = angle + u * span * 2, b = angle + v * span * 2;
-    const taper = 1 - Math.abs(u + .5 / steps) * 1.7;
-    if (taper <= 0) continue;
-    const ra = Math.min(radius, clip ? clip(a, radius) : radius), rb = Math.min(radius, clip ? clip(b, radius) : radius);
-    if (ra < radius - 4 || rb < radius - 4) continue;
-    const w = Math.max(1, Math.round(thick * taper));
-    const pa: [number, number] = [x + Math.cos(a) * ra, y + Math.sin(a) * ra], pb: [number, number] = [x + Math.cos(b) * rb, y + Math.sin(b) * rb];
-    r.pixelLine(pa[0] - Math.cos(a) * w, pa[1] - Math.sin(a) * w, pb[0] - Math.cos(b) * w, pb[1] - Math.sin(b) * w, '#3a2440', w + 1, fade * .5 * taper);
-    r.pixelLine(pa[0] - Math.cos(a) * (w - 1), pa[1] - Math.sin(a) * (w - 1), pb[0] - Math.cos(b) * (w - 1), pb[1] - Math.sin(b) * (w - 1), body, w, fade * .9);
-    r.pixelLine(pa[0], pa[1], pb[0], pb[1], edge, 1, fade);
-  }
-}
-
-/** One visual impact per release strike, independent of support-family tick schedules. */
-export function drawReleaseStrike(r: Renderer, ax: number, ay: number, tx: number, ty: number, t: number, family: SupportFamily, final: boolean, side: number, reach: number,
-  clip?: (angle: number, radius: number) => number): void {
-  if (t < -.18 || t > .46) return;
-  const angle = Math.atan2(ty - ay, tx - ax), color = side < 0 ? '#ee9fb6' : '#9fcbe8';
-  if (t < 0) {
-    // the hand draws back: a short blade glint beside the keeper
-    const ready = 1 + t / .18, d = final ? 9 : 7;
-    line(r, ax, ay, angle, -6 + ready * 4, side * d, 6 + ready * 6, side * d, '#2a1c30', 3, ready);
-    line(r, ax, ay, angle, -6 + ready * 4, side * d, 6 + ready * 6, side * d, final ? '#fff6ee' : color, 1, ready);
-    if (final) line(r, ax, ay, angle, -6 + ready * 4, -side * d, 6 + ready * 6, -side * d, '#9fcbe8', 1, ready);
-    return;
-  }
-  const limit = Math.max(20, Math.min(final ? 140 : 132, reach));
-  if (final) {
-    wave(r, ax, ay, angle, limit, t, 1.25, '#ffffff', '#f2c8d8', clip);
-    wave(r, ax, ay, angle, limit - 10, t - .03, 1.1, '#e8f6ff', '#9fcbe8', clip);
-    glint(r, ax + Math.cos(angle) * 18, ay + Math.sin(angle) * 18, angle + .75, 10 * out(t, .14), out(t, .14));
-  } else if (family === 0) {
-    wave(r, ax, ay, angle + side * .18, limit, t, .95, '#fff6ee', color, clip);
-  } else if (family === 2) drawBlast(r, tx, ty, t, 50, true);
-  else {
-    // a lance of light down the lane (pierce = narrow, beam = wide)
-    const fade = out(t, .26), width = family === 3 ? 6 : 3, q = clamp01(t / .06);
-    const px = ax + (tx - ax) * q, py = ay + (ty - ay) * q;
-    r.pixelLine(ax, ay, px, py, '#3a2440', width + 2, fade * .55);
-    r.pixelLine(ax, ay, px, py, color, width, fade * .95);
-    r.pixelLine(ax, ay, px, py, '#fff6ee', Math.max(1, width - 3), fade);
-    glint(r, tx, ty, angle + .8, 12, out(t - .04, .22));
-  }
-}
-
-/** Indexed book leaves build a hollow aisle; closing pages meet on the real final hit. */
-export function drawCorridor(r: Renderer, x: number, y: number, angle: number, length: number, t: number): void {
-  const fade = clamp01(t / .16) * clamp01((2.5 - t) / .4);
-  const closure = clamp01((t - 1.82) / .18), width = 29 * (1 - closure);
-  const nx = Math.cos(angle), ny = Math.sin(angle), sx = -ny, sy = nx;
-  // The full corridor remains active through the final hit. Only the book leaves
-  // fold inward: keep its floor boundaries fixed so the closing animation cannot
-  // imply that enemies near the edges are already outside the attack.
-  const boundary = t < 2 ? fade : out(t - 2, .3);
-  for (const side of [-1, 1]) {
-    line(r, x, y, angle, 0, side * 29, length, side * 29, '#51678e', 3, boundary * .25);
-    line(r, x, y, angle, 0, side * 29, length, side * 29, '#afc6e6', 1, boundary * .65);
-    for (let i = 0; i <= 4; i++) {
-      const distance = length * i / 4, reveal = clamp01(t * 7 - i * .18);
-      const px = x + nx * distance + sx * side * width, py = y + ny * distance + sy * side * width;
-      bookMark(r, px, py, angle + side * (.2 + closure * 1.15), fade * reveal * .88 * (t < 2 ? 1 : out(t - 2, .16)), (1 - closure) * reveal);
-      if (i < 4 && t < 1.82) {
-        line(r, x, y, angle, distance + 10, side * 25, distance + 15, side * 25, '#d2c7b0', 1, fade * .45);
-        line(r, x, y, angle, distance + 10, side * 22, distance + 12, side * 22, '#91a6ca', 1, fade * .38);
-      }
-    }
-  }
-  let pulse = 0;
-  for (const at of [.2, .7, 1.2, 1.7]) if (t >= at && t < 2) pulse = Math.max(pulse, out(t - at, .22));
-  for (let i = 1; i <= 3; i++) {
-    const d = length * i / 4, px = x + nx * d, py = y + ny * d;
-    diamond(r, px, py, 6 + pulse * 2, '#b3c9ea', fade * (.14 + pulse * .35), angle);
-    if (pulse > 0) for (const side of [-1, 1]) line(r, x, y, angle, d - 2, side * (6 + 14 * (1 - pulse)), d + 2, side * (6 + 14 * (1 - pulse)), '#e4deed', 1, pulse * fade);
-  }
-  if (t >= 2) {
-    const end = t - 2, glow = out(end, .3);
-    line(r, x, y, angle, 0, 0, length, 0, '#637fa9', 7, glow * .2);
-    line(r, x, y, angle, 0, 0, length, 0, '#eef1ff', 2, glow * .95);
-    for (const side of [-1, 1]) line(r, x, y, angle, 0, side * 23, length, side * 23, '#d8e2f4', 1, glow * .55);
-    for (let i = 0; i < 7; i++) {
-      const d = length * (i + .5) / 7, drift = end * (10 + i % 3 * 5), side = i % 2 ? 1 : -1;
-      const px = x + nx * d + sx * side * drift, py = y + ny * d + sy * side * drift - end * 13;
-      path(r, px, py, angle + side * end * 2, [[-3, -3], [3, -3], [3, 3], [-3, 3], [-3, -3]], '#cbd7e9', 1, fade * .7);
-      if (i % 2 === 0) line(r, x, y, angle, d - 2, -26, d + 2, 26, '#c8d5ed', 1, glow * .3);
-      if (i % 2 === 0) glint(r, x + nx * d, y + ny * d, angle + Math.PI / 2, 8, glow * .65, '#f4e9ff');
-    }
   }
 }
