@@ -6,6 +6,7 @@ import { rayLength, segDist } from '../weapons/common';
 import { RefugeOwned, aimPoint, nearby, visible, onLane, refugeHit, supportFamily, type SupportFamily } from './refuge-common';
 import { slowSealBullets, slowSealEnemy } from './refuge-devices';
 import { drawBlast, drawShellWarning, drawThreadKnot, drawWovenThread, drawThreadCut, drawShield, drawShieldWake, drawReleaseStrike, drawCorridor } from './refuge-burst-fx';
+import { blastImpact, corridorClose, pageImpact, shieldDust, shieldImpact, strikeImpact, threadImpact, waveImpact } from './refuge-impact-fx';
 
 /** Fixed-step, owner-bound choreography. Eleven base damage against an unobstructed target. */
 export class RefugeRelease extends RefugeOwned {
@@ -49,6 +50,7 @@ export class RefugeRelease extends RefugeOwned {
       m['blastAt' + m.phase] = this.age;
       for (const target of nearby(w, x, y, 44)) refugeHit(w, this.owner, target, m.damage * [3, 3.5, 4.5][m.phase], this, true, 30);
       w.sfx('explosion', { vol: .48, pitch: 1.15 - m.phase * .12, x });
+      blastImpact(w, this.owner, x, y, 44, true);
       m.phase++;
       return true;
     });
@@ -62,7 +64,9 @@ export class RefugeRelease extends RefugeOwned {
         const target = w.enemies.find(e => e.id === m['target' + i]);
         if (!target || !visible(w, m.ax, m.ay, target.x, target.y, target.r) || Math.hypot(target.x - m.ax, target.y - m.ay) > 240) continue;
         refugeHit(w, this.owner, target, m.damage * [2, 3, 6][m.phase], this, true);
+        threadImpact(w, this.owner, target.x, target.y - 8, m.phase === 1 ? -.8 : .8, m.phase === 2);
       }
+      if (m.phase === 2) threadImpact(w, this.owner, m.ax, m.ay - 6, 0, true);
       w.sfx('paper_flutter', { vol: .4, pitch: 1.4 - m.phase * .15 });
       m.phase++;
       return true;
@@ -82,9 +86,12 @@ export class RefugeRelease extends RefugeOwned {
           ? distance < 140 + target.r && direction > .25
           : family === 2 ? Math.hypot(target.x - m.tx, target.y - m.ty) < 55 + target.r
             : onLane(w, target, m.ax, m.ay, bx, by, 24);
-        if (inside && visible(w, m.ax, m.ay, target.x, target.y, target.r)) refugeHit(w, this.owner, target, m.damage * [3, 3, 5][m.phase], this, true, m.phase === 2 ? 60 : 0);
+        if (inside && visible(w, m.ax, m.ay, target.x, target.y, target.r) && refugeHit(w, this.owner, target, m.damage * [3, 3, 5][m.phase], this, true, m.phase === 2 ? 60 : 0))
+          strikeImpact(w, this.owner, target.x, target.y - 4, m.angle, m.phase === 2 ? 0 : m.phase === 0 ? -1 : 1, m.phase === 2);
       }
       w.sfx(m.phase === 2 ? 'swing_heavy' : 'swing', { vol: .4, pitch: m.phase === 2 ? .9 : 1.25 });
+      if (m.phase === 2 || family === 0) waveImpact(w, this.owner, m.ax, m.ay, m.angle, Math.max(20, Math.min(m.phase === 2 ? 140 : 132, m.length)), m.phase === 2 ? 0 : m.phase === 0 ? -1 : 1, m.phase === 2);
+      else if (family === 2) blastImpact(w, this.owner, m.tx, m.ty, 50, true);
       m.phase++;
       return true;
     });
@@ -115,7 +122,10 @@ export class RefugeRelease extends RefugeOwned {
         const key = 'pending:' + target.id, hits = m[key] ?? 0;
         if (!hits) continue;
         m[key] = 0;
-        if (visible(w, m.ax, m.ay, target.x, target.y, target.r)) success = refugeHit(w, this.owner, target, m.damage * 5.5 * hits, this, true, 35) || success;
+        if (visible(w, m.ax, m.ay, target.x, target.y, target.r) && refugeHit(w, this.owner, target, m.damage * 5.5 * hits, this, true, 35)) {
+          success = true;
+          shieldImpact(w, this.owner, target.x, target.y - 4, m.angle + (t < .5 ? 0 : Math.PI), true);
+        }
       }
       if (success) w.sfx('hit_metal', { vol: .4, pitch: .8, x: this.x });
       return success;
@@ -127,9 +137,11 @@ export class RefugeRelease extends RefugeOwned {
         if (bullet.dead || bullet.team !== 'enemy' || bullet.delay > 0 || bullet.z > 18) continue;
         if (!swept(bullet.x, bullet.y, bullet.r) || !visible(w, this.x, this.y, bullet.x, bullet.y, bullet.r)) continue;
         bullet.dead = true; m.blocks--; count++;
+        shieldImpact(w, this.owner, bullet.x, bullet.y, m.angle + (t < .5 ? 0 : Math.PI), false);
       }
       return count > 0;
     });
+    if (t < 1 && Math.floor(this.age * 14) !== Math.floor((this.age - w.dt) * 14)) shieldDust(w, this.owner, this.x, this.y);
     m.prevX = this.x; m.prevY = this.y;
   }
 
@@ -145,6 +157,8 @@ export class RefugeRelease extends RefugeOwned {
         if (m.phase < 4) slowSealEnemy(w, target);
         refugeHit(w, this.owner, target, m.damage * (m.phase === 4 ? 8 : .75), this, true);
       }
+      if (m.phase === 4) corridorClose(w, this.owner, m.ax, m.ay, m.angle, m.length);
+      else for (const q of [.3, .7]) pageImpact(w, this.owner, m.ax + Math.cos(m.angle) * m.length * q, m.ay + Math.sin(m.angle) * m.length * q, false);
       w.sfx('paper_flutter', { vol: m.phase === 4 ? .5 : .2, pitch: m.phase === 4 ? .8 : 1.3 });
       m.phase++;
       return true;
@@ -192,11 +206,11 @@ export class RefugeRelease extends RefugeOwned {
       // Ground brackets identify its launch point and the safe side of the moving face.
       for (const side of [-1, 1]) {
         const x = m.ax - ny * side * 25, y = m.ay + nx * side * 25;
-        r.line(x - nx * 5, y - ny * 5, x + nx * 5, y + ny * 5, '#b8caa1', 1, fade * .35);
+        r.pixelLine(x - nx * 5, y - ny * 5, x + nx * 5, y + ny * 5, '#b8caa1', 1, fade * .35);
       }
       drawShield(r, this.x, this.y, m.angle, 28, m.blocks > 0 ? 2 : 0, fade);
       const reversal = Math.max(0, 1 - Math.abs(t - .85) / .12);
-      if (reversal > 0) r.line(this.x + ny * 23 + nx * 10, this.y - nx * 23 + ny * 10,
+      if (reversal > 0) r.pixelLine(this.x + ny * 23 + nx * 10, this.y - nx * 23 + ny * 10,
         this.x - ny * 23 + nx * 10, this.y + nx * 23 + ny * 10, '#edf0cd', 2, reversal * .75);
     } else drawCorridor(r, m.ax, m.ay, m.angle, m.length, t);
   }

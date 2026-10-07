@@ -1,11 +1,12 @@
 // In-game HUD (UI space 768x432), laid out as the keeper's own gear:
-//   top-left   two lanterns standing side by side: the release lantern (ember
-//              gauge: ember rises in its glass, glows when 등불 해방 is ready,
-//              shutters while it recovers) and, right of it, the larger health
-//              lantern: red hearts, soul hearts and one-hit wards each fill its
-//              glass from the bottom, the one spent first drawn in front (wards,
-//              then soul, then red), a flame on the highest level, and a short
-//              readout beside it; temporary buffs hang below
+//   top-left   two PixelLab lanterns standing side by side: the health lantern
+//              in front (red hearts, soul hearts and one-hit wards each fill its
+//              glass from the bottom, the one spent first drawn in front: wards,
+//              then soul, then red; a flame on the highest level; a short readout
+//              under it) and, right of it, the release lantern (ember gauge: ember
+//              rises in its glass, glows with the release key under it when
+//              등불 해방 is ready, shutters while it recovers); temporary buffs
+//              hang below the readout
 //   top-right  minimap · floor name · objective / seed · purse (coins / bombs / keys)
 //   bottom-right  equipment slots (no backing): secondary + swap key, primary
 //              (rarity rim + gem), active item + charge wick, potion
@@ -58,11 +59,13 @@ export function minimapBlockRect(uiW: number, safe: { l: number; r: number; t: n
 const HEART_VALUE: Record<HeartKind, number> = { full: 2, half: 1, empty: 0, soul: 2, soulHalf: 1 };
 
 // ---- lantern geometry (UI units, from the safe-area top-left; even = on the art grid)
-/** release lantern (left) and health lantern (right) share a baseline */
+/** health lantern (front, left) and release lantern (right of it) share a baseline */
 const LANTERN_BASE = 74;
-const REL_X = 8;
-/** gap (UI units) between the release lantern and the health lantern */
+const HP_X = 8;
+/** gap (UI units) between the health lantern and the release lantern */
 const LANTERN_GAP = 4;
+/** health readout lines under the health lantern (UI) */
+const READOUT_LINE = 12;
 
 /** Purse (coins / bombs / keys) row under the minimap block: its height (UI). */
 const PURSE_H = 20;
@@ -325,7 +328,7 @@ export class Hud {
   /** Top-left of a lantern (UI units inside the safe area). */
   private lanternPos(kind: 'release' | 'health'): { x: number; y: number } {
     const sp = lanternSpec(kind);
-    const x = kind === 'release' ? REL_X : REL_X + lanternSpec('release').w * PX + LANTERN_GAP;
+    const x = kind === 'health' ? HP_X : HP_X + lanternSpec('health').w * PX + LANTERN_GAP;
     return { x, y: LANTERN_BASE - sp.h * PX };
   }
 
@@ -337,9 +340,11 @@ export class Hud {
     return healthStackTop(x, y, { red: p.red, soul: p.soul, shields: p.shields, scale: this.hpScale });
   }
 
-  /** Bottom edge of the lantern block (UI units inside the safe area). */
-  private plateBottom(_w: World): number {
-    return LANTERN_BASE;
+  /** Bottom edge of the lantern block and the health readout under it (UI units inside the safe area). */
+  private plateBottom(w: World): number {
+    const p = w.player;
+    const lines = 1 + (p.soul > 0 ? 1 : 0) + (p.shields > 0 ? 1 : 0);
+    return LANTERN_BASE + 3 + lines * READOUT_LINE;
   }
 
   // ================================================================ draw
@@ -382,7 +387,7 @@ export class Hud {
     this.drawHealth(r, w, A);
     this.drawLanternGauge(r, w, A);
     const pb = this.plateBottom(w);
-    this.drawBuffs(r, w, A, pb + 18);
+    this.drawBuffs(r, w, A, pb + 6);
     // purse under the minimap block
     if (counterBusy(this.coins) || counterBusy(this.bombs) || counterBusy(this.keys)) this.drawConsumables(r, w, A);
     else this.lyPurse.draw(r, `${p.coins}|${p.bombs}|${p.keys}|${this.W}`, ox, oy, this.W - 150, this.purseY() - 4, 150, PURSE_H + 18, A, this.paintPurse);
@@ -411,7 +416,7 @@ export class Hud {
     }
   }
 
-  /** The health lantern, a glow that throbs at low health, and a short readout beside it. */
+  /** The health lantern, a glow that throbs at low health, and a short readout under it. */
   private drawHealth(r: Renderer, w: World, A: number): void {
     const p = w.player;
     const { x, y } = this.lanternPos('health');
@@ -427,19 +432,17 @@ export class Hud {
       const a = 1 - s.age / s.life;
       r.uiRect(s.x - 1.5, s.y - 1.5, 3, 3, s.color, a * A);
     }
-    // readout: hearts as "3.5/4", soul and wards only when held
-    const tx = x + sp.w * PX + 6;
-    let ty = y + 16;
+    // readout under the lantern: hearts as "3.5/4", soul and wards only when held
+    const tx = x + (sp.w * PX) / 2;
+    let ty = LANTERN_BASE + 3;
     const hearts = (n: number) => (n % 2 ? (n / 2).toFixed(1) : String(n / 2));
-    r.uiText(`${hearts(p.red)}/${hearts(p.maxRed)}`, tx, ty, { size: 10, font: 'small', color: low ? '#ff8a8a' : '#ffb0a8', alpha: A, outline: C.ink });
-    if (p.soul > 0) {
-      ty += 13;
-      r.uiText(`+${hearts(p.soul)}`, tx, ty, { size: 10, font: 'small', color: '#a8c0ff', alpha: A, outline: C.ink });
-    }
-    if (p.shields > 0) {
-      ty += 13;
-      r.uiText(`방패 ${p.shields}`, tx, ty, { size: 10, font: 'small', color: '#e4eaf6', alpha: A, outline: C.ink });
-    }
+    const line = (text: string, color: string) => {
+      r.uiText(text, tx, ty, { size: 10, font: 'small', align: 'center', color, alpha: A, outline: C.ink });
+      ty += READOUT_LINE;
+    };
+    line(`${hearts(p.red)}/${hearts(p.maxRed)}`, low ? '#ff8a8a' : '#ffb0a8');
+    if (p.soul > 0) line(`+${hearts(p.soul)}`, '#a8c0ff');
+    if (p.shields > 0) line(`방패 ${p.shields}`, '#e4eaf6');
   }
 
   /** The release lantern: ember gauge, ready glow + key, release burst, cooldown shutters. */
@@ -472,7 +475,7 @@ export class Hud {
   private drawBuffs(r: Renderer, w: World, A: number, y: number): void {
     const buffs = w.items.buffs;
     if (!buffs.length) return;
-    let x = REL_X;
+    let x = HP_X;
     let newest: { label: string; t: number } | null = null;
     for (const b of buffs) {
       const seen = this.buffSeen.get(b.key) ?? this.t;

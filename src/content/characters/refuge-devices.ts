@@ -8,6 +8,7 @@ import { proc } from '../items/lib';
 import { rayLength, segDist } from '../weapons/common';
 import { RefugeOwned, nearby, visible, refugeHit, onLane, refugeVisualOpacity, type SupportFamily } from './refuge-common';
 import { drawBlast, drawThreadKnot, drawShield, drawSeal, drawSupport } from './refuge-burst-fx';
+import { blastImpact, pageImpact, shieldImpact, strikeImpact, threadPulse } from './refuge-impact-fx';
 
 export class RefugeCharge extends RefugeOwned {
   constructor(w: World, p: Player, x: number, y: number, damage: number, targetId = 0, mine = false) {
@@ -29,6 +30,7 @@ export class RefugeCharge extends RefugeOwned {
       m.fired = 1; m.firedAt = this.age;
       for (const enemy of nearby(w, this.x, this.y, m.mine ? 35 : 30)) refugeHit(w, this.owner, enemy, m.damage, this, false, 45);
       w.sfx('explosion', { vol: .3, pitch: m.mine ? 1 : 1.3, x: this.x });
+      blastImpact(w, this.owner, this.x, this.y, m.mine ? 35 : 30, false);
       proc(w, 'passive:tove', true);
       return true;
     });
@@ -45,9 +47,9 @@ export class RefugeCharge extends RefugeOwned {
       for (let i = 0; i < 4; i++) {
         const a = i * Math.PI / 2, nx = Math.cos(a), ny = Math.sin(a);
         const x = this.x + nx * 15, y = this.y + ny * 15;
-        r.line(x - ny * 2, y + nx * 2, x + ny * 2, y - nx * 2, '#dba26a', 1, armed * .32);
-        r.line(this.x + nx * 4, this.y + ny * 4, this.x + nx * 8, this.y + ny * 8, '#211d2c', 3);
-        r.line(this.x + nx * 4, this.y + ny * 4 - 1, this.x + nx * 7, this.y + ny * 7 - 1, '#9a7755', 1);
+        r.pixelLine(x - ny * 2, y + nx * 2, x + ny * 2, y - nx * 2, '#dba26a', 1, armed * .32);
+        r.pixelLine(this.x + nx * 4, this.y + ny * 4, this.x + nx * 8, this.y + ny * 8, '#211d2c', 3);
+        r.pixelLine(this.x + nx * 4, this.y + ny * 4 - 1, this.x + nx * 7, this.y + ny * 7 - 1, '#9a7755', 1);
       }
       r.rect(this.x - 4, this.y - 4, 8, 7, '#272330');
       r.rect(this.x - 3, this.y - 3, 6, 5, '#956746');
@@ -67,12 +69,12 @@ export class RefugeCharge extends RefugeOwned {
     r.rect(this.x - 4, y - 1, 8, 2, '#e8c793');
     r.rect(this.x - 1, y - 1, 2, 2, '#9d7556');
     const fuseX = this.x + 4 + remaining * 5, fuseY = y - 3 - remaining * 3;
-    r.line(this.x + 3, y - 2, fuseX, fuseY, '#231d2b', 3);
-    r.line(this.x + 3, y - 2, fuseX, fuseY, '#e5cfa6', 1);
+    r.pixelLine(this.x + 3, y - 2, fuseX, fuseY, '#231d2b', 3);
+    r.pixelLine(this.x + 3, y - 2, fuseX, fuseY, '#e5cfa6', 1);
     r.rect(fuseX - 1, fuseY - 1, 2, 2, '#fff3c8', pulse);
     r.rect(fuseX + 2, fuseY - 3, 1, 1, '#f6a35a', pulse * .8);
     if (pop > 0) for (const side of [-1, 1])
-      r.line(this.x + side * (6 + pop * 3), y - 2, this.x + side * (8 + pop * 5), y - 4, '#fff0be', 1, pop);
+      r.pixelLine(this.x + side * (6 + pop * 3), y - 2, this.x + side * (8 + pop * 5), y - 4, '#fff0be', 1, pop);
   }
   override light(w: World): void {
     const flash = this.mem.fired ? Math.max(0, 1 - (this.age - this.mem.firedAt) / .24) : .15;
@@ -123,7 +125,10 @@ export class RefugeWeave extends RefugeOwned {
       m.pool = 0;
       let hit = false;
       for (const target of receivers) hit = refugeHit(w, this.owner, target, damage, this) || hit;
-      if (hit) { m.flash = w.time; proc(w, 'passive:luen', true); w.sfx('paper_flutter', { vol: .15, pitch: 1.45 }); }
+      if (hit) {
+        m.flash = w.time; proc(w, 'passive:luen', true); w.sfx('paper_flutter', { vol: .15, pitch: 1.45 });
+        for (const target of receivers) threadPulse(w, this.owner, target.x, target.y - target.r - 7);
+      }
       return hit;
     }, .5);
   }
@@ -140,8 +145,8 @@ export class RefugeWeave extends RefugeOwned {
           const t0 = (j - 1) / 8, t1 = j / 8;
           const x0 = ax + (bx - ax) * t0, y0 = ay + (by - ay) * t0 - Math.sin(t0 * Math.PI) * lift;
           const x1 = ax + (bx - ax) * t1, y1 = ay + (by - ay) * t1 - Math.sin(t1 * Math.PI) * lift;
-          r.line(x0, y0, x1, y1, '#30233f', 3, .55);
-          r.line(x0, y0, x1, y1, '#c4abdf', 1, .42 + lit * .45);
+          r.pixelLine(x0, y0, x1, y1, '#30233f', 3, .55);
+          r.pixelLine(x0, y0, x1, y1, '#c4abdf', 1, .42 + lit * .45);
         }
         if (lit > 0) {
           const t = Math.min(1, (1 - lit) * 1.35);
@@ -184,6 +189,8 @@ export class RefugeSupport extends RefugeOwned {
         }
         m.phase++;
         w.sfx(m.family === 0 ? 'swing' : m.family === 2 ? 'explosion' : 'shoot_magic', { vol: .2, pitch: 1.4, x: m.tx });
+        if (m.family === 2) blastImpact(w, this.owner, m.tx, m.ty, 34, false);
+        else strikeImpact(w, this.owner, m.tx, m.ty, m.angle, m.family === 0 ? 0 : 1, false);
         return true;
       });
     }
@@ -195,8 +202,8 @@ export class RefugeSupport extends RefugeOwned {
       const nx = Math.cos(m.angle), ny = Math.sin(m.angle);
       for (const side of [-1, 1]) {
         const x = m.ax - ny * side * (4 + wind * 3), y = m.ay + nx * side * (4 + wind * 3) - 5;
-        r.line(x - nx * 5, y - ny * 5, x + nx * 3, y + ny * 3, '#332638', 3, wind);
-        r.line(x - nx * 5, y - ny * 5, x + nx * 3, y + ny * 3, side < 0 ? '#ecabb6' : '#b4d7e8', 1, wind);
+        r.pixelLine(x - nx * 5, y - ny * 5, x + nx * 3, y + ny * 3, '#332638', 3, wind);
+        r.pixelLine(x - nx * 5, y - ny * 5, x + nx * 3, y + ny * 3, side < 0 ? '#ecabb6' : '#b4d7e8', 1, wind);
       }
     }
     drawSupport(r, m.ax, m.ay, m.tx, m.ty, this.age, m.family as SupportFamily);
@@ -248,6 +255,7 @@ export class RefugeGuard extends RefugeOwned {
         bullet.dead = true;
         p.vars.rfOrtCharges--;
         m.flash = w.time;
+        shieldImpact(w, p, bullet.x, bullet.y, m.angle, false);
         w.sfx('parry', { vol: .3, pitch: .9, x: this.x });
         proc(w, 'passive:ort', true);
         return true;
@@ -259,14 +267,14 @@ export class RefugeGuard extends RefugeOwned {
     const nx = Math.cos(this.mem.angle), ny = Math.sin(this.mem.angle), sx = -ny, sy = nx;
     if (parked) for (const side of [-1, 1]) {
       const x = this.x + sx * side * 12, y = this.y + sy * side * 12 + 2;
-      r.line(x - nx * 4, y - ny * 4, x + nx * 3, y + ny * 3, '#263a35', 4, .8);
-      r.line(x - nx * 3, y - ny * 3 - 1, x + nx * 2, y + ny * 2 - 1, '#c3d6ae', 1, .7);
+      r.pixelLine(x - nx * 4, y - ny * 4, x + nx * 3, y + ny * 3, '#263a35', 4, .8);
+      r.pixelLine(x - nx * 3, y - ny * 3 - 1, x + nx * 2, y + ny * 2 - 1, '#c3d6ae', 1, .7);
     }
     drawShield(r, this.x - nx * lit * 2, this.y - ny * lit * 2, this.mem.angle, 17, this.owner.vars.rfOrtCharges, .75 + lit * .25);
     if (lit > 0) for (let i = 0; i < 4; i++) {
       const side = i % 2 ? 1 : -1, spread = (1 - lit) * (5 + i * 2);
       const x = this.x + nx * (5 + spread) + sx * side * (2 + spread), y = this.y + ny * (5 + spread) + sy * side * (2 + spread);
-      r.line(x, y, x + nx * 3 + sx * side * 2, y + ny * 3 + sy * side * 2, i < 2 ? '#fff0c6' : '#a6d3b0', 1, lit);
+      r.pixelLine(x, y, x + nx * 3 + sx * side * 2, y + ny * 3 + sy * side * 2, i < 2 ? '#fff0c6' : '#a6d3b0', 1, lit);
     }
   }
   override light(w: World): void {
@@ -289,8 +297,8 @@ const sealBulletBehavior: ProjBehavior = {
       const y = bullet.y - bullet.z;
       // Small page corners leave the hostile projectile's own core fully visible.
       for (const side of [-1, 1]) {
-        r.line(bullet.x + side * 4, y - 4, bullet.x + side * 4, y - 1, '#d3dff1', 1, .6);
-        r.line(bullet.x + side * 4, y - 4, bullet.x + side * 2, y - 4, '#b3c9ee', 1, .6);
+        r.pixelLine(bullet.x + side * 4, y - 4, bullet.x + side * 4, y - 1, '#d3dff1', 1, .6);
+        r.pixelLine(bullet.x + side * 4, y - 4, bullet.x + side * 2, y - 4, '#b3c9ee', 1, .6);
       }
     }
   },
@@ -336,6 +344,7 @@ export class RefugeSeal extends RefugeOwned {
       if (!targets.length) return false;
       for (const target of targets) { slowSealEnemy(w, target); refugeHit(w, this.owner, target, this.mem.damage * .2, this); }
       this.mem.pulse = w.time;
+      pageImpact(w, this.owner, this.x, this.y - 2, false);
       return true;
     }, .5);
   }
@@ -345,8 +354,8 @@ export class RefugeSeal extends RefugeOwned {
     const opening = Math.max(0, 1 - this.age / .28);
     if (opening > 0) for (const side of [-1, 1]) {
       const x = this.x + side * (4 + (1 - opening) * 10), y = this.y - 3 - Math.sin(opening * Math.PI) * 5;
-      r.line(this.x, this.y - 2, x, y - 4, '#e4e8ee', 2, opening * .8);
-      r.line(x, y - 4, x + side * 2, y + 2, '#8faed3', 1, opening * .7);
+      r.pixelLine(this.x, this.y - 2, x, y - 4, '#e4e8ee', 2, opening * .8);
+      r.pixelLine(x, y - 4, x + side * 2, y + 2, '#8faed3', 1, opening * .7);
     }
   }
   override light(w: World): void {
@@ -378,15 +387,15 @@ export class RefugeFootwork extends RefugeOwned {
       for (let i = 1; i <= 6; i++) {
         const a = (i - 1) / 6, b = i / 6;
         const bendA = Math.sin(a * Math.PI) * 4, bendB = Math.sin(b * Math.PI) * 4;
-        r.line(this.x + dx * a - ny * bendA, this.y + dy * a + nx * bendA,
+        r.pixelLine(this.x + dx * a - ny * bendA, this.y + dy * a + nx * bendA,
           this.x + dx * b - ny * bendB, this.y + dy * b + nx * bendB, '#c3a9e7', 1, fade * .7);
       }
       drawThreadKnot(r, this.x, this.y, this.age, 3, fade * .8);
     } else {
       for (let i = 0; i < 3; i++) for (const side of [-1, 1]) {
         const d = length * (i + .6) / 4, x = this.x + nx * d - ny * side * 4, y = this.y + ny * d + nx * side * 4;
-        r.line(x - nx * 3, y - ny * 3, x + nx * 2, y + ny * 2, side < 0 ? '#e8a5b5' : '#bad8e8', 2, fade * (1 - i * .15));
-        r.line(x + nx * 2, y + ny * 2, x + nx * 2 - ny * side * 2, y + ny * 2 + nx * side * 2, '#f4e6dc', 1, fade * .65);
+        r.pixelLine(x - nx * 3, y - ny * 3, x + nx * 2, y + ny * 2, side < 0 ? '#e8a5b5' : '#bad8e8', 2, fade * (1 - i * .15));
+        r.pixelLine(x + nx * 2, y + ny * 2, x + nx * 2 - ny * side * 2, y + ny * 2 + nx * side * 2, '#f4e6dc', 1, fade * .65);
       }
     }
   }

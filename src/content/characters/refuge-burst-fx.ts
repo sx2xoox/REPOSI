@@ -5,11 +5,15 @@ const TAU = Math.PI * 2;
 const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
 const out = (t: number, duration: number): number => clamp01(1 - t / duration);
 
-/** All choreography is sampled from simulation age. Draws never write state. */
+/**
+ * All choreography is sampled from simulation age. Draws never write state.
+ * Every stroke is a crisp pixel line (Renderer.pixelLine): a dark wide pass
+ * under a bright narrow one reads as an outlined pixel shape, not a blur.
+ */
 function line(r: Renderer, x: number, y: number, angle: number, ax: number, ay: number, bx: number, by: number,
   color: string, width = 1, alpha = 1): void {
   const c = Math.cos(angle), s = Math.sin(angle);
-  r.line(x + c * ax - s * ay, y + s * ax + c * ay, x + c * bx - s * by, y + s * bx + c * by, color, width, clamp01(alpha));
+  r.pixelLine(x + c * ax - s * ay, y + s * ax + c * ay, x + c * bx - s * by, y + s * bx + c * by, color, width, clamp01(alpha));
 }
 
 function path(r: Renderer, x: number, y: number, angle: number, points: readonly (readonly [number, number])[], color: string, width: number, alpha: number): void {
@@ -29,38 +33,44 @@ function glint(r: Renderer, x: number, y: number, angle: number, size: number, a
   r.rect(x - 1, y - 1, 2, 2, '#fff8e5', alpha);
 }
 
-/** Broken ground shock, short fire tongues and brass shrapnel; no opaque disk. */
+/**
+ * A crisp fireball: white flash, a rising fire core in three heat bands, a
+ * soot rim on the ground and a thin shock ring. Sparks, smoke and grit are
+ * particles spawned by the simulation at the same moment (blastImpact).
+ */
 export function drawBlast(r: Renderer, x: number, y: number, t: number, radius: number, heavy = false): void {
-  if (t < 0 || t > .44) return;
-  const k = clamp01(t / .34), fade = out(t, .44), burst = 1 - Math.pow(1 - clamp01(t / .18), 3);
-  const edge = radius * (.2 + .8 * burst);
-  for (let i = 0; i < 8; i++) {
-    const a = i * TAU / 8 + .13, b = a + .25, d = edge * (i % 2 ? .92 : 1);
-    const ax = x + Math.cos(a) * d, ay = y + Math.sin(a) * d;
-    const bx = x + Math.cos(b) * d, by = y + Math.sin(b) * d;
-    r.line(ax, ay, bx, by, '#503844', heavy ? 4 : 3, fade * .4);
-    r.line(ax, ay - 1, bx, by - 1, '#e1a568', heavy ? 2 : 1, fade * .75);
-    if (i % 2 === 0) {
-      const inner = d - 6;
-      r.line(x + Math.cos(a) * inner, y + Math.sin(a) * inner,
-        x + Math.cos(a + .18) * (inner - 4), y + Math.sin(a + .18) * (inner - 4), '#94735e', 1, fade * .5);
-    }
+  const life = heavy ? .46 : .36;
+  if (t < 0 || t > life) return;
+  const k = clamp01(t / life), grow = 1 - Math.pow(1 - clamp01(t / .1), 3);
+  const shock = radius * (.3 + .7 * (1 - Math.pow(1 - clamp01(t / .2), 2)));
+  r.pixelRing(x, y, shock, '#fff0c8', heavy ? 2 : 1, out(t, .2) * .85);
+  r.pixelRing(x, y + 1, radius * .5 * grow, '#2a1a20', 2, out(t, .3) * .45);
+  const core = radius * (heavy ? .4 : .34), fire = out(t - .06, life - .06), lift = (heavy ? 9 : 6) * k;
+  const size = core * (t < .1 ? .55 + grow * .55 : 1.1 * (1 - (k - .2) * .9));
+  if (size > .8) {
+    // soot outline first, so the lobes read as one chunky silhouette
+    r.pixelDisc(x - size * .42, y + size * .12 - lift, size * .7 + 1, '#3a1418', fire * .9);
+    r.pixelDisc(x + size * .42, y + size * .16 - lift, size * .66 + 1, '#3a1418', fire * .9);
+    r.pixelDisc(x, y - size * .3 - lift, size * .8 + 1, '#3a1418', fire * .9);
+    r.pixelDisc(x - size * .42, y + size * .12 - lift, size * .7, '#a8321e', fire);
+    r.pixelDisc(x + size * .42, y + size * .16 - lift, size * .66, '#a8321e', fire);
+    r.pixelDisc(x, y - size * .3 - lift, size * .8, '#c8482a', fire);
+    r.pixelDisc(x, y - size * .08 - lift, size * .72, '#f08a32', fire);
+    r.pixelDisc(x - size * .14, y - size * .26 - lift, size * .46, '#ffcf6e', fire);
+    r.pixelDisc(x - size * .2, y - size * .36 - lift, size * .22, '#fff6dc', fire);
   }
-  const flame = out(t, .24), lift = (heavy ? 24 : 16) * (1 - Math.pow(1 - k, 2));
-  for (let i = 0; i < 5; i++) {
-    const a = i * TAU / 5 - 1.3, reach = (8 + i % 3 * 4) * burst;
-    const px = x + Math.cos(a) * reach, py = y + Math.sin(a) * reach * .55 - lift;
-    r.line(x + Math.cos(a) * 3, y - 2, px, py, '#794b47', (heavy ? 7 : 5) * flame + 1, flame * .6);
-    r.line(x + Math.cos(a) * 3, y - 3, px, py - 3, '#efb366', (heavy ? 4 : 3) * flame + 1, flame * .9);
-    r.rect(px - 1, py - 5, 2, 4, '#ffe4a8', flame);
+  if (t < .07) {
+    // the flash: a small hot core with four short spikes, not a flat disc
+    const f = 1 - t / .07, spike = core * (1.3 - t * 5);
+    r.pixelDisc(x, y - 2, core * .55, '#ffffff', f);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) r.pixelLine(x, y - 2, x + dx * spike, y - 2 + dy * spike * .7, '#fff6dc', 2, f);
   }
-  glint(r, x, y - 3, -.18, (heavy ? 16 : 11) * out(t, .1), out(t, .1));
-  for (let i = 0; i < (heavy ? 14 : 9); i++) {
-    const a = i * 2.399963 + .2, d = radius * (.28 + (i * 5 % 9) / 14) * burst;
-    const px = x + Math.cos(a) * d, py = y + Math.sin(a) * d - Math.sin(k * Math.PI) * (7 + i % 3 * 4);
-    if (i % 3 === 0) line(r, px, py, a + k * 2, -3, -1, 2, 1, '#5a4242', 3, fade * .8);
-    r.rect(px - 1, py - 1, i % 3 === 0 ? 3 : 2, 2, i % 2 ? '#efc88a' : '#b77652', fade);
-    if (i < 4) r.line(px, py, px - Math.cos(a) * 5 * (1 - k), py - Math.sin(a) * 5 * (1 - k), '#fff1c5', 1, fade * .7);
+  // a few hot embers thrown up and out (fixed by index: deterministic in drawing)
+  const ember = out(t, life);
+  for (let i = 0; i < (heavy ? 8 : 5); i++) {
+    const a = -Math.PI / 2 + (i / ((heavy ? 8 : 5) - 1) - .5) * 2.6, d = radius * (.25 + .55 * grow) * (i % 2 ? .8 : 1);
+    const px = x + Math.cos(a) * d, py = y + Math.sin(a) * d * .7 - lift - k * k * -10;
+    r.rect(px - 1, py - 1, 2, 2, i % 3 ? '#ffd27a' : '#fff4d8', ember);
   }
 }
 
@@ -69,11 +79,11 @@ export function drawShellWarning(r: Renderer, x: number, y: number, timeToImpact
   if (timeToImpact < 0) return;
   const tension = 1 - clamp01(timeToImpact / .28), size = 14 + (1 - tension) * 6, alpha = .24 + tension * .52;
   for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
-    r.line(x + sx * size, y + sy * (size - 5), x + sx * size, y + sy * size, '#e6bb7e', 1, alpha);
-    r.line(x + sx * size, y + sy * size, x + sx * (size - 5), y + sy * size, '#e6bb7e', 1, alpha);
+    r.pixelLine(x + sx * size, y + sy * (size - 5), x + sx * size, y + sy * size, '#e6bb7e', 1, alpha);
+    r.pixelLine(x + sx * size, y + sy * size, x + sx * (size - 5), y + sy * size, '#e6bb7e', 1, alpha);
   }
-  r.line(x - 3, y, x + 3, y, '#f3d29b', 1, alpha);
-  r.line(x, y - 3, x, y + 3, '#f3d29b', 1, alpha);
+  r.pixelLine(x - 3, y, x + 3, y, '#f3d29b', 1, alpha);
+  r.pixelLine(x, y - 3, x, y + 3, '#f3d29b', 1, alpha);
   for (let i = 0; i <= index; i++) r.rect(x - index * 2 + i * 4 - 1, y + size + 4, 2, 1, '#b98556', alpha);
   if (timeToImpact > .2) return;
   const flight = clamp01(timeToImpact / .2), px = x - flight * 15, py = y - flight * 55;
@@ -103,8 +113,8 @@ export function drawWovenThread(r: Renderer, ax: number, ay: number, bx: number,
   const point = (k: number): [number, number] => [ax + dx * k + nx * Math.sin(k * Math.PI) * bend, ay + dy * k + ny * Math.sin(k * Math.PI) * bend];
   for (let i = 0; i < 8; i++) {
     const a = point(i / 8), b = point((i + 1) / 8);
-    r.line(...a, ...b, '#584666', 2, alpha * .35);
-    r.line(...a, ...b, i % 2 ? '#d4bce9' : '#a58dc9', 1, alpha);
+    r.pixelLine(...a, ...b, '#584666', 2, alpha * .35);
+    r.pixelLine(...a, ...b, i % 2 ? '#d4bce9' : '#a58dc9', 1, alpha);
   }
   const p = point((t * 1.7) % 1);
   r.rect(p[0] - 1, p[1] - 1, 2, 2, '#fff0d7', alpha);
@@ -177,7 +187,7 @@ export function drawSeal(r: Renderer, x: number, y: number, radius: number, t: n
     // Broken quarter corners hint at the actual circular footprint without a full ring.
     for (let j = 0; j < 3; j++) {
       const u = a - .2 + j * .13, v = u + .13;
-      r.line(x + Math.cos(u) * radius, y + Math.sin(u) * radius,
+      r.pixelLine(x + Math.cos(u) * radius, y + Math.sin(u) * radius,
         x + Math.cos(v) * radius, y + Math.sin(v) * radius, '#9aafd4', 1, alpha * (.4 + pulse * .15));
     }
     const px = x + Math.cos(a) * (radius - 5), py = y + Math.sin(a) * (radius - 5);
@@ -195,23 +205,24 @@ export function drawSeal(r: Renderer, x: number, y: number, radius: number, t: n
 
 function slash(r: Renderer, x: number, y: number, angle: number, radius: number, t: number, color: string, reverse = false,
   clip?: (angle: number, radius: number) => number): void {
-  if (t < 0 || t > .32) return;
-  const k = clamp01(t / .32), direction = reverse ? -1 : 1;
-  const head = angle + direction * (-1.1 + clamp01(k * 3) * 2.2), fade = out(t, .32);
-  for (let i = 0; i < 14; i++) {
-    const a = head - direction * i * .075, b = a - direction * .08, tail = 1 - i / 14;
+  if (t < 0 || t > .3) return;
+  const k = clamp01(t / .3), direction = reverse ? -1 : 1;
+  const head = angle + direction * (-1.1 + clamp01(k * 3) * 2.2), fade = out(t, .3);
+  // a solid crescent: dark rim, colored body, white leading edge; thick at the head, thin at the tail
+  for (let i = 0; i < 16; i++) {
+    const a = head - direction * i * .07, b = a - direction * .075, tail = 1 - i / 16;
     const ra = clip ? clip(a, radius) : radius, rb = clip ? clip(b, radius) : radius;
     // Occluded arc pieces disappear; projecting them onto a wall would draw a false rail.
     if (ra < radius - 4 || rb < radius - 4) continue;
+    const thick = Math.max(1, Math.round(tail * 4));
     const ax = x + Math.cos(a) * ra, ay = y + Math.sin(a) * ra;
     const bx = x + Math.cos(b) * rb, by = y + Math.sin(b) * rb;
-    r.line(ax, ay, bx, by, '#593c59', tail * 5 + 1, fade * .45 * tail);
-    r.line(ax, ay, bx, by, color, tail * 3 + 1, fade * .8 * tail);
-    r.line(x + Math.cos(a) * (ra + 1), y + Math.sin(a) * (ra + 1), x + Math.cos(b) * (rb + 1), y + Math.sin(b) * (rb + 1), '#fff0df', 1, fade * tail);
+    r.pixelLine(ax, ay, bx, by, '#3a2440', thick + 2, fade * .55 * tail);
+    r.pixelLine(ax, ay, bx, by, color, thick, fade * .95 * tail);
+    r.pixelLine(x + Math.cos(a) * (ra + thick / 2), y + Math.sin(a) * (ra + thick / 2), x + Math.cos(b) * (rb + thick / 2), y + Math.sin(b) * (rb + thick / 2), '#fff6ee', 1, fade * tail);
   }
   const tip = clip ? clip(head, radius) : radius;
-  const px = x + Math.cos(head) * tip, py = y + Math.sin(head) * tip;
-  glint(r, px, py, head, 3, fade);
+  glint(r, x + Math.cos(head) * tip, y + Math.sin(head) * tip, head, 4, fade);
 }
 
 /** Support skills preserve their existing impact times: .12 / .24 / .12,.34,.56. */
@@ -227,8 +238,8 @@ export function drawSupport(r: Renderer, ax: number, ay: number, tx: number, ty:
     glint(r, tx, ty, angle + .8, 8, out(t - .12, .16) * Number(t >= .12));
   } else if (family === 1) {
     const q = clamp01(t / .12), fade = out(Math.max(0, t - .12), .25), px = ax + (tx - ax) * q, py = ay + (ty - ay) * q;
-    r.line(ax, ay, px, py, '#6c486a', 3, fade * .25);
-    r.line(ax, ay, px, py, '#efc5d5', 1, fade * .8);
+    r.pixelLine(ax, ay, px, py, '#6c486a', 3, fade * .25);
+    r.pixelLine(ax, ay, px, py, '#efc5d5', 1, fade * .8);
     path(r, px, py, angle, [[-7, -3], [1, 0], [-7, 3]], '#fff0db', 1, fade);
     if (t >= .12) glint(r, tx, ty, angle + .8, 9, out(t - .12, .2));
   } else if (family === 2) {
@@ -242,10 +253,32 @@ export function drawSupport(r: Renderer, ax: number, ay: number, tx: number, ty:
     let pulse = 0;
     for (const at of [.12, .34, .56]) if (t >= at) pulse = Math.max(pulse, out(t - at, .17));
     if (t < .12) diamond(r, ax, ay, 3 + t * 30, '#cbd6ec', t / .12 * .7, angle);
-    r.line(ax, ay, tx, ty, '#9f77a7', 5 * scale, .2 * pulse);
-    r.line(ax, ay, tx, ty, '#f1dceb', 1, .9 * pulse);
+    r.pixelLine(ax, ay, tx, ty, '#9f77a7', 5 * scale, .2 * pulse);
+    r.pixelLine(ax, ay, tx, ty, '#f1dceb', 1, .9 * pulse);
     for (const q of [.18, .55, .84]) diamond(r, ax + (tx - ax) * q, ay + (ty - ay) * q, 3 + pulse * 2, '#c2dbe8', pulse * .8, angle);
     glint(r, tx, ty, angle + .8, 7, pulse);
+  }
+}
+
+/** A crisp crescent wave that leaves the keeper and runs out to `reach` (clipped by walls). */
+function wave(r: Renderer, x: number, y: number, angle: number, reach: number, t: number, span: number, edge: string, body: string,
+  clip?: (angle: number, radius: number) => number): void {
+  if (t < 0 || t > .3) return;
+  const travel = 1 - Math.pow(1 - clamp01(t / .16), 2), fade = out(t - .12, .18);
+  const radius = 14 + (reach - 14) * travel, thick = 3 + Math.round((1 - travel) * 3);
+  const steps = 22;
+  for (let i = 0; i < steps; i++) {
+    const u = i / steps - .5, v = (i + 1) / steps - .5;
+    const a = angle + u * span * 2, b = angle + v * span * 2;
+    const taper = 1 - Math.abs(u + .5 / steps) * 1.7;
+    if (taper <= 0) continue;
+    const ra = Math.min(radius, clip ? clip(a, radius) : radius), rb = Math.min(radius, clip ? clip(b, radius) : radius);
+    if (ra < radius - 4 || rb < radius - 4) continue;
+    const w = Math.max(1, Math.round(thick * taper));
+    const pa: [number, number] = [x + Math.cos(a) * ra, y + Math.sin(a) * ra], pb: [number, number] = [x + Math.cos(b) * rb, y + Math.sin(b) * rb];
+    r.pixelLine(pa[0] - Math.cos(a) * w, pa[1] - Math.sin(a) * w, pb[0] - Math.cos(b) * w, pb[1] - Math.sin(b) * w, '#3a2440', w + 1, fade * .5 * taper);
+    r.pixelLine(pa[0] - Math.cos(a) * (w - 1), pa[1] - Math.sin(a) * (w - 1), pb[0] - Math.cos(b) * (w - 1), pb[1] - Math.sin(b) * (w - 1), body, w, fade * .9);
+    r.pixelLine(pa[0], pa[1], pb[0], pb[1], edge, 1, fade);
   }
 }
 
@@ -253,31 +286,31 @@ export function drawSupport(r: Renderer, ax: number, ay: number, tx: number, ty:
 export function drawReleaseStrike(r: Renderer, ax: number, ay: number, tx: number, ty: number, t: number, family: SupportFamily, final: boolean, side: number, reach: number,
   clip?: (angle: number, radius: number) => number): void {
   if (t < -.18 || t > .46) return;
-  const angle = Math.atan2(ty - ay, tx - ax), color = side < 0 ? '#edb2c8' : '#b4d4e5';
+  const angle = Math.atan2(ty - ay, tx - ax), color = side < 0 ? '#ee9fb6' : '#9fcbe8';
   if (t < 0) {
-    const ready = 1 + t / .18;
-    const d = final ? 14 : 9;
-    path(r, ax, ay, angle, [[-4, side * d], [5, side * (d + 4)], [14, side * d]], color, 1, ready * .75);
-    line(r, ax, ay, angle, 4, side * d, 17, side * d, '#fff0df', 1, ready * .8);
+    // the hand draws back: a short blade glint beside the keeper
+    const ready = 1 + t / .18, d = final ? 9 : 7;
+    line(r, ax, ay, angle, -6 + ready * 4, side * d, 6 + ready * 6, side * d, '#2a1c30', 3, ready);
+    line(r, ax, ay, angle, -6 + ready * 4, side * d, 6 + ready * 6, side * d, final ? '#fff6ee' : color, 1, ready);
+    if (final) line(r, ax, ay, angle, -6 + ready * 4, -side * d, 6 + ready * 6, -side * d, '#9fcbe8', 1, ready);
     return;
   }
-  if (final || family === 0) {
-    slash(r, ax, ay, angle, Math.max(18, Math.min(final ? 136 : 126, reach)), t, color, final ? false : side > 0, clip);
-    if (final) {
-      slash(r, ax, ay, angle, Math.max(15, Math.min(123, reach - 8)), t + .02, '#b8d8e7', true, clip);
-      glint(r, tx, ty, angle + .75, 16, out(t, .2));
-    }
+  const limit = Math.max(20, Math.min(final ? 140 : 132, reach));
+  if (final) {
+    wave(r, ax, ay, angle, limit, t, 1.25, '#ffffff', '#f2c8d8', clip);
+    wave(r, ax, ay, angle, limit - 10, t - .03, 1.1, '#e8f6ff', '#9fcbe8', clip);
+    glint(r, ax + Math.cos(angle) * 18, ay + Math.sin(angle) * 18, angle + .75, 10 * out(t, .14), out(t, .14));
+  } else if (family === 0) {
+    wave(r, ax, ay, angle + side * .18, limit, t, .95, '#fff6ee', color, clip);
   } else if (family === 2) drawBlast(r, tx, ty, t, 50, true);
   else {
-    const fade = out(t, .28), width = family === 3 ? 5 : 3;
-    r.line(ax, ay, tx, ty, '#8b628a', width + 3, fade * .2);
-    r.line(ax, ay, tx, ty, color, width, fade * .7);
-    r.line(ax, ay, tx, ty, '#fff2e5', 1, fade);
-    for (const q of [.2, .5, .8]) {
-      const px = ax + (tx - ax) * q, py = ay + (ty - ay) * q;
-      path(r, px, py, angle, [[-4, -5], [3, 0], [-4, 5]], color, 1, fade * .6);
-    }
-    glint(r, tx, ty, angle + .8, 12, out(t, .25));
+    // a lance of light down the lane (pierce = narrow, beam = wide)
+    const fade = out(t, .26), width = family === 3 ? 6 : 3, q = clamp01(t / .06);
+    const px = ax + (tx - ax) * q, py = ay + (ty - ay) * q;
+    r.pixelLine(ax, ay, px, py, '#3a2440', width + 2, fade * .55);
+    r.pixelLine(ax, ay, px, py, color, width, fade * .95);
+    r.pixelLine(ax, ay, px, py, '#fff6ee', Math.max(1, width - 3), fade);
+    glint(r, tx, ty, angle + .8, 12, out(t - .04, .22));
   }
 }
 

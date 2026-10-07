@@ -562,6 +562,96 @@ export class Renderer {
     c.globalAlpha = 1;
   }
 
+  /**
+   * Crisp pixel line: Bresenham steps stamped with a `width` px square brush on
+   * the world pixel grid, filled once so a translucent line keeps one alpha
+   * where the brush overlaps (unlike `line`, which is anti-aliased and round-capped).
+   */
+  pixelLine(x0: number, y0: number, x1: number, y1: number, color: string, width = 1, alpha = 1): void {
+    if (alpha <= 0 || !Number.isFinite(x0 + y0 + x1 + y1)) return;
+    const c = this.ctx;
+    const s = Math.max(1, Math.round(width));
+    const off = Math.floor(s / 2);
+    let ax = Math.round(x0 - this.viewX);
+    let ay = Math.round(y0 - this.viewY);
+    const bx = Math.round(x1 - this.viewX);
+    const by = Math.round(y1 - this.viewY);
+    const dx = Math.abs(bx - ax);
+    const dy = -Math.abs(by - ay);
+    const sx = ax < bx ? 1 : -1;
+    const sy = ay < by ? 1 : -1;
+    let err = dx + dy;
+    c.globalAlpha = alpha * this.worldOpacity;
+    c.fillStyle = color;
+    c.beginPath();
+    for (let n = 0; n < 2048; n++) {
+      c.rect(ax - off, ay - off, s, s);
+      if (ax === bx && ay === by) break;
+      const e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        ax += sx;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        ay += sy;
+      }
+    }
+    c.fill();
+    c.globalAlpha = 1;
+  }
+
+  /** Crisp filled disc on the world pixel grid (row spans, one fill). */
+  pixelDisc(x: number, y: number, r: number, color: string, alpha = 1): void {
+    if (alpha <= 0 || r <= 0 || !Number.isFinite(x + y + r)) return;
+    const c = this.ctx;
+    const cx = Math.round(x - this.viewX);
+    const cy = Math.round(y - this.viewY);
+    const rr = Math.min(256, r);
+    const n = Math.ceil(rr);
+    c.globalAlpha = alpha * this.worldOpacity;
+    c.fillStyle = color;
+    c.beginPath();
+    for (let dy = -n; dy <= n; dy++) {
+      const q = rr * rr - dy * dy;
+      if (q < 0) continue;
+      const half = Math.floor(Math.sqrt(q) + 0.35);
+      c.rect(cx - half, cy + dy, half * 2 + 1, 1);
+    }
+    c.fill();
+    c.globalAlpha = 1;
+  }
+
+  /** Crisp ring of `width` px on the world pixel grid (row spans, one fill). */
+  pixelRing(x: number, y: number, r: number, color: string, width = 1, alpha = 1): void {
+    if (alpha <= 0 || r <= 0 || !Number.isFinite(x + y + r + width)) return;
+    const c = this.ctx;
+    const cx = Math.round(x - this.viewX);
+    const cy = Math.round(y - this.viewY);
+    const ro = Math.min(256, r + Math.max(1, width) / 2);
+    const ri = Math.max(0, ro - Math.max(1, width));
+    const n = Math.ceil(ro);
+    c.globalAlpha = alpha * this.worldOpacity;
+    c.fillStyle = color;
+    c.beginPath();
+    for (let dy = -n; dy <= n; dy++) {
+      const qo = ro * ro - dy * dy;
+      if (qo < 0) continue;
+      const xo = Math.floor(Math.sqrt(qo) + 0.35);
+      const qi = ri * ri - dy * dy;
+      if (qi <= 0) {
+        c.rect(cx - xo, cy + dy, xo * 2 + 1, 1);
+        continue;
+      }
+      const xi = Math.ceil(Math.sqrt(qi) - 0.35);
+      if (xo < xi) continue;
+      c.rect(cx - xo, cy + dy, xo - xi + 1, 1);
+      c.rect(cx + xi, cy + dy, xo - xi + 1, 1);
+    }
+    c.fill();
+    c.globalAlpha = 1;
+  }
+
   /** Soft elliptical ground shadow (pre-rendered per size: one drawImage). */
   shadow(x: number, y: number, w: number, h = w * 0.4, alpha = 0.35): void {
     if (alpha <= 0) return;

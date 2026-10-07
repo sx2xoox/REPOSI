@@ -112,10 +112,10 @@ export const REFUGE_PASSIVES: PassiveDef[] = [
       const p = w.player;
       if (!p.vars.rfLuenRetie || !p.alive || p.downed) return;
       const x = p.x - 8, y = p.y - 16, alpha = refugeVisualOpacity(w, p);
-      r.line(x - 3, y, x, y - 3, '#e4ceee', 1, alpha * .85);
-      r.line(x, y - 3, x + 3, y, '#bba3e5', 1, alpha * .85);
-      r.line(x + 3, y, x, y + 3, '#bba3e5', 1, alpha * .85);
-      r.line(x, y + 3, x - 3, y, '#e4ceee', 1, alpha * .85);
+      r.pixelLine(x - 3, y, x, y - 3, '#e4ceee', 1, alpha * .85);
+      r.pixelLine(x, y - 3, x + 3, y, '#bba3e5', 1, alpha * .85);
+      r.pixelLine(x + 3, y, x, y + 3, '#bba3e5', 1, alpha * .85);
+      r.pixelLine(x, y + 3, x - 3, y, '#e4ceee', 1, alpha * .85);
       r.rect(x, y - 1, 1, 2, '#fff0df', alpha);
     },
     onRoomEnter(w) { w.vars.rfLuenWeave = 0; w.vars.rfLuenRetie = 0; w.vars.rfLuenPool = 0; w.vars.rfLuenTarget = 0; },
