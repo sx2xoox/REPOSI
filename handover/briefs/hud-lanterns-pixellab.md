@@ -2,12 +2,14 @@
 
 User request (2026-10-07): health becomes a lantern like the ember gauge. Make **two lanterns with
 PixelLab** that look like a natural pair: the **health lantern** where the ember lantern used to be,
-and the **release (ember) lantern** to its left. Soul hearts and shields are layered on top of health
-inside the health lantern in the order they are spent (shield → soul → red; the top layer goes first).
+and the **release (ember) lantern** to its left. Soul hearts and shields are overlaid on health inside
+the health lantern: each fills from the bottom of the glass on the same scale, and the layer spent first
+is drawn in front (shield → soul → red), so the one behind shows as the front one drains.
 
 ## Already done in code (commit after a48fd5e)
 - `src/ui/hud-gear.ts`: procedural placeholder frames for both lanterns, `drawLantern` (release) and
-  `drawHealthLantern` (stacked red / soul / ward layers, flame on top, heart lines, capacity notch).
+  `drawHealthLantern` (red / soul / ward overlaid from the bottom, flame on the highest level, heart lines,
+  capacity notch).
   `setLanternArt(kind, canvas, glass)` swaps in generated frames.
 - `src/ui/pixellab-hud.ts`: loads `src/assets/pixellab/hud/lantern_release.png`,
   `lantern_health.png` and `layout.json` at boot (wired in `src/main.ts`). Without files the

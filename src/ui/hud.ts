@@ -2,10 +2,10 @@
 //   top-left   two lanterns standing side by side: the release lantern (ember
 //              gauge: ember rises in its glass, glows when 등불 해방 is ready,
 //              shutters while it recovers) and, right of it, the larger health
-//              lantern whose glass stacks the keeper's life upward in the order
-//              it is spent — red hearts, then soul hearts, then one-hit wards,
-//              with a flame on top — and a short readout beside it; temporary
-//              buffs hang below
+//              lantern: red hearts, soul hearts and one-hit wards each fill its
+//              glass from the bottom, the one spent first drawn in front (wards,
+//              then soul, then red), a flame on the highest level, and a short
+//              readout beside it; temporary buffs hang below
 //   top-right  minimap · floor name · objective / seed · purse (coins / bombs / keys)
 //   bottom-right  equipment slots (no backing): secondary + swap key, primary
 //              (rarity rim + gem), active item + charge wick, potion
@@ -157,7 +157,7 @@ export class Hud {
   private readonly lyPurse = new UiLayer();
   private readonly lyMap = new UiLayer();
   private readonly lySlots = new UiLayer();
-  /** health lantern scale (red + soul capacity, half hearts), eased so the glass never jumps */
+  /** health lantern scale (red capacity, or soul / wards when they reach higher; half hearts), eased */
   private hpScale = -1;
   /** left edge of the gear rack this frame (UI units inside the safe area; W when hidden) */
   private rackLeft = UI_W;
@@ -202,7 +202,7 @@ export class Hud {
     if (this.lastHp >= 0 && hp < this.lastHp) this.hurtFlash = 1;
     this.lastHp = hp;
     this.hurtFlash = Math.max(0, this.hurtFlash - dt * 2.5);
-    const cap = Math.max(2, Math.max(p.maxRed, p.red) + p.soul);
+    const cap = Math.max(2, p.maxRed, p.red, p.soul, p.shields * 2);
     this.hpScale = this.hpScale < 0 ? cap : this.hpScale + (cap - this.hpScale) * Math.min(1, dt * 6);
     for (const s of this.shards) {
       s.age += dt;

@@ -303,7 +303,7 @@ export interface HealthState {
   soul: number;
   /** one-hit wards */
   shields: number;
-  /** smoothed red + soul capacity the glass is scaled to (half hearts) */
+  /** smoothed capacity the glass is scaled to (half hearts): red capacity, or more if soul / wards reach higher */
   scale: number;
   t: number;
   /** white flash 0..1 after a hit / gain */
@@ -314,73 +314,70 @@ export interface HealthState {
 
 const RED = { hi: '#ff8a7a', body: '#d81f34', shade: '#8a0e1e', deep: '#5a0812', top: '#ffc0b0' };
 const SOUL = { hi: '#d6e2ff', body: '#6a8cf6', shade: '#2c3c9c', deep: '#1e2a70', top: '#f0f4ff' };
-/** art px of glass each ward band takes */
-const WARD_ROWS = 3;
+const WARD_LIGHT = { hi: '#ffffff', body: '#c8d2e6', shade: '#7a86a0', deep: '#5a6680', top: '#ffffff' };
 
 /**
- * Health lantern at UI (x, y). The glass holds the keeper's life as layers that
- * stack upward in the order they are spent, so a hit always takes the top
- * layer first: red lamp-oil (hearts) at the bottom, blue spirit-light (soul
- * hearts) on it, silver ward bands (one-hit shields) on top, and a flame on
- * the very top of the stack. Faint lines split the liquid into whole hearts; a
- * brass notch on the right post marks the red capacity.
+ * Health lantern at UI (x, y). Every kind of life fills the glass from the
+ * bottom with the same scale, and the one spent first is drawn in front: red
+ * lamp-oil (hearts) at the back, blue spirit-light (soul hearts) over it, and
+ * silver ward-light (one-hit shields, a heart's height each) in front. A hit
+ * drains the front layer and uncovers what is behind it. The flame burns on
+ * the highest level; faint lines mark whole hearts; a brass notch marks the
+ * red capacity.
  */
 export function drawHealthLantern(r: Renderer, x: number, y: number, s: HealthState, alpha: number): void {
   if (alpha <= 0.01) return;
   const art = lanternArt.has('health');
   if (!art) blitFrame(r, 'health', false, x, y, alpha);
-  const { gx, gy, gw, gh, rows: glassRows } = glassRect('health', x, y);
-  const wards = Math.max(0, Math.min(s.shields, Math.floor((glassRows - 8) / WARD_ROWS)));
-  const lifeRows = glassRows - wards * WARD_ROWS;
-  const unit = (lifeRows * PX) / Math.max(2, s.scale);
+  const { gx, gy, gw, gh } = glassRect('health', x, y);
+  const unit = gh / Math.max(2, s.scale);
   const bottom = gy + gh;
-  const redTop = bottom - Math.round((s.red * unit) / PX) * PX;
-  const soulTop = bottom - Math.round(((s.red + s.soul) * unit) / PX) * PX;
-  const layer = (top: number, bot: number, c: typeof RED) => {
-    if (bot - top <= 0) return;
-    r.uiRect(gx, top, gw, bot - top, c.body, alpha);
-    r.uiRect(gx, top, PX, bot - top, c.hi, alpha);
-    r.uiRect(gx + gw - PX, top, PX, bot - top, c.shade, alpha);
+  const level = (units: number) => Math.max(gy, bottom - Math.round((units * unit) / PX) * PX);
+  const redTop = level(s.red);
+  const soulTop = level(s.soul);
+  const wardTop = level(s.shields * 2);
+  const layer = (top: number, c: typeof RED) => {
+    if (bottom - top <= 0) return;
+    r.uiRect(gx, top, gw, bottom - top, c.body, alpha);
+    r.uiRect(gx, top, PX, bottom - top, c.hi, alpha);
+    r.uiRect(gx + gw - PX, top, PX, bottom - top, c.shade, alpha);
     r.uiRect(gx + PX, top, gw - 2 * PX, PX, c.top, alpha * 0.9);
+    r.uiRect(gx, bottom - PX, gw, PX, c.deep, alpha);
   };
-  layer(redTop, bottom, RED);
-  if (redTop < bottom) r.uiRect(gx, bottom - PX, gw, PX, RED.deep, alpha);
-  layer(soulTop, redTop, SOUL);
-  if (s.soul > 0 && soulTop < redTop) {
-    // motes of spirit-light rising through the blue layer
+  layer(redTop, RED);
+  if (s.soul > 0) {
+    layer(soulTop, SOUL);
+    // motes of spirit-light rising through the blue
     for (let i = 0; i < 2; i++) {
       const k = ((s.t * 0.6 + i * 0.5) % 1 + 1) % 1;
-      const my = Math.round(redTop - PX - k * Math.max(0, redTop - soulTop - 2 * PX));
+      const my = Math.round(bottom - 2 * PX - k * Math.max(0, bottom - soulTop - 3 * PX));
       r.uiRect(gx + (i ? gw - 3 * PX : 2 * PX), my, PX, PX, '#ffffff', alpha * (1 - k) * 0.85);
     }
   }
-  // whole-heart lines across the liquid
-  for (let k = 2; k < s.red + s.soul; k += 2) {
-    const ly = bottom - Math.round((k * unit) / PX) * PX;
-    if (ly > soulTop && ly < bottom) r.uiRect(gx + PX, ly, gw - 2 * PX, PX, C.ink, alpha * 0.32);
+  if (s.shields > 0) {
+    layer(wardTop, WARD_LIGHT);
+    const glint = 0.5 + 0.5 * Math.sin(s.t * 4);
+    r.uiRect(gx + gw / 2 - PX, wardTop + 2 * PX, PX * 2, PX, '#ffd060', alpha * (0.5 + 0.5 * glint));
   }
-  // ward bands stacked on top
-  let top = soulTop;
-  for (let i = 0; i < wards; i++) {
-    const bt = top - WARD_ROWS * PX;
-    r.uiRect(gx, bt, gw, WARD_ROWS * PX, '#c8d2e6', alpha);
-    r.uiRect(gx, bt, gw, PX, '#ffffff', alpha);
-    r.uiRect(gx, bt + (WARD_ROWS - 1) * PX, gw, PX, '#7a86a0', alpha);
-    const glint = 0.5 + 0.5 * Math.sin(s.t * 4 + i * 1.7);
-    r.uiRect(gx + gw / 2 - PX, bt + PX, PX * 2, PX, '#ffd060', alpha * (0.5 + 0.5 * glint));
-    top = bt;
+  // whole-heart lines across the filled part
+  const filled = Math.min(level(s.red), level(s.soul), level(s.shields * 2));
+  for (let k = 2; k < Math.max(s.red, s.soul, s.shields * 2); k += 2) {
+    const ly = level(k);
+    if (ly > filled && ly < bottom) r.uiRect(gx + PX, ly, gw - 2 * PX, PX, C.ink, alpha * 0.3);
   }
-  // the flame burns on top of whatever the keeper has left
-  if (s.red + s.soul > 0) {
+  // the flame burns on the highest level, in the color of the layer that reaches it
+  if (s.red + s.soul > 0 || s.shields > 0) {
     const sway = Math.sin(s.t * 5) > 0.6 ? PX : 0;
     const gutter = s.low ? (Math.sin(s.t * 17) > 0 ? 2 : 3) : 4 + (Math.sin(s.t * 13) > 0.2 ? 1 : 0);
-    const kind = wards > 0 ? 'ward' : s.soul > 0 ? 'soul' : 'red';
-    const tone = kind === 'ward' ? ['#c8d2e6', '#fff4c8', '#ffffff'] : kind === 'soul' ? ['#6a8cf6', '#b8ccff', '#f0f6ff'] : ['#ff5a2a', '#ffb848', '#fff0b8'];
-    flame(r, gx + gw / 2 + sway, top, gy, gutter, tone[0], tone[1], tone[2], alpha);
+    const tone =
+      s.shields > 0 && wardTop <= soulTop && wardTop <= redTop ? ['#c8d2e6', '#fff4c8', '#ffffff']
+        : s.soul > 0 && soulTop <= redTop ? ['#6a8cf6', '#b8ccff', '#f0f6ff']
+          : ['#ff5a2a', '#ffb848', '#fff0b8'];
+    flame(r, gx + gw / 2 + sway, filled, gy, gutter, tone[0], tone[1], tone[2], alpha);
   }
   // red capacity notch on the right post
-  const capY = bottom - Math.round((s.maxRed * unit) / PX) * PX;
-  if (!art && capY >= gy) {
+  const capY = level(s.maxRed);
+  if (!art && capY > gy) {
     r.uiRect(gx + gw, capY - PX, 2 * PX, PX * 2, C.ink, alpha);
     r.uiRect(gx + gw, capY - PX, PX, PX, '#ffe09a', alpha);
   }
@@ -390,12 +387,11 @@ export function drawHealthLantern(r: Renderer, x: number, y: number, s: HealthSt
   if (art) blitFrame(r, 'health', false, x, y, alpha);
 }
 
-/** Top of the health lantern's life stack (UI y), for effects that leave from it. */
+/** Highest life level in the health lantern (UI), for effects that leave from it. */
 export function healthStackTop(x: number, y: number, s: Pick<HealthState, 'red' | 'soul' | 'shields' | 'scale'>): { x: number; y: number } {
-  const { gx, gw, gh, gy, rows } = glassRect('health', x, y);
-  const wards = Math.max(0, Math.min(s.shields, Math.floor((rows - 8) / WARD_ROWS)));
-  const unit = ((rows - wards * WARD_ROWS) * PX) / Math.max(2, s.scale);
-  return { x: gx + gw / 2, y: Math.max(gy, gy + gh - (s.red + s.soul) * unit - wards * WARD_ROWS * PX) };
+  const { gx, gw, gh, gy } = glassRect('health', x, y);
+  const units = Math.max(s.red, s.soul, s.shields * 2);
+  return { x: gx + gw / 2, y: Math.max(gy, gy + gh - (units * gh) / Math.max(2, s.scale)) };
 }
 
 // ---------------------------------------------------------------- life cells
