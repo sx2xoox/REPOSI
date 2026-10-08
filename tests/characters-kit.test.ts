@@ -285,9 +285,12 @@ describe('balance: compressed weapons, characters that matter', () => {
   it('all weapons retain 0.85x..1.35x single-target and 6.5x crowd caps', () => {
     // Rarity and role variety must not make the existing legendary choices obsolete.
     const bad: string[] = [];
+    // 바람깃 라켓's rally curve is the user's extreme one (2026-10-08: +100 % from rally 8, +200 %
+    // from 15); a held rally reads high here, its own ceiling lives in tests/racket.test.ts
+    const cap: Record<string, number> = { badminton_racket: 1.75 };
     for (const d of Weapons.all()) {
       const k = bestDps(PLAIN_ID, d.id) / base;
-      if (k < 0.85 || k > 1.35) bad.push(`${d.id} ${k.toFixed(2)}`);
+      if (k < 0.85 || k > (cap[d.id] ?? 1.35)) bad.push(`${d.id} ${k.toFixed(2)}`);
       const c = bestDps(PLAIN_ID, d.id, true) / baseCrowd;
       if (c > 6.5) bad.push(`${d.id} crowd ${c.toFixed(2)}`);
     }
