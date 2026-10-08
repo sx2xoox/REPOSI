@@ -17,6 +17,8 @@ export const TOVE_RELAY_SHARE = 1.2;
 export const TOVE_RELAY_FUSE = .45;
 /** the handed-on charge is a tighter blast (charges 30 px, mines 35 px) */
 export const TOVE_RELAY_RADIUS = 22;
+/** ...that hits its carrier in full and the others it catches at this share (it must not turn a pack into a second full blast) */
+export const TOVE_RELAY_SPLASH = .3;
 export const TOVE_MINES = 2;
 export const TOVE_MINES_AFFINITY = 3;
 /** 루엔: linked enemies, and the double knot tied on the struck enemy at every transfer (share of the pool) */
@@ -26,20 +28,29 @@ export const LUEN_KNOT_AFFINITY = 1.1;
 /** 베스: with a favoured weapon each support technique is followed by the other hand's (delay s, share of its damage) */
 export const VES_ECHO_DELAY = .22;
 export const VES_ECHO_AFFINITY = 1.08;
+/** the follow-up is aimed at the first technique's enemy: anyone else it catches takes this share */
+export const VES_ECHO_SPLASH = .35;
 /** 오르트: shield durability, refill time (s), and the blocked shot sent back (x keeper damage) */
 export const ORT_CHARGES = 2;
 export const ORT_CHARGES_AFFINITY = 3;
 export const ORT_REFILL = 2.4;
 export const ORT_REFILL_AFFINITY = 1.8;
-export const ORT_REFLECT_AFFINITY = 2.5;
+export const ORT_REFLECT_AFFINITY = 3;
 /** half-width of the shield face (px): a favoured weapon raises a broader shield */
 export const ORT_WIDTH = 17;
 export const ORT_WIDTH_AFFINITY = 23;
-/** 미라: seal pulse interval (s); with a favoured weapon the enemy the seal was opened on is pinned and pulsed every MIRA_PIN s */
+/**
+ * 미라: seal pulse interval (s); with a favoured weapon the enemy the seal was opened on is pinned:
+ * its own pulse every MIRA_PIN_AFFINITY s, carrying what the seal wrote down of Mira's hits on it
+ */
 export const MIRA_PULSE = .5;
 export const MIRA_PIN_AFFINITY = .2;
 /** a pin pulse's damage, x the ordinary pulse (0.2x keeper damage) */
-export const MIRA_PIN_SHARE = 1.05;
+export const MIRA_PIN_SHARE = .8;
+/** the pinned enemy's seal also writes down this share of Mira's own hits on it; the next pin pulse reads it out */
+export const MIRA_PIN_RECORD = .12;
+/** at most this x keeper damage written down per pin pulse */
+export const MIRA_PIN_RECORD_CAP = 1.5;
 
 const favoured = (p: Player): boolean => p.flags.has('affinity');
 
@@ -73,7 +84,7 @@ export class RefugeCharge extends RefugeOwned {
     runProc(w, m.mine ? 'keeper:tove:mine:burst' : 'keeper:tove:charge:burst', () => {
       m.fired = 1; m.firedAt = this.age;
       const caught = nearby(w, this.x, this.y, this.radius);
-      for (const enemy of caught) refugeHit(w, this.owner, enemy, m.damage, this, false, 45);
+      for (const enemy of caught) refugeHit(w, this.owner, enemy, m.relay && enemy.id !== m.targetId ? m.damage * TOVE_RELAY_SPLASH : m.damage, this, false, 45);
       w.sfx('explosion', { vol: .3, pitch: m.mine ? 1 : 1.3, x: this.x });
       blastImpact(w, this.owner, this.x, this.y, this.radius, false);
       if (!m.relay && favoured(this.owner)) this.relay(w, caught);
@@ -249,7 +260,9 @@ export class RefugeSupport extends RefugeOwned {
           const inside = m.family === 0 || m.family === 2
             ? Math.hypot(target.x - m.tx, target.y - m.ty) <= (m.family === 0 ? 23 : 34) + target.r && visible(w, m.tx, m.ty, target.x, target.y, target.r)
             : onLane(w, target, m.ax, m.ay, m.tx + Math.cos(m.angle) * 8, m.ty + Math.sin(m.angle) * 8, m.family === 3 ? 10 : 5);
-          if (inside && visible(w, m.ax, m.ay, target.x, target.y, target.r)) refugeHit(w, this.owner, target, m.damage * factor, this);
+          if (inside && visible(w, m.ax, m.ay, target.x, target.y, target.r)) {
+            refugeHit(w, this.owner, target, m.damage * factor * (m.echo && target.id !== m.targetId ? VES_ECHO_SPLASH : 1), this);
+          }
         }
         m.phase++;
         w.sfx(m.family === 0 ? 'swing' : m.family === 2 ? 'explosion' : 'shoot_magic', { vol: .2, pitch: 1.4, x: m.tx });
@@ -425,15 +438,21 @@ export class RefugeSeal extends RefugeOwned {
   constructor(w: World, p: Player, x: number, y: number, anchor = 0) {
     super(w, p);
     this.x = x; this.y = y;
-    Object.assign(this.mem, { until: w.time + 2.8, damage: p.stats.damage, radius: 42, pulse: -99, anchor, pin: -99 });
+    Object.assign(this.mem, { until: w.time + 2.8, damage: p.stats.damage, radius: 42, pulse: -99, anchor, pin: -99, written: 0 });
     this.layer = 0;
   }
   place(w: World, x: number, y: number, anchor = 0): void {
     this.x = x; this.y = y;
     this.mem.until = w.time + 2.8;
     this.mem.damage = this.owner.stats.damage;
+    if (anchor !== this.mem.anchor) this.mem.written = 0;
     this.mem.anchor = anchor;
     this.age = 0;
+  }
+  /** Favoured weapon: Mira's own hit on the pinned enemy is written into the seal (read out by the next pin pulse). */
+  write(w: World, target: Enemy, amount: number): void {
+    if (amount <= 0 || this.pinned(w) !== target) return;
+    this.mem.written = Math.min(this.mem.damage * MIRA_PIN_RECORD_CAP, this.mem.written + amount * MIRA_PIN_RECORD);
   }
   /** Favoured weapon: the enemy the seal was opened on, while it stays inside. */
   pinned(w: World): Enemy | undefined {
@@ -461,7 +480,8 @@ export class RefugeSeal extends RefugeOwned {
     }, MIRA_PULSE);
     if (pinned) runProc(w, 'keeper:mira:seal:pin', () => {
       slowSealEnemy(w, pinned);
-      if (!refugeHit(w, this.owner, pinned, this.mem.damage * .2 * MIRA_PIN_SHARE, this)) return false;
+      if (!refugeHit(w, this.owner, pinned, this.mem.damage * .2 * MIRA_PIN_SHARE + this.mem.written, this)) return false;
+      this.mem.written = 0;
       this.mem.pin = w.time;
       return true;
     }, MIRA_PIN_AFFINITY);

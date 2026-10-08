@@ -165,6 +165,9 @@ export const REFUGE_PASSIVES: PassiveDef[] = [
       // inside the release dome, Mira's own hits are written down for its closing
       const stasis = w.entityById(w.player.vars.rfMiraStasis);
       if (stasis instanceof RefugeRelease && stasis.owner === w.player) stasis.record(w, target, contribution);
+      // favoured weapon: hits on the pinned enemy are written into the seal for its next pin pulse
+      const seal = w.entityById(w.player.vars.rfMiraSeal);
+      if (seal instanceof RefugeSeal && seal.owner === w.player && seal.valid(w)) seal.write(w, target, contribution);
       runProc(w, 'keeper:mira:place', () => { placeSeal(w, w.player, target.x, target.y, target.id); return true; }, 1.6);
     },
     onRoomEnter(w) { w.vars.rfMiraSeal = 0; w.vars.rfMiraStasis = 0; },
@@ -268,13 +271,13 @@ export const REFUGE_AFFINITIES: AffinityDef[] = [
   },
   {
     name: '방패·창',
-    desc: '넓은 방벽·내구 3·회복 1.8초. 막은 적탄은 앞의 적에게 2.5배로 되쏜다.',
+    desc: '넓은 방벽·내구 3·회복 1.8초. 막은 적탄은 앞의 적에게 3배로 되쏜다.',
     tags: ['spear'],
     ids: ['mirror_buckler', 'aegis_cannon', 'iron_spear', 'fang_spear', 'crescent_bow'],
   },
   {
     name: '봉인 도구',
-    desc: '결계를 펼친 적을 묶어 그 적만 0.2초마다 맥동한다(평소 0.5초).',
+    desc: '결계를 연 적을 묶어 0.2초마다 맥동하고, 준 피해 12%를 더한다.',
     ids: ['brass_revolver', 'twin_lamp', 'stasis_arbalest', 'gravity_orb', 'ink_brush', 'firefly_tome', 'constellation_staff'],
   },
 ];

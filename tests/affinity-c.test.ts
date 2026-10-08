@@ -1,11 +1,12 @@
 // Favoured weapons of the five refuge keepers (토브 / 루엔 / 베스 / 오르트 / 미라).
 // Holding a weapon of the keeper's class upgrades the keeper's own device, never the
-// weapon's damage: 토브's charges relay, 루엔 ties a double knot over five links, 베스's
-// other hand repeats every support technique, 오르트's shield grows broader with a third
-// plate and sends blocked shots back, 미라's seal pins the enemy it opened on. The measured
-// gain is about +20-25 % over the same keeper and weapon without the affinity (short runs
-// here; the full dps bench: AFFINITY_BENCH=1 npx vitest run tests/affinity-c; 오르트's is
-// measured in boss fights, see the comment on its gain test).
+// weapon's damage: 토브's charges relay (full on the new carrier, a weaker splash around it),
+// 루엔 ties a double knot over five links, 베스's other hand repeats every support technique
+// on the same enemy, 오르트's shield grows broader with a third plate and sends blocked shots
+// back, 미라's seal pins the enemy it opened on and writes down a share of her hits on it.
+// The measured gain is about +20-25 % over the same keeper and weapon without the affinity
+// (short runs here; the full dps bench: AFFINITY_BENCH=1 npx vitest run tests/affinity-c;
+// 오르트's is measured in boss fights, see the comment on its gain test).
 
 import './headless';
 import { describe, it, expect } from 'vitest';
@@ -21,8 +22,8 @@ import type { Enemy } from '../src/game/enemy';
 import { DUMMY_ID, measureDps } from './dpsharness';
 import { REFUGE_AFFINITIES, REFUGE_DASHES, RefugeCharge, RefugeWeave, RefugeSupport, RefugeGuard, RefugeSeal } from '../src/content/characters/refuge-kits';
 import {
-  LUEN_KNOT_AFFINITY, LUEN_LINKS, LUEN_LINKS_AFFINITY, MIRA_PIN_AFFINITY, MIRA_PIN_SHARE, MIRA_PULSE, ORT_CHARGES, ORT_CHARGES_AFFINITY,
-  ORT_REFLECT_AFFINITY, ORT_WIDTH, ORT_WIDTH_AFFINITY, TOVE_MINES, TOVE_MINES_AFFINITY, TOVE_RELAY_SHARE, VES_ECHO_AFFINITY,
+  LUEN_KNOT_AFFINITY, LUEN_LINKS, LUEN_LINKS_AFFINITY, MIRA_PIN_AFFINITY, MIRA_PIN_RECORD, MIRA_PIN_SHARE, MIRA_PULSE, ORT_CHARGES, ORT_CHARGES_AFFINITY,
+  ORT_REFLECT_AFFINITY, ORT_WIDTH, ORT_WIDTH_AFFINITY, TOVE_MINES, TOVE_MINES_AFFINITY, TOVE_RELAY_SHARE, TOVE_RELAY_SPLASH, VES_ECHO_AFFINITY, VES_ECHO_SPLASH,
 } from '../src/content/characters/refuge-devices';
 
 const IDS = ['tove', 'luen', 'ves', 'ort', 'mira'];
@@ -169,6 +170,12 @@ describe('토브 — 연쇄 폭약', () => {
     const relay = live(w, RefugeCharge).filter((c) => c.mem.relay && !c.mem.fired);
     expect(relay).toHaveLength(1);
     expect(relay[0].mem.targetId).toBe(other.id);
+    // its blast hits the carrier in full and the rest of what it catches at the splash share
+    const damage = relay[0].mem.damage, hp = target.hp, hpOther = other.hp;
+    idle(w, 40);
+    expect(relay[0].mem.fired).toBe(1);
+    expect(hpOther - other.hp).toBeCloseTo(damage, 5);
+    expect(hp - target.hp).toBeCloseTo(damage * TOVE_RELAY_SPLASH, 5);
   });
 
   it('without a favoured weapon: no relay, and two mines instead of three', () => {
@@ -248,6 +255,26 @@ describe('베스 — 반대 손 연계', () => {
     }
   });
 
+  it('the follow-up strikes the first technique\'s enemy in full, bystanders at the splash share', () => {
+    const { w, target } = sim('ves');
+    w.player.weapon2Id = null; // 교차 베기 around the struck enemy
+    const near = dummy(w, target.x, target.y + 12);
+    idle(w, 1);
+    deal(w, target);
+    idle(w, 1);
+    const [first, echo] = live(w, RefugeSupport);
+    expect(echo.mem.echo).toBe(1);
+    const base = first.mem.damage;
+    const hp = target.hp, hpNear = near.hp;
+    idle(w, 10); // the first technique lands
+    expect(hpNear - near.hp).toBeCloseTo(base, 5);
+    const hp2 = target.hp, hpNear2 = near.hp;
+    expect(hp - hp2).toBeCloseTo(base, 5);
+    idle(w, 40); // the other hand
+    expect(hp2 - target.hp).toBeCloseTo(base * VES_ECHO_AFFINITY, 5);
+    expect(hpNear2 - near.hp).toBeCloseTo(base * VES_ECHO_AFFINITY * VES_ECHO_SPLASH, 5);
+  });
+
   it('the follow-up re-aims at its target when it starts and draws nothing before', () => {
     const { w, target } = sim('ves');
     deal(w, target);
@@ -298,7 +325,7 @@ describe('오르트 — 되받아치는 방벽', () => {
     }
   });
 
-  it('a blocked shot flies back at the nearest enemy ahead (2.5x), only with a favoured weapon', () => {
+  it('a blocked shot flies back at the nearest enemy ahead (3x), only with a favoured weapon', () => {
     for (const [weapon, k] of [['crescent_bow', ORT_REFLECT_AFFINITY], [NEUTRAL, 0]] as const) {
       const { w, target } = sim('ort', weapon);
       const g = w.entityById(w.vars.rfOrtGuard) as RefugeGuard;
@@ -339,6 +366,34 @@ describe('미라 — 묶는 인장', () => {
     }
   });
 
+  it('the seal writes down a share of Mira\'s hits on the pinned enemy; its next pin pulse carries them', () => {
+    for (const [weapon, share] of [['brass_revolver', MIRA_PIN_RECORD], [NEUTRAL, 0]] as const) {
+      const { w, target } = sim('mira', weapon);
+      const other = dummy(w, target.x + 12, target.y + 10);
+      idle(w, 1);
+      deal(w, target);
+      idle(w, 13); // the pin pulse right after the seal opened has gone off
+      const seal = w.entityById(w.vars.rfMiraSeal) as RefugeSeal;
+      expect(seal.mem.written, weapon).toBe(0);
+      deal(w, other, 50); // not the pinned one: nothing written
+      expect(seal.mem.written, weapon).toBe(0);
+      deal(w, target, 50);
+      expect(seal.mem.written, weapon).toBeCloseTo(50 * share, 5);
+      if (!share) continue;
+      // exactly one pin pulse later: it carried the written share, and the page is blank again
+      const hp = target.hp, pin = seal.mem.pin;
+      while (seal.mem.pin === pin) idle(w, 1);
+      expect(hp - target.hp, weapon).toBeCloseTo(seal.mem.damage * .2 * MIRA_PIN_SHARE + 50 * share, 5);
+      expect(seal.mem.written).toBe(0);
+      // a seal moved off its enemy (the dash) starts a blank page
+      deal(w, target, 50);
+      expect(seal.mem.written).toBeGreaterThan(0);
+      w.withIds(() => REFUGE_DASHES[4].end!(w, w.player));
+      expect(seal.mem.anchor).toBe(0);
+      expect(seal.mem.written).toBe(0);
+    }
+  });
+
   it('a seal placed by the dash pins nobody; an anchor that walks out is released', () => {
     const { w, target } = sim('mira');
     w.withIds(() => REFUGE_DASHES[4].end!(w, w.player));
@@ -359,17 +414,44 @@ describe('미라 — 묶는 인장', () => {
 
 describe('the gain: +20-25 % over the same keeper and weapon without the affinity', () => {
   // short runs (6 s, starter + one more favoured weapon); the full bench lands each keeper's
-  // single-target and mid-build medians at 1.20-1.25
-  const pick: Record<string, string[]> = { tove: ['nail_carbine', 'thunder_mortar'], luen: ['amber_wand', 'frost_wand'], ves: ['copper_sabre', 'twin_daggers'], mira: ['brass_revolver', 'ink_brush'] };
+  // single-target and mid-build medians at 1.20-1.25 (미라's second weapon is one whose
+  // artifacts outgrow a keeper-damage pulse; the written share of her hits keeps it in band)
+  const pick: Record<string, string[]> = { tove: ['nail_carbine', 'thunder_mortar'], luen: ['amber_wand', 'frost_wand'], ves: ['copper_sabre', 'twin_daggers'], mira: ['brass_revolver', 'constellation_staff'] };
   for (const id of Object.keys(pick)) it(`${id}: single target`, () => {
     const g = median(pick[id].map((wid) => gain(id, wid, 6)));
+    if (process.env.AFFC_PRINT) console.log(`${id} single ${g.toFixed(3)}`);
     expect(g, id).toBeGreaterThanOrEqual(1.18);
     expect(g, id).toBeLessThanOrEqual(1.27);
   }, 60_000);
 
-  // 오르트's value is the shield, so it is measured in boss fights (tests/boss-bench bossFight,
-  // floor 1-3 bosses x 6 seeds at x2 power, ranged favoured weapons): time to kill x1.17-1.25 and
-  // hearts lost per boss kill (= time to kill x damage taken per second) x1.18-1.28, median x1.22.
+  // the same with a mid build (10 random 6-artifact builds, starter weapon): the upgrades are
+  // kit effects, so they must keep their share when artifacts raise the weapon's output
+  const mid = (seed: string) => {
+    const pool = Artifacts.all().filter((a) => !a.hidden && !a.blessing);
+    const rng = new RNG(seed);
+    return Array.from({ length: 10 }, () => {
+      const left = [...pool];
+      return Array.from({ length: 6 }, () => {
+        const c = rng.weighted(left, (a) => RARITY_WEIGHT[a.rarity as keyof typeof RARITY_WEIGHT])!;
+        left.splice(left.indexOf(c), 1);
+        return c.id;
+      });
+    });
+  };
+  for (const id of Object.keys(pick)) it(`${id}: mid build`, () => {
+    const builds = mid('AFFC-MID');
+    const g = median(pick[id].map((wid) => median(builds.map((b, i) => gain(id, wid, 8, b, false, `AFFC-MID-${wid}-${i}`)))));
+    if (process.env.AFFC_PRINT) console.log(`${id} mid ${g.toFixed(3)}`);
+    expect(g, id).toBeGreaterThanOrEqual(1.185);
+    expect(g, id).toBeLessThanOrEqual(1.27);
+  }, 120_000);
+
+  // 오르트's value is the shield, so it is measured in boss fights (tests/boss-bench bossFight with
+  // hearts and damage taken recorded, floor 1-3 bosses x 6 seeds, 3 ranged + 4 melee favoured
+  // weapons; the melee bot holds 14-28 px): hearts lost per boss kill (= time to kill x damage
+  // taken per second) median x1.22 at x2 power and x1.23 at x1.5, time to kill x1.19 / x1.24.
+  // The shield is rarely saturated in boss fights (about 0.2 returned shots a second); a lone
+  // shooter that keeps it saturated (below) shows the ceiling, x1.3-1.9 depending on the weapon.
   // Here: the returned shots only exist when something shoots at the shield.
   it('오르트: with shots coming at the shield, the returned shots add damage (and nothing without them)', () => {
     if (!Enemies.has('__affc_turret')) {
