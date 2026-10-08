@@ -3,7 +3,7 @@
 // Kept separate so it can be unit-tested in node (tests/ui.test.ts).
 
 import { Characters, Weapons, Artifacts, weaponMatchesAffinity, type CharacterDef, type WeaponDef } from '../game/defs';
-import { BASE_STATS, StatMods, computeStats, type StatKey, type Stats } from '../game/stats';
+import { BASE_STATS, StatMods, WEAPON_DAMAGE_SCALE, computeStats, type StatKey, type Stats } from '../game/stats';
 import type { RoomKind } from '../game/constants';
 
 // ---------------------------------------------------------------- seeds
@@ -35,6 +35,8 @@ export function characterStats(def: CharacterDef): Stats {
   const weapon = Weapons.get(def.weapon);
   try {
     weapon?.stats?.(m);
+    // the weapon's attacks deal WEAPON_DAMAGE_SCALE of their damage (as ItemSystem.recomputeStats)
+    m.mulStat('damage', WEAPON_DAMAGE_SCALE);
     if (weaponMatchesAffinity(def.affinity, weapon)) def.affinity?.stats?.(m);
     def.passive?.stats?.(m, 1, undefined as never);
   } catch {
