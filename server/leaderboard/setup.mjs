@@ -46,18 +46,9 @@ console.log(`[setup] wrangler.toml에 database_id 기록: ${db.uuid}`);
 console.log('[setup] 테이블 생성');
 wrangler(['d1', 'execute', DB, '--remote', '--file=schema.sql', '-y']);
 
-console.log('[setup] Worker 배포');
-const out = wrangler(['deploy'], { capture: true });
-process.stdout.write(out);
-const url = out.match(/https:\/\/[a-z0-9.-]+\.workers\.dev/i)?.[0];
-if (!url) {
-  console.log('\n[setup] 배포는 끝났지만 주소를 출력에서 찾지 못했습니다. 위 출력의 https://...workers.dev 주소를 알려주세요.');
-  process.exit(0);
-}
-try {
-  const r = await fetch(`${url}/v1/health`);
-  console.log(`[setup] 상태 확인: ${r.status} ${await r.text()}`);
-} catch (e) {
-  console.log(`[setup] 상태 확인 실패 (DNS 반영에 1~2분 걸릴 수 있습니다): ${e}`);
-}
-console.log(`\n랭킹 서버 주소: ${url}\n이 주소를 알려주시면 게임에 연결합니다. (비밀 값이 아니라 그대로 공유해도 됩니다)`);
+// interactive on purpose: a first deploy may ask to register a workers.dev subdomain (answer Y
+// and pick a name); capturing the output would make wrangler answer "no" on its own
+console.log('[setup] Worker 배포 (workers.dev 하위 도메인을 물으면 Y를 누르고 이름을 정해 주세요)');
+wrangler(['deploy']);
+console.log('\n위 출력의 https://lanternkeeper-ranking.<이름>.workers.dev 주소를 알려주시면 게임에 연결합니다.');
+console.log('(브라우저에서 그 주소 뒤에 /v1/health 를 붙여 열면 {"ok":true,"floors":7} 이 보여야 합니다. 비밀 값이 아니라 그대로 공유해도 됩니다)');
