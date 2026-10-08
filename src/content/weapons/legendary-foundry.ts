@@ -62,7 +62,7 @@ function rifle(w: World, p: Player, st: WeaponState, firing: boolean, aim: numbe
   recordShot(w, p, st, aim);
   const s = p.weaponStats;
   const shots = p.fireProjectiles(w, aim, {
-    damageMult: 2.2, speed: s.shotSpeed * 2.2, range: s.range * 1.7,
+    damageMult: 2.05, speed: s.shotSpeed * 2.2, range: s.range * 1.7,
     pierce: s.pierce + 2 + (p.flags.has('pierceAll') ? 99 : 0), radius: 1.8,
     style: 'sprite', sprite: 'shot_ember_musket', spriteRotates: true, color: '#edbc77',
     knockback: s.knockback * 1.4, spreadMult: .45, behaviors: [foundryTrail, riflePierce, rifleImpact],
@@ -88,7 +88,7 @@ function shotgun(w: World, p: Player, st: WeaponState, firing: boolean, aim: num
   // The proc gate treats them as one owner's shared additional-effect budget.
   for (let i = 0; i < 6; i++) {
     const shots = p.fireProjectiles(w, aim + (i - 2.5) * .06, {
-      damageMult: .295, speed: s.shotSpeed * 1.4, range: s.range * .75,
+      damageMult: .28, speed: s.shotSpeed * 1.4, range: s.range * .75,
       radius: Math.max(1.1, s.projSize * .65), style: 'sprite', sprite: 'shot_bell_blunderbuss',
       spriteRotates: true, color: '#d4ac7b', knockback: s.knockback * 1.3,
       spreadMult: .6, behaviors: [foundryTrail, shotgunImpact],

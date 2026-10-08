@@ -320,6 +320,8 @@ defineArtifact({
     const cur = lanceReg.get(w);
     if (cur && cur.t === w.time && !cur.p.dead) {
       cur.p.damage += p.damage * 0.9;
+      // payloads built from weaponDamage (bursts, stakes, saws ...) keep the merged share too
+      if (p.mem.weaponDamage !== undefined) cur.p.mem.weaponDamage = Number(cur.p.mem.weaponDamage ?? 0) + Number(p.mem.weaponDamage) * 0.9;
       cur.p.mem.merged = (cur.p.mem.merged ?? 1) + 1;
       cur.p.scale = Math.min(1.8, 1 + (cur.p.mem.merged - 1) * 0.15);
       p.dead = true;

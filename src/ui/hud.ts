@@ -16,6 +16,7 @@
 // touch controls shown, the weapon / active / potion live on their buttons, so
 // the equipment slots and the release lantern are hidden (the life gauge stays).
 
+import type { SplitNotice } from './speedrun-feed';
 import type { Renderer } from '../engine/renderer';
 import { UI_H, UI_W } from '../engine/renderer';
 import type { World } from '../game/world';
@@ -92,6 +93,14 @@ function counterBusy(tr: ChangeTracker): boolean {
 }
 
 export class Hud {
+  /** speedrun: split popups (HUD-local, aged with the HUD's own dt) */
+  readonly splitNotices: { n: SplitNotice; t: number }[] = [];
+
+  /** Speedrun: a floor boss fell (GameScene.onBossSplit). */
+  speedrunSplit(n: SplitNotice): void {
+    this.splitNotices.push({ n, t: 0 });
+  }
+
   t = 0;
   private coins = new ChangeTracker(0, 2.5);
   private bombs = new ChangeTracker(0, 2.5);

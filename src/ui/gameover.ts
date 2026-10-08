@@ -2,6 +2,7 @@
 // the killer's sprite, run summary with counting numbers, every item carried
 // (staggered pop-in), seed & time, and retry / same seed / title.
 
+import { RankingScene } from './ranking';
 import type { Scene } from './scene';
 import type { Renderer } from '../engine/renderer';
 import { UI_H, UI_W } from '../engine/renderer';
@@ -42,7 +43,13 @@ export class GameOverOverlay implements Scene {
   constructor(game: GameScene, info: GameOverInfo) {
     this.game = game;
     this.info = info;
-    this.menu = new Menu(game.run.campaign ? [
+    const sr = game.run.speedrun;
+    const lastFloor = sr?.splits.length ? sr.splits[sr.splits.length - 1].floor : 1;
+    this.menu = new Menu(sr ? [
+      { label: '다시 도전', action: () => app.startRun(randomSeedString(), game.run.characterId, false, { speedrun: true }), hint: '같은 등불지기로 새 스피드런을 시작합니다.' },
+      { label: '랭킹 보기', action: () => app.scenes.push(new RankingScene({ floor: lastFloor, highlightRun: game.runId, passUpdate: false })), hint: '층마다 1층부터 그 층 보스까지 걸린 시간의 순위.' },
+      { label: '등불터로 귀환', action: () => app.goTown() },
+    ] : game.run.campaign ? [
       { label: '등불터로 귀환', action: () => app.goTown(), hint: '해금과 이야기는 남습니다. 다음 원정은 1-1부터 새 장비로 시작합니다.' },
       { label: '타이틀로', action: () => app.goTitle() },
     ] : [

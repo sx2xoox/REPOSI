@@ -9,7 +9,8 @@ import { UI_W, UI_H, VIEW_W, VIEW_H } from '../engine/renderer';
 import { input } from '../engine/input';
 import { save } from '../engine/save';
 import { app } from '../game/app';
-import { Characters } from '../game/defs';
+import { Characters, lastFloorIndex } from '../game/defs';
+import { NicknamePrompt, speedrunName } from './nickname-prompt';
 import { randomSeedString } from '../engine/rng';
 import { animFrame } from '../engine/sprites';
 import { audio } from '../audio/audio';
@@ -65,6 +66,13 @@ export class TownScene implements Scene {
     const cp = this.c.checkpoint;
     app.startRun(cp?.seed ?? randomSeedString(), cp?.character ?? this.c.character);
   }
+  /** 스피드런 모드: a timed run from 1-1 to the last floor (the expedition checkpoint stays put). */
+  private launchSpeedrun(): void {
+    this.menu = null;
+    const go = () => app.startRun(randomSeedString(), this.c.character, false, { speedrun: true });
+    if (speedrunName()) go();
+    else app.scenes.push(new NicknamePrompt((name) => { if (name) go(); }, { note: '최대 10자 · 랭킹에 모두에게 보이는 이름이에요 (나중에 랭킹 화면에서 바꿀 수 있어요)' }));
+  }
   private resident(i: number): void {
     this.path=[];this.destination=null;this.moving=false;
     if(i===0&&this.story())return;
@@ -93,8 +101,9 @@ export class TownScene implements Scene {
       const cp = this.c.checkpoint;
       this.menu = new Menu([
         { label: cp ? `${cp.floor}-${cp.stage} 원정 이어가기` : `1-1부터 ${Math.min(7, Math.max(4, this.c.cleared + 1))}-3까지 출발`, action: () => this.launch(), hint: cp ? '중단한 원정만 보관한 장비로 스테이지 입구에서 이어갑니다.' : '새 장비로 출발합니다. 목표 층 보스를 잡으면 마을로 귀환합니다.' },
+        { label: '스피드런 모드', action: () => this.launchSpeedrun(), hint: `1-1부터 ${lastFloorIndex()}-3까지 시간을 재며 내려갑니다. 층마다 보스를 쓰러뜨린 시간이 랭킹에 오릅니다.` },
         { label: '마을 둘러보기', action: () => { this.menu = null; } },
-      ], UI_W / 2, 330, { width: 440, lineH: 27, hintY: 401 });
+      ], UI_W / 2, 314, { width: 440, lineH: 27, hintY: 401 });
     } else if (i === 1) {
       app.scenes.set(new CharacterSelectScene(undefined, id => { this.c.character = id; save.saveProgress(); app.goTown(); }));
     } else if (i === 2) {

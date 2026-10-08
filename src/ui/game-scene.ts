@@ -38,6 +38,14 @@ import type { CoopCommand } from '../game/coop';
 import { captureCheckpoint, restoreCheckpoint, type Checkpoint } from '../game/checkpoint';
 import { BOSS_STORIES } from '../game/story';
 import { StoryOverlay } from './story';
+import type { RunOptions } from '../game/app';
+import { SpeedrunRun, taintSpeedrun, ticksToMs, type BossSplit } from '../game/speedrun';
+import { lastFloorIndex } from '../game/defs';
+import { newRunId, speedrunStore } from '../engine/speedrun-store';
+import { BUILD_ID } from '../net/build';
+import { SEASON, canSubmit, flushQueue } from '../net/leaderboard';
+import { speedrunName } from './nickname-prompt';
+import type { SplitNotice } from './speedrun-feed';
 
 /** What the lobby hands to a co-op game scene. */
 export interface CoopStart {
@@ -64,23 +72,37 @@ export class GameScene implements Scene, WorldHost {
   private checkpointKey = '';
   private resume?: Checkpoint;
 
-  constructor(seed: string, character: string, seeded: boolean, coop: CoopStart | null = null) {
+  /** speedrun mode: this run's id for the ranking (UI side; one per run) */
+  readonly runId = newRunId();
+  /** split notices the HUD shows (online answers fill in later) */
+  private notices = new Map<number, SplitNotice>();
+
+  constructor(seed: string, character: string, seeded: boolean, coop: CoopStart | null = null, opts: RunOptions = {}) {
     this.coop = coop;
+    // speedrun: a fresh solo run from floor 1 to the last floor, never a campaign expedition
+    // (no checkpoint resume, no return to town, no story stops), seed never chosen
+    const speedrun = !!opts.speedrun && !coop;
+    if (speedrun) seeded = false;
     if (coop) {
       const me = coop.start.roster.find((p) => p.slot === coop.session.localSlot);
       character = me?.characterId ?? coop.start.roster[0]?.characterId ?? character;
       seed = coop.start.seed;
       seeded = false;
     }
-    this.resume = !coop && !seeded && save.activeSlot >= 0 ? save.progress.campaign?.checkpoint : undefined;
+    this.resume = !speedrun && !coop && !seeded && save.activeSlot >= 0 ? save.progress.campaign?.checkpoint : undefined;
     if (this.resume) { seed = this.resume.seed; character = this.resume.character; }
     this.run = new RunState(seed, character);
     this.run.staged = true;
-    this.run.campaign = !coop && !seeded && save.activeSlot >= 0;
+    this.run.campaign = !speedrun && !coop && !seeded && save.activeSlot >= 0;
     this.run.targetFloor = this.run.campaign ? Math.min(7, Math.max(4, (save.progress.campaign?.cleared ?? 0) + 1)) : 7;
     if (this.resume) this.run.targetFloor = this.resume.targetFloor;
     if (this.resume) { this.run.floor = this.resume.floor; this.run.stage = normalizeStage(this.resume.stage); }
     this.run.seeded = seeded;
+    if (speedrun) {
+      this.run.targetFloor = lastFloorIndex();
+      this.run.speedrun = new SpeedrunRun();
+      if (opts.unranked) taintSpeedrun(this.run, 'unranked');
+    }
     this.world = new World(app.renderer, this.run, this);
   }
 
@@ -96,6 +118,9 @@ export class GameScene implements Scene, WorldHost {
       this.net = new NetRun(c.session, c.start, w);
       this.alwaysUpdate = true;
     } else {
+      // speedrun: the simulation options are fixed for the whole run (a mid-run settings change
+      // cannot alter a timed run)
+      if (this.run.speedrun) this.world.rules = fixedRules({ hitStop: save.settings.hitStop });
       this.world.start();
       if (this.resume) restoreCheckpoint(this.world, this.resume);
       this.saveCheckpoint();
@@ -192,6 +217,54 @@ export class GameScene implements Scene, WorldHost {
     if (!this.overlayOpen) this.openOverlay(new StatusOverlay(this));
   }
 
+  /** Does this speedrun still count for the ranking? (solo, random seed, no debug / god mode) */
+  get speedrunRanked(): boolean {
+    const sr = this.run.speedrun;
+    return !!sr && !sr.taint && !this.run.seeded && !this.net && !!speedrunName();
+  }
+
+  /**
+   * Speedrun: a floor's boss fell. Recorded right away (a later death or a closed tab keeps
+   * it), shown by the HUD, and queued for the online board.
+   */
+  onBossSplit(split: BossSplit): void {
+    const w = this.world;
+    const splitMs = ticksToMs(split.splitTicks);
+    const bossMs = ticksToMs(split.bossTicks);
+    const ranked = this.speedrunRanked;
+    const notice: SplitNotice = { floor: split.floor, splitMs, bossMs, bossId: split.bossId, ranked, localRank: 0, personalBest: false, online: 'off' };
+    if (ranked) {
+      const res = speedrunStore.add({
+        runId: this.runId, floor: split.floor, splitMs, bossMs, bossId: split.bossId,
+        character: this.run.characterId, weapon: w.player.weaponId, seed: this.run.seed, name: speedrunName(),
+        date: new Date().toISOString(), build: BUILD_ID, season: SEASON, sent: 0,
+      });
+      notice.localRank = res.localRank;
+      notice.personalBest = res.added && res.personalBest;
+      notice.previousBestMs = res.previousBestMs;
+      if (canSubmit()) {
+        notice.online = 'pending';
+        void flushQueue((e, r) => {
+          if (e.runId !== this.runId) return;
+          const n = this.notices.get(e.floor);
+          if (!n) return;
+          if (r.ok) { n.online = 'ok'; n.onlineRank = r.rank; } else if (!r.retry) n.online = 'fail';
+        }).then(() => { if (notice.online === 'pending') notice.online = 'fail'; });
+      }
+    }
+    this.notices.set(split.floor, notice);
+    this.hud.speedrunSplit(notice);
+  }
+
+  /** Speedrun: what the debug console or god mode did to this run (UI-side checks). */
+  private watchSpeedrun(): void {
+    const sr = this.run.speedrun;
+    if (!sr || sr.taint) return;
+    if (this.world.players.some((p) => p.god)) taintSpeedrun(this.run, 'god');
+    else if (autoBlessEnabled()) taintSpeedrun(this.run, 'autobless');
+    else if ((window as unknown as { __lkLoop?: { manual?: boolean } }).__lkLoop?.manual) taintSpeedrun(this.run, 'manual-loop');
+  }
+
   onGameOver(info: GameOverInfo): void {
     if (this.run.campaign) save.progress.campaign!.checkpoint = undefined;
     const p = save.progress;
@@ -203,6 +276,7 @@ export class GameScene implements Scene, WorldHost {
     save.addRun({
       date: new Date().toISOString(), character: this.run.characterId, seed: this.run.seed, floor: this.run.floor,
       won: info.won, timeSec: Math.round(this.run.stats.timeSec), kills: this.run.stats.kills, killedBy: info.won ? undefined : info.source,
+      speedrun: this.run.speedrun ? true : undefined,
     });
     if (!info.won) audio.playMusic('gameover');
     if (this.overlayOpen) app.scenes.remove(this.overlayOpen);
@@ -237,6 +311,7 @@ export class GameScene implements Scene, WorldHost {
         return;
       }
     }
+    this.watchSpeedrun();
     w.update(dt);
     this.hud.update(w, dt);
     if (this.run.campaign && !w.gameOver && this.checkpointKey !== `${this.run.floor}-${this.run.stage}`) this.saveCheckpoint();

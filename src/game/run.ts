@@ -4,6 +4,7 @@ import { isContentTemporarilyLocked } from './release-policy';
 
 import { RNG } from '../engine/rng';
 import { Potions } from './defs';
+import type { SpeedrunRun } from './speedrun';
 
 export interface RunStats {
   kills: number;
@@ -51,6 +52,11 @@ export class RunState {
   won = false;
   /** seeded runs don't count for unlocks */
   seeded = false;
+  /**
+   * Speedrun mode (started from the town's central lantern): an in-game tick clock and one
+   * split per floor boss. Null for every other run. Pure sim state (see game/speedrun.ts).
+   */
+  speedrun: SpeedrunRun | null = null;
 
   constructor(seed: string, characterId: string) {
     this.seed = seed;

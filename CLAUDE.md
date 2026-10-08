@@ -113,6 +113,19 @@ Commands:
   cadence, crit-spawned shards are sized from the crit's own hit. Every keeper starts with a common weapon.
   Measure with `BUILD_CEILING=tove:nail_carbine,... npx vitest run tests/build-ceiling` (greedy best build + deep
   boss fights) and `ITEM_AUDIT=weapons|artifacts|starters npx vitest run tests/item-audit`.
+- **Speedrun mode** (user 2026-10-08; `src/game/speedrun.ts`, `tests/speedrun.test.ts`). Started from the town's central
+  lantern menu ('스피드런 모드', under the normal expedition) with `app.startRun(seed, char, false, { speedrun: true })`:
+  a normal non-campaign run 1-1 → 7-3 (no checkpoint resume, the expedition checkpoint is left alone, sim rules
+  frozen at start). `run.speedrun` keeps an integer tick clock (advanced next to `stats.timeSec`, so pause, menus,
+  transitions and hit-stop never count) and one `BossSplit` per floor, taken in `World.bossKilled` (real boss, boss
+  room, no other boss left, keeper alive) and reported through the optional `WorldHost.onBossSplit`. **Ranking of
+  floor N = clear time of floors 1..N** ("7층은 1~7층까지 집계"); the boss fight alone is the breakdown. GameScene
+  records each split right away in `engine/speedrun-store.ts` (this device, global key, submit queue) and sends it
+  to the online board (`net/leaderboard.ts` → `server/leaderboard`, a Cloudflare Worker + D1 the user deployed;
+  only its URL is in the game, never a key). Debug console use, god mode, auto-bless and seeded/co-op runs never
+  rank (`taintSpeedrun`). `__lk.speedrun(char)` starts an unranked speedrun for screenshots. The title's '랭킹'
+  screen shows 닉네임 / 캐릭터 / 시드 / 시간 per floor (dropdown) with each run's per-floor breakdown. Bump
+  `SEASON` in `net/leaderboard.ts` when balance changes make old times incomparable.
 - **등불 해방** balance: a release is a burst / crowd-control moment worth ~10–15x `stats.damage` on a
   single target (multi-hit releases use `HitFalloff`), ≤ ~20% of a run's damage.
 - Enemy AI = generator `script(e, w)`: `yield 0.5` waits 0.5s, `yield` waits a frame.

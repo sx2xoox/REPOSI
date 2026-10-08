@@ -154,6 +154,13 @@ function hashRun(h: StateHasher, w: World): void {
   h.word(-3);
   for (const id of r.obtained) h.str(id);
   h.word(-11).bool(r.won).str(r.lastDamageSource);
+  // speedrun clock and splits (only when on, so other runs hash exactly as before; the taint
+  // is set from outside the simulation and stays out)
+  const sr = r.speedrun;
+  if (sr) {
+    h.word(-12).int(sr.ticks).int(sr.bossStartTick).str(sr.bossId);
+    for (const s of sr.splits) h.int(s.floor).str(s.bossId).int(s.splitTicks).int(s.bossTicks);
+  }
 }
 
 function hashWorldScalars(h: StateHasher, w: World): void {

@@ -11,7 +11,7 @@ import type { AffinityDef, DashDef, PassiveDef } from '../../game/defs';
 import { Enemy } from '../../game/enemy';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { glowSprite } from '../weapons/common';
-import { isAttack, proc } from '../items/lib';
+import { amplify, isAttack, proc } from '../items/lib';
 import { EnemyOverlay, O, ensureOverlay } from './kit';
 
 export const SERIN_MARK_TIME = 4;
@@ -102,7 +102,7 @@ export const SERIN_PASSIVE: PassiveDef = {
       w.sfx('hit_crit', { vol: 0.5, pitch: 1.3, x: t.x });
       proc(w, 'passive:serin');
     }
-    if (isScented(w, t)) hit.damage *= 1 + SERIN_MARK_BONUS;
+    if (isScented(w, t)) amplify(hit, SERIN_MARK_BONUS);
   },
   onHit(w, t, hit) {
     if (!isAttack(hit) || !(t instanceof Enemy) || !t.alive) return;

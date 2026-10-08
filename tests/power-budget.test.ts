@@ -93,4 +93,10 @@ describe('power budget', () => {
     // keeper fire rate 2.6/s: at most ~6 mimics in 2 s however fast the weapon swings
     expect(fired.length).toBeLessThanOrEqual(6);
   });
+
+  it('tapping the void gaze beam is never better than holding it', () => {
+    const hold = measureDps({ character: PLAIN_ID, weapon: 'void_gaze', seconds: 6, seed: 'TAP' });
+    const tap = measureDps({ character: PLAIN_ID, weapon: 'void_gaze', seconds: 6, seed: 'TAP', fireCycle: { period: 0.12, hold: 0.05 } });
+    expect(tap.dps).toBeLessThanOrEqual(hold.dps * 1.02);
+  });
 });

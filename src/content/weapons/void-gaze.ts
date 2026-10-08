@@ -58,6 +58,9 @@ defineWeapon({
         m.on = 0;
         m.fade = 0.14;
       }
+      // the cadence keeps running while released: tapping is never faster than holding
+      if ((m.atk ?? 0) > 0) m.atk = Math.max(0, m.atk - dt);
+      if ((m.tick ?? 0) > 0) m.tick = Math.max(0, m.tick - dt);
       return;
     }
     const s = p.weaponStats;
@@ -65,8 +68,8 @@ defineWeapon({
       m.on = 1;
       m.beamA = aim;
       m.chan = 0;
-      m.tick = 0.06; // short warm-up
-      m.atk = 0;
+      m.tick = Math.max(m.tick ?? 0, 0.06); // short warm-up (never shorter than the running tick)
+      m.atk = Math.max(m.atk ?? 0, 0);
       m.hum = 0;
       w.sfx('beam_charge', { vol: 0.45, pitch: 1.3 });
     }

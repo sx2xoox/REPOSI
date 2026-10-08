@@ -10,7 +10,7 @@ import type { DashDef, PassiveDef } from '../../game/defs';
 import { Enemy } from '../../game/enemy';
 import { RingFx } from '../../game/effects';
 import { defineDrawnSprite } from '../../engine/sprites';
-import { HazardZone, enemiesNear, hitWeight, isAttack, itemHit, proc } from '../items/lib';
+import { HazardZone, enemiesNear, hitShare, hitWeight, isAttack, itemHit, proc } from '../items/lib';
 import { EnemyOverlay, O, ensureOverlay, trailReset, trailStep } from './kit';
 
 /** Extra ember gained per hit (fraction of the base gain). */
@@ -106,10 +106,12 @@ export const RIA_PASSIVE: PassiveDef = {
   onHit(w, t, hit) {
     if (!isAttack(hit)) return;
     const p = w.player;
-    p.addEmber(RIA_EMBER_BONUS * Math.min(6, 1.2 + (hit.damage / Math.max(1, p.stats.damage)) * 1.3));
+    // the same charge the hit already gave (hit size, boss and beam rules, no secondary shots)
+    p.addEmber(RIA_EMBER_BONUS * (hit.emberCharge ?? 0));
     if (!(t instanceof Enemy) || !t.alive) return;
     const stale = w.time - (t.mem.__riaAt ?? -99) > RIA_MARK_TIME;
-    const n = (stale ? 0 : t.mem.__riaMarks ?? 0) + hitWeight(hit);
+    // marks follow hit size: four plain shots' worth of damage, however it is split
+    const n = (stale ? 0 : t.mem.__riaMarks ?? 0) + hitWeight(hit) * hitShare(w, hit);
     t.mem.__riaAt = w.time;
     if (n >= RIA_SPARK_HITS) {
       t.mem.__riaMarks = 0;

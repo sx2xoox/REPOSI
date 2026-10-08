@@ -67,7 +67,9 @@ export class PauseOverlay implements Scene {
         app.scenes.push(new StoryOverlay({title:objective.title,lines:[{who:'기록',text:objective.detail},{who:'기록',text:'각 층의 세 번째 구역에 보스가 있다. 방을 정리하고 열린 통로를 따라 진행하자. 발견한 기록은 마을 기록실에서 다시 읽을 수 있다.'}]},()=>{}));
       } }] : []),
       { label: '설정', action: () => app.scenes.push(new SettingsOverlay()), hint: '소리, 화면, 조작 설정.' },
-      { label: '원정 포기', danger: true, hint: '이번 원정의 장비와 중간 저장을 버립니다.', action: () => {
+      game.run.speedrun ? { label: '스피드런 포기', danger: true, hint: '지금까지의 층 기록은 남기고 마을로 돌아갑니다.', action: () => {
+        app.scenes.push(new AbandonExpeditionOverlay(() => app.goTown(), 'speedrun'));
+      } } : { label: '원정 포기', danger: true, hint: '이번 원정의 장비와 중간 저장을 버립니다.', action: () => {
         app.scenes.push(new AbandonExpeditionOverlay(() => {
           if (game.run.campaign) { save.abandonExpedition(); app.goTown(); }
           else app.goTitle();

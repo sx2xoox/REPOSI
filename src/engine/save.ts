@@ -1,5 +1,6 @@
 // Persistent settings + meta progression in localStorage (fails gracefully).
 import { normalizeStage } from '../game/stage-plan';
+import { speedrunStore } from './speedrun-store';
 
 export interface Settings {
   masterVolume: number;
@@ -91,6 +92,8 @@ export interface RunRecord {
   timeSec: number;
   kills: number;
   killedBy?: string;
+  /** a speedrun-mode run */
+  speedrun?: boolean;
 }
 
 const KEY_SETTINGS = 'lanternkeeper.settings.v1';
@@ -241,5 +244,7 @@ export const save = {
     this.saveSettings();
     this.saveProgress();
     write(KEY_HISTORY, []);
+    // this device's speedrun records too (the online board keeps what it already received)
+    speedrunStore.clear();
   },
 };

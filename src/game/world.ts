@@ -26,6 +26,7 @@ import { Projectile } from './projectile';
 import { FlowField } from './flow';
 import { ItemSystem, Loot } from './items';
 import { RunState } from './run';
+import type { BossSplit } from './speedrun';
 import { roomHandler } from './roomkinds';
 import { DamageNumber, DoorClearGlow, FloatingText, RingFx } from './effects';
 import { Bomb, Chest, FirePlace, Pedestal, Pickup, Trapdoor, itemInfo, type PedestalItem, type PickupKind } from './pickups';
@@ -89,6 +90,8 @@ export interface WorldHost {
   openFacility?(entity: number): void;
   onGameOver(info: GameOverInfo): void;
   onCampaignPassage?(floor: number, proceed: () => void): void;
+  /** speedrun mode: a floor's boss fell (called once per floor, in the step of the killing blow) */
+  onBossSplit?(split: BossSplit): void;
 }
 
 interface RoomCacheEntry {
@@ -541,6 +544,12 @@ export class World {
     if (!node.cleared) {
       hostile = handler?.spawnEnemies ? handler.spawnEnemies(this, room, new RNG(node.seed ^ 0x1234)) : this.spawnRoomEnemies(room, new RNG(node.seed ^ 0x1234));
       this.flushPending();
+      // speedrun: the boss fight starts when the boss spawns (a re-entry respawns it whole)
+      const sr = this.run.speedrun;
+      if (sr && hostile && node.kind === 'boss') {
+        sr.bossStartTick = sr.ticks;
+        sr.bossId = this.bosses[0]?.def.id ?? '';
+      }
       if (!hostile && (handler?.clearOnEnter ?? true)) {
         node.cleared = true;
       }
@@ -809,6 +818,7 @@ export class World {
     this.time += sdt;
     this.roomTime += sdt;
     this.run.stats.timeSec += dt;
+    if (this.run.speedrun) this.run.speedrun.ticks++;
 
     this.flushPending();
     this.rebuildCaches();
@@ -1386,6 +1396,7 @@ export class World {
 
   private bossKilled(e: Enemy): void {
     this.run.stats.bossesKilled++;
+    this.speedrunSplit(e);
     this.sfx('boss_die', { pan: 0 });
     this.shake(1);
     this.renderer.screenFlash('#ffffff', 0.6);
@@ -1960,6 +1971,21 @@ export class World {
 
   get bosses(): Enemy[] {
     return this.enemies.filter((e) => e.isBoss && e.alive && !e.isMinion);
+  }
+
+  /**
+   * Speedrun: the floor's boss died. One split per floor, only for the real boss in the boss
+   * room once no other boss stands, never after the keeper fell; taken in the step of the
+   * killing blow (before room clear, rewards and the floor-7 finale).
+   */
+  private speedrunSplit(e: Enemy): void {
+    const sr = this.run.speedrun;
+    if (!sr || e.isMinion || this.node.kind !== 'boss' || sr.bossStartTick < 0) return;
+    if (this.deathT >= 0 || this.bosses.length > 0 || sr.has(this.floor.index)) return;
+    const split: BossSplit = { floor: this.floor.index, bossId: e.def.id, splitTicks: sr.ticks, bossTicks: sr.ticks - sr.bossStartTick };
+    sr.splits.push(split);
+    sr.bossStartTick = -1;
+    this.host.onBossSplit?.(split);
   }
 
   /** The keeper's cursor in world px, from this step's input (aimed actives / launchers). */

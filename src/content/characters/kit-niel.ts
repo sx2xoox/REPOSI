@@ -14,7 +14,7 @@ import { RingFx } from '../../game/effects';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { fx } from '../../engine/rng';
 import { glowSprite } from '../weapons/common';
-import { proc } from '../items/lib';
+import { cooldown, proc } from '../items/lib';
 import { O } from './kit';
 
 export const NIEL_ECHO_EVERY = 4;
@@ -94,6 +94,8 @@ export const NIEL_PASSIVE: PassiveDef = {
     m.flag('flying');
   },
   onAttack(w, angle) {
+    // counted at the keeper's own cadence: a fast weapon does not call more echoes
+    if (!cooldown(w, 'nielEcho', 0.9 / Math.max(0.5, w.player.stats.fireRate))) return;
     const n = (w.vars.__nielAtk ?? 0) + 1;
     if (n >= echoEvery(w)) {
       w.vars.__nielAtk = 0;

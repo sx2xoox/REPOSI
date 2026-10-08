@@ -21,7 +21,7 @@ import { defineDrawnSprite } from '../../engine/sprites';
 import { fx } from '../../engine/rng';
 import { TAU, angleTo, dist, dist2 } from '../../engine/math';
 import { glowSprite } from '../weapons/common';
-import { Familiar, familiarsOf, isAttack, itemHit, proc, syncFamiliars } from '../items/lib';
+import { Familiar, amplify, familiarsOf, isAttack, itemHit, proc, syncFamiliars } from '../items/lib';
 import { HitFalloff, ReleaseShot, releaseHit } from './releases';
 import { KitTimeline, releaseOpen } from './kit-common';
 import { EnemyOverlay, O, ensureOverlay } from './kit';
@@ -255,7 +255,7 @@ export const MORI_PASSIVE: PassiveDef = {
   },
   modifyHit(w, t, hit) {
     if (!isAttack(hit) || !(t instanceof Enemy) || !isGrouped(w, t)) return;
-    hit.damage *= 1 + MORI_GROUP_BONUS;
+    amplify(hit, MORI_GROUP_BONUS);
     proc(w, 'passive:mori', true);
   },
   draw(w, r) {

@@ -77,6 +77,17 @@ export function formatTime(sec: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
 
+/** Format milliseconds as m:ss.cc (or h:mm:ss.cc): speedrun times. */
+export function formatSplit(ms: number): string {
+  const cs = Math.max(0, Math.floor(ms / 10));
+  const t = Math.floor(cs / 100);
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const s = t % 60;
+  const c = String(cs % 100).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${c}` : `${m}:${String(s).padStart(2, '0')}.${c}`;
+}
+
 /** Roman numerals for tier labels (1..10). */
 export function roman(n: number): string {
   return ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][n] ?? String(n);

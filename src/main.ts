@@ -38,7 +38,7 @@ async function boot(): Promise<void> {
   app.factories.title = () => new TitleScene();
   app.factories.town = () => new TownScene();
   app.factories.characterSelect = () => new CharacterSelectScene();
-  app.factories.game = (seed, ch, seeded) => new GameScene(seed, ch, seeded);
+  app.factories.game = (seed, ch, seeded, opts) => new GameScene(seed, ch, seeded, null, opts);
   app.factories.coop = (session, start) => new GameScene(start.seed, '', false, { session, start });
 
   try {

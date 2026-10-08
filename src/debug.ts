@@ -8,6 +8,7 @@ import { input } from './engine/input';
 import { Pedestal, Pickup } from './game/pickups';
 import { FIXED_DT } from './game/constants';
 import { stateHash } from './game/statehash';
+import { taintSpeedrun } from './game/speedrun';
 import type { GameScene } from './ui/game-scene';
 import type { CoopCommand } from './game/coop';
 
@@ -34,6 +35,8 @@ export interface DebugApi {
   /** jump straight to floor `index` (returns false when no such floor is defined) */
   gotoFloor(index: number): boolean;
   step(frames: number): void;
+  /** start a speedrun-mode run (always unranked: it never reaches the ranking) */
+  speedrun(character?: string, seed?: string): void;
   press(code: string, frames?: number): void;
   list(): Record<string, string[]>;
   errors: string[];
@@ -97,6 +100,10 @@ export function installDebug(): void {
     start(seed = 'TEST-SEED', character) {
       const ch = character ?? Characters.all()[0]?.id;
       app.startRun(seed, ch, true);
+    },
+    speedrun(character, seed = 'TEST-SEED') {
+      const ch = character ?? Characters.all()[0]?.id;
+      app.startRun(seed, ch, false, { speedrun: true, unranked: true });
     },
     world,
     state() {
@@ -203,6 +210,20 @@ export function installDebug(): void {
         potions: Potions.all().map((a) => a.id),
       };
     },
+  };
+  // anything that changes a run from the console takes a speedrun off the ranking
+  const mutating = ['god', 'give', 'swap', 'interact', 'spawn', 'killAll', 'gotoRoom', 'nextFloor', 'gotoFloor', 'step', 'press'] as const;
+  for (const k of mutating) {
+    const f = api[k] as (...a: unknown[]) => unknown;
+    (api as unknown as Record<string, unknown>)[k] = (...a: unknown[]) => {
+      taintSpeedrun(world()?.run, `debug:${k}`);
+      return f(...a);
+    };
+  }
+  const cmd = api.coop.cmd;
+  api.coop.cmd = (c) => {
+    taintSpeedrun(world()?.run, 'debug:coop');
+    return cmd(c);
   };
   (window as unknown as { __lk: DebugApi }).__lk = api;
 }

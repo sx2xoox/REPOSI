@@ -123,7 +123,9 @@ for(const d of ARSENAL){
  defineWeapon({id:d.id,name:d.name,desc:d.desc,icon:'icon_'+d.id,heldSprite:'w_'+d.id,kind:melee?'melee':d.charge?'charge':'ranged',rarity:d.rarity,pools:['treasure','shop','boss'],
   archetype:melee?(thrust?'창':'검·둔기'):d.shape==='bow'||d.shape==='crossbow'?'활·쇠뇌':d.shape==='staff'||d.shape==='wand'?'마법봉':'사격',
   tags:melee?[thrust?'spear':'blade',...(d.rate<.8?['heavy']:[])]:d.shape==='bow'||d.shape==='crossbow'?['bow']:d.shape==='staff'||d.shape==='wand'?['arcane','staff']:['gun'],
-  stats(m){m.mulStat('fireRate',d.rate);},
+  // the per-hit factor (x pellets) lives on the weapon's sheet, so the status panel, the power
+  // readout and pedestal comparisons show the real damage; attacks divide it back out
+  stats(m){m.mulStat('fireRate',d.rate);m.mulStat('damage',d.damage*(d.pellets??1));},
   update(w,p,st,dt,firing,aim){
    if(st.cooldown>0)return;
    let power=1;
@@ -133,10 +135,10 @@ for(const d of ARSENAL){
     power=.15+.85*st.charge*st.charge;st.charge=0;
    }else if(!attackInput(st,w,firing))return;
    consumeAttack(st);beginAttack(w,p,st,aim);st.cooldown=attackInterval(p,d.charge?.48:1);st.combo++;st.mem.attackAim=aim;st.mem.interval=st.cooldown;
-   const s=p.weaponStats,color=d.color,statuses:StatusApply[]=d.status?[{kind:d.status,duration:2,power:d.status==='slow'?.25:s.damage*.06,chance:d.status==='slow'?1:.2}]:[];
-   if(melee){const dir=st.combo%2?1:-1;p.swing(w,{angle:aim,damage:s.damage*d.damage,thrust,reach:(d.reach??35)+s.range*.025,arc:d.arc??2.3,color,knockback:s.knockback*(d.rate<.8?3:1.5),statuses,swingDir:dir,visual:thrust?.16:d.rate<.8?.22:.18});if(!thrust)startSwingPose(st,w,aim-1.1*dir,aim+1.3*dir,d.rate<.8?.12:.075,d.rate<.8?.075:.035);w.sfx(d.rate<.8?'swing_heavy':'swing',{vol:.5,pitch:d.rate});}
+   const s=p.weaponStats,base=s.damage/(d.damage*(d.pellets??1)),color=d.color,statuses:StatusApply[]=d.status?[{kind:d.status,duration:2,power:d.status==='slow'?.25:base*.06,chance:d.status==='slow'?1:.2}]:[];
+   if(melee){const dir=st.combo%2?1:-1;p.swing(w,{angle:aim,damage:s.damage,thrust,reach:(d.reach??35)+s.range*.025,arc:d.arc??2.3,color,knockback:s.knockback*(d.rate<.8?3:1.5),statuses,swingDir:dir,visual:thrust?.16:d.rate<.8?.22:.18});if(!thrust)startSwingPose(st,w,aim-1.1*dir,aim+1.3*dir,d.rate<.8?.12:.075,d.rate<.8?.075:.035);w.sfx(d.rate<.8?'swing_heavy':'swing',{vol:.5,pitch:d.rate});}
    else {
-    const n=d.pellets??1;for(let i=0;i<n;i++)p.fireProjectiles(w,aim+(i-(n-1)/2)*(d.spread??0),{damageMult:d.damage*power,color,speed:s.shotSpeed*(d.speed??1),range:s.range*(d.range??1),pierce:s.pierce+(d.pierce??0)+(p.flags.has('pierceAll')?99:0),bounce:s.bounce+(d.bounce??0),homing:s.homing+(d.homing??0),statuses,style:'sprite',sprite:'shot_'+d.id,spriteRotates:true,behaviors:[trail],radius:Math.max(1.2,s.projSize*(n>1?.75:1))});
+    const n=d.pellets??1;for(let i=0;i<n;i++)p.fireProjectiles(w,aim+(i-(n-1)/2)*(d.spread??0),{damageMult:power/n,color,speed:s.shotSpeed*(d.speed??1),range:s.range*(d.range??1),pierce:s.pierce+(d.pierce??0)+(p.flags.has('pierceAll')?99:0),bounce:s.bounce+(d.bounce??0),homing:s.homing+(d.homing??0),statuses,style:'sprite',sprite:'shot_'+d.id,spriteRotates:true,behaviors:[trail],radius:Math.max(1.2,s.projSize*(n>1?.75:1))});
     if(d.shape==='shotgun'||d.id==='ember_musket')kick(w,aim+Math.PI,.7);else if(d.shape==='revolver')kick(w,aim+Math.PI,.35);w.sfx(d.shape==='bow'||d.shape==='crossbow'||d.shape==='knife'?'shoot_arrow':d.shape==='wand'||d.shape==='staff'||d.shape==='fan'?'shoot_magic':'shoot',{vol:.4,pitch:d.rate});
    }
   },

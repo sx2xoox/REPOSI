@@ -6,6 +6,14 @@ import { SceneManager } from '../ui/scene';
 import { audio } from '../audio/audio';
 import { save } from '../engine/save';
 
+/** How a solo run is played (beyond seed / keeper). */
+export interface RunOptions {
+  /** speedrun mode: timed floor bosses, ranked (see game/speedrun.ts) */
+  speedrun?: boolean;
+  /** debug / QA launch: a speedrun that never records */
+  unranked?: boolean;
+}
+
 export class App {
   renderer!: Renderer;
   scenes!: SceneManager;
@@ -14,7 +22,7 @@ export class App {
   factories: {
     title?: () => import('../ui/scene').Scene;
     town?: () => import('../ui/scene').Scene;
-    game?: (seed: string, character: string, seeded: boolean) => import('../ui/scene').Scene;
+    game?: (seed: string, character: string, seeded: boolean, opts?: RunOptions) => import('../ui/scene').Scene;
     characterSelect?: () => import('../ui/scene').Scene;
     /** online co-op run (net/session.ts startNetRun) */
     coop?: (session: import('../net/session').NetSession, start: import('../net/lobby').StartInfo) => import('../ui/scene').Scene;
@@ -49,8 +57,8 @@ export class App {
     if (this.factories.characterSelect) this.scenes.set(this.factories.characterSelect());
   }
 
-  startRun(seed: string, character: string, seeded = false): void {
-    if (this.factories.game) this.scenes.set(this.factories.game(seed, character, seeded));
+  startRun(seed: string, character: string, seeded = false, opts: RunOptions = {}): void {
+    if (this.factories.game) this.scenes.set(this.factories.game(seed, character, seeded, opts));
   }
 }
 

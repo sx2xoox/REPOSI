@@ -347,7 +347,9 @@ defineWeapon({
     for (let i = 0; i + 2 < all.length; i += 3) {
       const tri = all.slice(i, i + 3);
       for (const q of tri) q.dead = true;
-      w.spawn(new Constellation(p, [tri[0].x, tri[0].y, tri[1].x, tri[1].y, tri[2].x, tri[2].y], s.damage));
+      // built from its stars' damage, so extra shots share it like the stars do
+      const dmg = (Number(tri[0].mem.dmg ?? s.damage) + Number(tri[1].mem.dmg ?? s.damage) + Number(tri[2].mem.dmg ?? s.damage)) / 3;
+      w.spawn(new Constellation(p, [tri[0].x, tri[0].y, tri[1].x, tri[1].y, tri[2].x, tri[2].y], dmg));
     }
     const h = handPos(p, aim, 22);
     muzzle(w, h.x, h.y, aim, ['#ffffff', '#fff6d0', '#9ab8ff'], 4, [30, 90]);
