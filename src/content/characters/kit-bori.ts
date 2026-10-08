@@ -8,9 +8,10 @@
 //     heavy (knockback resistance).
 //   dash 몸통 밀치기: a short, heavy shove; a shield wall in front blocks bullets
 //     and shoves enemies for ~0.3 s
-//   affinity 묵직한 무기: with a heavy weapon the body block stands longer and
-//     wider and shoves harder (longer stun), and every weapon hit pours a little
-//     into the barrel (by the hit's size); +30% knockback as flavour
+//   affinity 둔기·도끼 / 방패: with a mace, hammer, axe, flail or scythe or a shield
+//     in hand the body block stands longer and wider and shoves harder (longer
+//     stun), and every weapon hit pours a little into the barrel (by the hit's
+//     size); +30% knockback as flavour
 //   release 구조의 울음 (releaseRescueHowl): a howl that stuns and knocks every
 //     enemy around, heals, then a lantern beacon pulses for 2.4 s
 //
@@ -55,7 +56,7 @@ export const BORI_BLOCK_RADIUS = 20;
 export const BORI_SHOVE_DMG = 0.6;
 export const BORI_SHOVE_STUN = 0.3;
 export const BORI_SHOVE_KNOCK = 320;
-/** affinity (heavy weapon): the body block's duration, radius, shove damage and stun */
+/** affinity (둔기·도끼 / 방패): the body block's duration, radius, shove damage and stun */
 export const BORI_BLOCK_TIME_AFFINITY = 0.45;
 export const BORI_BLOCK_RADIUS_AFFINITY = 24;
 export const BORI_SHOVE_DMG_AFFINITY = 1.2;
@@ -115,7 +116,7 @@ defineDrawnSprite('fx_bori_charge', 5, 6, (p) => {
 for (let d = 20; d <= 44; d += 4) glowSprite(d, '#ffb86a');
 
 // ------------------------------------------------------------------ barrel
-/** Is the context keeper holding a heavy weapon (the favoured class)? */
+/** Is the context keeper holding a favoured weapon (둔기·도끼 / 방패)? */
 export function boriAffinity(w: World): boolean {
   return w.player.flags.has('affinity');
 }
@@ -278,7 +279,7 @@ export const BORI_PASSIVE: PassiveDef = {
     addBarrel(w, BORI_ROOM_CHARGE, true);
   },
   onHit(w, t, hit) {
-    // a heavy weapon's every blow pours a little into the barrel (by the hit's size)
+    // with a favoured weapon every blow pours a little into the barrel (by the hit's size)
     if (!boriAffinity(w) || !(t instanceof Enemy) || !isAttack(hit) || hit.release) return;
     if (!hit.source || hit.source instanceof BodyBlock || hit.attacker !== w.player) return;
     addBarrel(w, BORI_HIT_CHARGE * hitShare(w, hit), true);
@@ -318,7 +319,7 @@ export class BodyBlock extends Entity {
   dx: number;
   dy: number;
   life: number;
-  /** bullet-block radius; the heavy weapon's wall is wider */
+  /** bullet-block radius; the favoured weapon's wall is wider */
   R: number;
   /** shove damage (x player damage) and stun (s) */
   shove: number;
@@ -411,7 +412,7 @@ export class BodyBlock extends Entity {
     c.arc(0, 0, rad, a - 1.25, a + 1.25);
     c.stroke();
     if (heavy) {
-      // the heavy weapon's wall: a second, golden rim (the barrel's bands)
+      // the favoured weapon's wall: a second, golden rim (the barrel's bands)
       c.globalAlpha = 0.45 * k + 0.15;
       c.strokeStyle = '#f0c050';
       c.lineWidth = 1;
@@ -450,7 +451,7 @@ export const BORI_DASH: DashDef = {
 // ------------------------------------------------------------------ affinity
 export const BORI_AFFINITY: AffinityDef = {
   name: '둔기·도끼 / 방패',
-  desc: '대시(몸통 밀치기) 때 세우는 방패벽이 크고 오래 서며 더 세게 밀친다. 무기로 칠 때마다 통이 조금씩 찬다.',
+  desc: '대시 방패벽이 크고 오래 서며 더 세게 민다. 칠 때마다 통이 조금씩 찬다.',
   families: ['heavy', 'shield'],
   stats(m) {
     m.mulStat('knockback', 1.3);

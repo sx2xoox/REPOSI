@@ -20,6 +20,7 @@ import { BAEKGU_COUNTER_DMG_AFFINITY, BAEKGU_SLOW_SCALE, BAEKGU_WINDOW_AFFINITY,
 import { MORI_GROUP_BONUS, MORI_SHEEP, MORI_SHEEP_AFFINITY, SpiritSheep, herdPoint, isGrouped, penActive } from '../src/content/characters/kit-mori';
 import { BORI_UNLOCK_DEATHS, MORI_UNLOCK_KILLS, boriUnlockDue, bossUnlocksBaekgu, moriUnlockDue } from '../src/content/characters/unlocks';
 import { familiarsOf } from '../src/content/items/lib';
+import { weaponFamily } from '../src/game/weapon-families';
 import { characterKitRows, characterStats } from '../src/ui/logic';
 import { getAnim, hasAnim, hasSprite } from '../src/engine/sprites';
 import { SFX_NAMES, hasSfx } from '../src/audio/audio';
@@ -105,16 +106,28 @@ describe('new keepers: registration, art, text', () => {
     }
   });
 
-  it('starter weapons are tagged for their keeper\'s affinity and carry art', () => {
+  it('starter weapons belong to their keeper\'s favoured families and carry art', () => {
+    // 보리 둔기·도끼 / 방패, 백구 단검 / 투척, 모리 지팡이: the class is the families on the weapon's info line
+    expect(Characters.must('bori').affinity?.families).toEqual(['heavy', 'shield']);
+    expect(Characters.must('baekgu').affinity?.families).toEqual(['dagger', 'thrown']);
+    expect(Characters.must('mori').affinity?.families).toEqual(['staff']);
+    expect(weaponFamily('lantern_flail')?.name).toBe('둔기·도끼');
+    expect(weaponFamily('fang_blade')?.name).toBe('단검');
+    expect(weaponFamily('shepherd_crook')?.name).toBe('지팡이');
     expect(weaponMatchesAffinity(Characters.must('bori').affinity, Weapons.must('lantern_flail'))).toBe(true);
     expect(weaponMatchesAffinity(Characters.must('bori').affinity, Weapons.must('great_hammer'))).toBe(true);
+    expect(weaponMatchesAffinity(Characters.must('bori').affinity, Weapons.must('mirror_buckler'))).toBe(true);
     expect(weaponMatchesAffinity(Characters.must('bori').affinity, Weapons.must('lantern_bolt'))).toBe(false);
+    expect(weaponMatchesAffinity(Characters.must('bori').affinity, Weapons.must('titan_greatsword'))).toBe(false);
     expect(weaponMatchesAffinity(Characters.must('baekgu').affinity, Weapons.must('fang_blade'))).toBe(true);
     expect(weaponMatchesAffinity(Characters.must('baekgu').affinity, Weapons.must('twin_daggers'))).toBe(true);
+    expect(weaponMatchesAffinity(Characters.must('baekgu').affinity, Weapons.must('throwing_knives'))).toBe(true);
     expect(weaponMatchesAffinity(Characters.must('baekgu').affinity, Weapons.must('sentinel_blade'))).toBe(false);
+    expect(weaponMatchesAffinity(Characters.must('baekgu').affinity, Weapons.must('moon_katana'))).toBe(false);
     expect(weaponMatchesAffinity(Characters.must('mori').affinity, Weapons.must('shepherd_crook'))).toBe(true);
     expect(weaponMatchesAffinity(Characters.must('mori').affinity, Weapons.must('prism_staff'))).toBe(true);
     expect(weaponMatchesAffinity(Characters.must('mori').affinity, Weapons.must('hunter_bow'))).toBe(false);
+    expect(weaponMatchesAffinity(Characters.must('mori').affinity, Weapons.must('amber_wand'))).toBe(false);
     for (const id of ['lantern_flail', 'fang_blade', 'shepherd_crook']) {
       const d = Weapons.must(id);
       expect(hasSprite(d.icon)).toBe(true);
@@ -225,7 +238,7 @@ describe('보리 — 구조통 / 몸통 밀치기', () => {
 
 // ====================================================================== 백구
 describe('백구 — 간파 / 찰나 걸음', () => {
-  it('the window is wider with stick / touch aim and with a short blade', () => {
+  it('the window is wider with stick / touch aim and with a dagger or thrown weapon', () => {
     const { w } = sim('baekgu', 'fang_blade');
     const p = w.player;
     expect(p.flags.has('affinity')).toBe(true);
@@ -253,7 +266,7 @@ describe('백구 — 간파 / 찰나 걸음', () => {
     expect(pr.dead).toBe(false);
     expect(w.enemyTimeScale).toBeCloseTo(BAEKGU_SLOW_SCALE, 5);
     expect(inCounter(w)).toBe(true);
-    // (with her own short blade 반격 is the stronger x1.65; tests/affinity-b covers both)
+    // (with her own dagger 반격 is the stronger x1.62; tests/affinity-b covers both)
     expect(p.stats.damage).toBeCloseTo(dmg0 * BAEKGU_COUNTER_DMG_AFFINITY, 3);
     expect(p.ember).toBeGreaterThan(0);
     drive(w, 8);
@@ -300,7 +313,7 @@ describe('백구 — 간파 / 찰나 걸음', () => {
 
 // ====================================================================== 모리
 describe('모리 — 양치기 / 비켜서기', () => {
-  it('fights beside spirit sheep: three with a staff, two otherwise; they come back each room', () => {
+  it('fights beside spirit sheep: three with a staff (지팡이), two otherwise; they come back each room', () => {
     const { w } = sim('mori', 'shepherd_crook');
     const p = w.player;
     expect(p.flags.has('affinity')).toBe(true);

@@ -6,9 +6,10 @@
 //     are "herded" and take +25% damage from the keeper's attacks.
 //   dash 비켜서기: a quick sidestep; the sheep keep the spot the keeper left as a
 //     pen for 1.5 s and herd enemies toward it (away from her).
-//   affinity 지팡이: staves add a third sheep, and an enemy a sheep has
-//     headbutted counts as herded for MORI_MARK_TIME s even when it stands alone
-//     (bosses and stragglers take the herd bonus too)
+//   affinity 지팡이: a staff (the 지팡이 family; wands are 마법봉) adds a third
+//     sheep and faster headbutts, and an enemy a sheep has headbutted counts as
+//     herded for MORI_MARK_TIME s even when it stands alone (bosses and stragglers
+//     take the herd bonus too)
 //   release 양몰이 돌격 (releaseStampede): a whistle pulls enemies into a pen at
 //     the aim, then a stampede of spectral sheep tramples through it.
 
@@ -35,7 +36,7 @@ export const MORI_MARK_TIME = 2;
 /** headbutt: damage (x player damage), cooldown (s; x MORI_HEADBUTT_CD_AFFINITY with a staff), nudge toward the herd point */
 export const MORI_HEADBUTT_DMG = 0.38;
 export const MORI_HEADBUTT_CD = 0.75;
-export const MORI_HEADBUTT_CD_AFFINITY = 0.85;
+export const MORI_HEADBUTT_CD_AFFINITY = 0.82;
 export const MORI_HEADBUTT_KNOCK = 110;
 /** sheep only work enemies this close to the herd point */
 export const MORI_HERD_RANGE = 120;

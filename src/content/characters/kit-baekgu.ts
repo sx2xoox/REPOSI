@@ -6,10 +6,13 @@
 //     guaranteed critical, and for 1.6 s (반격) all damage is x1.5. Bullets that
 //     pass through the dashing keeper inside the window count as well.
 //   dash 찰나 걸음: a short sidestep (36 px)
-//   affinity 단도·도: short blades widen the window (+0.05 s) and the bullet
+//   affinity 단검 / 투척: daggers and thrown weapons widen the window (+0.05 s) and the bullet
 //     return (48 -> 72 px), make 반격 longer (+0.6 s) and stronger (x1.5 ->
-//     x1.65) and follow the counter slash with a second, crossing one at the
-//     same target (also a guaranteed critical); +8% move speed as flavour
+//     x1.62) and follow the counter slash with a second, crossing one at the
+//     same target (also a guaranteed critical). A thrown weapon keeps its distance,
+//     out of the slashes' reach, so with one in hand the second counter is a white
+//     fang thrown at the first slash's target (or the nearest enemy within
+//     BAEKGU_THROW2_RANGE). +8% move speed as flavour
 //   release 섬광 연참 (releaseFlashSlashes): six teleporting slashes, then a finisher
 
 import type { World } from '../../game/world';
@@ -18,7 +21,7 @@ import type { Renderer } from '../../engine/renderer';
 import type { AffinityDef, DashDef, PassiveDef } from '../../game/defs';
 import { Weapons, weaponMatchesAffinity } from '../../game/defs';
 import { Enemy } from '../../game/enemy';
-import type { Projectile } from '../../game/projectile';
+import { Projectile, type ProjBehavior } from '../../game/projectile';
 import { MeleeSwing, reflectProjectile } from '../../game/melee';
 import { Afterimage, RingFx } from '../../game/effects';
 import { HELD } from '../../game/seam';
@@ -35,11 +38,11 @@ import { O } from './kit';
 export const BAEKGU_WINDOW_CURSOR = 0.17;
 export const BAEKGU_WINDOW_STICK = 0.22;
 export const BAEKGU_WINDOW_AFFINITY = 0.05;
-/** 반격 window (s) after a perfect dodge (+ affinity), damage multiplier during it (with a short blade) */
+/** 반격 window (s) after a perfect dodge (+ affinity), damage multiplier during it (with a favoured weapon) */
 export const BAEKGU_COUNTER_TIME = 1.6;
 export const BAEKGU_COUNTER_TIME_AFFINITY = 0.6;
 export const BAEKGU_COUNTER_DMG = 1.5;
-export const BAEKGU_COUNTER_DMG_AFFINITY = 1.65;
+export const BAEKGU_COUNTER_DMG_AFFINITY = 1.62;
 /** counter slash: damage (x player damage, always a critical), base reach, search radius */
 export const BAEKGU_STRIKE_DMG = 1.8;
 export const BAEKGU_STRIKE_REACH = 34;
@@ -47,6 +50,9 @@ export const BAEKGU_STRIKE_RANGE = 70;
 /** affinity: the second (crossing) counter slash — delay after the first (s), damage (x player damage) */
 export const BAEKGU_STRIKE2_DELAY = 0.14;
 export const BAEKGU_STRIKE2_DMG = 1.8;
+/** affinity with a thrown (non-melee) weapon: the second counter is a thrown fang — search range, speed */
+export const BAEKGU_THROW2_RANGE = 180;
+export const BAEKGU_THROW2_SPEED = 340;
 /** bullets within this radius are reflected (damage x player damage) */
 export const BAEKGU_REFLECT_RADIUS = 48;
 /** affinity: the perfect dodge returns bullets from this far instead */
@@ -96,6 +102,14 @@ defineDrawnSprite('fx_bg_fang', 5, 7, (p) => {
   p.px(1, 1, '#c8d8ff');
 }, { outline: '#1c2650' });
 
+// the thrown counter: a white fang blade (pointing right)
+defineDrawnSprite('fx_bg_throw_fang', 9, 5, (p) => {
+  p.rect(0, 1, 2, 3, '#8aa0d8');
+  p.poly([2, 0.5, 9, 2.5, 2, 4.5], '#e8f0ff');
+  p.line(3, 2, 8, 2, '#ffffff');
+  p.px(2, 1, '#c8d8ff');
+}, { outline: '#1c2650', origin: [4, 2] });
+
 for (let d = 8; d <= 12; d += 2) glowSprite(d, '#c8d8ff');
 
 // ------------------------------------------------------------------ state
@@ -104,7 +118,7 @@ export function hasAffinity(w: World): boolean {
 }
 
 /**
- * Is a short blade in hand right now? (Read by the passive's stats(), which runs while the
+ * Is a favoured weapon (단검 / 투척) in hand right now? (Read by the passive's stats(), which runs while the
  * stats — and with them the 'affinity' flag — are being recomputed after a weapon swap.)
  */
 function bladeInHand(w: World): boolean {
@@ -247,7 +261,7 @@ export function perfectDodge(w: World, p: Player): void {
   w.lights.glow(p.x, p.y - 6, 80, '#ffffff', 0.8);
   const reflected = reflectAround(w, p.x, p.y, hasAffinity(w) ? BAEKGU_REFLECT_RADIUS_AFFINITY : BAEKGU_REFLECT_RADIUS);
   if (reflected) w.sfx('parry', { vol: 0.6, pitch: 1.2 });
-  // the counter slash at the nearest enemy (with a short blade, a second one crosses it)
+  // the counter slash at the nearest enemy (with a favoured weapon, a second one crosses it)
   w.vars.__bgStrikeTarget = 0;
   counterSlash(w, p, false);
   w.vars.__bgStrike2At = hasAffinity(w) ? w.time + BAEKGU_STRIKE2_DELAY : 0;
@@ -261,6 +275,10 @@ export function perfectDodge(w: World, p: Player): void {
  */
 function counterSlash(w: World, p: Player, second: boolean): void {
   const prev = second ? w.enemies.find((e) => e.id === w.vars.__bgStrikeTarget && e.alive && !e.hidden && e.vulnerable) : undefined;
+  if (second && counterThrows(w)) {
+    counterThrow(w, p, prev && dist(p.x, p.y, prev.x, prev.y) <= BAEKGU_THROW2_RANGE ? prev : w.nearestEnemy(p.x, p.y, BAEKGU_THROW2_RANGE));
+    return;
+  }
   const t = prev && dist(p.x, p.y, prev.x, prev.y) <= BAEKGU_STRIKE_RANGE ? prev : w.nearestEnemy(p.x, p.y, BAEKGU_STRIKE_RANGE);
   if (!t) return;
   const a = angleTo(p.x, p.y, t.x, t.y);
@@ -284,6 +302,45 @@ function counterSlash(w: World, p: Player, second: boolean): void {
   p.aim = a;
 }
 
+/** Is the favoured weapon in hand a thrown one (not melee)? Then the second counter is thrown. */
+export function counterThrows(w: World): boolean {
+  const d = Weapons.get(w.player.weaponId);
+  return !!d && d.kind !== 'melee' && hasAffinity(w);
+}
+
+const throwFangFx: ProjBehavior = {
+  id: 'bg_throw_fang',
+  update(q, ww, dt) {
+    if (fx.chance(dt * 40)) ww.particles.spawn({ x: q.x + fx.range(-1, 1), y: q.y - q.z + fx.range(-1, 1), life: 0.18, colors: WHITE, size: 1, additive: true });
+  },
+  draw(q, r) {
+    r.sprite(glowSprite(10, '#c8d8ff'), q.x, q.y - q.z, { alpha: 0.55, additive: true });
+    r.sprite('fx_bg_throw_fang', q.x, q.y - q.z, { rot: q.angle });
+  },
+};
+
+/**
+ * The thrown follow-up counter (a favoured thrown weapon in hand): a white fang flies at `t` (the
+ * first slash's target, else the nearest enemy in range), homing, always a critical like the slashes.
+ */
+function counterThrow(w: World, p: Player, t: Enemy | null | undefined): void {
+  if (!t) return;
+  const s = p.stats;
+  const a = angleTo(p.x, p.y - 5, t.x, t.y - t.z * 0.3 - 4);
+  const pr = new Projectile({
+    team: 'player', x: p.x + Math.cos(a) * 6, y: p.y - 5 + Math.sin(a) * 4, angle: a, speed: BAEKGU_THROW2_SPEED, damage: s.damage * BAEKGU_STRIKE2_DMG,
+    radius: 3, range: BAEKGU_THROW2_RANGE + 80, owner: p, homing: 8, color: '#ffffff', style: 'none', light: 10, knockback: s.knockback * 2, z: 5,
+    behaviors: [throwFangFx],
+  });
+  pr.generation = 1; // a kit-made shot: never re-triggers spawn procs
+  w.spawn(pr);
+  w.vars.__bgStrike2Id = pr.id;
+  w.sfx('baekgu_counter', { vol: 0.75, pitch: 1.3 });
+  w.sfx('whoosh', { vol: 0.4, pitch: 1.9 });
+  w.particles.burst(pr.x, pr.y - pr.z, { count: 8, speed: [40, 120], angle: a, spread: 0.6, life: [0.1, 0.2], colors: WHITE, shape: 'spark', size: [1, 2], additive: true });
+  p.aim = a;
+}
+
 /** Try to count the current dash as a perfect dodge (once per dash). */
 function tryDodge(w: World, p: Player, predictive: boolean): void {
   if (w.vars.__bgDodged) return;
@@ -299,7 +356,7 @@ export const BAEKGU_PASSIVE: PassiveDef = {
   icon: 'icon_baekgu_passive',
   look: { hit: '#ffffff', step: '#e8f0ff' },
   stats(m, _power, w) {
-    // 반격: all damage x1.5 (x1.65 with a short blade in hand)
+    // 반격: all damage x1.5 (x1.62 with a dagger or thrown weapon in hand)
     if (w?.vars && (w.vars.__bgCounterUntil ?? -1) > w.time) m.mulStat('damage', bladeInHand(w) ? BAEKGU_COUNTER_DMG_AFFINITY : BAEKGU_COUNTER_DMG);
   },
   modifyHit(w, t, hit) {
@@ -317,7 +374,7 @@ export const BAEKGU_PASSIVE: PassiveDef = {
       if (!timeStopped(w) && Math.abs(w.enemyTimeScale - (w.vars.__bgSlowScale ?? -1)) < 1e-9) w.enemyTimeScale = 1;
       w.vars.__bgSlowUntil = 0;
     }
-    // the short blade's crossing follow-up slash
+    // the favoured weapon's crossing follow-up slash
     if ((w.vars.__bgStrike2At ?? 0) > 0 && w.time >= w.vars.__bgStrike2At!) {
       w.vars.__bgStrike2At = 0;
       if (p.alive && hasAffinity(w)) counterSlash(w, p, true);
@@ -368,7 +425,7 @@ export const BAEKGU_DASH: DashDef = {
 // ------------------------------------------------------------------ affinity
 export const BAEKGU_AFFINITY: AffinityDef = {
   name: '단검 / 투척',
-  desc: '간파 창·반사 범위가 넓어지고, 반격이 길고 세지며(+65%) 반격 베기가 두 번.',
+  desc: '간파 창·반사가 넓고 반격이 길고 세다(+62%). 일격 두 번(투척은 던진다).',
   families: ['dagger', 'thrown'],
   stats(m) {
     m.mulStat('moveSpeed', 1.08);
