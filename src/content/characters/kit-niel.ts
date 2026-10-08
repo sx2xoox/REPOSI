@@ -211,7 +211,7 @@ export const NIEL_DASH: DashDef = {
 };
 
 export const NIEL_AFFINITY: AffinityDef = {
-  name: '마법 무기',
-  desc: '마법 무기를 들면 공허 메아리가 두 번째 공격마다 나오고 더 크고 세진다.',
-  tags: ['arcane'],
+  name: '주술구 / 마도서·붓',
+  desc: '공허 메아리가 두 번째 공격마다 나오고 더 크고 세진다.',
+  families: ['occult', 'tome'],
 };

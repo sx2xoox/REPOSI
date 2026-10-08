@@ -15,7 +15,7 @@ import { clamp } from '../engine/math';
 import { C, formatTime } from './theme';
 import { divider, fitScale, frame, gauge, iconSlot, keyHintRow, spriteCentered } from './frame';
 import { Repeater, Spring, appear } from './anim';
-import { gridMove, scrollToRow } from './logic';
+import { gridMove, scrollToRow, weaponClassText } from './logic';
 import { touchUiActive } from './touch-mode';
 
 type TabId = 'artifact' | 'active' | 'weapon' | 'enemy' | 'record';
@@ -80,7 +80,7 @@ function buildEntries(tab: TabId): Entry[] {
       return Weapons.all().sort(byRarity).map((d) => ({
         id: d.id, name: d.name, sprite: d.icon, seen: seenItems.has(d.id) || starters.has(d.id) && Characters.all().some((c) => c.weapon === d.id && (c.unlocked || save.hasFlag(`unlock:${c.id}`))), rarity: d.rarity,
         lines: () => ({
-          title: d.name, sub: `${RARITY_NAME[d.rarity]} · ${WEAPON_KIND[d.kind] ?? d.kind}`, body: d.desc,
+          title: d.name, sub: `${RARITY_NAME[d.rarity]} · ${weaponClassText(d)}`, body: d.desc,
           facts: [['등장', starters.has(d.id) ? '시작 무기' : poolText(d.pools)]],
         }),
       }));

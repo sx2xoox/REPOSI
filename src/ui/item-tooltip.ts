@@ -17,6 +17,7 @@ import { SYNERGIES, synergyActive } from '../game/synergies';
 import { Pedestal, Pickup, itemInfo, potionSpriteFor, type PickupKind } from '../game/pickups';
 import { BASE_STATS, StatMods, computeStats, type Stats } from '../game/stats';
 import { frame, iconSlot, keycap } from './frame';
+import { weaponClassRuns } from './logic';
 import { C } from './theme';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
@@ -158,11 +159,12 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
       }
     } else {
       const def = Weapons.get(it.id);
-      sub.push({ t: ` · 무기 · ${def?.archetype ?? WEAPON_KIND[def?.kind ?? ''] ?? ''}`, c: C.textDim });
+      // 등급 · 계열 · 속성: the family is green when it is this keeper's favoured weapon
+      if (def) sub.push({ t: ' · ', c: C.textDim }, ...weaponClassRuns(def, p.character, C.textDim, C.good));
       extra.push(weaponCompare(it.id, p.weaponId));
       extra.push([{ t: '기본 능력치 비교 · 연타/폭발 별도', c: C.textFaint }]);
       if (p.character.affinity && weaponMatchesAffinity(p.character.affinity, def)) {
-        extra.push([{ t: `${p.character.name} 선호 무기 · ${p.character.affinity.name}`, c: C.goldHi }]);
+        extra.push([{ t: `${p.character.name}의 선호 무기 (${p.character.affinity.name})`, c: C.good }]);
       }
       if (p.weapon2Id || it.id === p.weaponId) {
         const held = Weapons.get(it.id === p.weapon2Id ? p.weapon2Id : p.weaponId);

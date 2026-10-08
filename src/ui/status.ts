@@ -21,9 +21,9 @@ import { BASE_STATS } from '../game/stats';
 import { potionSpriteFor } from '../game/pickups';
 import { C, formatSplit, formatTime, roman, splitFloorName } from './theme';
 import { ticksToMs } from '../game/speedrun';
-import { fitScale, frame, gauge, iconSlot, keyHintRow, keyHintWidth, keycap, spriteCentered } from './frame';
+import { drawRuns, fitScale, frame, gauge, iconSlot, keyHintRow, keyHintWidth, keycap, spriteCentered } from './frame';
 import { Repeater, Spring, appear } from './anim';
-import { characterKitRows, fullStatRows, gridMove, scrollToRow } from './logic';
+import { characterKitRows, fullStatRows, gridMove, scrollToRow, weaponClassRuns } from './logic';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
 import { estimateDps, powerScore } from '../game/power';
@@ -471,7 +471,7 @@ export class StatusOverlay implements Scene {
       iconSlot(r, def?.icon ?? null, GX + 32, y + 31, 38, { alpha: k, scale: def ? fitScale(def.icon, 30, 2) : 1 });
       r.uiText(slot.label, GX + 62, y + 10, { size: 10, font: 'small', color: C.textFaint, alpha: k });
       nameLines.forEach((line, i) => r.uiText(line, GX + 62, y + 24 + i * 16, { size: 14, bold: true, color: def ? RARITY_COLOR[def.rarity] : C.textMute, alpha: k }));
-      if (def) r.uiText(`${RARITY_NAME[def.rarity]} · ${def.archetype ?? WEAPON_KIND[def.kind] ?? ''}`, GX + 62, y + 26 + nameLines.length * 16, { size: 10, font: 'small', color: C.textDim, alpha: k });
+      if (def) drawRuns(r, [{ t: `${RARITY_NAME[def.rarity]} · `, c: C.textDim }, ...weaponClassRuns(def, p.character, C.textDim, C.good)], GX + 62, y + 26 + nameLines.length * 16, { size: 10, font: 'small', alpha: k });
       lines.forEach((line, i) => r.uiText(line, GX + 14, y + textY + i * 13, { size: 10, font: 'small', color: C.text, alpha: k }));
       if (temper) r.uiText(`제련 ${temper > 0 ? '+' : ''}${temper} · 무기 피해 ${100 + temper * 10}%`, GX + 14, y + textY + lines.length * 13 + 4, { size: 10, font: 'small', color: temper > 0 ? C.good : C.bad, alpha: k });
       y += height + 10;
@@ -503,8 +503,12 @@ export class StatusOverlay implements Scene {
       const temper = Number(row.state.mem.temper ?? 0);
       const name = def ? def.name + (temper ? ' [' + (temper > 0 ? '+' : '') + temper + ']' : '') : '장착하지 않음';
       r.uiText(truncate(name, ww - 112), x + 106, row.yy, { size: 10, font: 'small', color: def ? RARITY_COLOR[def.rarity] : C.textMute, alpha: k });
-      const detail = def ? (def.archetype ?? WEAPON_KIND[def.kind] ?? '') + (row.label === '주무기' && p.flags.has('affinity') ? ' · 선호 무기' : '') : '무기를 주우면 이 칸에 보관합니다';
-      r.uiText(truncate(detail, ww - 66), x + 51, row.yy + 15, { size: 10, font: 'small', color: C.textDim, alpha: k });
+      if (def) {
+        // 등급 · 계열 · 속성 (the family green when it is this keeper's favoured weapon)
+        const runs = [{ t: `${RARITY_NAME[def.rarity]} · `, c: C.textDim }, ...weaponClassRuns(def, p.character, C.textDim, C.good)];
+        const wide = runs.reduce((s, x) => s + r.measureText(x.t, 10, false, 'small'), 0) > ww - 66;
+        drawRuns(r, wide ? runs.slice(1) : runs, x + 51, row.yy + 15, { size: 10, font: 'small', alpha: k });
+      } else r.uiText('무기를 주우면 이 칸에 보관합니다', x + 51, row.yy + 15, { size: 10, font: 'small', color: C.textDim, alpha: k });
     }
     r.uiRect(x + 12, y + 99, ww - 24, 1, C.rimDark, k);
     const act = p.activeId ? Actives.get(p.activeId) : undefined;

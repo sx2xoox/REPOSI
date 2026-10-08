@@ -254,30 +254,28 @@ export const REFUGE_RELEASES = ids.map((id, mode) => (w: World, p: Player): void
  */
 export const REFUGE_AFFINITIES: AffinityDef[] = [
   {
-    name: '총·폭약',
+    name: '총 / 폭약·포',
     desc: '터진 폭약이 휘말린 적에게 옮겨 붙어 한 번 더 터진다. 지뢰 3개.',
-    tags: ['gun', 'explosive'],
-    ids: ['thunder_mortar', 'comet_tube', 'firework_barrel'],
+    families: ['gun', 'launcher'],
   },
   {
-    name: '마법봉·사슬',
+    name: '마법봉 / 사슬·채찍',
     desc: '실이 5명까지 이어지고, 전달할 때마다 맞은 적에게 겹매듭이 조여진다.',
-    ids: ['amber_wand', 'tide_staff', 'cinder_sceptre', 'stormhorn_rod', 'frost_wand', 'bubble_wand', 'ink_brush', 'thorn_whip', 'chain_sickle'],
+    families: ['wand', 'chain'],
   },
   {
-    name: '한 손 칼',
+    name: '검 / 단검',
     desc: '지원 기술마다 반대 손이 같은 기술로 한 번 더 이어 친다.',
-    ids: ['copper_sabre', 'rose_rapier', 'moon_katana', 'fang_blade', 'twin_daggers', 'throwing_knives', 'dusk_knives', 'return_blade'],
+    families: ['sword', 'dagger'],
   },
   {
-    name: '방패·창',
-    desc: '넓은 방벽·내구 3·회복 1.8초. 막은 적탄은 앞의 적에게 3배로 되쏜다.',
-    tags: ['spear'],
-    ids: ['mirror_buckler', 'aegis_cannon', 'iron_spear', 'fang_spear', 'crescent_bow'],
+    name: '창 / 방패',
+    desc: '전방 방벽이 넓어져 3발까지 막고 1.8초마다 회복한다. 막은 적탄은 앞의 적에게 3배로 되쏜다.',
+    families: ['spear', 'shield'],
   },
   {
-    name: '봉인 도구',
+    name: '총 / 종·향로',
     desc: '결계를 연 적을 묶어 0.2초마다 맥동하고, 준 피해 12%를 더한다.',
-    ids: ['brass_revolver', 'twin_lamp', 'stasis_arbalest', 'gravity_orb', 'ink_brush', 'firefly_tome', 'constellation_staff'],
+    families: ['gun', 'ritual'],
   },
 ];

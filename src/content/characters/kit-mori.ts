@@ -324,8 +324,7 @@ export const MORI_DASH: DashDef = {
 export const MORI_AFFINITY: AffinityDef = {
   name: '지팡이',
   desc: '양이 셋, 박치기가 빨라지고 받힌 적은 혼자여도 2초간 뭉친 적으로 친다.',
-  tags: ['staff'],
-  ids: ['shepherd_crook', 'crystal_gatling', 'prism_staff', 'dragon_breath', 'thunder_rod', 'meteor_staff', 'flame_staff'],
+  families: ['staff'],
 };
 
 // ------------------------------------------------------------------ release: 양몰이 돌격

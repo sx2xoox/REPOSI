@@ -1,4 +1,5 @@
 import { isContentTemporarilyLocked } from './release-policy';
+import { weaponFamily } from './weapon-families';
 // Content definition interfaces + registries.
 // Every piece of content (enemy, boss, artifact, resonance set, active item, potion,
 // weapon, character, floor, theme, room template) is a plain object registered
@@ -328,13 +329,16 @@ export interface PassiveDef extends ItemHooks {
 /**
  * Favoured weapon class: while a matching weapon is held the keeper gets
  * `p.flags` 'affinity' plus the optional stat bonus. A weapon matches when its
- * kind is in `kinds`, one of its tags is in `tags`, or its id is in `ids`.
+ * family is in `families` (game/weapon-families.ts), its kind is in `kinds`, one of
+ * its tags is in `tags`, or its id is in `ids`.
  */
 export interface AffinityDef {
   /** Korean name, e.g. "근접 무기" */
   name: string;
   /** one-line Korean description of the bonus */
   desc: string;
+  /** weapon families (game/weapon-families.ts), e.g. ['bow'] */
+  families?: string[];
   kinds?: WeaponDef['kind'][];
   tags?: string[];
   ids?: string[];
@@ -345,6 +349,10 @@ export interface AffinityDef {
 /** Does `weapon` count as a favoured weapon of `aff`? */
 export function weaponMatchesAffinity(aff: AffinityDef | undefined, weapon: WeaponDef | undefined): boolean {
   if (!aff || !weapon) return false;
+  if (aff.families) {
+    const f = weaponFamily(weapon.id);
+    if (f && aff.families.includes(f.id)) return true;
+  }
   if (aff.kinds?.includes(weapon.kind)) return true;
   if (aff.ids?.includes(weapon.id)) return true;
   if (aff.tags && weapon.tags) for (const t of weapon.tags) if (aff.tags.includes(t)) return true;

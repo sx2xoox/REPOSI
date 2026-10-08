@@ -449,10 +449,9 @@ export const BORI_DASH: DashDef = {
 
 // ------------------------------------------------------------------ affinity
 export const BORI_AFFINITY: AffinityDef = {
-  name: '묵직한 무기',
-  desc: '밀치기 방패가 크고 오래 서며 더 세게 밀친다. 칠 때마다 통이 조금씩 찬다.',
-  tags: ['heavy'],
-  ids: ['great_hammer', 'titan_greatsword', 'quake_mace', 'reaper_scythe', 'lantern_flail'],
+  name: '둔기·도끼 / 방패',
+  desc: '대시(몸통 밀치기) 때 세우는 방패벽이 크고 오래 서며 더 세게 밀친다. 무기로 칠 때마다 통이 조금씩 찬다.',
+  families: ['heavy', 'shield'],
   stats(m) {
     m.mulStat('knockback', 1.3);
   },

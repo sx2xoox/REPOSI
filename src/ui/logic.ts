@@ -5,6 +5,7 @@
 import { Characters, Weapons, Artifacts, weaponMatchesAffinity, type CharacterDef, type WeaponDef } from '../game/defs';
 import { BASE_STATS, StatMods, WEAPON_DAMAGE_SCALE, computeStats, type StatKey, type Stats } from '../game/stats';
 import type { RoomKind } from '../game/constants';
+import { WEAPON_KIND_NAMES, weaponFamily } from '../game/weapon-families';
 
 // ---------------------------------------------------------------- seeds
 const SEED_ALLOWED = /^[A-Z0-9-]$/;
@@ -51,6 +52,26 @@ export function characterStats(def: CharacterDef): Stats {
     }
   }
   return computeStats(base, m);
+}
+
+/** A coloured text run (info lines, tooltips). */
+export interface TextRun { t: string; c: string }
+
+/** A weapon's classification "계열 · 속성", e.g. "활·쇠뇌 · 충전 무기" (game/weapon-families.ts). */
+export function weaponClassText(def: WeaponDef): string {
+  return `${weaponFamily(def.id)?.name ?? '기타'} · ${WEAPON_KIND_NAMES[def.kind] ?? def.kind}`;
+}
+
+/**
+ * The classification as runs: the family turns `good` (green) when it is `keeper`'s favoured
+ * weapon (CharacterDef.affinity), so the line itself tells whose weapon it is.
+ */
+export function weaponClassRuns(def: WeaponDef, keeper: CharacterDef | null | undefined, base: string, good: string): TextRun[] {
+  const fav = weaponMatchesAffinity(keeper?.affinity, def);
+  return [
+    { t: weaponFamily(def.id)?.name ?? '기타', c: fav ? good : base },
+    { t: ` · ${WEAPON_KIND_NAMES[def.kind] ?? def.kind}`, c: base },
+  ];
 }
 
 export const WEAPON_KIND_LABELS: Record<WeaponDef['kind'], string> = { ranged: '원거리', melee: '근접', charge: '차지', beam: '광선' };

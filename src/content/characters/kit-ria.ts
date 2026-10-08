@@ -15,6 +15,7 @@ import { defineDrawnSprite } from '../../engine/sprites';
 import type { HitInfo } from '../../game/entity';
 import { clamp } from '../../engine/math';
 import { WEAPON_DAMAGE_SCALE } from '../../game/stats';
+import { familyMembers } from '../../game/weapon-families';
 import { HazardZone, enemiesNear, hitWeight, isAttack, itemHit, proc } from '../items/lib';
 import { EnemyOverlay, O, ensureOverlay, trailReset, trailStep } from './kit';
 
@@ -40,12 +41,8 @@ export const RIA_TRAIL_LIFE = 1.3;
 export const RIA_SPARK_HITS_AFFINITY = 3;
 export const RIA_SPARK_DMG_AFFINITY = 0.925;
 export const RIA_SPARK_BURN_AFFINITY = 0.555;
-/**
- * Lantern weapons (the affinity matches these ids): the hand lantern, the twin-wick lamp gun,
- * the wandering lamp spirit, the first keeper's dawn lantern, the rescue-lantern flail and the
- * mine lantern (its blasts count as weapon attacks since frontier-kit ownedHit tags them).
- */
-export const RIA_LANTERN_WEAPONS = ['lantern_bolt', 'twin_lamp', 'wandering_lamp', 'dawn_lantern', 'lantern_flail', 'mine_lantern'];
+/** Lantern weapons (the 등불 family, game/weapon-families.ts; the affinity matches it). */
+export const RIA_LANTERN_WEAPONS = familyMembers('lantern');
 
 const EMBER_COLORS = ['#ffffff', '#ffe080', '#ff9a30', '#c04010'];
 
@@ -188,7 +185,7 @@ export const RIA_DASH: DashDef = {
 };
 
 export const RIA_AFFINITY: AffinityDef = {
-  name: '등불 무기',
-  desc: '등불 무기를 들면 불씨가 세 번째 적중에 터지고 폭발·화상이 85% 세진다.',
-  ids: RIA_LANTERN_WEAPONS,
+  name: '등불',
+  desc: '등불을 들면 불씨가 세 번째 적중에 터지고 폭발·화상이 85% 세진다.',
+  families: ['lantern'],
 };

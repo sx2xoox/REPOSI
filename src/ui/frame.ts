@@ -343,6 +343,17 @@ export function keyHintRow(r: Renderer, hints: [string, string][], cx: number, y
 
 // ---------------------------------------------------------------- ornaments
 /** Horizontal ornament line fading at both ends with a diamond in the middle. */
+/** Draw coloured text runs left to right (one line); returns the width used. */
+export function drawRuns(r: Renderer, runs: readonly { t: string; c: string }[], x: number, y: number, o: { size: number; font?: 'main' | 'small'; bold?: boolean; alpha?: number }): number {
+  const font = o.font ?? 'main';
+  let cx = x;
+  for (const s of runs) {
+    r.uiText(s.t, cx, y, { size: o.size, font, bold: o.bold, color: s.c, alpha: o.alpha });
+    cx += r.measureText(s.t, o.size, !!o.bold, font);
+  }
+  return cx - x;
+}
+
 export function divider(r: Renderer, cx: number, y: number, w: number, color: string = C.gold, alpha = 1): void {
   const d = r.dctx;
   const half = w / 2;

@@ -367,10 +367,9 @@ export const BAEKGU_DASH: DashDef = {
 
 // ------------------------------------------------------------------ affinity
 export const BAEKGU_AFFINITY: AffinityDef = {
-  name: '단도·도',
+  name: '단검 / 투척',
   desc: '간파 창·반사 범위가 넓어지고, 반격이 길고 세지며(+65%) 반격 베기가 두 번.',
-  tags: ['quick'],
-  ids: ['fang_blade', 'twin_daggers', 'moon_katana', 'chain_sickle', 'return_blade'],
+  families: ['dagger', 'thrown'],
   stats(m) {
     m.mulStat('moveSpeed', 1.08);
   },

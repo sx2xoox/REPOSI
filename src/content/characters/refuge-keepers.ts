@@ -6,7 +6,7 @@ import { REFUGE_UNLOCK_HINTS, REFUGE_UNLOCK_REQUIREMENTS } from './refuge-unlock
 import './ria'; import './bern'; import './serin'; import './niel'; import './bori'; import './baekgu'; import './mori';
 const names=['토브','루엔','베스','오르트','미라'];
 const ids=['tove','luen','ves','ort','mira'];
-const weapons=['nail_carbine','amber_wand','copper_sabre','crescent_bow','brass_revolver'];
+const weapons=['nail_carbine','amber_wand','copper_sabre','javelin_bundle','brass_revolver'];
 const descriptions=[
  '끊어진 길에서 도구를 주워 살아남은 닥스훈트 공병. 적의 발걸음과 폭약의 심지를 읽고, 깔아 둔 폭약을 한꺼번에 터뜨려 막힌 전선을 연다.',
  '빛의 실로 흩어진 인연을 잇는 푸들 직조사. 멀어진 적들을 한 가닥으로 엮어 한 매듭으로 끌어모으고, 그 매듭을 끊어 싸움을 끝낸다.',

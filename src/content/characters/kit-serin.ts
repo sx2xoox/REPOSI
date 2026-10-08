@@ -165,8 +165,8 @@ export const SERIN_DASH: DashDef = {
 
 export const SERIN_AFFINITY: AffinityDef = {
   name: '활·쇠뇌',
-  desc: '활·쇠뇌를 들면 표식된 적에게 40% 확률로 약점 치명타, 사거리 +10%.',
-  tags: ['bow'],
+  desc: '표식된 적에게 40% 확률로 약점 치명타, 사거리 +10%.',
+  families: ['bow'],
   stats(m) {
     m.mulStat('range', 1.1);
   },

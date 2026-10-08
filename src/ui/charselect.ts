@@ -21,8 +21,8 @@ import { clamp, ease } from '../engine/math';
 import { backdrop } from './backdrop';
 import { Repeater, Spring, appear } from './anim';
 import { C, PX } from './theme';
-import { divider, fitScale, frame, gauge, glow, iconSlot, keyHintRow, spriteCentered } from './frame';
-import { characterKitRows, characterOrder, characterStatRows, characterStats, isUnlocked, DIFFICULTY_LABELS, weaponKindLabel } from './logic';
+import { divider, drawRuns, fitScale, frame, gauge, glow, iconSlot, keyHintRow, spriteCentered } from './frame';
+import { characterKitRows, characterOrder, characterStatRows, characterStats, isUnlocked, DIFFICULTY_LABELS, weaponClassRuns } from './logic';
 import { AbandonExpeditionOverlay } from './abandon-expedition';
 import { FireGaugeFx, drawFireGauge, fireGaugeLayout } from './hud-fire';
 
@@ -352,7 +352,7 @@ export class CharacterSelectScene implements Scene {
     if (wdef) {
       iconSlot(r, wdef.icon, tx + 15, cy + 15, 30, { alpha: A, scale: fitScale(wdef.icon, 22, 1.5) });
       r.uiText(wdef.name, tx + 38, cy + 2, { size: 12, color: C.text, alpha: A });
-      r.uiText(`시작 무기 · ${wdef.archetype ?? weaponKindLabel(wdef.kind)}`, tx + 38, cy + 18, { size: 10, font: 'small', color: C.textFaint, alpha: A });
+      drawRuns(r, [{ t: '시작 무기 · ', c: C.textFaint }, ...weaponClassRuns(wdef, c, C.textFaint, C.good)], tx + 38, cy + 18, { size: 10, font: 'small', alpha: A });
     }
     cy += 36;
     // favoured weapon class

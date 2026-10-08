@@ -177,8 +177,7 @@ export const BERN_DASH: DashDef = {
 };
 
 export const BERN_AFFINITY: AffinityDef = {
-  name: '근접 무기',
-  desc: '근접 무기를 들면 기세 한 칸이 공격 속도를 13.5% 올리고 늦게 식는다.',
-  kinds: ['melee'],
-  tags: ['blade'],
+  name: '검',
+  desc: '기세 한 칸이 공격 속도를 13.5% 올리고 늦게 식는다.',
+  families: ['sword'],
 };
