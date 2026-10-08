@@ -20,7 +20,7 @@ export const BOSS_TACTICS: Record<string, Record<string, Role>> = {
   mumyeong: { slam: 'arena', gaze: 'arena', rings: 'shot', summon: 'setup', claw: 'close', spiral: 'shot', devour: 'arena' },
   sunken_lighthouse: { sweep: 'arena', split: 'arena', blackout: 'arena', wisps: 'shot', slam: 'close', flash: 'arena', horn: 'shot', summon: 'setup' },
   grand_archivist: { write: 'shot', underline: 'arena', pages: 'setup', drops: 'shot', summon: 'setup', flood: 'arena', vortex: 'shot' },
-  clockwork_dancer: { pirouette: 'chase', skirt: 'shot', pins: 'shot', mirrors: 'setup', leap: 'chase', ribbons: 'shot', waltz: 'chase' },
+  clockwork_dancer: { pirouette: 'chase', skirt: 'shot', pins: 'shot', mirrors: 'setup', leap: 'chase', ribbons: 'shot', waltz: 'chase', rondo: 'arena', dacapo: 'chase', trio: 'shot', curtain: 'arena' },
   clockmaker: { freeze: 'shot', rewind: 'shot', hands: 'arena', wells: 'setup', gears: 'shot', summon: 'setup', stop: 'shot', chime: 'arena' },
 };
 
@@ -41,7 +41,7 @@ const FOLLOW_UPS: Record<string, Record<string, string[]>> = {
   mumyeong: { rings: ['gaze', 'slam'], summon: ['gaze'], gaze: ['claw', 'rings'] },
   sunken_lighthouse: { wisps: ['sweep'], summon: ['flash'], sweep: ['flash'], horn: ['slam', 'flash'] },
   grand_archivist: { pages: ['underline'], drops: ['underline'], summon: ['write'], underline: ['drops'] },
-  clockwork_dancer: { mirrors: ['leap'], pins: ['pirouette'], skirt: ['leap'], leap: ['ribbons'] },
+  clockwork_dancer: { mirrors: ['leap'], pins: ['pirouette'], skirt: ['leap'], leap: ['ribbons'], rondo: ['ribbons', 'pins'], dacapo: ['skirt', 'pins'], trio: ['leap'] },
   clockmaker: { wells: ['hands'], summon: ['chime'], freeze: ['hands'], rewind: ['chime'] },
 };
 

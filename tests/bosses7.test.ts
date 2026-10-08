@@ -20,7 +20,7 @@ import { Lob } from '../src/content/enemies/shared';
 import { ShockRing } from '../src/content/bosses/final-kit';
 import { bullet7, bulletSprite7, ClockHand, gapSlotFor, gearSprite, nextTick, rewind, rowWithGap, tickFreeze, TimeWell } from '../src/content/bosses/kit7';
 import { TimeStopFx } from '../src/content/bosses/clockmaker';
-import { GhostDancer } from '../src/content/bosses/clockwork-dancer';
+import { CueClone, EchoDancer, GhostDancer, RondoDancer, StepEcho, TrioClone } from '../src/content/bosses/clockwork-dancer';
 
 loadContent();
 
@@ -206,6 +206,10 @@ function fakeWorld(seed: string): FakeWorld {
       if (e instanceof GroundWarning) fw.warnTimes.push(e.time);
       if (e instanceof ClockHand) fw.warnTimes.push(e.o.warn);
       if (e instanceof GhostDancer) fw.warnTimes.push(e.o.warn);
+      if (e instanceof RondoDancer) fw.warnTimes.push(e.s.o.warn, e.s.o.aim);
+      if (e instanceof EchoDancer) fw.warnTimes.push(e.warn);
+      if (e instanceof TrioClone) fw.warnTimes.push(e.o.warn);
+      if (e instanceof CueClone) fw.warnTimes.push(e.lead);
       return e;
     },
     spawnEnemy(id: string, x: number, y: number): Enemy | null {
@@ -268,7 +272,8 @@ function step(fw: FakeWorld, seconds: number, onFrame?: (t: number) => void, mov
 function danger(fw: FakeWorld): number {
   return fw.entities.filter((x) => !x.dead && (
     (x instanceof Projectile && x.team === 'enemy') || x instanceof GroundWarning || x instanceof ShockRing || x instanceof Lob
-    || (x instanceof ClockHand && !x.fading) || (x instanceof TimeWell && x.armed) || (x instanceof GhostDancer && !x.done))).length;
+    || (x instanceof ClockHand && !x.fading) || (x instanceof TimeWell && x.armed) || (x instanceof GhostDancer && !x.done)
+    || x instanceof RondoDancer || x instanceof EchoDancer || x instanceof StepEcho || x instanceof TrioClone || x instanceof CueClone)).length;
 }
 
 function shots(fw: FakeWorld): Projectile[] {
@@ -331,7 +336,8 @@ describe('floor 7 boss AI (headless simulation)', () => {
       expect(danger(fw), `${id} leaves no live attacks behind`).toBe(0);
       step(fw, 2.5);
       expect(fw.w.enemies.filter((e) => e.alive && e.mem.owner === boss).length, `${id} minions dissolve`).toBe(0);
-      expect(fw.entities.filter((e) => (e instanceof TimeWell || e instanceof TimeStopFx || e instanceof GhostDancer) && !e.dead).length, `${id} hazards fade`).toBe(0);
+      expect(fw.entities.filter((e) => (e instanceof TimeWell || e instanceof TimeStopFx || e instanceof GhostDancer || e instanceof RondoDancer
+        || e instanceof EchoDancer || e instanceof StepEcho || e instanceof TrioClone || e instanceof CueClone) && !e.dead).length, `${id} hazards fade`).toBe(0);
     });
   }
 

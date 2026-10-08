@@ -132,7 +132,8 @@ export function bossFight(bossId: string, power: number, rules = true, seed = 'B
     if (startPhase2) {
       // straight to the second phase (past its phase change)
       boss.dormant = 0;
-      w.applyHit(boss, { damage: boss.maxHp * 0.55, kind: 'projectile', attacker: p, release: true });
+      // the keeper hit is scaled by `power` (applyHit wrapper above): undo it so the boss really crosses its line
+      w.applyHit(boss, { damage: (boss.maxHp * 0.55) / power, kind: 'projectile', attacker: p, release: true });
       for (let k = 0; k < 600 && (boss.phase < 1 || boss.mem.rsHold || (boss.mem.rsGuard ?? 0) > 0); k++) w.update(FIXED_DT);
     }
     const steps = Math.round(limit / FIXED_DT);

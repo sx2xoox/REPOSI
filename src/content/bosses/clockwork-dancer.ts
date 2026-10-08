@@ -8,8 +8,15 @@ import { pickBossPattern } from './tactics';
 //   shots as she pirouettes), 실린더 핀 (a row of pins along a wall advances in unison,
 //   one gap), 거울 무희 (mirrored ghost dancers dash through the keeper's spot), 그랑 주테
 //   (a leap onto the keeper: gapped shock ring + a burst), 리본 (serpentine shot ribbons).
+//   Her clones and afterimages (user 2026-10-08: "분신·잔상을 쓰는 패턴") keep dancing on their own
+//   while she starts the next figure: 론도 (a ring of clones circles the keeper, tosses petals on
+//   the beat, then collapses through the centre), 다 카포 (an echo replays her dash route
+//   backwards), 삼인무 (two clones spin their own counter-turning spirals with her), and every
+//   pirouette leaves afterimages standing on its lane (남는 잔상).
 // Phase 2 (≤50%): the porcelain cracks and the gears show, the tempo rises, the box
-//   detunes — 깨진 왈츠: dashes mirrored by ghosts, double pin rows, four-armed skirts.
+//   detunes — 깨진 왈츠: dashes mirrored by ghosts, double pin rows, four-armed skirts, bigger
+//   rings, afterimages that throw petals, encores without a pause, and once under 30% HP the
+//   커튼콜 (six clones round the stage dash through the keeper cue by cue while she spins).
 
 import { defineBoss } from '../../game/defs';
 import { Entity } from '../../game/entity';
@@ -497,6 +504,616 @@ class GhostDancer extends Entity {
   }
 }
 
+/** A rose copy of the dancer (shared look of every clone and afterimage). */
+function drawClone(r: Renderer, frame: string, x: number, y: number, alpha: number, flipX = false, tint: string = ROSE[3]): void {
+  r.shadow(x, y + 2, 20, 6, 0.2 * alpha);
+  r.sprite(frame, x, y, { alpha, tint, tintAmount: 0.5, flipX });
+}
+
+/** Fade-in flicker of a clone that is not dangerous yet (0.15..0.65). */
+function fadeIn(age: number, warn: number): number {
+  return 0.15 + 0.5 * clamp(age / warn, 0, 1) * (Math.floor(age * 12) % 2 ? 1 : 0.7);
+}
+
+/** One rose petal from (x, y) at `angle`, fired in the dancer's name (her shots die with her). */
+function petal(boss: Enemy, w: World, x: number, y: number, angle: number, speed: number): void {
+  if (!boss.alive) return;
+  const pr = boss.shoot(w, angle, bullet7('rose', 3, { speed, z: 5 }));
+  pr.x = x + Math.cos(angle) * 6;
+  pr.y = y - 6 + Math.sin(angle) * 4;
+}
+
+/** Clamp a clone's feet into the room so its tall sprite stays off the top wall. */
+function stageSpot(w: World, x: number, y: number): { x: number; y: number } {
+  const r = w.room;
+  return { x: clamp(x, r.interiorX + 16, r.interiorX + r.interiorW - 16), y: clamp(y, r.interiorY + 32, r.interiorY + r.interiorH - 12) };
+}
+
+/** The keeper the clones dance at (a charm turns her on another target). */
+function targetOf(boss: Enemy, w: World): { x: number; y: number } {
+  return boss.alive ? boss.target(w) : w.player;
+}
+
+interface RondoOpts {
+  count: number;
+  /** fade-in before the clones can hurt */
+  warn: number;
+  /** circling time */
+  hold: number;
+  /** lane telegraph before the collapse */
+  aim: number;
+  r0: number;
+  r1: number;
+  /** ring rotation (rad/s, signed) */
+  spin: number;
+  /** how fast the ring's centre follows the keeper (px/s, well under their walk) */
+  drift: number;
+  /** a clone tosses petals every `beat` seconds */
+  beat: number;
+  petalSpeed: number;
+  dashSpeed: number;
+  p2: boolean;
+}
+
+/** The ring is squashed like the floor (and so fits the room's height). */
+const RONDO_SQUASH = 0.62;
+
+/** Shared state of one 론도 ring; the first living clone advances it each step. */
+interface RondoState {
+  boss: Enemy;
+  o: RondoOpts;
+  cx: number;
+  cy: number;
+  angle: number;
+  rad: number;
+  age: number;
+  beatT: number;
+  beatK: number;
+  collapsed: boolean;
+  members: RondoDancer[];
+}
+
+/**
+ * 론도 (분신 윤무): clone dancers fade in on a ring round the keeper and circle them while the
+ * ring slowly follows and closes in (on every beat one clone tosses a fan of petals); then each
+ * clone collapses through the centre along a telegraphed lane. Leave the ring between two
+ * clones before it closes — or stand between the lanes.
+ */
+class RondoDancer extends Entity {
+  s: RondoState;
+  i: number;
+  lane: { a: number; len: number; travelled: number; struck: boolean } | null = null;
+  laneAt = 0;
+  private trailT = 0;
+  constructor(s: RondoState, i: number) {
+    super();
+    this.s = s;
+    this.i = i;
+    this.r = 7;
+    this.layer = 1;
+    this.tileCollide = false;
+    this.team = 'enemy';
+    this.enemyHazard = true;
+    this.place(null);
+  }
+
+  /** Clone `i`'s spot on the ring (the ring is squashed like the floor). */
+  private place(w: World | null): void {
+    const s = this.s;
+    const a = s.angle + (this.i / s.o.count) * TAU;
+    const x = s.cx + Math.cos(a) * s.rad;
+    const y = s.cy + Math.sin(a) * s.rad * RONDO_SQUASH;
+    const p = w ? stageSpot(w, x, y) : { x, y };
+    this.x = p.x;
+    this.y = p.y;
+  }
+
+  get dashing(): boolean {
+    return !!this.lane && this.age >= this.laneAt && this.lane.travelled < this.lane.len;
+  }
+
+  get done(): boolean {
+    return !!this.lane && this.lane.travelled >= this.lane.len;
+  }
+
+  override get sortY(): number {
+    return this.y + 1;
+  }
+
+  frameName(): string {
+    const pre = this.s.o.p2 ? 'dancer2' : 'dancer';
+    return this.lane ? `${pre}_spin_${Math.floor(this.age * 16) % 4}` : `${pre}_spin_${Math.floor(this.age * 9 + this.i) % 4}`;
+  }
+
+  /** The first living clone moves the whole ring (spawn order: deterministic). */
+  private advance(w: World, dt: number): void {
+    const s = this.s;
+    const o = s.o;
+    s.age += dt;
+    if (s.collapsed) return;
+    const t = targetOf(s.boss, w);
+    const dx = t.x - s.cx;
+    const dy = t.y - s.cy;
+    const d = Math.hypot(dx, dy);
+    if (d > 1) {
+      const k = Math.min(d, o.drift * dt) / d;
+      s.cx += dx * k;
+      s.cy += dy * k;
+    }
+    s.angle += o.spin * dt;
+    s.rad = o.r0 + (o.r1 - o.r0) * clamp((s.age - o.warn) / o.hold, 0, 1);
+    if (s.age < o.warn) return;
+    s.beatT += dt;
+    if (s.beatT >= o.beat) {
+      s.beatT -= o.beat;
+      const alive = s.members.filter((m) => !m.dead);
+      const m = alive[s.beatK % Math.max(1, alive.length)];
+      s.beatK++;
+      if (m) {
+        const a = Math.atan2(t.y - m.y, t.x - m.x);
+        for (const da of [-0.24, 0, 0.24]) petal(s.boss, w, m.x, m.y, a + da, o.petalSpeed);
+        chime(w, s.beatK, 0.22, o.p2);
+      }
+    }
+    if (s.age >= o.warn + o.hold) {
+      // the collapse: every clone shows its lane through the centre, then dashes along it
+      s.collapsed = true;
+      w.sfx('clockboss_pirouette', { vol: 0.7, pitch: 1.25 });
+      for (const m of s.members) {
+        if (m.dead) continue;
+        const a = Math.atan2(s.cy - m.y, s.cx - m.x);
+        const len = Math.max(30, Math.min(s.rad * 2 + 40, beamToWall(w, m.x, m.y, a) - 6));
+        m.lane = { a, len, travelled: 0, struck: false };
+        m.laneAt = m.age + o.aim;
+        laneWarning(w, m.x, m.y, a, len, 16, o.aim, ROSE[2]);
+      }
+    }
+  }
+
+  override update(w: World, dt: number): void {
+    this.age += dt;
+    const s = this.s;
+    if (s.members.find((m) => !m.dead) === this) this.advance(w, dt);
+    if (!this.lane) {
+      this.place(w);
+      if (s.age >= s.o.warn) hitPlayerCircle(w, this.x, this.y, 7, 1, NAME, 150);
+      return;
+    }
+    const l = this.lane;
+    if (this.age < this.laneAt) return;
+    if (l.travelled < l.len) {
+      const step = Math.min(s.o.dashSpeed * dt, l.len - l.travelled);
+      this.x += Math.cos(l.a) * step;
+      this.y += Math.sin(l.a) * step;
+      l.travelled += step;
+      if (!l.struck && hitPlayerCircle(w, this.x, this.y, 9, 1, NAME, 170)) l.struck = true;
+      this.trailT += dt;
+      if (this.trailT > 0.045) {
+        this.trailT = 0;
+        w.spawn(new Afterimage(this.frameName(), this.x, this.y, false, ROSE[3], 0.28));
+      }
+      if (l.travelled >= l.len) this.laneAt = this.age; // fade clock
+    } else if (this.age - this.laneAt >= 0.25) this.dead = true;
+  }
+
+  override draw(r: Renderer): void {
+    const s = this.s;
+    let alpha: number;
+    if (s.age < s.o.warn) alpha = fadeIn(s.age, s.o.warn);
+    else if (this.done) alpha = 0.6 * clamp(1 - (this.age - this.laneAt) / 0.25, 0, 1);
+    else alpha = 0.78;
+    // the leader traces the ring on the floor: where the clones will dance
+    if (!s.collapsed && s.members.find((m) => !m.dead) === this) {
+      for (let k = 0; k < 28; k++) {
+        const a = (k / 28) * TAU + s.angle * 0.5;
+        r.rect(Math.round(s.cx + Math.cos(a) * s.rad), Math.round(s.cy + Math.sin(a) * s.rad * RONDO_SQUASH), 2, 1, ROSE[3], 0.5);
+      }
+    }
+    drawClone(r, this.frameName(), this.x, this.y, alpha, this.lane ? Math.cos(this.lane.a) < 0 : false);
+    if (s.age < s.o.warn) r.ring(this.x, this.y, 9 + Math.sin(s.age * 10) * 2, ROSE[3], 1, 0.6 * alpha);
+  }
+
+  override light(w: World): void {
+    w.lights.add(this.x, this.y - 16, 26, '#ff70a8', { intensity: this.dashing ? 0.8 : 0.4 });
+  }
+}
+
+/**
+ * 다 카포 (잔상 되감기): a rose echo of the dancer replays her route backwards — every segment
+ * of it is telegraphed at once, and each warning lasts until the echo has danced past it.
+ * Phase 2: the echo sheds a ring of petals at every turn.
+ */
+class EchoDancer extends Entity {
+  boss: Enemy;
+  pts: { x: number; y: number }[];
+  warn: number;
+  speed: number;
+  p2: boolean;
+  seg = 0;
+  segT = 0;
+  finished = false;
+  fadeAt = 0;
+  struck = false;
+  private trailT = 0;
+  private echoD = 0;
+  private echoN = 0;
+  constructor(boss: Enemy, pts: { x: number; y: number }[], warn: number, speed: number, p2: boolean) {
+    super();
+    this.boss = boss;
+    this.pts = pts;
+    this.warn = warn;
+    this.speed = speed;
+    this.p2 = p2;
+    this.x = pts[0].x;
+    this.y = pts[0].y;
+    this.r = 8;
+    this.layer = 1;
+    this.tileCollide = false;
+    this.team = 'enemy';
+    this.enemyHazard = true;
+  }
+
+  get dashing(): boolean {
+    return this.age >= this.warn && !this.finished;
+  }
+
+  override get sortY(): number {
+    return this.y + 1;
+  }
+
+  frameName(): string {
+    return `${this.p2 ? 'dancer2' : 'dancer'}_spin_${Math.floor(this.age * 16) % 4}`;
+  }
+
+  override update(w: World, dt: number): void {
+    this.age += dt;
+    if (this.finished) {
+      if (this.age - this.fadeAt >= 0.25) this.dead = true;
+      return;
+    }
+    if (this.age < this.warn) return;
+    let step = this.speed * dt;
+    // the replay leaves its own afterimages standing (each throws a petal after its flare)
+    this.echoD += step;
+    if (this.echoD >= (this.p2 ? 44 : 58)) {
+      this.echoD = 0;
+      w.spawn(new StepEcho(this.boss, this.x, this.y, this.frameName(), 0.7 + (this.echoN++ % 3) * 0.08, true, false, this.p2 ? 82 : 72));
+    }
+    while (step > 0 && this.seg < this.pts.length - 1) {
+      const b = this.pts[this.seg + 1];
+      const d = Math.hypot(b.x - this.x, b.y - this.y);
+      if (d <= step) {
+        this.x = b.x;
+        this.y = b.y;
+        step -= d;
+        this.seg++;
+        // a turn of the route: petals in phase 2, a step of the tune either way
+        chime(w, this.seg, 0.25, this.p2);
+        if (this.p2 && this.seg < this.pts.length - 1) {
+          const off = w.rng.range(0, 0.6);
+          for (const a of gapRing(6, off, [], 0)) petal(this.boss, w, this.x, this.y, a, 70);
+        }
+      } else {
+        this.x += ((b.x - this.x) / d) * step;
+        this.y += ((b.y - this.y) / d) * step;
+        step = 0;
+      }
+    }
+    if (!this.struck && hitPlayerCircle(w, this.x, this.y, 9, 1, NAME, 170)) this.struck = true;
+    this.trailT += dt;
+    if (this.trailT > 0.045) {
+      this.trailT = 0;
+      w.spawn(new Afterimage(this.frameName(), this.x, this.y, false, ROSE[3], 0.3));
+    }
+    if (this.seg >= this.pts.length - 1) {
+      this.finished = true;
+      this.fadeAt = this.age;
+    }
+  }
+
+  override draw(r: Renderer): void {
+    let alpha: number;
+    if (this.age < this.warn) alpha = fadeIn(this.age, this.warn);
+    else if (this.finished) alpha = 0.6 * clamp(1 - (this.age - this.fadeAt) / 0.25, 0, 1);
+    else alpha = 0.8;
+    const nx = this.pts[Math.min(this.seg + 1, this.pts.length - 1)];
+    drawClone(r, this.frameName(), this.x, this.y, alpha, nx.x < this.x);
+    if (this.age < this.warn) r.ring(this.x, this.y, 10 + Math.sin(this.age * 10) * 2, ROSE[3], 1, 0.6 * alpha);
+  }
+
+  override light(w: World): void {
+    w.lights.add(this.x, this.y - 16, 30, '#ff70a8', { intensity: this.dashing ? 0.8 : 0.4 });
+  }
+}
+
+/**
+ * 남는 잔상: an afterimage that stays where she spun, still dancing — it blocks the spot for a
+ * moment, and with `shot` it flares (telegraph) and throws one petal at the keeper before fading.
+ */
+class StepEcho extends Entity {
+  boss: Enemy;
+  frame: string;
+  hold: number;
+  shot: boolean;
+  flipX: boolean;
+  speed: number;
+  fired = false;
+  constructor(boss: Enemy, x: number, y: number, frame: string, hold: number, shot: boolean, flipX: boolean, speed = 80) {
+    super();
+    this.boss = boss;
+    this.speed = speed;
+    this.x = x;
+    this.y = y;
+    this.frame = frame;
+    this.hold = hold;
+    this.shot = shot;
+    this.flipX = flipX;
+    this.r = 6;
+    this.layer = 1;
+    this.tileCollide = false;
+    this.team = 'enemy';
+    this.enemyHazard = true;
+  }
+
+  /** the flare before its petal */
+  static readonly FLARE = 0.35;
+
+  override update(w: World, dt: number): void {
+    this.age += dt;
+    if (this.age > 0.12 && this.age < this.hold) hitPlayerCircle(w, this.x, this.y, 6, 1, NAME, 130);
+    if (this.shot && !this.fired && this.age >= this.hold) {
+      this.fired = true;
+      const t = targetOf(this.boss, w);
+      petal(this.boss, w, this.x, this.y, Math.atan2(t.y - this.y, t.x - this.x), this.speed);
+    }
+    if (this.age >= this.hold + 0.22) this.dead = true;
+  }
+
+  override draw(r: Renderer): void {
+    const flare = this.shot && this.age > this.hold - StepEcho.FLARE && this.age < this.hold;
+    const alpha = this.age < this.hold ? (flare ? 0.85 : 0.5) : 0.5 * clamp(1 - (this.age - this.hold) / 0.22, 0, 1);
+    drawClone(r, this.frame, this.x, this.y, alpha, this.flipX, flare ? '#ffffff' : ROSE[3]);
+    if (flare) r.ring(this.x, this.y - 12, 4 + (this.hold - this.age) * 24, ROSE[4], 1, 0.8);
+  }
+
+  override light(w: World): void {
+    w.lights.add(this.x, this.y - 14, 18, '#ff70a8', { intensity: 0.35 });
+  }
+}
+
+interface TrioOpts {
+  warn: number;
+  arms: number;
+  steps: number;
+  stepT: number;
+  turn: number;
+  speed: number;
+  /** phase 2: after the spin, dash once at the keeper */
+  dash: boolean;
+  p2: boolean;
+}
+
+/**
+ * 삼인무: a clone that fades in, then spins on the spot shedding its own spiral of petals in
+ * time with the dancer's (counter-turning, so the three spirals weave a lattice).
+ */
+class TrioClone extends Entity {
+  boss: Enemy;
+  o: TrioOpts;
+  base: number;
+  k = 0;
+  stepT = 0;
+  constructor(boss: Enemy, x: number, y: number, base: number, o: TrioOpts) {
+    super();
+    this.boss = boss;
+    this.x = x;
+    this.y = y;
+    this.base = base;
+    this.o = o;
+    this.r = 7;
+    this.layer = 1;
+    this.tileCollide = false;
+    this.team = 'enemy';
+    this.enemyHazard = true;
+  }
+
+  override get sortY(): number {
+    return this.y + 1;
+  }
+
+  frameName(): string {
+    const pre = this.o.p2 ? 'dancer2' : 'dancer';
+    return this.age < this.o.warn ? `${pre}_pose_${Math.floor(this.age * 8) % 2}` : `${pre}_spin_${Math.floor(this.age * 14) % 4}`;
+  }
+
+  override update(w: World, dt: number): void {
+    this.age += dt;
+    const o = this.o;
+    if (this.age < o.warn) return;
+    hitPlayerCircle(w, this.x, this.y, 7, 1, NAME, 140);
+    this.stepT -= dt;
+    while (this.stepT <= 0 && this.k < o.steps) {
+      this.stepT += o.stepT;
+      for (const a of spiralAngles(this.base, o.arms, this.k, o.turn)) {
+        if (!this.boss.alive) break;
+        const pr = this.boss.shoot(w, a, bullet7('rose', 3, { speed: o.speed, z: 6 }));
+        pr.x = this.x + Math.cos(a) * 12;
+        pr.y = this.y - 10 + Math.sin(a) * 6;
+      }
+      this.k++;
+    }
+    if (this.k >= o.steps) {
+      this.dead = true;
+      if (o.dash && this.boss.alive) {
+        // the clone breaks off its spin and dashes through the keeper
+        const t = targetOf(this.boss, w);
+        const a = Math.atan2(t.y - this.y, t.x - this.x);
+        const len = Math.min(230, beamToWall(w, this.x, this.y, a) - 8);
+        const warn = 0.55;
+        laneWarning(w, this.x, this.y, a, len, 18, warn, ROSE[2]);
+        w.spawn(new GhostDancer(this.x, this.y, a, { source: NAME, warn, speed: 300, len, damage: 1, p2: o.p2 }));
+      } else {
+        w.spawn(new Afterimage(this.frameName(), this.x, this.y, false, ROSE[3], 0.3));
+      }
+    }
+  }
+
+  override draw(r: Renderer): void {
+    const alpha = this.age < this.o.warn ? fadeIn(this.age, this.o.warn) : 0.8;
+    drawClone(r, this.frameName(), this.x, this.y, alpha);
+    if (this.age < this.o.warn) r.ring(this.x, this.y - 12, 16 - 8 * clamp(this.age / this.o.warn, 0, 1), ROSE[3], 1, 0.7);
+    else {
+      r.ring(this.x, this.y - 16, 17 + Math.sin(this.age * 20) * 1.5, ROSE[3], 2, 0.3);
+    }
+  }
+
+  override light(w: World): void {
+    w.lights.add(this.x, this.y - 16, 28, '#ff70a8', { intensity: 0.5 });
+  }
+}
+
+/**
+ * 커튼콜 clone: poses at the edge of the stage until its cue, then locks onto the keeper
+ * (lane telegraph) and becomes a dashing ghost dancer.
+ */
+class CueClone extends Entity {
+  cue: number;
+  lead: number;
+  boss: Enemy;
+  p2: boolean;
+  constructor(boss: Enemy, x: number, y: number, cue: number, lead: number, p2: boolean) {
+    super();
+    this.boss = boss;
+    this.x = x;
+    this.y = y;
+    this.cue = cue;
+    this.lead = lead;
+    this.p2 = p2;
+    this.r = 7;
+    this.layer = 1;
+    this.tileCollide = false;
+    this.team = 'enemy';
+    this.enemyHazard = true;
+  }
+
+  override get sortY(): number {
+    return this.y + 1;
+  }
+
+  override update(w: World, dt: number): void {
+    this.age += dt;
+    if (this.age < this.cue - this.lead) return;
+    this.dead = true;
+    if (!this.boss.alive) return;
+    const t = targetOf(this.boss, w);
+    const a = Math.atan2(t.y - this.y, t.x - this.x);
+    const len = Math.min(300, beamToWall(w, this.x, this.y, a) - 8);
+    laneWarning(w, this.x, this.y, a, len, 18, this.lead, ROSE[2]);
+    w.spawn(new GhostDancer(this.x, this.y, a, { source: NAME, warn: this.lead, speed: 320, len, damage: 1, p2: this.p2 }));
+  }
+
+  override draw(r: Renderer): void {
+    const pre = this.p2 ? 'dancer2' : 'dancer';
+    const near = this.age > this.cue - this.lead - 0.4;
+    drawClone(r, `${pre}_pose_${Math.floor(this.age * 6) % 2}`, this.x, this.y, near ? 0.75 : fadeIn(this.age, 0.6), false);
+    if (near) r.ring(this.x, this.y - 12, 6 + Math.sin(this.age * 14) * 2, ROSE[4], 1, 0.8);
+  }
+
+  override light(w: World): void {
+    w.lights.add(this.x, this.y - 16, 22, '#ff70a8', { intensity: 0.35 });
+  }
+}
+
+/**
+ * 주테 분신: the clone that follows her grand jeté — it waits where she took off, then leaps
+ * onto the keeper's spot (ground warning for the whole flight) with its own gapped shock ring.
+ */
+class LeapEcho extends Entity {
+  boss: Enemy;
+  delay: number;
+  flight: number;
+  p2: boolean;
+  fromX: number;
+  fromY: number;
+  toX = 0;
+  toY = 0;
+  launched = false;
+  landedAt = -1;
+  constructor(boss: Enemy, x: number, y: number, delay: number, flight: number, p2: boolean) {
+    super();
+    this.boss = boss;
+    this.x = this.fromX = x;
+    this.y = this.fromY = y;
+    this.delay = delay;
+    this.flight = flight;
+    this.p2 = p2;
+    this.r = 8;
+    this.layer = 1;
+    this.tileCollide = false;
+    this.team = 'enemy';
+    this.enemyHazard = true;
+  }
+
+  override get sortY(): number {
+    return this.y + 1;
+  }
+
+  override update(w: World, dt: number): void {
+    this.age += dt;
+    if (this.landedAt >= 0) {
+      if (this.age - this.landedAt > 0.25) this.dead = true;
+      return;
+    }
+    if (this.age < this.delay) return;
+    if (!this.launched) {
+      this.launched = true;
+      const t = targetOf(this.boss, w);
+      const s = inRoom(w, t.x, t.y, 20);
+      this.toX = s.x;
+      this.toY = s.y;
+      w.spawn(new GroundWarning(s.x, s.y, 26, this.flight, undefined, ROSE[2]));
+      w.sfx('clockboss_pirouette', { vol: 0.45, pitch: 0.9 });
+    }
+    const k = clamp((this.age - this.delay) / this.flight, 0, 1);
+    this.x = this.fromX + (this.toX - this.fromX) * k;
+    this.y = this.fromY + (this.toY - this.fromY) * k;
+    this.z = Math.sin(k * Math.PI) * 64;
+    if (k >= 1) {
+      this.z = 0;
+      this.landedAt = this.age;
+      w.sfx('clockboss_gear', { vol: 0.6, pitch: 1.2 });
+      w.shake(0.2);
+      hitPlayerCircle(w, this.x, this.y, 22, 1, NAME, 170);
+      porcelainShards(w, this.x, this.y, 6, 70);
+      const g = Math.atan2(w.player.y - this.y, w.player.x - this.x) + w.rng.range(-0.4, 0.4);
+      w.spawn(new ShockRing(this.x, this.y + 2, { speed: 125, maxR: 120, color: ROSE[2], gaps: [g + Math.PI / 2, g - Math.PI / 2], gapWidth: 1.1, damage: 1, source: NAME, thick: 4, debris: ROSE_FX }));
+    }
+  }
+
+  override draw(r: Renderer): void {
+    const pre = this.p2 ? 'dancer2' : 'dancer';
+    let alpha: number;
+    let frame: string;
+    if (this.landedAt >= 0) {
+      alpha = 0.6 * clamp(1 - (this.age - this.landedAt) / 0.25, 0, 1);
+      frame = `${pre}_idle_0`;
+    } else if (!this.launched) {
+      alpha = fadeIn(this.age, this.delay);
+      frame = `${pre}_pose_${Math.floor(this.age * 8) % 2}`;
+    } else {
+      alpha = 0.8;
+      frame = `${pre}_leap_0`;
+    }
+    const k = Math.min(0.6, this.z / 70);
+    r.shadow(this.x, this.y + 2, 20 * (1 - k), 6 * (1 - k), 0.2 * alpha);
+    r.sprite(frame, this.x, this.y - this.z, { alpha, tint: ROSE[3], tintAmount: 0.5, flipX: this.toX < this.fromX });
+  }
+
+  override light(w: World): void {
+    w.lights.add(this.x, this.y - this.z - 16, 26, '#ff70a8', { intensity: 0.45 });
+  }
+}
+
 /** Projectile behavior: the shot's curve flips sign every `every` seconds — a ribbon rippling through the air. */
 function ribbonWave(every: number, curve: number): ProjBehavior {
   return {
@@ -552,19 +1169,36 @@ function* glide(e: Enemy, w: World, time: number): Script {
   if (w.rng.chance(0.35)) e.mem.side = -side;
 }
 
-/** Spin-dash along a lane toward `angle` for `len` px, trailing afterimages. */
-function* spinDash(e: Enemy, w: World, angle: number, len: number, speed: number): Script {
+/** Distance between the afterimages a pirouette leaves standing (px). */
+const ECHO_STEP = 36;
+
+/**
+ * Spin-dash along a lane toward `angle` for `len` px, trailing afterimages. With `echoes`
+ * some of them stay behind on the lane (남는 잔상): they block it for a moment, and in phase 2
+ * each one flares and throws a petal at the keeper.
+ */
+function* spinDash(e: Enemy, w: World, angle: number, len: number, speed: number, echoes = false): Script {
   anim(e, 'spin', true);
   e.mem.spinning = 1;
   w.sfx('clockboss_pirouette', { vol: 0.8, pitch: 1 + (e.mem.p2 ? 0.1 : 0) });
   const time = len / speed;
   let trail = 0;
+  let sx = e.x;
+  let sy = e.y;
+  let n = 0;
   const sub = e.charge(w, angle, speed, time);
   while (!sub.next().done) {
     trail += w.dt;
     if (trail > 0.04) {
       trail = 0;
       w.spawn(new Afterimage(e.frame(), e.x, e.y, e.facing < 0, ROSE[3], 0.28));
+    }
+    if (echoes && Math.hypot(e.x - sx, e.y - sy) >= ECHO_STEP) {
+      sx = e.x;
+      sy = e.y;
+      const p2 = !!e.mem.p2;
+      w.spawn(new StepEcho(e, e.x, e.y, e.frame(), (p2 ? 0.7 : 0.75) + n * 0.06, true, e.facing < 0, p2 ? 84 : 72));
+      n++;
     }
     yield;
   }
@@ -601,7 +1235,7 @@ function* pirouette(e: Enemy, w: World, ghosts = false): Script {
       }
     }
     yield warn;
-    yield* spinDash(e, w, a, len, p2 ? 340 : 310);
+    yield* spinDash(e, w, a, len, p2 ? 340 : 310, true);
     if (p2) {
       // a burst of petals where she stops
       for (const b of gapRing(8, w.rng.range(0, 0.4), [], 0)) e.shoot(w, b, bullet7('rose', 3, { speed: 76 }));
@@ -733,6 +1367,8 @@ function* leap(e: Enemy, w: World): Script {
     const s = inRoom(w, t.x + w.player.vx * lead, t.y + w.player.vy * lead, 20);
     const flight = 0.85 * T;
     w.spawn(new GroundWarning(s.x, s.y, 26, flight));
+    // 듀엣: a clone waits where she took off and leaps after her onto the keeper's new spot
+    w.spawn(new LeapEcho(e, e.x, e.y, flight + 0.15 * T, 0.7 * T, p2));
     anim(e, 'leap', true);
     yield* e.jumpTo(w, s.x, s.y, flight, 74);
     anim(e, 'idle', true);
@@ -787,6 +1423,180 @@ function* ribbons(e: Enemy, w: World): Script {
   yield recover(e, 1.1);
 }
 
+/** Is any clone of hers still dancing (rondo ring, echo, trio, curtain clones, ghosts)? */
+function clonesLive(w: World): boolean {
+  return w.entities.some((x) => !x.dead && (x instanceof GhostDancer || x instanceof RondoDancer || x instanceof EchoDancer || x instanceof TrioClone || x instanceof CueClone));
+}
+
+/** 론도: she raises her arms and her clones take a ring round the keeper (see RondoDancer); she dances on meanwhile. */
+function* rondo(e: Enemy, w: World): Script {
+  const p2 = !!e.mem.p2;
+  const T = tempo(e);
+  e.halt();
+  anim(e, 'pose', true);
+  e.telegraph(0.45 * T);
+  w.sfx('clockboss_box', { vol: 0.6, pitch: 1.5 });
+  yield 0.45 * T;
+  const t = e.target(w);
+  const o: RondoOpts = {
+    count: p2 ? 7 : 5, warn: 0.75, hold: p2 ? 3.3 : 3.0, aim: 0.6 * T, r0: 104, r1: p2 ? 56 : 62,
+    spin: w.rng.sign() * (p2 ? 1.0 : 0.85), drift: p2 ? 38 : 30, beat: p2 ? 0.42 : 0.5, petalSpeed: p2 ? 80 : 74, dashSpeed: p2 ? 340 : 320, p2,
+  };
+  const s: RondoState = { boss: e, o, cx: t.x, cy: t.y, angle: w.rng.angle(), rad: o.r0, age: 0, beatT: 0, beatK: 0, collapsed: false, members: [] };
+  for (let i = 0; i < o.count; i++) s.members.push(w.spawn(new RondoDancer(s, i)));
+  for (let k = 0; k < 3; k++) chime(w, k * 2, 0.3, p2);
+  anim(e, 'idle');
+  // the ring dances on its own while she starts her next figure
+  yield recover(e, 0.6);
+}
+
+/**
+ * 다 카포: three (four) quick pirouette dashes at the keeper; then the music box replays the
+ * whole route backwards as a rose echo of her (see EchoDancer) while she goes on.
+ */
+function* dacapo(e: Enemy, w: World): Script {
+  const p2 = !!e.mem.p2;
+  const T = tempo(e);
+  const n = p2 ? 4 : 3;
+  const route: { x: number; y: number }[] = [{ x: e.x, y: e.y }];
+  for (let k = 0; k < n; k++) {
+    e.halt();
+    anim(e, 'pose', true);
+    const t = e.target(w);
+    const a = Math.atan2(t.y - e.y, t.x - e.x) + w.rng.range(-0.25, 0.25);
+    const len = Math.min(150, Math.max(50, beamToWall(w, e.x, e.y, a) - 14));
+    const warn = 0.5 * T;
+    e.telegraph(warn);
+    laneWarning(w, e.x, e.y, a, len, 20, warn, ROSE[3]);
+    chime(w, k, 0.4, p2);
+    yield warn;
+    yield* spinDash(e, w, a, len, p2 ? 360 : 330);
+    route.push({ x: e.x, y: e.y });
+    yield 0.12 * T;
+  }
+  anim(e, 'pose', true);
+  // da capo: the echo dances the route from her last step back to her first
+  const pts = route.reverse();
+  const warn = 0.75;
+  const speed = p2 ? 320 : 290;
+  let at = warn;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i];
+    const b = pts[i + 1];
+    const d = Math.hypot(b.x - a.x, b.y - a.y);
+    if (d < 4) continue;
+    at += d / speed;
+    laneWarning(w, a.x, a.y, Math.atan2(b.y - a.y, b.x - a.x), d, 18, at, ROSE[2]);
+  }
+  w.spawn(new EchoDancer(e, pts, warn, speed, p2));
+  w.sfx('clockboss_detune', { vol: 0.5, pitch: 1.3 });
+  for (let k = 0; k < 4; k++) chime(w, 5 - k, 0.28, p2);
+  yield 0.3 * T;
+  anim(e, 'idle');
+  yield recover(e, 0.5);
+}
+
+/**
+ * 삼인무: two clones step out to make a triangle round the keeper with her, and all three
+ * spin their skirts at once — counter-turning spirals that weave a lattice. Phase 2: when the
+ * spin ends the clones dash through the keeper.
+ */
+function* trio(e: Enemy, w: World): Script {
+  const p2 = !!e.mem.p2;
+  const T = tempo(e);
+  e.halt();
+  anim(e, 'pose', true);
+  const t = e.target(w);
+  const a0 = Math.atan2(e.y - t.y, e.x - t.x);
+  const dist = clamp(Math.hypot(e.x - t.x, e.y - t.y), 80, 112);
+  const warn = 0.75 * T;
+  const steps = p2 ? 24 : 22;
+  const stepT = 0.11 * T;
+  const dir = w.rng.sign();
+  for (const sd of [-1, 1]) {
+    const a = a0 + (sd * TAU) / 3;
+    const s = stageSpot(w, t.x + Math.cos(a) * dist, t.y + Math.sin(a) * dist * 0.8);
+    w.spawn(new GroundWarning(s.x, s.y, 16, warn, undefined, ROSE[2]));
+    w.spawn(new TrioClone(e, s.x, s.y, w.rng.angle(), { warn, arms: 2, steps, stepT, turn: -dir * 0.26, speed: p2 ? 72 : 66, dash: p2, p2 }));
+  }
+  e.telegraph(warn);
+  w.sfx('clockboss_box', { vol: 0.6, pitch: 1.1 });
+  gather(w, e.x, e.y - 16, ROSE_FX, 10, 26);
+  yield warn;
+  anim(e, 'spin', true);
+  e.mem.spinning = 1;
+  const arms = p2 ? 3 : 2;
+  const base = w.rng.angle();
+  for (let k = 0; k < steps; k++) {
+    for (const a of spiralAngles(base, arms, k, dir * 0.26)) {
+      const pr = e.shoot(w, a, bullet7('rose', 3, { speed: p2 ? 76 : 70, z: 6 }));
+      pr.x = e.x + Math.cos(a) * 13;
+      pr.y = e.y - 10 + Math.sin(a) * 6;
+    }
+    if (k % 4 === 0) chime(w, k / 4, 0.3, p2);
+    yield stepT;
+  }
+  e.mem.spinning = 0;
+  anim(e, 'idle');
+  yield recover(e, 0.8);
+}
+
+/** HP share under which the one-time 커튼콜 plays (phase 2). */
+const CURTAIN_HP = 0.3;
+
+/**
+ * 커튼콜 (once, phase 2 under 30% HP): she leaps to the middle of the stage and spins a slow
+ * spiral while six clones pose round its edge and, cue by cue, dash through the keeper.
+ */
+function* curtainCall(e: Enemy, w: World): Script {
+  const T = tempo(e);
+  const room = w.room;
+  e.halt();
+  anim(e, 'pose', true);
+  e.telegraph(0.5);
+  w.banner('커튼콜', '무희의 분신들이 차례로 무대를 가로지른다', { color: ROSE[3], small: true });
+  w.sfx('clockboss_detune', { vol: 0.9, pitch: 1.1 });
+  yield 0.5;
+  const c = inRoom(w, room.centerX, room.centerY, 30);
+  w.spawn(new GroundWarning(c.x, c.y, 24, 0.7));
+  anim(e, 'leap', true);
+  yield* e.jumpTo(w, c.x, c.y, 0.7, 70);
+  anim(e, 'idle', true);
+  w.sfx('clockboss_gear', { vol: 0.8, pitch: 1.1 });
+  hitPlayerCircle(w, e.x, e.y, 22, 1, NAME, 170);
+  porcelainShards(w, e.x, e.y, 10, 90);
+  // six clones round the edge of the stage; cues alternate across it
+  const rx = room.interiorW / 2 - 22;
+  const ry = room.interiorH / 2 - 18;
+  const off = w.rng.angle();
+  const spots = [0, 1, 2, 3, 4, 5].map((i) => stageSpot(w, c.x + Math.cos(off + (i / 6) * TAU) * rx, c.y + Math.sin(off + (i / 6) * TAU) * ry));
+  const order = [0, 3, 1, 4, 2, 5, 0, 3, 1, 4];
+  const lead = 0.6;
+  const gap = 0.42 * T;
+  for (let k = 0; k < order.length; k++) {
+    const s = spots[order[k]];
+    w.spawn(new CueClone(e, s.x, s.y, 0.9 + k * gap, lead, true));
+  }
+  // she spins a slow two-armed spiral in the middle through the whole call
+  anim(e, 'spin', true);
+  e.mem.spinning = 1;
+  const steps = Math.round((0.9 + order.length * gap + 0.4) / 0.14);
+  const base = w.rng.angle();
+  const dir = w.rng.sign();
+  for (let k = 0; k < steps; k++) {
+    for (const a of spiralAngles(base, 2, k, dir * 0.3)) {
+      const pr = e.shoot(w, a, bullet7('rose', 3, { speed: 62, z: 6 }));
+      pr.x = e.x + Math.cos(a) * 13;
+      pr.y = e.y - 10 + Math.sin(a) * 6;
+    }
+    if (k % 3 === 0) chime(w, k / 3, 0.3, true);
+    yield 0.14;
+  }
+  e.mem.spinning = 0;
+  anim(e, 'idle');
+  yield recover(e, 0.8);
+}
+
 function* phaseTwo(e: Enemy, w: World): Script {
   yield* phaseShift(e, w, {
     anim: 'dancer_hurt',
@@ -810,23 +1620,36 @@ function* phaseTwo(e: Enemy, w: World): Script {
   });
   if (!e.mem.taught) {
     e.mem.taught = 1;
-    w.banner('음악상자가 어긋난다', '박자가 빨라지고, 거울의 무희가 함께 춤춘다', { color: ROSE[3], small: true });
+    w.banner('음악상자가 어긋난다', '박자가 빨라지고, 분신들이 쉬지 않고 함께 춤춘다', { color: ROSE[3], small: true });
   }
 }
 
 function* patterns(e: Enemy, w: World): Script {
   while (true) {
     const p2 = !!e.mem.p2;
+    if (p2 && !e.mem.curtain && e.hp <= e.maxHp * CURTAIN_HP) {
+      e.mem.curtain = 1;
+      e.mem.last = 'curtain';
+      yield* curtainCall(e, w);
+      continue;
+    }
     const ghosts = w.entities.some((x) => x instanceof GhostDancer && !x.dead);
+    const live = (cls: abstract new (...a: never[]) => unknown) => w.entities.some((x) => x instanceof cls && !x.dead);
+    // one clone figure at a time in phase 1; once cracked she layers them (each kind once)
+    const clones = clonesLive(w);
+    const free = (cls: abstract new (...a: never[]) => unknown) => (p2 ? !live(cls) : !clones);
     const near = e.distToTarget(w) < 110;
     const id = pickBossPattern(e, w, [
-      { id: 'pirouette', w: 3 },
-      { id: 'skirt', w: 2.4 },
-      { id: 'pins', w: 2.4 },
-      { id: 'mirrors', w: 2.2, when: !ghosts },
-      { id: 'leap', w: near ? 1.6 : 2.6 },
-      { id: 'ribbons', w: 2.2 },
-      { id: 'waltz', w: 3, when: p2 && !ghosts },
+      { id: 'pirouette', w: 2.6 },
+      { id: 'skirt', w: 1.6 },
+      { id: 'pins', w: 2.0 },
+      { id: 'mirrors', w: 1.8, when: !ghosts },
+      { id: 'leap', w: near ? 1.4 : 2.2 },
+      { id: 'ribbons', w: 1.8 },
+      { id: 'rondo', w: 2.8, when: free(RondoDancer) },
+      { id: 'dacapo', w: 2.4, when: free(EchoDancer) },
+      { id: 'trio', w: 2.2, when: free(TrioClone) },
+      { id: 'waltz', w: 2.6, when: p2 && !ghosts },
     ], e.mem.last as string | null);
     e.mem.last = id;
     if (id === 'pirouette') yield* pirouette(e, w, false);
@@ -835,7 +1658,12 @@ function* patterns(e: Enemy, w: World): Script {
     else if (id === 'mirrors') yield* mirrors(e, w);
     else if (id === 'leap') yield* leap(e, w);
     else if (id === 'ribbons') yield* ribbons(e, w);
+    else if (id === 'rondo') yield* rondo(e, w);
+    else if (id === 'dacapo') yield* dacapo(e, w);
+    else if (id === 'trio') yield* trio(e, w);
     else yield* pirouette(e, w, true);
+    // encore: now and then she runs straight into the next figure (more often once cracked)
+    if (w.rng.chance(p2 ? 0.35 : 0.15)) continue;
     yield* glide(e, w, p2 ? w.rng.range(0.2, 0.32) : w.rng.range(0.28, 0.45));
   }
 }
@@ -845,7 +1673,8 @@ function clearArena(w: World): void {
   clearEnemyShots(w);
   for (const x of w.entities) {
     if (x.dead) continue;
-    if (x instanceof GroundWarning || x instanceof GhostDancer || x instanceof ShockRing) x.dead = true;
+    if (x instanceof GroundWarning || x instanceof GhostDancer || x instanceof ShockRing || x instanceof RondoDancer || x instanceof EchoDancer
+      || x instanceof StepEcho || x instanceof TrioClone || x instanceof CueClone || x instanceof LeapEcho) x.dead = true;
   }
 }
 
@@ -874,7 +1703,8 @@ defineBoss({
     e.mem.spinning = 0;
     // every attack by name (debug console / screenshot tooling: `e.script.set(e.mem.attacks.skirt(e, w))`)
     e.mem.attacks = {
-      pirouette: (b: Enemy, ww: World) => pirouette(b, ww, false), skirt, pins, mirrors, leap, ribbons, waltz: (b: Enemy, ww: World) => pirouette(b, ww, true), patterns,
+      pirouette: (b: Enemy, ww: World) => pirouette(b, ww, false), skirt, pins, mirrors, leap, ribbons, waltz: (b: Enemy, ww: World) => pirouette(b, ww, true),
+      rondo, dacapo, trio, curtain: curtainCall, patterns,
     } satisfies Record<string, (b: Enemy, ww: World) => Script>;
   },
   *script(e, w) {
@@ -927,4 +1757,4 @@ defineBoss({
   },
 });
 
-export { GhostDancer, ribbonWave, PORC_FX };
+export { GhostDancer, RondoDancer, EchoDancer, StepEcho, TrioClone, CueClone, LeapEcho, ribbonWave, PORC_FX };
