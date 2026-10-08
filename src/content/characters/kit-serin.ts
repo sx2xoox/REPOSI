@@ -19,8 +19,8 @@ export const SERIN_MARK_TIME = 4;
 export const SERIN_MARK_BONUS = 0.12;
 /** window (s) after a vault in which the first hit is a critical */
 export const SERIN_VAULT_WINDOW = 1.2;
-/** 활·쇠뇌 (affinity): a weak-spot roll on every non-critical hit on a scented enemy (its own 40 % chance) */
-export const SERIN_MARK_CRIT_AFFINITY = 0.4;
+/** 활·쇠뇌 (affinity): a weak-spot roll on every non-critical hit on a scented enemy (its own 36 % chance) */
+export const SERIN_MARK_CRIT_AFFINITY = 0.36;
 
 // ------------------------------------------------------------------ icons
 defineDrawnSprite('icon_serin_passive', 16, 16, (p) => {
@@ -165,7 +165,7 @@ export const SERIN_DASH: DashDef = {
 
 export const SERIN_AFFINITY: AffinityDef = {
   name: '활·쇠뇌',
-  desc: '표식된 적에게 40% 확률로 약점 치명타, 사거리 +10%.',
+  desc: '표식된 적에게 36% 확률로 약점 치명타, 사거리 +10%.',
   families: ['bow'],
   stats(m) {
     m.mulStat('range', 1.1);

@@ -62,27 +62,33 @@ describe('character kit framework', () => {
       expect(c.pitch).toMatch(HANGUL);
       expect(c.releaseName).toMatch(HANGUL);
     }
-    // favoured classes (tests/affinity-a.test.ts covers their kit upgrades)
-    expect(Characters.must('ria').affinity?.ids).toContain('lantern_bolt');
-    expect(Characters.must('bern').affinity?.kinds).toContain('melee');
-    expect(Characters.must('serin').affinity?.tags).toContain('bow');
-    expect(Characters.must('niel').affinity?.tags).toContain('arcane');
+    // favoured classes are weapon families (tests/affinity-a.test.ts covers their kit upgrades)
+    expect(Characters.must('ria').affinity?.families).toEqual(['lantern']);
+    expect(Characters.must('bern').affinity?.families).toEqual(['sword']);
+    expect(Characters.must('serin').affinity?.families).toEqual(['bow']);
+    expect(Characters.must('niel').affinity?.families).toEqual(['occult', 'tome']);
   });
 
-  it('weaponMatchesAffinity matches by kind, tag and id; weapons carry affinity tags', () => {
+  it('weaponMatchesAffinity matches by family (and still by kind, tag and id); weapons carry tags', () => {
     const bern = Characters.must('bern').affinity!;
     const serin = Characters.must('serin').affinity!;
     const niel = Characters.must('niel').affinity!;
     expect(weaponMatchesAffinity(bern, Weapons.must('sentinel_blade'))).toBe(true);
-    expect(weaponMatchesAffinity(bern, Weapons.must('titan_greatsword'))).toBe(true); // charge kind, 'blade' tag
+    expect(weaponMatchesAffinity(bern, Weapons.must('titan_greatsword'))).toBe(true); // charge kind, 검 family
+    expect(weaponMatchesAffinity(bern, Weapons.must('twin_daggers'))).toBe(false); // 단검, not 검
     expect(weaponMatchesAffinity(bern, Weapons.must('lantern_bolt'))).toBe(false);
     expect(weaponMatchesAffinity(serin, Weapons.must('hunter_bow'))).toBe(true);
     expect(weaponMatchesAffinity(serin, Weapons.must('star_piercer'))).toBe(true);
     expect(weaponMatchesAffinity(serin, Weapons.must('twin_daggers'))).toBe(false);
     expect(weaponMatchesAffinity(niel, Weapons.must('void_gaze'))).toBe(true);
+    expect(weaponMatchesAffinity(niel, Weapons.must('firefly_tome'))).toBe(true);
+    expect(weaponMatchesAffinity(niel, Weapons.must('amber_wand'))).toBe(false); // 마법봉
     expect(weaponMatchesAffinity(niel, Weapons.must('great_hammer'))).toBe(false);
     expect(weaponMatchesAffinity(undefined, Weapons.must('void_gaze'))).toBe(false);
+    // the older rules still work for a class that wants them
     expect(weaponMatchesAffinity({ name: 'x', desc: 'y', ids: ['frost_wand'] }, Weapons.must('frost_wand'))).toBe(true);
+    expect(weaponMatchesAffinity({ name: 'x', desc: 'y', kinds: ['beam'] }, Weapons.must('void_gaze'))).toBe(true);
+    expect(weaponMatchesAffinity({ name: 'x', desc: 'y', families: ['staff'] }, Weapons.must('void_gaze'))).toBe(false);
     const tagged = Weapons.all().filter((d) => d.tags?.length).length;
     expect(tagged).toBeGreaterThanOrEqual(20);
   });
@@ -162,13 +168,13 @@ describe('리아 — 불씨 심지 / 불씨 질주', () => {
 
 describe('베른 — 기세 / 설원 돌진', () => {
   it('builds momentum stacks while hitting (faster attacks and steps) and loses them when idle', () => {
-    const r = measureDps({ character: 'bern', weapon: 'twin_daggers', seconds: 4 });
+    const r = measureDps({ character: 'bern', weapon: 'copper_sabre', seconds: 4 });
     const w = r.world;
     const p = w.player;
     expect(momentum(w)).toBe(BERN_MAX_STACKS);
     const frMax = p.stats.fireRate;
     const mvMax = p.stats.moveSpeed;
-    expect(p.flags.has('affinity')).toBe(true); // daggers are melee: each stack is worth the affinity's speed
+    expect(p.flags.has('affinity')).toBe(true); // a sabre is a 검: each stack is worth the affinity's speed
     for (const e of [...w.enemies]) w.killEnemy(e);
     drive(w, 60 * 5, () => {});
     expect(momentum(w)).toBe(0);
@@ -232,8 +238,8 @@ describe('세린 — 사냥 감각 / 도약', () => {
 });
 
 describe('니엘 — 공허 메아리 / 공허 걸음', () => {
-  it('floats, and every 4th attack (2nd with an arcane weapon) sends out a homing echo', () => {
-    const { w, dummy } = sim('niel', 'twin_lamp');
+  it('floats, and every 4th attack (2nd with an occult weapon or a tome) sends out a homing echo', () => {
+    const { w, dummy } = sim('niel', 'star_launcher');
     const p = w.player;
     expect(p.flying).toBe(true);
     expect(p.flags.has('affinity')).toBe(true);
@@ -251,6 +257,8 @@ describe('니엘 — 공허 메아리 / 공허 걸음', () => {
     }
     expect(echoes).toBeGreaterThanOrEqual(2);
     p.equipWeapon(w, 'great_hammer');
+    expect(echoEvery(w)).toBe(NIEL_ECHO_EVERY);
+    p.equipWeapon(w, 'twin_lamp'); // a 등불 (리아's family), not Niel's
     expect(echoEvery(w)).toBe(NIEL_ECHO_EVERY);
   });
 

@@ -1,10 +1,12 @@
 // 니엘's kit — the void pomeranian, built around void echoes.
 //   passive 공허 메아리: every 4th attack sends out a void echo (a slow homing
-//     orb at 80% damage, pierces one enemy); the child floats over pits and spikes
+//     orb at 80% damage, pierces one enemy); attacks are counted on the keeper's
+//     beat, so a fast weapon calls no more echoes and a slow, heavy attack counts
+//     twice; the child floats over pits and spikes
 //   dash 공허 걸음: a short blink that leaves a rift at the origin, which pulls
 //     and bites nearby enemies before collapsing
-//   affinity 마법 무기: echoes every 2nd attack instead and the echo is a larger,
-//     stronger orb (90% damage instead of 80%)
+//   affinity 주술구 / 마도서·붓: echoes every 2nd attack instead and the echo is a
+//     larger, stronger orb (90% damage instead of 80%)
 
 import type { World } from '../../game/world';
 import type { Renderer } from '../../engine/renderer';
@@ -14,6 +16,7 @@ import { Projectile } from '../../game/projectile';
 import { RingFx } from '../../game/effects';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { fx } from '../../engine/rng';
+import { clamp } from '../../engine/math';
 import { glowSprite } from '../weapons/common';
 import { cooldown, proc } from '../items/lib';
 import { O } from './kit';
@@ -28,6 +31,8 @@ export const NIEL_RIFT_RADIUS = 20;
 export const NIEL_RIFT_LIFE = 0.7;
 export const NIEL_RIFT_DMG = 0.6;
 const RIFT_BITES = [0.18, 0.48];
+/** Most keeper beats one attack counts for: a slow, heavy attack (gravity orb, tesla stake) rings twice. */
+export const NIEL_BEAT_MAX = 2;
 
 const VOID = ['#ffffff', '#ead0ff', '#b070ff', '#4a2a7a'];
 // echo glows (normal / deeper echo) compiled up front with the boot warm-up
@@ -61,7 +66,12 @@ defineDrawnSprite('icon_niel_dash', 16, 16, (p) => {
   p.px(14, 3, '#ead0ff');
 }, { outline: '#4a2a7a' });
 
-/** Attacks until the next echo with / without a favoured weapon. */
+/** The keeper's beat (s): echoes are counted on it, whatever the weapon's own cadence. */
+export function echoBeat(w: World): number {
+  return 0.9 / Math.max(0.5, w.player.stats.fireRate);
+}
+
+/** Attacks (keeper beats) until the next echo with / without a favoured weapon. */
 export function echoEvery(w: World): number {
   return w.player.flags.has('affinity') ? NIEL_ECHO_EVERY_AFFINITY : NIEL_ECHO_EVERY;
 }
@@ -96,18 +106,25 @@ export function spawnEcho(w: World, angle: number): Projectile {
 
 export const NIEL_PASSIVE: PassiveDef = {
   name: '공허 메아리',
-  desc: '네 번째 공격마다 공허의 메아리가 적을 쫓는다. 발이 땅에 닿지 않아 함정 위를 지난다.',
+  desc: '네 번째 공격마다 공허의 메아리가 적을 쫓는다(느린 공격은 두 번 셈). 함정 위를 떠서 지난다.',
   icon: 'icon_niel_passive',
   look: { step: '#8a5ad8', aura: '#4a2a7a', mote: '#b070ff' },
   stats(m) {
     m.flag('flying');
   },
   onAttack(w, angle) {
-    // counted at the keeper's own cadence: a fast weapon does not call more echoes
-    if (!cooldown(w, 'nielEcho', 0.9 / Math.max(0.5, w.player.stats.fireRate))) return;
-    const n = (w.vars.__nielAtk ?? 0) + 1;
-    if (n >= echoEvery(w)) {
-      w.vars.__nielAtk = 0;
+    // counted on the keeper's own beat: a fast weapon does not call more echoes, and a slow,
+    // heavy attack counts the beats it took (up to NIEL_BEAT_MAX), so it does not call fewer
+    const beat = echoBeat(w);
+    if (!cooldown(w, 'nielEcho', beat)) return;
+    const last = w.vars.__nielBeatAt;
+    w.vars.__nielBeatAt = w.time;
+    const beats = last === undefined ? 1 : clamp((w.time - last) / beat, 1, NIEL_BEAT_MAX);
+    const every = echoEvery(w);
+    const n = (w.vars.__nielAtk ?? 0) + beats;
+    if (n >= every) {
+      // left-over beats carry (bounded, so a weapon swap cannot bank a burst of echoes)
+      w.vars.__nielAtk = Math.min(n - every, every - 1);
       spawnEcho(w, angle);
     } else w.vars.__nielAtk = n;
   },
@@ -115,10 +132,10 @@ export const NIEL_PASSIVE: PassiveDef = {
     // the echo counter: small void dots filling up beside the keeper's head
     const every = echoEvery(w);
     const n = w.vars.__nielAtk ?? 0;
-    if (n <= 0) return;
+    if (n < 1) return;
     const p = w.player;
     for (let i = 0; i < every - 1; i++) {
-      const on = i < n;
+      const on = i + 1 <= n;
       r.rect(p.x + 9 + i * 3, p.y - 22 - p.z + Math.sin(w.time * 4 + i) * 0.6, 2, 2, on ? '#b070ff' : '#2a1844', on ? 0.95 : 0.5);
     }
   },

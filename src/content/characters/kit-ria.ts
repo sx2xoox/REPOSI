@@ -3,8 +3,8 @@
 //     mark on the enemy and the 4th mark ignites (small burst + burn, +ember)
 //   dash 불씨 질주: a short rush that leaves a burning trail
 //   release 등불 개화 (releases.ts), a larger lantern light (CharacterDef.lightRadius)
-//   affinity 등불 무기: with a lantern weapon the marks ignite on the 3rd hit and the
-//     spark bursts and burns 85% harder (the ember refund per hit stays the same)
+//   affinity 등불: with a lantern (the 등불 family) the marks ignite on the 3rd hit and the
+//     spark bursts and burns 75% harder (the ember refund per hit stays the same)
 
 import type { World } from '../../game/world';
 import type { Renderer } from '../../engine/renderer';
@@ -35,12 +35,12 @@ export const RIA_SPARK_EMBER = 5;
 export const RIA_TRAIL_DMG = 0.25;
 export const RIA_TRAIL_LIFE = 1.3;
 /**
- * 등불 무기 (affinity): marks ignite on this many hits, and the spark's burst / burn
+ * 등불 (affinity): marks ignite on this many hits, and the spark's burst / burn
  * (fractions of player damage) with a favoured lantern weapon.
  */
 export const RIA_SPARK_HITS_AFFINITY = 3;
-export const RIA_SPARK_DMG_AFFINITY = 0.925;
-export const RIA_SPARK_BURN_AFFINITY = 0.555;
+export const RIA_SPARK_DMG_AFFINITY = 0.875;
+export const RIA_SPARK_BURN_AFFINITY = 0.525;
 /** Lantern weapons (the 등불 family, game/weapon-families.ts; the affinity matches it). */
 export const RIA_LANTERN_WEAPONS = familyMembers('lantern');
 
@@ -121,7 +121,7 @@ class EmberMarks extends EnemyOverlay {
 
 /**
  * The 4th ember mark (3rd with a lantern weapon) ignites: a small burst that burns
- * nearby enemies and refunds ember. The lantern spark hits 85% harder; the refund
+ * nearby enemies and refunds ember. The lantern spark hits 75% harder; the refund
  * follows the marks, so the gauge fills per hit exactly as fast either way.
  */
 export function emberSpark(w: World, e: Enemy): void {
@@ -186,6 +186,6 @@ export const RIA_DASH: DashDef = {
 
 export const RIA_AFFINITY: AffinityDef = {
   name: '등불',
-  desc: '등불을 들면 불씨가 세 번째 적중에 터지고 폭발·화상이 85% 세진다.',
+  desc: '등불을 들면 불씨가 세 번째 적중에 터지고 폭발·화상이 75% 세진다.',
   families: ['lantern'],
 };

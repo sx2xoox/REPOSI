@@ -3,7 +3,7 @@
 //     +5% move speed each; they drop one by one after 1.6s without a hit.
 //     Deflecting a bullet still feeds the ember gauge (the sentinel's old oath).
 //   dash 설원 돌진: a rushing charge that hits and shoves every enemy it passes
-//   affinity 근접 무기: with a melee weapon every momentum stack is worth +13.5% attack
+//   affinity 검: with a sword (the 검 family) every momentum stack is worth +13.5% attack
 //     speed instead of +6%, and the stacks hold on longer (2.4s) before they start to drop
 
 import type { World } from '../../game/world';
@@ -18,9 +18,9 @@ export const BERN_MAX_STACKS = 5;
 /** attack speed / move speed per stack */
 export const BERN_STACK_FIRE = 0.06;
 export const BERN_STACK_MOVE = 0.05;
-/** attack speed per stack with a favoured melee weapon (근접 무기) */
+/** attack speed per stack with a favoured sword (검) */
 export const BERN_STACK_FIRE_AFFINITY = 0.135;
-/** seconds without a hit before stacks start dropping (longer with a melee weapon), and the drop interval */
+/** seconds without a hit before stacks start dropping (longer with a sword), and the drop interval */
 export const BERN_DECAY_DELAY = 1.6;
 export const BERN_DECAY_DELAY_AFFINITY = 2.4;
 export const BERN_DECAY_STEP = 0.4;
@@ -61,7 +61,7 @@ export function momentum(w: World): number {
 }
 
 /**
- * Attack speed per momentum stack (+13.5% instead of +6% with a favoured melee weapon). Read from the
+ * Attack speed per momentum stack (+13.5% instead of +6% with a favoured sword). Read from the
  * weapon itself, not the 'affinity' flag: the stat hook runs while that flag is recomputed.
  */
 export function stackFire(w: World | undefined): number {
@@ -129,7 +129,7 @@ export const BERN_PASSIVE: PassiveDef = {
     // stack pips above the head; the newest pops and the row pulses at full momentum
     const since = w.time - (w.vars.__bernStackAt ?? -99);
     const pulse = n >= BERN_MAX_STACKS ? 0.8 + 0.2 * Math.sin(w.time * 12) : 1;
-    // 근접 무기: every pip is a double chevron (each stack worth over twice the speed)
+    // 검: every pip is a double chevron (each stack worth over twice the speed)
     const sword = p.flags.has('affinity');
     for (let i = 0; i < n; i++) {
       const pop = i === n - 1 && since < 0.2 ? 1 + (1 - since / 0.2) * 0.6 : 1;
