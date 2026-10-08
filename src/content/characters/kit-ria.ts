@@ -4,7 +4,7 @@
 //   dash 불씨 질주: a short rush that leaves a burning trail
 //   release 등불 개화 (releases.ts), a larger lantern light (CharacterDef.lightRadius)
 //   affinity 등불 무기: with a lantern weapon the marks ignite on the 3rd hit and the
-//     spark bursts and burns twice as hard (the ember refund per hit stays the same)
+//     spark bursts and burns 85% harder (the ember refund per hit stays the same)
 
 import type { World } from '../../game/world';
 import type { Renderer } from '../../engine/renderer';
@@ -12,7 +12,10 @@ import type { AffinityDef, DashDef, PassiveDef } from '../../game/defs';
 import { Enemy } from '../../game/enemy';
 import { RingFx } from '../../game/effects';
 import { defineDrawnSprite } from '../../engine/sprites';
-import { HazardZone, enemiesNear, hitShare, hitWeight, isAttack, itemHit, proc } from '../items/lib';
+import type { HitInfo } from '../../game/entity';
+import { clamp } from '../../engine/math';
+import { WEAPON_DAMAGE_SCALE } from '../../game/stats';
+import { HazardZone, enemiesNear, hitWeight, isAttack, itemHit, proc } from '../items/lib';
 import { EnemyOverlay, O, ensureOverlay, trailReset, trailStep } from './kit';
 
 /** Extra ember gained per hit (fraction of the base gain). */
@@ -35,8 +38,8 @@ export const RIA_TRAIL_LIFE = 1.3;
  * (fractions of player damage) with a favoured lantern weapon.
  */
 export const RIA_SPARK_HITS_AFFINITY = 3;
-export const RIA_SPARK_DMG_AFFINITY = 1.0;
-export const RIA_SPARK_BURN_AFFINITY = 0.6;
+export const RIA_SPARK_DMG_AFFINITY = 0.925;
+export const RIA_SPARK_BURN_AFFINITY = 0.555;
 /**
  * Lantern weapons (the affinity matches these ids): the hand lantern, the twin-wick lamp gun,
  * the wandering lamp spirit, the first keeper's dawn lantern and the rescue-lantern flail.
@@ -84,6 +87,17 @@ export function sparkHits(w: World): number {
   return lanternHeld(w) ? RIA_SPARK_HITS_AFFINITY : RIA_SPARK_HITS;
 }
 
+/**
+ * Marks a hit leaves: its size next to one plain weapon shot (the keeper's damage x
+ * WEAPON_DAMAGE_SCALE), 0.25..2, laser ticks half. A plain shot leaves exactly one mark, so
+ * "the 4th hit" (3rd with a lantern) holds however the damage is split, and the weapon
+ * damage scale does not slow the sparks down (kits keep the keeper's cadence).
+ */
+export function markWeight(w: World, hit: HitInfo): number {
+  const plain = Math.max(1, w.player.stats.damage * WEAPON_DAMAGE_SCALE);
+  return hitWeight(hit) * clamp(hit.damage / plain, 0.25, 2);
+}
+
 /** Ember marks orbiting the enemies that carry them (cosmetic). */
 class EmberMarks extends EnemyOverlay {
   drawMark(r: Renderer, w: World, e: Enemy): void {
@@ -110,7 +124,7 @@ class EmberMarks extends EnemyOverlay {
 
 /**
  * The 4th ember mark (3rd with a lantern weapon) ignites: a small burst that burns
- * nearby enemies and refunds ember. The lantern spark hits twice as hard; the refund
+ * nearby enemies and refunds ember. The lantern spark hits 85% harder; the refund
  * follows the marks, so the gauge fills per hit exactly as fast either way.
  */
 export function emberSpark(w: World, e: Enemy): void {
@@ -144,7 +158,7 @@ export const RIA_PASSIVE: PassiveDef = {
     if (!(t instanceof Enemy) || !t.alive) return;
     const stale = w.time - (t.mem.__riaAt ?? -99) > RIA_MARK_TIME;
     // marks follow hit size: four plain shots' worth of damage, however it is split
-    const n = (stale ? 0 : t.mem.__riaMarks ?? 0) + hitWeight(hit) * hitShare(w, hit);
+    const n = (stale ? 0 : t.mem.__riaMarks ?? 0) + markWeight(w, hit);
     t.mem.__riaAt = w.time;
     if (n >= sparkHits(w)) {
       t.mem.__riaMarks = 0;
@@ -175,6 +189,6 @@ export const RIA_DASH: DashDef = {
 
 export const RIA_AFFINITY: AffinityDef = {
   name: '등불 무기',
-  desc: '등불 무기를 들면 불씨가 세 번째 적중에 터지고 불길이 두 배로 세진다.',
+  desc: '등불 무기를 들면 불씨가 세 번째 적중에 터지고 폭발·화상이 85% 세진다.',
   ids: RIA_LANTERN_WEAPONS,
 };

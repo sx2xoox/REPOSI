@@ -1,10 +1,10 @@
 // Favoured weapon classes of 리아 / 베른 / 세린 / 니엘 (CharacterDef.affinity, user 2026-10-08:
 // weapons -15 %, a keeper holding its favoured class is 20–25 % more effective — through an
 // upgrade of the keeper's own kit, not a flat damage bonus):
-//   리아 등불 무기  — the ember marks ignite on the 3rd hit and the spark bursts / burns twice as hard
+//   리아 등불 무기  — the ember marks ignite on the 3rd hit and the spark bursts / burns 85 % harder
 //                    (lantern weapons by id: lantern_bolt, twin_lamp, wandering_lamp, dawn_lantern, lantern_flail)
 //   베른 근접 무기  — every momentum stack is worth +13.5 % attack speed instead of +6 %, held 2.4 s
-//   세린 활·쇠뇌    — scent marks expose a weak spot: +40 % critical chance on scented enemies
+//   세린 활·쇠뇌    — scent marks expose a weak spot: a 40 % critical roll on scented enemies
 //   니엘 마법 무기  — the void echo answers every 2nd attack and is a larger orb (90 % damage)
 // Each keeper: the class matches the right weapons (incl. the starter), the flag follows weapon
 // swaps, the upgrade only works with the flag, and the measured gain against the same keeper
@@ -14,9 +14,10 @@ import './headless';
 import { describe, expect, it } from 'vitest';
 import { Artifacts, Characters, RARITY_WEIGHT, Weapons, defineCharacter, weaponMatchesAffinity } from '../src/game/defs';
 import { RNG } from '../src/engine/rng';
-import { StatMods } from '../src/game/stats';
+import { StatMods, WEAPON_DAMAGE_SCALE } from '../src/game/stats';
 import { FIXED_DT } from '../src/game/constants';
 import { measureDps } from './dpsharness';
+import { isAttack } from '../src/content/items/lib';
 import {
   RIA_LANTERN_WEAPONS, RIA_SPARK_DMG, RIA_SPARK_DMG_AFFINITY, RIA_SPARK_EMBER, RIA_SPARK_HITS, RIA_SPARK_HITS_AFFINITY, emberSpark, sparkHits,
 } from '../src/content/characters/kit-ria';
@@ -110,7 +111,7 @@ describe('리아 — 등불 무기', () => {
     expect(sparkHits(w)).toBe(RIA_SPARK_HITS);
   });
 
-  it('the lantern spark bursts twice as hard, and the ember refund per mark stays the same', () => {
+  it('the lantern spark bursts and burns 85 % harder, and the ember refund per mark stays the same', () => {
     const burst = (weapon: string) => {
       const { w, dummy } = sim('ria', weapon);
       w.update(FIXED_DT);
@@ -128,7 +129,7 @@ describe('리아 — 등불 무기', () => {
     expect(lantern.ember / lantern.marks).toBeCloseTo(bow.ember / bow.marks, 5);
   });
 
-  it('twelve plain hits ignite four sparks with a lantern, three without', () => {
+  it('twelve plain weapon shots ignite four sparks with a lantern, three without', () => {
     const sparks = (weapon: string) => {
       const { w, dummy } = sim('ria', weapon);
       w.update(FIXED_DT);
@@ -136,13 +137,36 @@ describe('리아 — 등불 무기', () => {
       p.stats.critChance = 0;
       let n = 0;
       for (let i = 0; i < 12; i++) {
-        w.applyHit(dummy, { damage: p.stats.damage, kind: 'projectile', attacker: p });
+        // one plain weapon shot (weapons deal WEAPON_DAMAGE_SCALE of the keeper's damage)
+        w.applyHit(dummy, { damage: p.stats.damage * WEAPON_DAMAGE_SCALE, kind: 'projectile', attacker: p });
         if (dummy.mem.__riaMarks === 0) n++;
       }
       return n;
     };
     expect(sparks('lantern_bolt')).toBe(12 / RIA_SPARK_HITS_AFFINITY);
     expect(sparks('hunter_bow')).toBe(12 / RIA_SPARK_HITS);
+  });
+
+  it('the real hand lantern ignites on its 3rd shot, the 4th without the class', () => {
+    // shots fired at the dummy until two sparks: the weapon damage scale must not stretch the count
+    const shotsPerSpark = (character: string) => {
+      const { w, dummy } = sim(character, 'lantern_bolt');
+      const p = w.player;
+      const seq: string[] = [];
+      const orig = w.applyHit.bind(w);
+      w.applyHit = (target, hit) => {
+        if (target === dummy && hit.procs?.includes('ria_spark')) seq.push('s');
+        else if (target === dummy && isAttack(hit)) seq.push('a');
+        return orig(target, hit);
+      };
+      for (let i = 0; i < Math.round(8 / FIXED_DT) && seq.filter((x) => x === 's').length < 2; i++) {
+        p.stats.critChance = 0;
+        w.update(FIXED_DT);
+      }
+      return seq.join('').split('s').slice(0, 2).map((run) => run.length);
+    };
+    expect(shotsPerSpark('ria')).toEqual([RIA_SPARK_HITS_AFFINITY, RIA_SPARK_HITS_AFFINITY]);
+    expect(shotsPerSpark(noAffinity('ria'))).toEqual([RIA_SPARK_HITS, RIA_SPARK_HITS]);
   });
 });
 
