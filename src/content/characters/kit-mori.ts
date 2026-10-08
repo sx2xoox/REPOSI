@@ -35,7 +35,7 @@ export const MORI_MARK_TIME = 2;
 /** headbutt: damage (x player damage), cooldown (s; x MORI_HEADBUTT_CD_AFFINITY with a staff), nudge toward the herd point */
 export const MORI_HEADBUTT_DMG = 0.38;
 export const MORI_HEADBUTT_CD = 0.75;
-export const MORI_HEADBUTT_CD_AFFINITY = 0.8;
+export const MORI_HEADBUTT_CD_AFFINITY = 0.85;
 export const MORI_HEADBUTT_KNOCK = 110;
 /** sheep only work enemies this close to the herd point */
 export const MORI_HERD_RANGE = 120;

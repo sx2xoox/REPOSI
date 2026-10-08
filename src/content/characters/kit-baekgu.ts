@@ -7,15 +7,16 @@
 //     pass through the dashing keeper inside the window count as well.
 //   dash 찰나 걸음: a short sidestep (36 px)
 //   affinity 단도·도: short blades widen the window (+0.05 s) and the bullet
-//     return (48 -> 72 px), lengthen 반격 (+0.6 s) and follow the counter slash
-//     with a second, crossing one at the same target (also a guaranteed
-//     critical); +8% move speed as flavour
+//     return (48 -> 72 px), make 반격 longer (+0.6 s) and stronger (x1.5 ->
+//     x1.65) and follow the counter slash with a second, crossing one at the
+//     same target (also a guaranteed critical); +8% move speed as flavour
 //   release 섬광 연참 (releaseFlashSlashes): six teleporting slashes, then a finisher
 
 import type { World } from '../../game/world';
 import type { Player } from '../../game/player';
 import type { Renderer } from '../../engine/renderer';
 import type { AffinityDef, DashDef, PassiveDef } from '../../game/defs';
+import { Weapons, weaponMatchesAffinity } from '../../game/defs';
 import { Enemy } from '../../game/enemy';
 import type { Projectile } from '../../game/projectile';
 import { MeleeSwing, reflectProjectile } from '../../game/melee';
@@ -34,10 +35,11 @@ import { O } from './kit';
 export const BAEKGU_WINDOW_CURSOR = 0.17;
 export const BAEKGU_WINDOW_STICK = 0.22;
 export const BAEKGU_WINDOW_AFFINITY = 0.05;
-/** 반격 window (s) after a perfect dodge (+ affinity), damage multiplier during it */
+/** 반격 window (s) after a perfect dodge (+ affinity), damage multiplier during it (with a short blade) */
 export const BAEKGU_COUNTER_TIME = 1.6;
 export const BAEKGU_COUNTER_TIME_AFFINITY = 0.6;
 export const BAEKGU_COUNTER_DMG = 1.5;
+export const BAEKGU_COUNTER_DMG_AFFINITY = 1.65;
 /** counter slash: damage (x player damage, always a critical), base reach, search radius */
 export const BAEKGU_STRIKE_DMG = 1.8;
 export const BAEKGU_STRIKE_REACH = 34;
@@ -99,6 +101,15 @@ for (let d = 8; d <= 12; d += 2) glowSprite(d, '#c8d8ff');
 // ------------------------------------------------------------------ state
 export function hasAffinity(w: World): boolean {
   return w.player.flags.has('affinity');
+}
+
+/**
+ * Is a short blade in hand right now? (Read by the passive's stats(), which runs while the
+ * stats — and with them the 'affinity' flag — are being recomputed after a weapon swap.)
+ */
+function bladeInHand(w: World): boolean {
+  const p = w.player;
+  return weaponMatchesAffinity(p.character.affinity, Weapons.get(p.weaponId));
 }
 
 /** The perfect-dodge window for this step's input (wider with stick / touch aim and the affinity). */
@@ -288,7 +299,8 @@ export const BAEKGU_PASSIVE: PassiveDef = {
   icon: 'icon_baekgu_passive',
   look: { hit: '#ffffff', step: '#e8f0ff' },
   stats(m, _power, w) {
-    if (w?.vars && (w.vars.__bgCounterUntil ?? -1) > w.time) m.mulStat('damage', BAEKGU_COUNTER_DMG);
+    // 반격: all damage x1.5 (x1.65 with a short blade in hand)
+    if (w?.vars && (w.vars.__bgCounterUntil ?? -1) > w.time) m.mulStat('damage', bladeInHand(w) ? BAEKGU_COUNTER_DMG_AFFINITY : BAEKGU_COUNTER_DMG);
   },
   modifyHit(w, t, hit) {
     if (!isAttack(hit) || !(t instanceof Enemy)) return;
@@ -356,7 +368,7 @@ export const BAEKGU_DASH: DashDef = {
 // ------------------------------------------------------------------ affinity
 export const BAEKGU_AFFINITY: AffinityDef = {
   name: '단도·도',
-  desc: '간파 창·반사 범위가 넓어지고, 반격이 길어지며 베기가 두 번 들어간다.',
+  desc: '간파 창·반사 범위가 넓어지고, 반격이 길고 세지며(+65%) 반격 베기가 두 번.',
   tags: ['quick'],
   ids: ['fang_blade', 'twin_daggers', 'moon_katana', 'chain_sickle', 'return_blade'],
   stats(m) {

@@ -61,7 +61,7 @@ export const BORI_BLOCK_RADIUS_AFFINITY = 24;
 export const BORI_SHOVE_DMG_AFFINITY = 1.2;
 export const BORI_SHOVE_STUN_AFFINITY = 0.6;
 /** affinity: barrel poured in per weapon hit, x the hit's size (hitShare: 1 = one plain hit) */
-export const BORI_HIT_CHARGE = 0.01;
+export const BORI_HIT_CHARGE = 0.02;
 /** release: howl damage, beacon pulses (damage each, with falloff), final pulse */
 export const BORI_HOWL_DMG = 3;
 export const BORI_HOWL_RADIUS = 95;

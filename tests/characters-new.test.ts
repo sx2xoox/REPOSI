@@ -16,7 +16,7 @@ import { BORI } from '../src/content/characters/bori';
 import { BAEKGU } from '../src/content/characters/baekgu';
 import { MORI } from '../src/content/characters/mori';
 import { BORI_BLOCK_CHARGE, BORI_MASS, BodyBlock, RescuePuddle, addBarrel, barrel } from '../src/content/characters/kit-bori';
-import { BAEKGU_COUNTER_DMG, BAEKGU_SLOW_SCALE, BAEKGU_WINDOW_AFFINITY, BAEKGU_WINDOW_CURSOR, BAEKGU_WINDOW_STICK, dodgeWindow, inCounter } from '../src/content/characters/kit-baekgu';
+import { BAEKGU_COUNTER_DMG_AFFINITY, BAEKGU_SLOW_SCALE, BAEKGU_WINDOW_AFFINITY, BAEKGU_WINDOW_CURSOR, BAEKGU_WINDOW_STICK, dodgeWindow, inCounter } from '../src/content/characters/kit-baekgu';
 import { MORI_GROUP_BONUS, MORI_SHEEP, MORI_SHEEP_AFFINITY, SpiritSheep, herdPoint, isGrouped, penActive } from '../src/content/characters/kit-mori';
 import { BORI_UNLOCK_DEATHS, MORI_UNLOCK_KILLS, boriUnlockDue, bossUnlocksBaekgu, moriUnlockDue } from '../src/content/characters/unlocks';
 import { familiarsOf } from '../src/content/items/lib';
@@ -253,7 +253,8 @@ describe('백구 — 간파 / 찰나 걸음', () => {
     expect(pr.dead).toBe(false);
     expect(w.enemyTimeScale).toBeCloseTo(BAEKGU_SLOW_SCALE, 5);
     expect(inCounter(w)).toBe(true);
-    expect(p.stats.damage).toBeCloseTo(dmg0 * BAEKGU_COUNTER_DMG, 3);
+    // (with her own short blade 반격 is the stronger x1.65; tests/affinity-b covers both)
+    expect(p.stats.damage).toBeCloseTo(dmg0 * BAEKGU_COUNTER_DMG_AFFINITY, 3);
     expect(p.ember).toBeGreaterThan(0);
     drive(w, 8);
     // the counter slash landed on the dummy as a critical

@@ -4,14 +4,15 @@
 //   보리 묵직한 무기 — the body block's wall stands longer and wider and shoves harder, and every
 //     weapon hit pours a little into the rescue barrel (by the hit's size)
 //   백구 단도·도   — wider perfect-dodge window, wider bullet return, a second crossing
-//     counter slash, a longer 반격
+//     counter slash, a longer and stronger 반격 (x1.5 -> x1.65)
 //   모리 지팡이    — a third sheep, faster headbutts, and a headbutted enemy counts as herded
 //     even alone (the +25 % herd bonus reaches bosses and stragglers)
 // The gain is checked against a clone of the keeper without the affinity, on short runs:
 // training dummies for 모리 (single target), a bullet duel for 백구 (perfect dodges on a
 // clock) and a short boss drill (boss-bench bot, real hearts: fight time and hearts lost net
-// of healing) for 보리 and 백구. The full measurement (312 boss fights per variant against
-// +20 % / +25 % damage references, mid builds) is in the commit report.
+// of healing) for 보리 and 백구. The full measurement (416 boss fights per weapon and variant,
+// four favoured weapons each, against +20 % / +25 % damage references; dummies with mid
+// builds for 모리) is in the commit message.
 
 import './headless';
 import { fakeDisplay } from './headless';
@@ -30,7 +31,8 @@ import {
   BodyBlock, barrel,
 } from '../src/content/characters/kit-bori';
 import {
-  BAEKGU_COUNTER_TIME, BAEKGU_COUNTER_TIME_AFFINITY, BAEKGU_REFLECT_RADIUS, BAEKGU_REFLECT_RADIUS_AFFINITY, BAEKGU_STRIKE2_DELAY, inCounter,
+  BAEKGU_COUNTER_DMG, BAEKGU_COUNTER_DMG_AFFINITY, BAEKGU_COUNTER_TIME, BAEKGU_COUNTER_TIME_AFFINITY, BAEKGU_REFLECT_RADIUS, BAEKGU_REFLECT_RADIUS_AFFINITY,
+  BAEKGU_STRIKE2_DELAY, inCounter,
 } from '../src/content/characters/kit-baekgu';
 import { MORI_GROUP_BONUS, MORI_MARK_TIME, MORI_SHEEP, MORI_SHEEP_AFFINITY, SpiritSheep, isHerded, isMarked } from '../src/content/characters/kit-mori';
 import { familiarsOf } from '../src/content/items/lib';
@@ -160,6 +162,20 @@ const DRILL_POWER: Record<number, number> = { 1: 1.5, 2: 2.1, 3: 3, 4: 4.2, 5: 5
 let drillRenderer: Renderer | null = null;
 
 /**
+ * `character` with its base damage x `k`: the drill's build stands in as real keeper damage, so
+ * effects sized by the hit (hitShare: 보리's barrel, ember, procs) see hits of their natural size.
+ * (Scaling hit.damage inside applyHit instead would make every hit look up to 2x "bigger".)
+ */
+function powered(character: string, k: number): string {
+  const nid = `${character}__x${k}`;
+  if (!Characters.has(nid)) {
+    const c = Characters.must(character);
+    defineCharacter({ ...c, id: nid, unlocked: false, baseStats: { ...(c.baseStats ?? {}), damage: (c.baseStats?.damage ?? 10) * k } });
+  }
+  return nid;
+}
+
+/**
  * One boss fight on its floor under the boss-bench bot (strafes, closes in with a melee weapon,
  * dashes off bullets), with the keeper's real hearts: a death refills them. Returns the fight
  * time and the hearts lost net of healing (½♥ units).
@@ -168,7 +184,7 @@ function bossDrill(bossId: string, character: string, weapon: string, seed: stri
   if (!drillRenderer) drillRenderer = new Renderer(fakeDisplay(1280, 720));
   const def = Enemies.must(bossId);
   const floor = def.bossFloors![0];
-  const run = new RunState(`${seed}-${bossId}`, character);
+  const run = new RunState(`${seed}-${bossId}`, powered(character, DRILL_POWER[floor]));
   run.seeded = true;
   const w = new World(drillRenderer, run, { openInventory() {}, onGameOver() {} });
   w.setQuality({ lighting: false, particles: 0 });
@@ -228,12 +244,6 @@ function bossDrill(bossId: string, character: string, weapon: string, seed: stri
   w.spawnEnemy = (id: string, x: number, y: number) => orig(Enemies.get(id)?.boss ? bossId : id, x, y);
   w.enterRoom(node, null);
   w.spawnEnemy = orig;
-  const power = DRILL_POWER[floor];
-  const applyHit = w.applyHit.bind(w);
-  w.applyHit = (target, hit) => {
-    if (hit.attacker === p || (hit.source && 'team' in hit.source && (hit.source as { team: string }).team === 'player')) hit.damage *= power;
-    return applyHit(target, hit);
-  };
   let healed = 0;
   const heal = p.heal.bind(p);
   p.heal = (k: number) => { const h = heal(k); healed += h; return h; };
@@ -296,6 +306,18 @@ describe('favoured weapon classes (보리 / 백구 / 모리)', () => {
       p.equipWeapon(w, CLASS[id].yes[1]);
       drive(w, 1);
       expect(p.flags.has('affinity'), `${id} ${CLASS[id].yes[1]}`).toBe(true);
+      // the second slot: a plain weapon in hand, the starter holstered; the swap key flips the flag
+      p.equipWeapon(w, 'lantern_bolt');
+      drive(w, Math.round(0.2 / FIXED_DT));
+      expect(p.weapon2Id, id).toBe(c.weapon);
+      expect(p.flags.has('affinity'), `${id} lantern, starter in slot 2`).toBe(false);
+      expect(p.swapWeapon(w), id).toBe(true);
+      drive(w, 1);
+      expect(p.flags.has('affinity'), `${id} swapped to the starter`).toBe(true);
+      drive(w, Math.round(0.2 / FIXED_DT));
+      expect(p.swapWeapon(w), id).toBe(true);
+      drive(w, 1);
+      expect(p.flags.has('affinity'), `${id} swapped back to the lantern`).toBe(false);
       // never a flat damage bonus: the weapon hits exactly as hard as on the keeper without a class
       const plain = sim(noAff(id), c.weapon).w.player;
       const own = sim(id, c.weapon).w.player;
@@ -359,8 +381,10 @@ describe('보리 묵직한 무기: a longer, wider body block and a barrel that 
     expect(g.ttk).toBeGreaterThan(0.94);
     expect(g.ttk).toBeLessThan(1.1);
     expect(g.net).toBeGreaterThan(1.04);
-    // 16 fights only: the full bench (312 fights per variant) puts it at about x1.12, the gain of +20–25 % damage
-    expect(g.net).toBeLessThan(1.6);
+    // 16 fights on floors 1–4 only (x1.58 here, where a hit costs ½♥ and a barrel charge heals a lot):
+    // the full bench (13 bosses, 4 heavy weapons, 1664 fights per variant) puts it at x1.13, what
+    // +24 % damage would save. The ceiling only catches a runaway.
+    expect(g.net).toBeLessThan(2);
   }, 120_000);
 });
 
@@ -393,6 +417,27 @@ describe('백구 단도·도: a second counter slash, a longer 반격, a wider b
     expect(one).toBeGreaterThan(0);
     // (both include the reflected bullet; the second crit slash adds about as much again as the first)
     expect(two).toBeGreaterThan(one * 1.5);
+  });
+
+  it('반격 hits harder with a short blade in hand (x1.65 instead of x1.5), and only while it is held', () => {
+    const counterMul = (character: string): { w: World; base: number; mul: number } => {
+      const { w } = sim(character, 'fang_blade', 30);
+      const base = w.player.stats.damage;
+      const { w: w2 } = dodge(character);
+      drive(w2, 1);
+      expect(inCounter(w2), character).toBe(true);
+      return { w: w2, base, mul: w2.player.stats.damage / base };
+    };
+    const blade = counterMul('baekgu');
+    expect(blade.mul).toBeCloseTo(BAEKGU_COUNTER_DMG_AFFINITY, 6);
+    expect(counterMul(noAff('baekgu')).mul).toBeCloseTo(BAEKGU_COUNTER_DMG, 6);
+    // swapping to a plain weapon mid-반격 drops it back to x1.5 (the keeper's damage, not the weapon's)
+    const p = blade.w.player;
+    p.equipWeapon(blade.w, 'lantern_bolt');
+    drive(blade.w, 1);
+    expect(inCounter(blade.w)).toBe(true);
+    expect(p.flags.has('affinity')).toBe(false);
+    expect(p.stats.damage / blade.base).toBeCloseTo(BAEKGU_COUNTER_DMG, 6);
   });
 
   it('반격 lasts longer and the dodge returns bullets from farther away', () => {
@@ -434,8 +479,8 @@ describe('백구 단도·도: a second counter slash, a longer 반격, a wider b
   it('boss drill: the counter upgrades shorten boss fights', () => {
     const g = drillGain('baekgu', 'fang_blade', DRILL_BOSSES, ['A', 'B']);
     console.log(`백구 boss drill: ttk x${g.ttk.toFixed(3)} net hearts x${g.net.toFixed(3)}`);
-    // 16 fights only: the full bench (312 fights per variant) puts the fight time at about x1.14,
-    // between what +20 % (x1.12) and +25 % (x1.16) damage would give
+    // 16 fights only: the full bench (4 short blades, 1664 fights per variant) puts the fight time
+    // at x1.145, what +21 % damage would give (hearts lost: x1.165, +23 %)
     expect(g.ttk).toBeGreaterThan(1.04);
     expect(g.ttk).toBeLessThan(1.4);
   }, 120_000);
