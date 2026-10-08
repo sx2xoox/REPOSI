@@ -15,10 +15,12 @@ import { clamp } from '../engine/math';
 import { C, formatTime } from './theme';
 import { divider, fitScale, frame, gauge, iconSlot, keyHintRow, spriteCentered } from './frame';
 import { Repeater, Spring, appear } from './anim';
-import { gridMove, scrollToRow, weaponClassText } from './logic';
+import { favouringKeepers, gridMove, scrollToRow, weaponClassText } from './logic';
 import { touchUiActive } from './touch-mode';
 
 type TabId = 'artifact' | 'active' | 'weapon' | 'enemy' | 'record';
+
+type Fact = [string, string] | [string, string, string];
 
 interface Entry {
   id: string;
@@ -28,7 +30,8 @@ interface Entry {
   seen: boolean;
   rarity?: Rarity;
   boss?: boolean;
-  lines: () => { title: string; sub: string; body: string; quote?: string; tags?: { icon: string; name: string; color: string }[]; facts: [string, string][] };
+  /** facts: [label, value, value colour (default C.textDim)] rows at the bottom of the detail panel */
+  lines: () => { title: string; sub: string; body: string; quote?: string; tags?: { icon: string; name: string; color: string }[]; facts: Fact[] };
 }
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
@@ -43,7 +46,6 @@ const RAR_ORDER: Rarity[] = ['common', 'rare', 'epic', 'legendary'];
 const POOL_NAME: Record<string, string> = {
   treasure: '보물방', shop: '상점', boss: '보스', secret: '비밀방', challenge: '도전방', curse: '저주방', shrine: '성소',
 };
-const WEAPON_KIND: Record<string, string> = { ranged: '원거리', melee: '근접', charge: '차지', beam: '광선' };
 
 const COLS = 10;
 const CELL = 38;
@@ -79,10 +81,17 @@ function buildEntries(tab: TabId): Entry[] {
       const starters = new Set(Characters.all().map((c) => c.weapon));
       return Weapons.all().sort(byRarity).map((d) => ({
         id: d.id, name: d.name, sprite: d.icon, seen: seenItems.has(d.id) || starters.has(d.id) && Characters.all().some((c) => c.weapon === d.id && (c.unlocked || save.hasFlag(`unlock:${c.id}`))), rarity: d.rarity,
-        lines: () => ({
-          title: d.name, sub: `${RARITY_NAME[d.rarity]} · ${weaponClassText(d)}`, body: d.desc,
-          facts: [['등장', starters.has(d.id) ? '시작 무기' : poolText(d.pools)]],
-        }),
+        lines: () => {
+          // 등급 · 계열 · 속성, and the keepers whose favoured class holds the family (green, as in a run)
+          const fans = favouringKeepers(d, save.progress.flags);
+          return {
+            title: d.name, sub: `${RARITY_NAME[d.rarity]} · ${weaponClassText(d)}`, body: d.desc,
+            facts: [
+              ['선호 등불지기', fans.length ? fans.join(' · ') : '없음', fans.length ? C.good : C.textDim],
+              ['등장', starters.has(d.id) ? '시작 무기' : poolText(d.pools)],
+            ],
+          };
+        },
       }));
     }
     case 'enemy': {
@@ -319,10 +328,10 @@ export class CollectionScene implements Scene {
       ty += 4;
     }
     divider(r, x + w / 2, Math.max(ty + 2, y + h - 18 - L.facts.length * 15 - 6), w - 40, C.goldDark, k * 0.7);
-    L.facts.forEach(([a, b], i) => {
+    L.facts.forEach(([a, b, bc], i) => {
       const fy = y + h - 18 - (L.facts.length - i) * 15 + 4;
       r.uiText(a, x + 14, fy, { size: 10, font: 'small', color: C.textFaint, alpha: k });
-      r.uiText(b, x + w - 14, fy, { size: 10, font: 'small', align: 'right', color: C.textDim, alpha: k });
+      r.uiText(b, x + w - 14, fy, { size: 10, font: 'small', align: 'right', color: bc ?? C.textDim, alpha: k });
     });
   }
 

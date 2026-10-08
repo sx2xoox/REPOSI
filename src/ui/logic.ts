@@ -74,9 +74,12 @@ export function weaponClassRuns(def: WeaponDef, keeper: CharacterDef | null | un
   ];
 }
 
-export const WEAPON_KIND_LABELS: Record<WeaponDef['kind'], string> = { ranged: '원거리', melee: '근접', charge: '차지', beam: '광선' };
-export function weaponKindLabel(kind: WeaponDef['kind']): string {
-  return WEAPON_KIND_LABELS[kind] ?? kind;
+/**
+ * Keepers whose favoured class holds `def` (registry order), for the collection: the name of an
+ * unlocked keeper, '???' for one still locked (as the character select shows it).
+ */
+export function favouringKeepers(def: WeaponDef, flags: string[]): string[] {
+  return Characters.all().filter((c) => weaponMatchesAffinity(c.affinity, def)).map((c) => (isUnlocked(c, flags) ? c.name : '???'));
 }
 
 export const DIFFICULTY_LABELS: Record<number, string> = { 1: '쉬움', 2: '보통', 3: '어려움' };

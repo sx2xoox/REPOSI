@@ -331,16 +331,24 @@ export class CharacterSelectScene implements Scene {
         r.uiText(line, tx + 26, cy + 16 + i * 14, { size: 10, font: 'small', color: C.textFaint, alpha: A }));
       return;
     }
-    // the pitch: why pick this keeper (gold, up to 2 lines)
+    // the favoured class text is shown whole (it explains the green family labels); the
+    // block under the story: divider + weapon row + class label + these lines
+    const aff = c.affinity;
+    const affLines = r.wrapText(aff ? aff.desc : '어떤 무기든 고르게 다룬다.', tw, 10, false, 'small').slice(0, 4);
+    const bottom = 68 + affLines.length * 12;
+    const storyRoom = (top: number) => Math.floor((h - (top - y) - bottom) / 16);
+    // the pitch: why pick this keeper (gold): 3 lines while two story lines still fit, else 2 (an ellipsis when cut)
     if (c.pitch) {
-      const pl = r.wrapText(c.pitch, tw, 12, true).slice(0, 2);
+      const all = r.wrapText(c.pitch, tw, 12, true);
+      const n = all.length > 2 && storyRoom(cy + 3 * 16 + 4) >= 2 ? 3 : 2;
+      const pl = all.slice(0, n);
+      if (all.length > n) pl[n - 1] = `${pl[n - 1].replace(/[,.\s]+$/, '')}…`;
       pl.forEach((l, i) => r.uiText(l, tx, cy + i * 16, { size: 12, bold: true, color: C.goldHi, alpha: A * k }));
       cy += pl.length * 16 + 4;
     }
     // the story: as many lines as fit above the weapon block (an ellipsis when cut)
     const story = r.wrapText(c.desc, tw, 12);
-    const bottom = 92; // divider + weapon row + favoured class block
-    const maxStory = Math.max(2, Math.floor((h - (cy - y) - bottom) / 16));
+    const maxStory = Math.max(2, storyRoom(cy));
     const shown = story.slice(0, maxStory);
     if (story.length > maxStory) shown[shown.length - 1] = `${shown[shown.length - 1].replace(/[,.\s]+$/, '')}…`;
     shown.forEach((l, i) => r.uiText(l, tx, cy + i * 16, { size: 12, color: C.text, alpha: A * k }));
@@ -352,17 +360,16 @@ export class CharacterSelectScene implements Scene {
     if (wdef) {
       iconSlot(r, wdef.icon, tx + 15, cy + 15, 30, { alpha: A, scale: fitScale(wdef.icon, 22, 1.5) });
       r.uiText(wdef.name, tx + 38, cy + 2, { size: 12, color: C.text, alpha: A });
-      drawRuns(r, [{ t: '시작 무기 · ', c: C.textFaint }, ...weaponClassRuns(wdef, c, C.textFaint, C.good)], tx + 38, cy + 18, { size: 10, font: 'small', alpha: A });
+      r.uiText('시작 무기', tx + tw, cy + 4, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: A });
+      // 계열 · 속성 on its own line (the family green: every starter is in its keeper's class)
+      drawRuns(r, weaponClassRuns(wdef, c, C.textDim, C.good), tx + 38, cy + 18, { size: 10, font: 'small', alpha: A });
     }
     cy += 36;
-    // favoured weapon class
-    const aff = c.affinity;
+    // favoured weapon class (its families in green, as on every weapon's info line)
     r.uiText('선호 무기', tx, cy, { size: 10, font: 'small', color: C.gold, alpha: A });
     r.uiText(aff ? aff.name : '없음', tx + 50, cy, { size: 10, font: 'small', color: aff ? C.good : C.textDim, alpha: A });
     cy += 13;
-    const affDesc = aff ? aff.desc : '어떤 무기든 고르게 다룬다.';
-    const al = r.wrapText(affDesc, tw, 10, false, 'small').slice(0, 2);
-    al.forEach((l, i) => r.uiText(l, tx, cy + i * 12, { size: 10, font: 'small', color: C.textDim, alpha: A * k }));
+    affLines.forEach((l, i) => r.uiText(l, tx, cy + i * 12, { size: 10, font: 'small', color: C.textDim, alpha: A * k }));
   }
 
   private drawStats(r: Renderer, c: CharacterDef, open: boolean, A: number, k: number, h: number): void {

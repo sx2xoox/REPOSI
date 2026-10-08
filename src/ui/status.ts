@@ -11,7 +11,7 @@ import { UI_H, UI_W, UI_W_BASE, uiCenterX } from '../engine/renderer';
 import type { GameScene } from './game-scene';
 import { input } from '../engine/input';
 import { app } from '../game/app';
-import { Actives, Floors, Potions, RARITY_COLOR, RARITY_NAME, Sets, Weapons } from '../game/defs';
+import { Actives, Floors, Potions, RARITY_COLOR, RARITY_NAME, Sets, Weapons, weaponMatchesAffinity } from '../game/defs';
 import type { ComputedArtifact } from '../game/inventory';
 import { discardArtifact, discardBlockFor } from '../game/interact';
 import { blessingFloor } from '../game/blessings';
@@ -48,7 +48,6 @@ const ARM_TIME = 3;
 /** equipment panel height (weapon / active row + the keeper's passive row) */
 const EQUIP_H = 154;
 const RES_H = 80;
-const WEAPON_KIND: Record<string, string> = { ranged: '원거리', melee: '근접', charge: '차지', beam: '광선' };
 
 export class StatusOverlay implements Scene {
   transparent = true;
@@ -470,6 +469,8 @@ export class StatusOverlay implements Scene {
       frame(r, GX, y, width, height, 'panel', { alpha: k });
       iconSlot(r, def?.icon ?? null, GX + 32, y + 31, 38, { alpha: k, scale: def ? fitScale(def.icon, 30, 2) : 1 });
       r.uiText(slot.label, GX + 62, y + 10, { size: 10, font: 'small', color: C.textFaint, alpha: k });
+      // the green family on the line below means "favoured": say so once, in the same green
+      if (def && weaponMatchesAffinity(p.character.affinity, def)) r.uiText(`${p.character.name}의 선호 무기`, GX + width - 14, y + 10, { size: 10, font: 'small', align: 'right', color: C.good, alpha: k });
       nameLines.forEach((line, i) => r.uiText(line, GX + 62, y + 24 + i * 16, { size: 14, bold: true, color: def ? RARITY_COLOR[def.rarity] : C.textMute, alpha: k }));
       if (def) drawRuns(r, [{ t: `${RARITY_NAME[def.rarity]} · `, c: C.textDim }, ...weaponClassRuns(def, p.character, C.textDim, C.good)], GX + 62, y + 26 + nameLines.length * 16, { size: 10, font: 'small', alpha: k });
       lines.forEach((line, i) => r.uiText(line, GX + 14, y + textY + i * 13, { size: 10, font: 'small', color: C.text, alpha: k }));

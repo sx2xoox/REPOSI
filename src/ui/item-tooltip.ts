@@ -16,7 +16,7 @@ import { Actives, Artifacts, Potions, RARITY_COLOR, RARITY_NAME, Sets, Weapons, 
 import { SYNERGIES, synergyActive } from '../game/synergies';
 import { Pedestal, Pickup, itemInfo, potionSpriteFor, type PickupKind } from '../game/pickups';
 import { BASE_STATS, StatMods, computeStats, type Stats } from '../game/stats';
-import { frame, iconSlot, keycap } from './frame';
+import { frame, iconSlot, keyHintWidth, keycap } from './frame';
 import { weaponClassRuns } from './logic';
 import { C } from './theme';
 import { actionLabel } from './keys';
@@ -25,6 +25,8 @@ import { UiLayer } from './layer-cache';
 import { bannersBottom } from './cards';
 
 const CARD_W = 214;
+/** a long sub line (a weapon's "등급 · 계열 · 속성" beside the interact key) widens the card up to this */
+const CARD_W_MAX = 280;
 const PAD = 9;
 const LINE = 13;
 /** the HUD's top rows (hearts, artifact row) end about here (UI units below the safe top) */
@@ -65,7 +67,6 @@ const PICKUP_ICON: Partial<Record<PickupKind, string>> = {
   heart_half: 'pk_heart_half', heart: 'pk_heart', soul_heart: 'pk_soul', soul_half: 'pk_soul_half',
   bomb: 'pk_bomb', bomb2: 'pk_bomb2', key: 'pk_key', coin: 'pk_coin', nickel: 'pk_nickel', dime: 'pk_dime',
 };
-const WEAPON_KIND: Record<string, string> = { ranged: '원거리', melee: '근접', charge: '차지', beam: '광선' };
 const RARITY_ORDER: Rarity[] = ['common', 'rare', 'epic', 'legendary'];
 
 const statCache = new Map<string, Stats>();
@@ -232,6 +233,19 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
   return null;
 }
 
+/**
+ * Card width: wide enough for the sub line and the interact hint beside it on one row (as
+ * paintCard lays them out), so a weapon's 속성 is never cut off; CARD_W..CARD_W_MAX.
+ */
+export function cardWidth(r: Renderer, c: ItemCard): number {
+  const sub = c.sub.reduce((s, sg) => s + r.measureText(sg.t, 10, false, 'small'), 0);
+  const a = c.action;
+  // keycap + label, or the touch hand (14) + label; 6 = gap to the sub text
+  const act = a ? (a.key ? keyHintWidth(r, a.key, a.label, a.pad) : 14 + 4 + r.measureText(a.label, 10, false, 'small')) + 6
+    : c.note ? r.measureText(c.note, 10, false, 'small') + 6 : 0;
+  return clamp(Math.ceil(PAD + 38 + sub + act + PAD), CARD_W, CARD_W_MAX);
+}
+
 /** Cache signature of everything a card shows (cheap; rebuilt only when it changes). */
 function signature(w: World, e: Entity): string {
   const p = w.player;
@@ -250,6 +264,7 @@ export class ItemTooltip {
   private lines: string[] = [];
   private extraLines: Seg[][] = [];
   private h = 0;
+  private w = CARD_W;
   /** 0..1 appear progress */
   private a = 0;
   private t = 0;
@@ -304,10 +319,11 @@ export class ItemTooltip {
       this.card = buildCard(w, e);
       if (this.card) {
         const c = this.card;
-        this.lines = r.wrapText(c.desc, CARD_W - PAD * 2, 10, false, 'small');
+        this.w = cardWidth(r, c);
+        this.lines = r.wrapText(c.desc, this.w - PAD * 2, 10, false, 'small');
         this.extraLines = c.extra.flatMap((row) => {
           if (row.length !== 1) return [row];
-          return r.wrapText(row[0].t, CARD_W - PAD * 2, 10, false, 'small').map((t) => [{ t, c: row[0].c }]);
+          return r.wrapText(row[0].t, this.w - PAD * 2, 10, false, 'small').map((t) => [{ t, c: row[0].c }]);
         });
         this.h = PAD + 32 + 3 + this.lines.length * LINE + this.extraLines.length * LINE + 5;
       }
@@ -321,7 +337,7 @@ export class ItemTooltip {
     const bottom = e instanceof Pedestal ? e.y + 14 : e.y + 8;
     const at = r.displayToUI(...xy(r.worldToDisplay(e.x, top)));
     const ab = r.displayToUI(...xy(r.worldToDisplay(e.x, bottom)));
-    const W = CARD_W;
+    const W = this.w;
     const H = this.h;
     const maxY = UI_H - sa.b - 6 - H;
     const minX = sa.l + 6;
@@ -387,7 +403,7 @@ export class ItemTooltip {
     }
     d.globalAlpha = 1;
     this.pr = r;
-    this.ly.draw(r, `${this.sig}|${H}`, ox, oy, 0, 0, W, H, A, this.paint);
+    this.ly.draw(r, `${this.sig}|${W}x${H}`, ox, oy, 0, 0, W, H, A, this.paint);
     this.pr = null;
     // a refused press (can't pay): the price blinks red for a moment
     const deny = e instanceof Pedestal ? e.mem.denyT : undefined;
@@ -399,7 +415,7 @@ export class ItemTooltip {
 
   private paintCard(r: Renderer): void {
     const c = this.card!;
-    const W = CARD_W;
+    const W = this.w;
     const H = this.h;
     frame(r, 0, 0, W, H, 'tooltip', { color: c.color });
     iconSlot(r, c.icon, PAD + 15, PAD + 15, 30);

@@ -1,8 +1,9 @@
 // Weapon families (user 2026-10-08: "무기 종류를 정리"): every weapon belongs to exactly one
 // family, shown on its info line as "등급 · 계열 · 속성" (e.g. "일반 · 활·쇠뇌 · 충전 무기"), in
 // green when it is the current keeper's favoured weapon. Keeper favoured classes
-// (CharacterDef.affinity) are built from families (AffinityDef.families) plus ids / kinds.
-// A new weapon must be added here (tests/weapon-families.test.ts checks every weapon).
+// (CharacterDef.affinity) are made only of families (AffinityDef.families) and named after
+// them ("창 / 방패"), so the family label alone tells whose weapon it is; 부채·라켓 is
+// nobody's. A new weapon must be added here (tests/weapon-families.test.ts checks every weapon).
 
 export interface WeaponFamily {
   id: string;
