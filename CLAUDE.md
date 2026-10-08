@@ -113,6 +113,18 @@ Commands:
   cadence, crit-spawned shards are sized from the crit's own hit. Every keeper starts with a common weapon.
   Measure with `BUILD_CEILING=tove:nail_carbine,... npx vitest run tests/build-ceiling` (greedy best build + deep
   boss fights) and `ITEM_AUDIT=weapons|artifacts|starters npx vitest run tests/item-audit`.
+- **Keeper pick matters late** (user 2026-10-08: "무기 피해량을 전체적으로 15% 정도 줄이고, 본인 선호 무기를 꼈을 때 20~25%의
+  효율… 단순하게 피해증가로 효율을 올리지 말고, 직업에 맞는 효과가 업그레이드"). `WEAPON_DAMAGE_SCALE` (0.85, game/stats.ts) scales
+  every weapon's own attacks (weaponStats; kits, releases and artifact procs read p.stats and are not scaled; per-hit weights that
+  compare a hit with p.stats.damage must allow for it, see kit-ria markWeight). Every keeper has a `CharacterDef.affinity` (favoured
+  weapon class incl. the starter); its bonus upgrades the keeper's OWN kit behind `p.flags.has('affinity')` (more links, faster
+  echo, wider shield …), never a flat damage multiplier, worth +20–25 % against the same keeper without it (measured on 3–4
+  favoured weapons vs a `__noaff_` clone: single / crowd / mid build; defensive kits via boss-bench net hearts per kill;
+  tests/affinity-{a,b,c}.test.ts). A new keeper needs one too.
+- **Weapon-type artifacts** (blade-arts / whirl-arts / beam-arts / charge-arts, 20 artifacts, user 2026-10-08 "근접이나, 광선,
+  충전식 등등을 활용할 수 있는 유물"): each does nothing (never a penalty) off its weapon type; melee = swings of the held weapon
+  (kind melee + titan_greatsword), beam = laser hits of a beam weapon, charge = the charge recorded each frame in onUpdate
+  (most charge weapons zero `weapon.charge` before onShoot); bands are measured on the target weapons (tests/arts-*.test.ts).
 - **Speedrun mode** (user 2026-10-08; `src/game/speedrun.ts`, `tests/speedrun.test.ts`). Started from the town's central
   lantern menu ('스피드런 모드', under the normal expedition) with `app.startRun(seed, char, false, { speedrun: true })`:
   a normal non-campaign run 1-1 → 7-3 (no checkpoint resume, the expedition checkpoint is left alone, sim rules
