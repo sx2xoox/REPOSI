@@ -42,10 +42,10 @@ export const RIA_SPARK_DMG_AFFINITY = 0.925;
 export const RIA_SPARK_BURN_AFFINITY = 0.555;
 /**
  * Lantern weapons (the affinity matches these ids): the hand lantern, the twin-wick lamp gun,
- * the wandering lamp spirit, the first keeper's dawn lantern and the rescue-lantern flail.
- * 지뢰 등잔 stays out while its mine blasts do not count as attacks (no marks, no sparks).
+ * the wandering lamp spirit, the first keeper's dawn lantern, the rescue-lantern flail and the
+ * mine lantern (its blasts count as weapon attacks since frontier-kit ownedHit tags them).
  */
-export const RIA_LANTERN_WEAPONS = ['lantern_bolt', 'twin_lamp', 'wandering_lamp', 'dawn_lantern', 'lantern_flail'];
+export const RIA_LANTERN_WEAPONS = ['lantern_bolt', 'twin_lamp', 'wandering_lamp', 'dawn_lantern', 'lantern_flail', 'mine_lantern'];
 
 const EMBER_COLORS = ['#ffffff', '#ffe080', '#ff9a30', '#c04010'];
 

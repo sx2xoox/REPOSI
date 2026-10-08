@@ -33,7 +33,7 @@ const HANGUL = /[가-힣]/;
 const CLASSES: Record<string, [string[], string[]]> = {
   // 지뢰 등잔 is lantern-shaped but its mine blasts are not attacks (no marks to upgrade); the
   // firefly tome is a book of firefly spirits, not a lantern
-  ria: [['lantern_bolt', 'twin_lamp', 'wandering_lamp', 'dawn_lantern', 'lantern_flail'], ['mine_lantern', 'firefly_tome', 'void_gaze', 'hunter_bow', 'sentinel_blade']],
+  ria: [['lantern_bolt', 'twin_lamp', 'wandering_lamp', 'dawn_lantern', 'lantern_flail', 'mine_lantern'], ['firefly_tome', 'void_gaze', 'hunter_bow', 'sentinel_blade']],
   bern: [['sentinel_blade', 'copper_sabre', 'twin_daggers', 'moon_katana', 'titan_greatsword', 'gatebreaker_maul'], ['lantern_bolt', 'hunter_bow', 'void_gaze']],
   serin: [['hunter_bow', 'crescent_bow', 'repeater_crossbow', 'star_piercer', 'pearl_crossbow', 'silvermoon_longbow'], ['twin_daggers', 'lantern_bolt', 'brass_revolver']],
   niel: [['void_gaze', 'lantern_bolt', 'amber_wand', 'frost_wand', 'prism_staff'], ['great_hammer', 'hunter_bow', 'sentinel_blade']],

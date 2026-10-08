@@ -38,11 +38,14 @@ export interface OwnedHitOpts {
 
 /** One hit from keeper `p`'s weapon `weaponId` (item onHit hooks, crits and embers as usual). */
 export function ownedHit(w: World, p: Player, weaponId: string, target: Actor, damage: number, o: OwnedHitOpts = {}): boolean {
+  const kind = o.kind ?? 'projectile';
   return w.applyHit(target, {
-    damage, kind: o.kind ?? 'projectile', attacker: p, source: o.source ?? null,
+    damage, kind, attacker: p, source: o.source ?? null,
     dirX: o.dirX ?? 0, dirY: o.dirY ?? 0, knockback: o.knockback ?? 0,
     statuses: o.statuses?.map((s) => ({ ...s, procKey: s.procKey ?? `weapon:${weaponId}:${s.kind}` })),
-    light: o.light, noProc: o.noProc, procs: o.procs,
+    // the weapon's own explosions (mine, implosion) count as attacks for keeper passives and item
+    // procs, like every other weapon blast (items/lib isAttack, weapons/kit blast, arms-kit keeperHit)
+    light: o.light, noProc: o.noProc, procs: kind === 'explosion' && !o.noProc ? [...(o.procs ?? []), 'weapon-primary'] : o.procs,
   });
 }
 
