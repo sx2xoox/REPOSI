@@ -1,5 +1,5 @@
 // 광선 (beam) artifacts for the beam weapons (kind 'beam': 공허의 눈 void_gaze,
-// 프리즘 광선봉 prism_staff, 뇌명 지팡이 thunder_rod):
+// 프리즘 지팡이 prism_staff, 뇌명 지팡이 thunder_rod):
 //  - 그을린 렌즈 (smoked_lens): keeping the beam on one enemy heats it up (+damage steps)
 //  - 반딧불 필라멘트 (firefly_filament): longer beams; enemies in the beam are slowed
 //  - 프리즘 조각 (prism_shard): the lit enemy refracts a thin branch beam into a neighbour

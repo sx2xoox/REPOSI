@@ -1,5 +1,5 @@
 // New weapons (batch w1): 공명 종, 작살총 (frontier-arms.ts), 투창 묶음, 연기 향로
-// (frontier-arms-2.ts), 지뢰 등잔, 중력 구슬포 (trap-arms.ts), 먹물 붓, 회전 팽이추
+// (frontier-arms-2.ts), 지뢰 등잔, 중력 구슬 (trap-arms.ts), 먹물 붓, 회전 팽이추
 // (trap-arms-2.ts). Registry and art, each weapon's signature mechanic in the
 // real World, the dummy DPS band, draw purity (state hash), no leftovers across
 // a room change, multishot and two-keeper lockstep.
@@ -290,7 +290,7 @@ describe('지뢰 등잔: lantern mines', () => {
   });
 });
 
-describe('중력 구슬포: pull then implode', () => {
+describe('중력 구슬: pull then implode', () => {
   it('stops on its target, drags nearby enemies inward, then implodes on all of them', () => {
     const w = setup('gravity_orb');
     const p = w.player;

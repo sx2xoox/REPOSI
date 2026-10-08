@@ -2,7 +2,7 @@
 //  지뢰 등잔     (mine_lantern, rare)   — lobs small lantern-mines onto the floor;
 //                                       they arm, then burst when an enemy comes
 //                                       close (or on their own after a while)
-//  중력 구슬포   (gravity_orb, rare)    — a slow dark orb stops on a hit or at the
+//  중력 구슬   (gravity_orb, rare)    — a slow dark orb stops on a hit or at the
 //                                       aimed spot, drags enemies in, then implodes
 
 import { defineWeapon, type WeaponState } from '../../game/defs';
@@ -243,7 +243,7 @@ defineWeapon({
   },
 });
 
-// ================================================================== 중력 구슬포
+// ================================================================== 중력 구슬
 defineDrawnSprite('w_gravity_orb', 22, 11, (p) => {
   // dark iron launcher with violet bands, a loaded orb in the cradle
   p.rect(1, 5, 6, 2, '#4a4060');
@@ -403,7 +403,7 @@ function gravityBehavior(p: Player, st: WeaponState, stopAt: number, blastR: num
 
 defineWeapon({
   id: 'gravity_orb',
-  name: '중력 구슬포',
+  name: '중력 구슬',
   desc: '느린 검은 구슬을 쏜다. 구슬은 적에 맞거나 조준한 자리에 닿으면 멈춰 주위 적을 끌어당기고, 잠시 뒤 안으로 무너지며 터진다. 구슬은 한 번에 하나뿐이다.',
   icon: 'icon_gravity_orb',
   heldSprite: 'w_gravity_orb',

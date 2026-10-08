@@ -24,11 +24,11 @@ export const ARSENAL: readonly ArsenalSpec[] = [
  {id:'comet_pike',name:'혜성 장창',desc:'별 꼬리 장식이 달린 긴 창. 일직선으로 멀리 찌르고 적을 꿰뚫는다.',shape:'spear',color:'#a7d8eb',rarity:'rare',rate:.8,damage:1.22,reach:62,arc:11},
  {id:'obsidian_cleaver',name:'흑요석 대도',desc:'검은 유리 칼날로 무겁게 벤다. 20% 확률로 2초간 약한 출혈을 남긴다.',shape:'cleaver',color:'#a293d2',rarity:'epic',rate:.72,damage:1.27,reach:43,arc:2.4,status:'bleed'},
  {id:'moon_fan',name:'달비늘 부채',desc:'부채를 펼쳐 세 개의 달비늘을 흩뿌린다. 비늘은 벽에 한 번 튕긴다.',shape:'fan',color:'#b6c9f0',rarity:'rare',rate:.85,damage:.44,pellets:3,spread:.1,bounce:1},
- {id:'dusk_knives',name:'투척 단검',desc:'날개 모양의 비수를 빠르게 던진다. 짧은 사거리에서 적 하나를 관통한다.',shape:'knife',color:'#c79fc6',rarity:'common',rate:1.35,damage:.76,pierce:1,range:.72},
+ {id:'dusk_knives',name:'날개 비수',desc:'날개 모양의 비수를 빠르게 던진다. 짧은 사거리에서 적 하나를 관통한다.',shape:'knife',color:'#c79fc6',rarity:'common',rate:1.35,damage:.76,pierce:1,range:.72},
  {id:'amber_wand',name:'호박석 마법봉',desc:'호박석 안의 작은 벌이 빛난다. 적을 약하게 따라가는 마법탄을 쏜다.',shape:'wand',color:'#edbc63',rarity:'common',rate:1,damage:.94,homing:1.6},
- {id:'tide_staff',name:'소라 지팡이',desc:'소라 끝에서 둥근 물탄 세 발을 넓게 쏜다. 맞은 적을 잠시 느리게 한다.',shape:'staff',color:'#80cfc8',rarity:'rare',rate:.85,damage:.45,pellets:3,spread:.1,status:'slow',speed:1},
+ {id:'tide_staff',name:'소라 마법봉',desc:'소라 끝에서 둥근 물탄 세 발을 넓게 쏜다. 맞은 적을 잠시 느리게 한다.',shape:'staff',color:'#80cfc8',rarity:'rare',rate:.85,damage:.45,pellets:3,spread:.1,status:'slow',speed:1},
  {id:'cinder_sceptre',name:'불꽃새 홀',desc:'새의 부리에서 붉은 불씨를 쏜다. 20% 확률로 2초간 약한 화상을 남긴다.',shape:'staff',color:'#f0a06c',rarity:'rare',rate:.9,damage:1.05,status:'burn',speed:1.15},
- {id:'stormhorn_rod',name:'폭풍 뿔지팡이',desc:'두 갈래 뿔에서 빠른 빛탄을 쏜다. 적 두 마리를 관통하고 벽에서 한 번 튕긴다.',shape:'wand',color:'#a8bafa',rarity:'epic',rate:.85,damage:1.2,pierce:2,bounce:1,speed:1.5},
+ {id:'stormhorn_rod',name:'폭풍뿔 마법봉',desc:'두 갈래 뿔에서 빠른 빛탄을 쏜다. 적 두 마리를 관통하고 벽에서 한 번 튕긴다.',shape:'wand',color:'#a8bafa',rarity:'epic',rate:.85,damage:1.2,pierce:2,bounce:1,speed:1.5},
 ];
 const meleeShapes=new Set<Shape>(['sabre','rapier','axe','mace','spear','cleaver']);
 /** Shared materials, separately shaped silhouettes; all point right from the grip. */

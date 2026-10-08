@@ -1,9 +1,9 @@
 import { visualHandPos } from '../../game/weapon-pose';
 // Light one-handed casters:
-//  쌍심지 등잔총 (twin_lamp, common)   — pistol: every pull fires a quick double tap
-//  서리 지팡이   (frost_wand, common)  — ice shards that slow (sometimes freeze)
-//  방울 지팡이   (bubble_wand, common) — slow drifting bubbles that pop in a splash
-//  별똥 발사기   (star_launcher, rare) — a big star that bursts into five small ones
+//  쌍심지 등잔 (twin_lamp, common)   — pistol: every pull fires a quick double tap
+//  서리 마법봉   (frost_wand, common)  — ice shards that slow (sometimes freeze)
+//  방울 마법봉   (bubble_wand, common) — slow drifting bubbles that pop in a splash
+//  별똥 수정구   (star_launcher, rare) — a big star that bursts into five small ones
 
 import { defineWeapon } from '../../game/defs';
 import type { ProjBehavior } from '../../game/projectile';
@@ -12,7 +12,7 @@ import { fx } from '../../engine/rng';
 import { O, attackInterval, glowSprite, handPos, kick, muzzle } from './common';
 import { beginAttack, blast, drawGun, fragment, shotFade } from './kit';
 
-// ================================================================== 쌍심지 등잔총
+// ================================================================== 쌍심지 등잔
 defineDrawnSprite('w_twin_lamp', 14, 8, (p) => {
   p.rect(0, 4, 3, 4, '#5a3a22');
   p.rect(1, 4, 1, 3, '#8a5a32');
@@ -59,8 +59,8 @@ defineDrawnSprite('proj_lamp_dart', 8, 3, (p) => {
 
 defineWeapon({
   id: 'twin_lamp',
-  name: '쌍심지 등잔총',
-  desc: '심지가 둘인 등잔총. 방아쇠를 당길 때마다 불씨탄을 두 발 연달아 쏜다.',
+  name: '쌍심지 등잔',
+  desc: '심지가 둘인 등잔. 손잡이를 당길 때마다 불씨탄을 두 발 연달아 쏜다.',
   icon: 'icon_twin_lamp',
   heldSprite: 'w_twin_lamp',
   kind: 'ranged',
@@ -109,7 +109,7 @@ defineWeapon({
   },
 });
 
-// ================================================================== 서리 지팡이
+// ================================================================== 서리 마법봉
 defineDrawnSprite('w_frost_wand', 17, 7, (p) => {
   p.rect(0, 3, 11, 1, '#8ab0c8');
   p.rect(0, 2, 11, 1, '#c8e0ee');
@@ -151,7 +151,7 @@ const iceTrail: ProjBehavior = {
 
 defineWeapon({
   id: 'frost_wand',
-  name: '서리 지팡이',
+  name: '서리 마법봉',
   desc: '얼음 조각을 쏜다. 맞은 적은 느려지고, 가끔 꽁꽁 얼어붙는다.',
   icon: 'icon_frost_wand',
   heldSprite: 'w_frost_wand',
@@ -185,7 +185,7 @@ defineWeapon({
   },
 });
 
-// ================================================================== 방울 지팡이
+// ================================================================== 방울 마법봉
 defineDrawnSprite('w_bubble_wand', 15, 9, (p) => {
   p.rect(0, 4, 9, 1, '#d070b0');
   p.rect(0, 3, 9, 1, '#f0a8d8');
@@ -239,7 +239,7 @@ const bubbleFx: ProjBehavior = {
 
 defineWeapon({
   id: 'bubble_wand',
-  name: '방울 지팡이',
+  name: '방울 마법봉',
   desc: '느릿느릿 떠다니는 방울을 분다. 방울은 터지면서 주변 적까지 적신다.',
   icon: 'icon_bubble_wand',
   heldSprite: 'w_bubble_wand',
@@ -272,7 +272,7 @@ defineWeapon({
   },
 });
 
-// ================================================================== 별똥 발사기
+// ================================================================== 별똥 수정구
 defineDrawnSprite('w_star_launcher', 18, 9, (p) => {
   p.rect(0, 5, 4, 4, '#3a3060');
   p.rect(1, 5, 1, 3, '#5a4a8a');
@@ -351,7 +351,7 @@ const miniStar: ProjBehavior = {
 
 defineWeapon({
   id: 'star_launcher',
-  name: '별똥 발사기',
+  name: '별똥 수정구',
   desc: '큼직한 별을 쏘아 올린다. 별은 부딪히면 작은 별 다섯 개로 흩어진다.',
   icon: 'icon_star_launcher',
   heldSprite: 'w_star_launcher',

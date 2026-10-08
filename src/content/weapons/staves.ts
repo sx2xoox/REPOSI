@@ -1,10 +1,10 @@
 import { visualHandPos } from '../../game/weapon-pose';
 import { multishotShare } from '../../game/stats';
 // Staves:
-//  수정 연사봉   (crystal_gatling, epic) — spins up into a hail of crystal shards
-//  프리즘 광선봉 (prism_staff, rare)     — instant rainbow beam that pierces all
+//  수정 연사 지팡이   (crystal_gatling, epic) — spins up into a hail of crystal shards
+//  프리즘 지팡이 (prism_staff, rare)     — instant rainbow beam that pierces all
 //                                         and ricochets off one wall
-//  용숨 화염포   (dragon_breath, epic)   — flamethrower: a roaring stream that
+//  용숨 지팡이   (dragon_breath, epic)   — flamethrower: a roaring stream that
 //                                         leaves burning ground
 //  뇌명 지팡이   (thunder_rod, epic)     — chain lightning that leaps between foes
 
@@ -21,7 +21,7 @@ import { tileProps } from '../../game/tiles';
 import { O, attackInterval, drawHeld, glowSprite, handPos, kick, muzzle, rayLength, segDist } from './common';
 import { FirePatch, Zap, beginAttack, enemiesOnSegment, enemyInCone, markShot, shotFade, strike } from './kit';
 
-// ================================================================== 수정 연사봉
+// ================================================================== 수정 연사 지팡이
 defineDrawnSprite('w_crystal_staff', 20, 9, (p) => {
   p.rect(0, 4, 13, 1, '#5a4a6a');
   p.rect(0, 3, 13, 1, '#8a7aa0');
@@ -58,7 +58,7 @@ for (const c of SHARD_COLS) {
 
 defineWeapon({
   id: 'crystal_gatling',
-  name: '수정 연사봉',
+  name: '수정 연사 지팡이',
   desc: '누르고 있으면 수정 고리가 점점 빨리 돌며 수정 파편을 퍼붓는다. 돌기 시작하는 데 시간이 걸린다.',
   icon: 'icon_crystal_gatling',
   heldSprite: 'w_crystal_staff',
@@ -132,7 +132,7 @@ defineWeapon({
   },
 });
 
-// ================================================================== 프리즘 광선봉
+// ================================================================== 프리즘 지팡이
 defineDrawnSprite('w_prism_staff', 19, 9, (p) => {
   p.rect(0, 4, 12, 1, '#6a6a7a');
   p.rect(0, 3, 12, 1, '#b0b0c8');
@@ -216,7 +216,7 @@ function reflect(w: World, x: number, y: number, a: number): number {
 
 defineWeapon({
   id: 'prism_staff',
-  name: '프리즘 광선봉',
+  name: '프리즘 지팡이',
   desc: '순식간에 무지개 광선을 쏜다. 광선은 모든 적을 꿰뚫고 벽에 한 번 튕긴다.',
   icon: 'icon_prism_staff',
   heldSprite: 'w_prism_staff',
@@ -276,7 +276,7 @@ defineWeapon({
   },
 });
 
-// ================================================================== 용숨 화염포
+// ================================================================== 용숨 지팡이
 defineDrawnSprite('w_dragon_breath', 21, 11, (p) => {
   p.rect(0, 6, 5, 4, '#4a2a1a');
   p.rect(3, 3, 11, 5, '#7a2a1a');
@@ -328,7 +328,7 @@ const breathFx: ProjBehavior = {
 
 defineWeapon({
   id: 'dragon_breath',
-  name: '용숨 화염포',
+  name: '용숨 지팡이',
   desc: '적을 꿰뚫는 불길과 바닥의 불씨로 태운다. 탄환 수가 늘면 불길도 여러 갈래로 퍼진다.',
   icon: 'icon_dragon_breath',
   heldSprite: 'w_dragon_breath',
