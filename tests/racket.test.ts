@@ -20,7 +20,7 @@ import { ownedBy } from '../src/content/weapons/arms-kit';
 import { runCoop } from './coopsim';
 import { DUMMY_ID, PLAIN_ID, bestDps, measureDps } from './dpsharness';
 import {
-  MAX_FLOATING, POP_FOLLOW, POP_TIME, RALLY_CAP, RallyShuttle, SERVE_DAMAGE, SERVE_REACH, SMASH_REACH, SHUTTLE_MIN_SPEED, smashMult,
+  MAX_FLOATING, POP_FOLLOW, POP_TIME, LEGEND_RALLY, POWER_RALLY, RALLY_BUILD, RallyShuttle, rallyBonus, rallyTier, SERVE_DAMAGE, SERVE_REACH, SMASH_REACH, SHUTTLE_MIN_SPEED, smashMult,
 } from '../src/content/weapons/racket';
 
 const ID = 'badminton_racket';
@@ -145,10 +145,22 @@ describe('badminton racket: the shuttle', () => {
       drive(w, 1, fireAt(60, 6));
       best = Math.max(best, p.weapon.mem.rally ?? 0);
     }
-    expect(best).toBeGreaterThanOrEqual(RALLY_CAP);
-    expect(smashMult(RALLY_CAP + 5)).toBe(smashMult(RALLY_CAP));
-    expect(smashMult(RALLY_CAP)).toBeGreaterThan(smashMult(0) * 1.3);
+    expect(best).toBeGreaterThanOrEqual(RALLY_BUILD - 1);
     expect(ownedBy(w, RallyShuttle, p).length).toBeLessThanOrEqual(MAX_FLOATING);
+  });
+
+  it('rally curve (user 2026-10-08): +3 % per rally to 7, the power shuttle from 8 (+100 %), the legend shuttle from 15 (+200 %)', () => {
+    expect(rallyBonus(1)).toBeCloseTo(0.03);
+    expect(rallyBonus(RALLY_BUILD)).toBeCloseTo(0.21);
+    expect(rallyBonus(POWER_RALLY)).toBe(1);
+    expect(rallyBonus(LEGEND_RALLY - 1)).toBe(1);
+    expect(rallyBonus(LEGEND_RALLY)).toBe(2);
+    expect(rallyBonus(99)).toBe(2);
+    // smashMult(rally so far): the smash makes rally + 1
+    expect(smashMult(0) / smashMult(-1)).toBeCloseTo(1.03);
+    expect(smashMult(POWER_RALLY - 1) / smashMult(POWER_RALLY - 2)).toBeCloseTo(2 / 1.21);
+    expect(smashMult(LEGEND_RALLY - 1) / smashMult(LEGEND_RALLY - 2)).toBeCloseTo(1.5);
+    expect([1, 7, 8, 14, 15, 30].map(rallyTier)).toEqual([0, 0, 1, 1, 2, 2]);
   });
 
   it('the landing spot follows a walking keeper but not a dash; a shuttle nobody hits lands and ends its rally', () => {
@@ -183,11 +195,14 @@ describe('badminton racket: the shuttle', () => {
 });
 
 describe('badminton racket: balance', () => {
-  it('0.85x..1.35x single target (legendary: at least 1.05x), crowd within 6.5x of the lantern', () => {
+  // user 2026-10-08 asked for an extreme rally curve (+100 % from rally 8, +200 % from 15): the
+  // bot keeps a perfect rally on an immobile dummy, so the racket sits well above the usual 1.35x
+  it('single target 1.05x..1.75x of the lantern with a perfect rally (legendary), crowd within 6.5x', () => {
     const k = bestDps(PLAIN_ID, ID) / bestDps(PLAIN_ID, 'lantern_bolt');
     const c = bestDps(PLAIN_ID, ID, true) / bestDps(PLAIN_ID, 'lantern_bolt', true);
+    console.log('RACKET balance single', k.toFixed(2), 'crowd', c.toFixed(2));
     expect(k).toBeGreaterThanOrEqual(1.05);
-    expect(k).toBeLessThanOrEqual(1.35);
+    expect(k).toBeLessThanOrEqual(1.75);
     expect(c).toBeLessThanOrEqual(6.5);
   }, 60_000);
 });

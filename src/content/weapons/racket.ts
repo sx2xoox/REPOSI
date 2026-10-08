@@ -5,8 +5,11 @@
 //    its keeper; its shadow and a closing ring mark where it will come down.
 //  - Swinging while a falling shuttle is within reach smashes it instead of
 //    serving: a fast, heavy, piercing shot that pops again on contact. Each
-//    return in a row raises the rally and the smash grows with it. A shuttle
-//    that touches the floor ends its rally.
+//    return in a row raises the rally and the smash grows with it (user
+//    2026-10-08): +3 % per rally up to rally 7, then the power shuttle from
+//    rally 8 (+100 %, gold and burning) and the legend shuttle from rally 15
+//    (+200 %, prismatic, with a shockwave). A shuttle that touches the floor
+//    ends its rally.
 
 import { defineWeapon } from '../../game/defs';
 import type { World } from '../../game/world';
@@ -73,6 +76,58 @@ defineDrawnSprite('proj_shuttlecock', 9, 7, (p) => {
   p.px(7, 4, '#c8a878');
 }, { outline: '#14101c', origin: [4, 3] });
 
+/** Rally 8+: the power shuttle — bigger, gold cork, burning feather tips. */
+defineDrawnSprite('proj_shuttlecock_power', 12, 9, (p) => {
+  // flared feather skirt with flame tips
+  p.poly([0, 0, 7, 3, 7, 5, 0, 8], '#fff4d8');
+  p.line(0, 0, 6, 3, '#ffffff');
+  p.line(0, 4, 6, 4, '#f0c870');
+  p.px(0, 0, '#ff9a30');
+  p.px(0, 8, '#ff9a30');
+  p.px(0, 2, '#ffd060');
+  p.px(0, 6, '#ffd060');
+  p.px(1, 1, '#ffb040');
+  p.px(1, 7, '#ffb040');
+  // a thick gold band
+  p.rect(7, 2, 1, 5, '#e09a20');
+  p.px(7, 2, '#ffe08a');
+  // gold cork, hot highlight
+  p.rect(8, 2, 3, 5, '#ffd860');
+  p.px(11, 3, '#ffd860');
+  p.px(11, 4, '#ffd860');
+  p.px(11, 5, '#ffd860');
+  p.px(8, 2, '#fffbe0');
+  p.px(9, 2, '#fff2b0');
+  p.px(10, 6, '#c88a20');
+}, { outline: '#2a1408', origin: [6, 4] });
+
+/** Rally 15+: the legend shuttle — three frames of prismatic feathers around a white-hot cork. */
+const LEGEND_FEATHERS = [
+  ['#7af8ff', '#ff6ad8', '#ffe860'],
+  ['#ff6ad8', '#ffe860', '#7af8ff'],
+  ['#ffe860', '#7af8ff', '#ff6ad8'],
+];
+LEGEND_FEATHERS.forEach((cols, f) => defineDrawnSprite(`proj_shuttlecock_legend_${f}`, 14, 11, (p) => {
+  // three feather tiers, each its own colour, fanning wide
+  p.poly([0, 0, 8, 4, 8, 6, 0, 10], cols[0]);
+  p.poly([1, 2, 8, 4, 8, 6, 1, 8], cols[1]);
+  p.poly([3, 4, 8, 4.5, 8, 5.5, 3, 6], cols[2]);
+  p.line(0, 0, 7, 4, '#ffffff');
+  p.line(0, 10, 7, 6, '#ffffff');
+  p.px(0, 5, '#ffffff');
+  // star glints on the skirt
+  p.px(2, 1, '#ffffff');
+  p.px(2, 9, '#ffffff');
+  // platinum band and a white-hot cork
+  p.rect(8, 3, 1, 5, '#e8e8ff');
+  p.rect(9, 3, 3, 5, '#ffffff');
+  p.px(12, 4, '#ffffff');
+  p.px(12, 5, '#ffffff');
+  p.px(12, 6, '#ffffff');
+  p.px(13, 5, '#fff8d0');
+  p.px(11, 7, cols[2]);
+}, { outline: '#1a0830', origin: [7, 5] }));
+
 defineDrawnSprite('icon_badminton_racket', 16, 16, (p) => {
   // racket on the diagonal, head top-right
   p.line(1, 15, 6, 10, '#28306a');
@@ -103,9 +158,15 @@ defineDrawnSprite('icon_badminton_racket', 16, 16, (p) => {
 export const SERVE_DAMAGE = 0.7;
 /** Smash damage (x weapon damage) before the rally bonus. */
 export const SMASH_DAMAGE = 1.1;
-/** Smash bonus per rally step, up to `RALLY_CAP` steps. */
-export const RALLY_STEP = 0.08;
-export const RALLY_CAP = 6;
+/** Smash bonus per rally (rally 1..RALLY_BUILD): +3 % each. */
+export const RALLY_STEP = 0.03;
+export const RALLY_BUILD = 7;
+/** From this rally the power shuttle: +100 % (flat until the legend shuttle). */
+export const POWER_RALLY = 8;
+export const POWER_BONUS = 1;
+/** From this rally the legend shuttle: +200 %. */
+export const LEGEND_RALLY = 15;
+export const LEGEND_BONUS = 2;
 /** Launch speed (x shot speed): serve, smash. */
 export const SERVE_SPEED = 1.8;
 /** A serve runs out of speed after about this x the keeper range. */
@@ -124,9 +185,30 @@ export const POP_FOLLOW = 100;
 /** Most shuttles one keeper can have floating at once (further hits do not pop). */
 export const MAX_FLOATING = 3;
 
-export function smashMult(rally: number): number {
-  return SMASH_DAMAGE * (1 + RALLY_STEP * clamp(rally, 0, RALLY_CAP));
+/** The smash bonus of rally `n` (the first smash makes rally 1). */
+export function rallyBonus(n: number): number {
+  if (n >= LEGEND_RALLY) return LEGEND_BONUS;
+  if (n >= POWER_RALLY) return POWER_BONUS;
+  return RALLY_STEP * clamp(n, 0, RALLY_BUILD);
 }
+
+/** Smash damage (x weapon damage) of a shuttle whose rally so far is `rally` (the smash makes rally + 1). */
+export function smashMult(rally: number): number {
+  return SMASH_DAMAGE * (1 + rallyBonus(rally + 1));
+}
+
+/** 0 plain, 1 power shuttle (rally 8+), 2 legend shuttle (rally 15+). */
+export function rallyTier(n: number): 0 | 1 | 2 {
+  return n >= LEGEND_RALLY ? 2 : n >= POWER_RALLY ? 1 : 0;
+}
+
+/** The shuttle sprite of rally `n` (the legend shuttle cycles its colours). */
+function shuttleSprite(n: number, t: number): string {
+  const tier = rallyTier(n);
+  if (tier === 2) return `proj_shuttlecock_legend_${Math.floor(t * 12) % 3}`;
+  return tier === 1 ? 'proj_shuttlecock_power' : 'proj_shuttlecock';
+}
+const TIER_GLOW = ['#ffe8a0', '#ffb040', '#ff9af0'];
 
 // ------------------------------------------------------------------ the floating shuttle
 /** A shuttle knocked high off a foe, floating back to its keeper to be smashed. */
@@ -213,8 +295,10 @@ export class RallyShuttle extends Entity {
     const flip = ease.inOutQuad(clamp((this.t - 0.35) / 0.3, 0, 1));
     const sway = Math.sin(this.age * 11 + this.id) * 0.18 * (1 - flip * 0.5);
     const rot = -Math.PI / 2 + Math.PI * flip + sway;
+    const tier = rallyTier(this.rally);
+    if (tier) r.sprite(glowSprite(tier === 2 ? 22 : 16, TIER_GLOW[tier]), this.x, y, { alpha: 0.35 + 0.15 * Math.sin(w.time * 14), additive: true });
     if (ready) r.sprite(glowSprite(12, '#ffe8a0'), this.x, y, { alpha: 0.35 + 0.15 * Math.sin(w.time * 18), additive: true });
-    r.sprite('proj_shuttlecock', this.x, y, { rot, flash: ready ? 0.25 : 0 });
+    r.sprite(shuttleSprite(this.rally, w.time), this.x, y, { rot, flash: ready ? 0.25 : 0 });
   }
 
   override light(w: World): void {
@@ -263,8 +347,10 @@ export class RallyText extends Entity {
   }
   override draw(r: Renderer): void {
     if (typeof document === 'undefined') return;
-    const hot = this.n >= RALLY_CAP;
-    const c = pixelTextCanvas(`랠리 ${this.n}`, { size: 10, font: 'Galmuri9', color: hot ? '#ffd860' : '#f4f0e6', outline: '#100c18' });
+    const tier = rallyTier(this.n);
+    const label = tier === 2 ? `전설의 랠리 ${this.n}!` : tier === 1 ? `강타 랠리 ${this.n}!` : `랠리 ${this.n}`;
+    const color = tier === 2 ? ['#7af8ff', '#ff6ad8', '#ffe860'][Math.floor(this.age * 14) % 3] : tier === 1 ? '#ffb040' : this.n >= RALLY_BUILD ? '#ffd860' : '#f4f0e6';
+    const c = pixelTextCanvas(label, { size: tier ? 12 : 10, font: 'Galmuri9', color, outline: tier === 2 ? '#2a0838' : '#100c18' });
     const a = this.age < 0.5 ? 1 : 1 - (this.age - 0.5) / 0.2;
     const pop = this.age < 0.06 ? 1 : 0;
     r.ctx.globalAlpha = Math.max(0, a) * r.worldOpacity;
@@ -295,8 +381,19 @@ const shuttleFx: ProjBehavior = {
     }
     // a smash is struck downward: it dives from the height it was hit at
     if (pr.mem.smash ?? 0) pr.z += (6 - pr.z) * Math.min(1, 14 * dt);
-    if ((pr.mem.smash ?? 0) && fx.chance(0.5)) {
-      w.particles.spawn({ x: pr.x - pr.vx * 0.01, y: pr.y - pr.z, vx: -pr.vx * 0.05, vy: -pr.vy * 0.05, life: 0.18, size: 1, colors: ['#ffffff', '#ffe8a0'], additive: true });
+    if (pr.mem.smash ?? 0) {
+      const tier = rallyTier(pr.mem.rally ?? 0);
+      const y = pr.y - pr.z;
+      if (tier === 0 && fx.chance(0.5)) {
+        w.particles.spawn({ x: pr.x - pr.vx * 0.01, y, vx: -pr.vx * 0.05, vy: -pr.vy * 0.05, life: 0.18, size: 1, colors: ['#ffffff', '#ffe8a0'], additive: true });
+      } else if (tier === 1) {
+        // burning feathers: embers peel off the skirt
+        for (let i = 0; i < 2; i++) w.particles.spawn({ x: pr.x - pr.vx * 0.012 + fx.range(-2, 2), y: y + fx.range(-2, 2), vx: -pr.vx * 0.08 + fx.range(-20, 20), vy: -pr.vy * 0.08 + fx.range(-20, 20), life: fx.range(0.18, 0.32), size: fx.chance(0.3) ? 2 : 1, colors: ['#ffffff', '#ffd060', '#ff8a20'], additive: true, light: 3 });
+      } else if (tier === 2) {
+        // a prismatic comet: rainbow sparks and star glints
+        for (let i = 0; i < 3; i++) w.particles.spawn({ x: pr.x - pr.vx * 0.012 + fx.range(-3, 3), y: y + fx.range(-3, 3), vx: -pr.vx * 0.1 + fx.range(-30, 30), vy: -pr.vy * 0.1 + fx.range(-30, 30), life: fx.range(0.22, 0.42), size: fx.chance(0.35) ? 2 : 1, colors: [['#7af8ff', '#ff6ad8', '#ffe860'][i], '#ffffff'], additive: true, light: 4 });
+        if (fx.chance(0.35)) w.particles.spawn({ x: pr.x + fx.range(-6, 6), y: y + fx.range(-6, 6), vx: 0, vy: -10, life: 0.3, size: 2, colors: ['#ffffff', '#fff8d0'], shape: 'spark', additive: true });
+      }
     }
   },
   onHit(pr, w, target) {
@@ -308,8 +405,26 @@ const shuttleFx: ProjBehavior = {
       pop(pr, w);
     }
     if (pr.mem.smash ?? 0) {
-      w.particles.burst(pr.x, pr.y - pr.z, { count: 8, speed: [40, 130], life: [0.1, 0.28], colors: ['#ffffff', '#ffe8a0', '#f4f0e6'], size: [1, 2], shape: 'spark', additive: true });
-      w.spawn(new RingFx(pr.x, pr.y - pr.z, 9, 0.16, '#ffe8a0', 1));
+      const tier = rallyTier(pr.mem.rally ?? 0);
+      const y = pr.y - pr.z;
+      if (tier === 2) {
+        // the legend shuttle lands like a meteor: a prismatic shockwave and a star burst
+        w.particles.burst(pr.x, y, { count: 26, speed: [60, 240], life: [0.2, 0.5], colors: ['#ffffff', '#7af8ff', '#ff6ad8', '#ffe860'], size: [1, 3], shape: 'spark', additive: true, light: 8 });
+        w.spawn(new RingFx(pr.x, y, 26, 0.3, '#ff9af0', 3));
+        w.spawn(new RingFx(pr.x, y, 16, 0.22, '#7af8ff', 2));
+        w.spawn(new RingFx(pr.x, y, 9, 0.14, '#ffffff', 2));
+        w.lights.glow(pr.x, y, 60, '#ff9af0', 0.7);
+        w.shake(0.18);
+        w.sfx('explosion', { vol: 0.3, pitch: 1.6, x: pr.x });
+      } else if (tier === 1) {
+        w.particles.burst(pr.x, y, { count: 16, speed: [50, 180], life: [0.14, 0.36], colors: ['#ffffff', '#ffd060', '#ff8a20'], size: [1, 2], shape: 'spark', additive: true, light: 6 });
+        w.spawn(new RingFx(pr.x, y, 16, 0.22, '#ffb040', 2));
+        w.lights.glow(pr.x, y, 40, '#ffb040', 0.55);
+        w.shake(0.1);
+      } else {
+        w.particles.burst(pr.x, y, { count: 8, speed: [40, 130], life: [0.1, 0.28], colors: ['#ffffff', '#ffe8a0', '#f4f0e6'], size: [1, 2], shape: 'spark', additive: true });
+        w.spawn(new RingFx(pr.x, y, 9, 0.16, '#ffe8a0', 1));
+      }
     } else {
       w.particles.burst(pr.x, pr.y - pr.z, { count: 4, speed: [20, 60], life: [0.12, 0.25], colors: ['#f4f0e6', '#ffffff'], size: [1, 1], shape: 'pixel' });
     }
@@ -321,8 +436,30 @@ const shuttleFx: ProjBehavior = {
     const sp = Math.max(1, pr.speed);
     const ux = pr.vx / sp;
     const uy = pr.vy / sp;
-    const len = Math.min(smash ? 22 : 10, sp * (smash ? 0.045 : 0.025));
-    if (smash) {
+    const n = smash ? (pr.mem.rally ?? 0) : 0;
+    const tier = rallyTier(n);
+    const rot = Math.atan2(pr.vy, pr.vx);
+    const len = Math.min(smash ? 22 + tier * 12 : 10, sp * (smash ? 0.045 + tier * 0.02 : 0.025));
+    if (tier === 2) {
+      // a pulsing prismatic halo, a three-colour comet tail and rainbow after-images
+      const pulse = 0.5 + 0.5 * Math.sin(pr.age * 26);
+      r.sprite(glowSprite(30, '#ff9af0'), pr.x, y, { alpha: 0.35 + 0.2 * pulse, additive: true });
+      r.sprite(glowSprite(16, '#ffffff'), pr.x, y, { alpha: 0.55, additive: true });
+      const cols = ['#7af8ff', '#ff6ad8', '#ffe860'];
+      for (let k = 0; k < 3; k++) {
+        const off = (k - 1) * 2;
+        pixLine(r, pr.x - ux * len - uy * off, y - uy * len + ux * off, pr.x - ux * 5 - uy * off * 0.4, y - uy * 5 + ux * off * 0.4, cols[k], 0.8);
+      }
+      for (let k = 3; k >= 1; k--) {
+        r.sprite(shuttleSprite(n, pr.age - k * 0.03), pr.x - ux * k * 6, y - uy * k * 6, { rot, alpha: 0.5 - k * 0.12, tint: cols[k % 3], tintAmount: 0.75, additive: true });
+      }
+    } else if (tier === 1) {
+      r.sprite(glowSprite(20, '#ffb040'), pr.x, y, { alpha: 0.5, additive: true });
+      pixLine(r, pr.x - ux * len, y - uy * len, pr.x - ux * 4, y - uy * 4, '#ffd060', 0.85);
+      pixLine(r, pr.x - ux * len * 0.7 - uy * 2, y - uy * len * 0.7 + ux * 2, pr.x - ux * 4 - uy, y - uy * 4 + ux, '#ff8a20', 0.6);
+      pixLine(r, pr.x - ux * len * 0.7 + uy * 2, y - uy * len * 0.7 - ux * 2, pr.x - ux * 4 + uy, y - uy * 4 - ux, '#ff8a20', 0.6);
+      for (let k = 2; k >= 1; k--) r.sprite('proj_shuttlecock_power', pr.x - ux * k * 6, y - uy * k * 6, { rot, alpha: 0.35 - k * 0.1, tint: '#ff9a30', tintAmount: 0.6, additive: true });
+    } else if (smash) {
       r.sprite(glowSprite(12, '#ffe8a0'), pr.x, y, { alpha: 0.45, additive: true });
       pixLine(r, pr.x - ux * len, y - uy * len, pr.x - ux * 4, y - uy * 4, '#ffe8a0', 0.7);
     } else if (len > 4) {
@@ -330,7 +467,7 @@ const shuttleFx: ProjBehavior = {
     }
     // slowing down it starts to wobble
     const wob = smash ? 0 : Math.sin(pr.age * 30 + pr.id) * clamp(1 - sp / 200, 0, 1) * 0.35;
-    r.sprite('proj_shuttlecock', pr.x, y, { rot: Math.atan2(pr.vy, pr.vx) + wob, flash: smash ? 0.3 : 0 });
+    r.sprite(shuttleSprite(n, pr.age), pr.x, y, { rot: rot + wob, flash: smash ? (tier === 2 ? 0.15 : 0.3) : 0 });
   },
 };
 
@@ -352,7 +489,7 @@ function smash(w: World, p: Player, st: { mem: Record<string, number> }, aim: nu
     const shots = p.fireProjectiles(w, aim, {
       count: 1, style: 'none', x: b.x, y: b.y + 1, z: Math.max(4, b.z), damageMult: 0, damage: b.dmg * smashMult(b.rally),
       speed: s.shotSpeed * SMASH_SPEED, range: 1e9, life: 3, pierce: s.pierce + 1, radius: s.projSize + 0.5,
-      knockback: s.knockback * 2.2, color: '#ffe8a0', light: 12, behaviors: [shuttleFx], fxMaterial: 'wood',
+      knockback: s.knockback * 2.2, color: TIER_GLOW[rallyTier(rally)], light: 12 + rallyTier(rally) * 6, behaviors: [shuttleFx], fxMaterial: 'wood',
     });
     for (const pr of shots) {
       pr.mem.smash = 1;
@@ -369,16 +506,26 @@ function smash(w: World, p: Player, st: { mem: Record<string, number> }, aim: nu
   st.mem.rally = best;
   st.mem.rallyAt = w.time;
   if (best >= 2) w.spawn(new RallyText(p.x, p.y - 24, best));
-  kick(w, aim, 1.6);
-  w.shake(Math.min(0.12, 0.05 + best * 0.01));
-  w.sfx('swing_heavy', { vol: 0.45, pitch: 1.5 });
-  w.sfx('hit_crit', { vol: 0.35, pitch: 1.2 + Math.min(0.5, best * 0.07) });
+  const tier = rallyTier(best);
+  kick(w, aim, 1.6 + tier * 0.8);
+  w.shake(Math.min(0.12, 0.05 + best * 0.01) + tier * 0.05);
+  w.sfx('swing_heavy', { vol: 0.45, pitch: 1.5 - tier * 0.15 });
+  w.sfx('hit_crit', { vol: 0.35 + tier * 0.1, pitch: tier ? 0.9 + tier * 0.15 : 1.2 + Math.min(0.5, best * 0.07) });
+  // reaching a new shuttle: a fanfare at the strings
+  if (best === POWER_RALLY || best === LEGEND_RALLY) {
+    const h = handPos(p, aim, 12);
+    const col = TIER_GLOW[tier];
+    w.spawn(new RingFx(h.x, h.y, tier === 2 ? 34 : 24, 0.35, col, 3));
+    w.particles.burst(h.x, h.y, { count: tier === 2 ? 40 : 24, speed: [60, 220], life: [0.25, 0.6], colors: tier === 2 ? ['#ffffff', '#7af8ff', '#ff6ad8', '#ffe860'] : ['#ffffff', '#ffd060', '#ff8a20'], size: [1, 3], shape: 'spark', additive: true, light: 8 });
+    w.renderer.screenFlash(col, tier === 2 ? 0.18 : 0.1);
+    w.sfx(tier === 2 ? 'secret_found' : 'charge_ready', { vol: 0.6 });
+  }
 }
 
 defineWeapon({
   id: 'badminton_racket',
   name: '바람깃 라켓',
-  desc: '휘두르면 셔틀콕이 빠르게 날아가다 바람에 꺾여 급히 느려진다. 적을 맞힌 셔틀콕은 높이 떠올라 내 쪽으로 되돌아오고, 떨어지는 셔틀콕을 휘둘러 받아치면 스매시! 랠리가 이어질수록 스매시가 강해지고, 바닥에 떨어지면 랠리가 끊긴다.',
+  desc: '랠리를 이어갈수록 점점 강해지는 라켓.',
   icon: 'icon_badminton_racket',
   heldSprite: 'w_badminton_racket',
   kind: 'ranged',
