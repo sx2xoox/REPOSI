@@ -1,12 +1,13 @@
 // 베른's kit — the husky sled-runner swordsman, built around momentum.
-//   passive 기세: consecutive hits build stacks (max 5): +7% attack speed and
+//   passive 기세: consecutive hits build stacks (max 5): +6% attack speed and
 //     +5% move speed each; they drop one by one after 1.6s without a hit.
 //     Deflecting a bullet still feeds the ember gauge (the sentinel's old oath).
 //   dash 설원 돌진: a rushing charge that hits and shoves every enemy it passes
-//   affinity 근접 무기: +12% damage, +20% knockback with melee weapons
+//   affinity 근접 무기: with a melee weapon every momentum stack is worth +13.5% attack
+//     speed instead of +6%, and the stacks hold on longer (2.4s) before they start to drop
 
 import type { World } from '../../game/world';
-import type { AffinityDef, DashDef, PassiveDef } from '../../game/defs';
+import { Weapons, weaponMatchesAffinity, type AffinityDef, type DashDef, type PassiveDef } from '../../game/defs';
 import { RingFx } from '../../game/effects';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { fx } from '../../engine/rng';
@@ -17,8 +18,11 @@ export const BERN_MAX_STACKS = 5;
 /** attack speed / move speed per stack */
 export const BERN_STACK_FIRE = 0.06;
 export const BERN_STACK_MOVE = 0.05;
-/** seconds without a hit before stacks start dropping, and the drop interval */
+/** attack speed per stack with a favoured melee weapon (근접 무기) */
+export const BERN_STACK_FIRE_AFFINITY = 0.135;
+/** seconds without a hit before stacks start dropping (longer with a melee weapon), and the drop interval */
 export const BERN_DECAY_DELAY = 1.6;
+export const BERN_DECAY_DELAY_AFFINITY = 2.4;
 export const BERN_DECAY_STEP = 0.4;
 /** rush damage (fraction of player damage) and knockback */
 export const BERN_RUSH_DMG = 0.9;
@@ -56,6 +60,15 @@ export function momentum(w: World): number {
   return w.vars.__bernStacks ?? 0;
 }
 
+/**
+ * Attack speed per momentum stack (+13.5% instead of +6% with a favoured melee weapon). Read from the
+ * weapon itself, not the 'affinity' flag: the stat hook runs while that flag is recomputed.
+ */
+export function stackFire(w: World | undefined): number {
+  const p = w?.player;
+  return p && weaponMatchesAffinity(p.character.affinity, Weapons.get(p.weaponId)) ? BERN_STACK_FIRE_AFFINITY : BERN_STACK_FIRE;
+}
+
 function setStacks(w: World, n: number): void {
   w.vars.__bernStacks = n;
   watch(w, 'bernStacks', n);
@@ -69,7 +82,7 @@ export const BERN_PASSIVE: PassiveDef = {
   stats(m, _power, w) {
     const n = w?.vars?.__bernStacks ?? 0;
     if (n <= 0) return;
-    m.mulStat('fireRate', 1 + n * BERN_STACK_FIRE);
+    m.mulStat('fireRate', 1 + n * stackFire(w));
     m.mulStat('moveSpeed', 1 + n * BERN_STACK_MOVE);
   },
   onHit(w, _t, hit) {
@@ -93,7 +106,8 @@ export const BERN_PASSIVE: PassiveDef = {
     const n = momentum(w);
     if (n <= 0) return;
     const p = w.player;
-    if (w.time - (w.vars.__bernHitAt ?? -99) > BERN_DECAY_DELAY && w.time - (w.vars.__bernDropAt ?? -99) > BERN_DECAY_STEP) {
+    const delay = p.flags.has('affinity') ? BERN_DECAY_DELAY_AFFINITY : BERN_DECAY_DELAY;
+    if (w.time - (w.vars.__bernHitAt ?? -99) > delay && w.time - (w.vars.__bernDropAt ?? -99) > BERN_DECAY_STEP) {
       w.vars.__bernDropAt = w.time;
       setStacks(w, n - 1);
       return;
@@ -115,9 +129,14 @@ export const BERN_PASSIVE: PassiveDef = {
     // stack pips above the head; the newest pops and the row pulses at full momentum
     const since = w.time - (w.vars.__bernStackAt ?? -99);
     const pulse = n >= BERN_MAX_STACKS ? 0.8 + 0.2 * Math.sin(w.time * 12) : 1;
+    // 근접 무기: every pip is a double chevron (each stack worth over twice the speed)
+    const sword = p.flags.has('affinity');
     for (let i = 0; i < n; i++) {
       const pop = i === n - 1 && since < 0.2 ? 1 + (1 - since / 0.2) * 0.6 : 1;
-      r.sprite('fx_momentum_pip', p.x + (i - (n - 1) / 2) * 6, p.y - 25 - p.z + Math.sin(w.time * 6 + i) * 0.8, { sx: pop, sy: pop, alpha: pulse, additive: n >= BERN_MAX_STACKS });
+      const px = p.x + (i - (n - 1) / 2) * 6;
+      const py = p.y - 25 - p.z + Math.sin(w.time * 6 + i) * 0.8;
+      if (sword) r.sprite('fx_momentum_pip', px, py - 3, { sx: pop, sy: pop, alpha: pulse * 0.7, additive: true });
+      r.sprite('fx_momentum_pip', px, py, { sx: pop, sy: pop, alpha: pulse, additive: n >= BERN_MAX_STACKS });
     }
   },
 };
@@ -159,11 +178,7 @@ export const BERN_DASH: DashDef = {
 
 export const BERN_AFFINITY: AffinityDef = {
   name: '근접 무기',
-  desc: '근접 무기를 들면 피해 +12%, 넉백 +20%.',
+  desc: '근접 무기를 들면 기세 한 칸이 공격 속도를 13.5% 올리고 늦게 식는다.',
   kinds: ['melee'],
   tags: ['blade'],
-  stats(m) {
-    m.mulStat('damage', 1.12);
-    m.mulStat('knockback', 1.2);
-  },
 };

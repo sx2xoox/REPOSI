@@ -3,7 +3,8 @@
 //     +12% damage and are revealed (paw print + glow, even when burrowed); the
 //     first hit on an untouched enemy is a guaranteed critical (선제 사격)
 //   dash 도약: a long vault; the first hit within 1.2s afterwards is a critical
-//   affinity 활·쇠뇌: +1 pierce, +15% shot speed, +10% range
+//   affinity 활·쇠뇌: with a bow the scent marks expose a weak spot: hits on a
+//     scented enemy roll an extra critical chance (+10% range as flavour)
 
 import type { World } from '../../game/world';
 import type { Renderer } from '../../engine/renderer';
@@ -18,6 +19,8 @@ export const SERIN_MARK_TIME = 4;
 export const SERIN_MARK_BONUS = 0.12;
 /** window (s) after a vault in which the first hit is a critical */
 export const SERIN_VAULT_WINDOW = 1.2;
+/** 활·쇠뇌 (affinity): extra critical chance of every hit on a scented enemy */
+export const SERIN_MARK_CRIT_AFFINITY = 0.4;
 
 // ------------------------------------------------------------------ icons
 defineDrawnSprite('icon_serin_passive', 16, 16, (p) => {
@@ -64,6 +67,16 @@ class ScentMarks extends EnemyOverlay {
     const a = Math.min(1, left / 0.6);
     const top = e.y - e.z - e.r * 2 - 9;
     r.sprite('fx_paw_mark', e.x, top + Math.sin(this.age * 5) * 1.2, { alpha: a, rot: Math.sin(this.age * 2.5) * 0.25 });
+    // 활·쇠뇌: the weak spot shows as four aim ticks closing in around the body
+    if (w.player.flags.has('affinity')) {
+      const cy = e.y - e.z - e.r;
+      const g = Math.round(e.r + 4 + Math.sin(this.age * 6) * 1.2);
+      const ticks: [number, number, number, number][] = [[e.x - 1, cy - g - 2, 2, 3], [e.x - 1, cy + g, 2, 3], [e.x - g - 2, cy - 1, 3, 2], [e.x + g, cy - 1, 3, 2]];
+      for (const [x, y, tw, th] of ticks) {
+        r.rect(x - 1, y - 1, tw + 2, th + 2, O, 0.55 * a);
+        r.rect(x, y, tw, th, '#fff0b0', 0.9 * a);
+      }
+    }
     // revealed: an outline ring at the feet shows even a burrowed enemy's position
     r.ring(e.x, e.y + 1, e.r + 2, '#ffe08a', 1, 0.35 * a * (e.hidden ? 1.6 : 1));
   }
@@ -102,7 +115,14 @@ export const SERIN_PASSIVE: PassiveDef = {
       w.sfx('hit_crit', { vol: 0.5, pitch: 1.3, x: t.x });
       proc(w, 'passive:serin');
     }
-    if (isScented(w, t)) amplify(hit, SERIN_MARK_BONUS);
+    if (!isScented(w, t)) return;
+    amplify(hit, SERIN_MARK_BONUS);
+    // 활·쇠뇌: the scent shows the hunter where to aim — an extra critical roll
+    if (!hit.crit && p.flags.has('affinity') && w.rng.chance(SERIN_MARK_CRIT_AFFINITY)) {
+      hit.crit = true;
+      hit.damage *= p.stats.critMult;
+      proc(w, 'passive:serin', true);
+    }
   },
   onHit(w, t, hit) {
     if (!isAttack(hit) || !(t instanceof Enemy) || !t.alive) return;
@@ -145,11 +165,9 @@ export const SERIN_DASH: DashDef = {
 
 export const SERIN_AFFINITY: AffinityDef = {
   name: '활·쇠뇌',
-  desc: '활과 쇠뇌를 들면 관통 +1, 탄속 +15%, 사거리 +10%.',
+  desc: '활·쇠뇌를 들면 표식된 적에게 치명타 확률 +40%, 사거리 +10%.',
   tags: ['bow'],
   stats(m) {
-    m.addStat('pierce', 1);
-    m.mulStat('shotSpeed', 1.15);
     m.mulStat('range', 1.1);
   },
 };

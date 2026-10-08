@@ -3,10 +3,12 @@
 //     mark on the enemy and the 4th mark ignites (small burst + burn, +ember)
 //   dash 불씨 질주: a short rush that leaves a burning trail
 //   release 등불 개화 (releases.ts), a larger lantern light (CharacterDef.lightRadius)
+//   affinity 등불 무기: with a lantern weapon the marks ignite on the 3rd hit and the
+//     spark bursts and burns twice as hard (the ember refund per hit stays the same)
 
 import type { World } from '../../game/world';
 import type { Renderer } from '../../engine/renderer';
-import type { DashDef, PassiveDef } from '../../game/defs';
+import type { AffinityDef, DashDef, PassiveDef } from '../../game/defs';
 import { Enemy } from '../../game/enemy';
 import { RingFx } from '../../game/effects';
 import { defineDrawnSprite } from '../../engine/sprites';
@@ -28,6 +30,19 @@ export const RIA_SPARK_EMBER = 5;
 /** Burning trail of the dash: damage per tick (fraction of player damage) and zone life (s). */
 export const RIA_TRAIL_DMG = 0.25;
 export const RIA_TRAIL_LIFE = 1.3;
+/**
+ * 등불 무기 (affinity): marks ignite on this many hits, and the spark's burst / burn
+ * (fractions of player damage) with a favoured lantern weapon.
+ */
+export const RIA_SPARK_HITS_AFFINITY = 3;
+export const RIA_SPARK_DMG_AFFINITY = 1.0;
+export const RIA_SPARK_BURN_AFFINITY = 0.6;
+/**
+ * Lantern weapons (the affinity matches these ids): the hand lantern, the twin-wick lamp gun,
+ * the wandering lamp spirit, the first keeper's dawn lantern and the rescue-lantern flail.
+ * 지뢰 등잔 stays out while its mine blasts do not count as attacks (no marks, no sparks).
+ */
+export const RIA_LANTERN_WEAPONS = ['lantern_bolt', 'twin_lamp', 'wandering_lamp', 'dawn_lantern', 'lantern_flail'];
 
 const EMBER_COLORS = ['#ffffff', '#ffe080', '#ff9a30', '#c04010'];
 
@@ -59,6 +74,16 @@ defineDrawnSprite('icon_ria_dash', 16, 16, (p) => {
 }, { outline: O });
 
 // ------------------------------------------------------------------ ember marks
+/** Is a favoured lantern weapon in hand (CharacterDef.affinity)? */
+function lanternHeld(w: World): boolean {
+  return w.player.flags.has('affinity');
+}
+
+/** Marks that ignite a spark: 4, or 3 with a lantern weapon. */
+export function sparkHits(w: World): number {
+  return lanternHeld(w) ? RIA_SPARK_HITS_AFFINITY : RIA_SPARK_HITS;
+}
+
 /** Ember marks orbiting the enemies that carry them (cosmetic). */
 class EmberMarks extends EnemyOverlay {
   drawMark(r: Renderer, w: World, e: Enemy): void {
@@ -83,18 +108,26 @@ class EmberMarks extends EnemyOverlay {
   }
 }
 
-/** The 4th ember mark ignites: a small burst that burns nearby enemies and refunds ember. */
+/**
+ * The 4th ember mark (3rd with a lantern weapon) ignites: a small burst that burns
+ * nearby enemies and refunds ember. The lantern spark hits twice as hard; the refund
+ * follows the marks, so the gauge fills per hit exactly as fast either way.
+ */
 export function emberSpark(w: World, e: Enemy): void {
   const d = w.player.stats.damage;
+  const lantern = lanternHeld(w);
   const y = e.y - e.z - 3;
-  w.sfx('ember_burst', { vol: 0.7, x: e.x });
+  w.sfx('ember_burst', { vol: lantern ? 0.8 : 0.7, pitch: lantern ? 1.12 : 1, x: e.x });
   w.spawn(new RingFx(e.x, y, RIA_SPARK_RADIUS + 2, 0.28, '#ffb040', 2));
-  w.particles.burst(e.x, y, { count: 16, speed: [40, 130], life: [0.2, 0.45], colors: EMBER_COLORS, size: [1, 2], additive: true, light: 5, lightColor: '#ff9a30' });
-  w.lights.glow(e.x, y, 44, '#ff9a30', 0.6);
+  if (lantern) w.spawn(new RingFx(e.x, y, RIA_SPARK_RADIUS - 6, 0.2, '#fff2b0', 1));
+  w.particles.burst(e.x, y, { count: lantern ? 24 : 16, speed: [40, lantern ? 160 : 130], life: [0.2, 0.45], colors: EMBER_COLORS, size: [1, 2], additive: true, light: 5, lightColor: '#ff9a30' });
+  w.lights.glow(e.x, y, lantern ? 56 : 44, '#ff9a30', lantern ? 0.75 : 0.6);
+  const burst = lantern ? RIA_SPARK_DMG_AFFINITY : RIA_SPARK_DMG;
+  const burn = lantern ? RIA_SPARK_BURN_AFFINITY : RIA_SPARK_BURN;
   for (const t of enemiesNear(w, e.x, e.y, RIA_SPARK_RADIUS)) {
-    itemHit(w, t, d * RIA_SPARK_DMG, { from: { x: e.x, y: e.y + 0.01 }, knockback: 60, kind: 'explosion', procs: ['ria_spark'], statuses: [{ kind: 'burn', duration: 2, power: d * RIA_SPARK_BURN }] });
+    itemHit(w, t, d * burst, { from: { x: e.x, y: e.y + 0.01 }, knockback: 60, kind: 'explosion', procs: ['ria_spark'], statuses: [{ kind: 'burn', duration: 2, power: d * burn }] });
   }
-  w.player.addEmber(RIA_SPARK_EMBER);
+  w.player.addEmber((RIA_SPARK_EMBER * sparkHits(w)) / RIA_SPARK_HITS);
   proc(w, 'passive:ria');
 }
 
@@ -113,7 +146,7 @@ export const RIA_PASSIVE: PassiveDef = {
     // marks follow hit size: four plain shots' worth of damage, however it is split
     const n = (stale ? 0 : t.mem.__riaMarks ?? 0) + hitWeight(hit) * hitShare(w, hit);
     t.mem.__riaAt = w.time;
-    if (n >= RIA_SPARK_HITS) {
+    if (n >= sparkHits(w)) {
       t.mem.__riaMarks = 0;
       emberSpark(w, t);
     } else {
@@ -138,4 +171,10 @@ export const RIA_DASH: DashDef = {
     const d = p.stats.damage;
     HazardZone.add(w, new HazardZone(w, p.x, p.y + 3, 'fire', { radius: 8, life: RIA_TRAIL_LIFE, tick: 0.3, damage: d * RIA_TRAIL_DMG, statuses: [{ kind: 'burn', duration: 1.5, power: d * 0.2 }] }), 12);
   },
+};
+
+export const RIA_AFFINITY: AffinityDef = {
+  name: '등불 무기',
+  desc: '등불 무기를 들면 불씨가 세 번째 적중에 터지고 불길이 두 배로 세진다.',
+  ids: RIA_LANTERN_WEAPONS,
 };

@@ -6,7 +6,7 @@
 import { defineCharacter } from '../../game/defs';
 import { defineCharacter2D, type CharSpec } from './look';
 import { releaseLanternBloom } from './releases';
-import { RIA_DASH, RIA_PASSIVE } from './kit-ria';
+import { RIA_AFFINITY, RIA_DASH, RIA_PASSIVE } from './kit-ria';
 
 export const RIA: CharSpec = {
   prefix: 'ria',
@@ -151,6 +151,7 @@ defineCharacter({
   releaseDesc: '탄환을 지우는 섬광 뒤, 유도 불꽃탄이 꽃잎처럼 사방으로 피어난다.',
   passive: RIA_PASSIVE,
   dash: RIA_DASH,
+  affinity: RIA_AFFINITY,
   playstyle: ['균형', '등불 해방', '불꽃'],
   difficulty: 1,
   pitch: '해방을 가장 자주 터뜨리고, 어떤 무기든 불씨를 남긴다.',

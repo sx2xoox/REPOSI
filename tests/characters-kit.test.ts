@@ -12,7 +12,7 @@ import { PRESS, HELD, type PlayerInput } from '../src/game/seam';
 import { Projectile } from '../src/game/projectile';
 import { HazardZone } from '../src/content/items/lib';
 import { VoidRift, echoEvery, NIEL_ECHO_EVERY, NIEL_ECHO_EVERY_AFFINITY } from '../src/content/characters/kit-niel';
-import { BERN_MAX_STACKS, BERN_STACK_FIRE, momentum } from '../src/content/characters/kit-bern';
+import { BERN_MAX_STACKS, BERN_STACK_FIRE_AFFINITY, momentum } from '../src/content/characters/kit-bern';
 import { RIA_SPARK_HITS } from '../src/content/characters/kit-ria';
 import { isScented, SERIN_VAULT_WINDOW } from '../src/content/characters/kit-serin';
 import { characterKitRows, characterStats } from '../src/ui/logic';
@@ -62,8 +62,8 @@ describe('character kit framework', () => {
       expect(c.pitch).toMatch(HANGUL);
       expect(c.releaseName).toMatch(HANGUL);
     }
-    // the four kits do not overlap the upcoming tank / parry / companion keepers
-    expect(Characters.must('ria').affinity).toBeUndefined();
+    // favoured classes (tests/affinity-a.test.ts covers their kit upgrades)
+    expect(Characters.must('ria').affinity?.ids).toContain('lantern_bolt');
     expect(Characters.must('bern').affinity?.kinds).toContain('melee');
     expect(Characters.must('serin').affinity?.tags).toContain('bow');
     expect(Characters.must('niel').affinity?.tags).toContain('arcane');
@@ -127,7 +127,8 @@ describe('character kit framework', () => {
 
   it('character select stats include affinity and passive stat hooks', () => {
     const serin = characterStats(Characters.must('serin'));
-    expect(serin.pierce).toBe(1); // bow affinity on the starting longbow
+    const serinPlain = characterStats({ ...Characters.must('serin'), affinity: undefined });
+    expect(serin.range / serinPlain.range).toBeCloseTo(1.1, 5); // bow affinity on the starting longbow
     expect(characterStats(Characters.must('niel')).maxHearts).toBe(2);
     for (const c of Characters.all()) for (const row of characterKitRows(c)) expect(row.desc).toBeTruthy();
   });
@@ -167,11 +168,11 @@ describe('베른 — 기세 / 설원 돌진', () => {
     expect(momentum(w)).toBe(BERN_MAX_STACKS);
     const frMax = p.stats.fireRate;
     const mvMax = p.stats.moveSpeed;
-    expect(p.flags.has('affinity')).toBe(true); // daggers are melee
+    expect(p.flags.has('affinity')).toBe(true); // daggers are melee: each stack is worth the affinity's speed
     for (const e of [...w.enemies]) w.killEnemy(e);
-    drive(w, 60 * 4, () => {});
+    drive(w, 60 * 5, () => {});
     expect(momentum(w)).toBe(0);
-    expect(frMax / p.stats.fireRate).toBeCloseTo(1 + BERN_MAX_STACKS * BERN_STACK_FIRE, 2);
+    expect(frMax / p.stats.fireRate).toBeCloseTo(1 + BERN_MAX_STACKS * BERN_STACK_FIRE_AFFINITY, 2);
     expect(mvMax).toBeGreaterThan(p.stats.moveSpeed);
   });
 
@@ -190,8 +191,8 @@ describe('세린 — 사냥 감각 / 도약', () => {
     const { w, dummy } = sim('serin', 'hunter_bow');
     const p = w.player;
     expect(p.flags.has('affinity')).toBe(true);
-    // the affinity's pierce is a weapon factor: it shapes the bow's shots, not the keeper's stats
-    expect(p.weaponStats.pierce).toBe(1);
+    // the affinity's range is a weapon factor: it shapes the bow's shots, not the keeper's stats
+    expect(p.weaponStats.range).toBeGreaterThan(p.stats.range);
     const dmg0 = w.run.stats.damageDealt;
     let crits = 0;
     const orig = w.applyHit.bind(w);
@@ -231,7 +232,7 @@ describe('세린 — 사냥 감각 / 도약', () => {
 });
 
 describe('니엘 — 공허 메아리 / 공허 걸음', () => {
-  it('floats, and every 4th attack (3rd with an arcane weapon) sends out a homing echo', () => {
+  it('floats, and every 4th attack (2nd with an arcane weapon) sends out a homing echo', () => {
     const { w, dummy } = sim('niel', 'twin_lamp');
     const p = w.player;
     expect(p.flying).toBe(true);

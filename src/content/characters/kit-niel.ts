@@ -3,7 +3,8 @@
 //     orb at 80% damage, pierces one enemy); the child floats over pits and spikes
 //   dash 공허 걸음: a short blink that leaves a rift at the origin, which pulls
 //     and bites nearby enemies before collapsing
-//   affinity 마법 무기: echoes every 3rd attack instead, +10% range
+//   affinity 마법 무기: echoes every 2nd attack instead and the echo is a larger,
+//     stronger orb (90% damage instead of 80%)
 
 import type { World } from '../../game/world';
 import type { Renderer } from '../../engine/renderer';
@@ -18,8 +19,10 @@ import { cooldown, proc } from '../items/lib';
 import { O } from './kit';
 
 export const NIEL_ECHO_EVERY = 4;
-export const NIEL_ECHO_EVERY_AFFINITY = 3;
+export const NIEL_ECHO_EVERY_AFFINITY = 2;
 export const NIEL_ECHO_DMG = 0.8;
+/** echo damage with a favoured arcane weapon (the deeper echo) */
+export const NIEL_ECHO_DMG_AFFINITY = 0.9;
 /** rift: radius, life (s), bite damage (fraction of player damage) and the two bite times */
 export const NIEL_RIFT_RADIUS = 20;
 export const NIEL_RIFT_LIFE = 0.7;
@@ -27,6 +30,9 @@ export const NIEL_RIFT_DMG = 0.6;
 const RIFT_BITES = [0.18, 0.48];
 
 const VOID = ['#ffffff', '#ead0ff', '#b070ff', '#4a2a7a'];
+// echo glows (normal / deeper echo) compiled up front with the boot warm-up
+glowSprite(14, '#9a50ff');
+glowSprite(18, '#9a50ff');
 
 // ------------------------------------------------------------------ icons
 defineDrawnSprite('icon_niel_passive', 16, 16, (p) => {
@@ -64,16 +70,19 @@ export function echoEvery(w: World): number {
 export function spawnEcho(w: World, angle: number): Projectile {
   const p = w.player;
   const s = p.stats;
+  // 마법 무기: the deeper echo — a larger orb that bites harder
+  const deep = p.flags.has('affinity');
+  const glow = deep ? 18 : 14;
   const pr = new Projectile({
-    team: 'player', x: p.x + Math.cos(angle) * 6, y: p.y - 5 + Math.sin(angle) * 4, angle, speed: 150, damage: s.damage * NIEL_ECHO_DMG,
-    radius: 4, range: Math.max(160, s.range * 1.1), owner: p, pierce: 1, homing: 5, color: '#b070ff', light: 24, knockback: 50, z: 7,
+    team: 'player', x: p.x + Math.cos(angle) * 6, y: p.y - 5 + Math.sin(angle) * 4, angle, speed: 150, damage: s.damage * (deep ? NIEL_ECHO_DMG_AFFINITY : NIEL_ECHO_DMG),
+    radius: deep ? 5 : 4, range: Math.max(160, s.range * 1.1), owner: p, pierce: 1, homing: 5, color: '#b070ff', light: deep ? 30 : 24, knockback: 50, z: 7,
     behaviors: [{
       id: 'void_echo',
       update(q, ww, dt) {
         if (fx.chance(dt * 30)) ww.particles.spawn({ x: q.x + fx.range(-2, 2), y: q.y - q.z + fx.range(-2, 2), life: 0.3, colors: ['#ead0ff', '#9a50ff', '#2a1844'], size: 1.5, sizeEnd: 0.5, shape: 'circle', additive: true });
       },
       draw(q, r) {
-        r.sprite(glowSprite(14, '#9a50ff'), q.x, q.y - q.z, { alpha: 0.5 + 0.2 * Math.sin(q.age * 18), additive: true });
+        r.sprite(glowSprite(glow, '#9a50ff'), q.x, q.y - q.z, { alpha: 0.5 + 0.2 * Math.sin(q.age * 18), additive: true });
       },
     }],
   });
@@ -203,9 +212,6 @@ export const NIEL_DASH: DashDef = {
 
 export const NIEL_AFFINITY: AffinityDef = {
   name: '마법 무기',
-  desc: '마법 무기를 들면 메아리가 세 번째 공격마다 나오고 사거리 +10%.',
+  desc: '마법 무기를 들면 공허 메아리가 두 번째 공격마다 나오고 더 크고 세진다.',
   tags: ['arcane'],
-  stats(m) {
-    m.mulStat('range', 1.1);
-  },
 };
