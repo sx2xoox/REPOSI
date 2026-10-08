@@ -38,10 +38,10 @@ export function isPrimary(hit: HitInfo): boolean {
   return true;
 }
 
-/** Chance that stacks with copies (1-(1-p)^n) plus a little luck. */
-export function procChance(w: World, base: number, power: number, luckK = 0.012): number {
+/** Chance that stacks with copies (1-(1-p)^n) plus a little luck (weighted like the base, see rollHit). */
+export function procChance(w: World, base: number, power: number, luckK = 0.012, share = 1): number {
   const luck = w.player?.stats?.luck ?? 0;
-  return clamp(1 - Math.pow(1 - base, Math.max(1, power)) + Math.max(0, luck) * luckK, 0, 0.95);
+  return clamp(1 - Math.pow(1 - base, Math.max(1, power)) + Math.max(0, luck) * luckK * share, 0, 0.95);
 }
 
 export function roll(w: World, base: number, power: number, luckK?: number): boolean {
@@ -53,9 +53,41 @@ export function hitWeight(hit: HitInfo): number {
   return hit.kind === 'laser' ? 0.5 : 1;
 }
 
-/** Per-hit proc roll that accounts for the hit's weight (see hitWeight). */
+/**
+ * How big this hit is next to one plain shot of its keeper (hit damage / keeper damage,
+ * 0.25..2). Per-hit procs scale their chance with it, so a weapon that splits its damage
+ * into many small hits (pellets, nails, beam ticks, extra shots) procs about as often per
+ * second as one that lands a few big ones: procs follow damage dealt, not hit count.
+ */
+export function hitShare(w: World, hit: HitInfo): number {
+  const a = hit.attacker as { weaponStats?: unknown; stats?: { damage: number } } | null | undefined;
+  const ref = a?.weaponStats && a.stats ? a.stats.damage : (w.player?.stats?.damage ?? 10);
+  return clamp(hit.damage / Math.max(1, ref), 0.25, 2);
+}
+
+/** Per-hit proc roll weighted by the hit's size (see hitShare). */
 export function rollHit(w: World, hit: HitInfo, base: number, power: number, luckK?: number): boolean {
-  return w.rng.chance(procChance(w, base * hitWeight(hit), power, luckK));
+  const share = hitShare(w, hit);
+  return w.rng.chance(procChance(w, base * share, power, luckK, share));
+}
+
+// ====================================================================== damage bonuses
+/**
+ * Item damage bonus for this hit (+0.3 = +30 %), from modifyHit. Bonuses on one hit add
+ * up and World.applyHit applies them once, so several "+30 %" items give +90 %, not x2.2.
+ */
+export function amplify(hit: HitInfo, bonus: number): void {
+  hit.amp = (hit.amp ?? 0) + bonus;
+}
+
+/** Item damage bonus carried by a fired shot (onShoot); added to its hits' bonus pool. */
+export function amplifyShot(p: Projectile, bonus: number): void {
+  p.mem.amp = Number(p.mem.amp ?? 0) + bonus;
+}
+
+/** Item damage bonus carried by a melee swing (onSwing); added to its hits' bonus pool. */
+export function amplifySwing(sw: { o: { amp?: number } }, bonus: number): void {
+  sw.o.amp = (sw.o.amp ?? 0) + bonus;
 }
 
 /** Diminishing stack multiplier: 1, 1.6, 2.0, 2.3 ... */
@@ -407,12 +439,15 @@ export function sineBehavior(amp = 0.9, freq = 11): ProjBehavior {
   };
 }
 
+/** Damage share of a boomerang shot on its way back. */
+export const BOOMERANG_RETURN = 0.35;
+
 /** Boomerang: decelerates, turns around and flies back through the player, piercing on return. */
 export function boomerangBehavior(): ProjBehavior {
   const turn = (p: Projectile) => {
     if (p.mem.boom) return;
     p.mem.boom = 1;
-    p.damage *= 0.65;
+    p.damage *= BOOMERANG_RETURN;
     p.generation = Math.max(1, p.generation); // Return damage never generates another proc cascade.
     p.hitIds.clear();
     p.pierce += 99;
@@ -436,7 +471,7 @@ export function boomerangBehavior(): ProjBehavior {
       const pl = w.player;
       const want = angleTo(p.x, p.y, pl.x, pl.y - 5);
       p.angle = rotateToward(p.angle, want, 12 * dt);
-      p.speed = Math.min(p.speed + 700 * dt, (p.mem.boomSpeed ||= Math.max(200, pl.stats.shotSpeed * 1.1)));
+      p.speed = Math.min(p.speed + 700 * dt, (p.mem.boomSpeed ||= Math.max(200, pl.weaponStats.shotSpeed * 1.1)));
       p.syncVel();
       p.spectral = true;
       if (Math.hypot(pl.x - p.x, pl.y - 5 - p.y) < 9) p.dead = true;
@@ -457,13 +492,14 @@ export function growBehavior(maxScale = 2.2, dmgGain = 1.0): ProjBehavior {
   return {
     id: 'grow',
     update(p) {
-      if (p.mem.r0 === undefined) {
-        p.mem.r0 = p.r;
-        p.mem.d0 = p.damage;
-      }
+      if (p.mem.r0 === undefined) p.mem.r0 = p.r;
       const k = clamp(p.traveled / Math.max(40, p.range), 0, 1);
       p.r = p.mem.r0 * (1 + (maxScale - 1) * k);
-      p.damage = p.mem.d0 * (1 + dmgGain * k);
+      // the growth rides in the shot's item bonus pool (mem.amp, applied once per hit), so it
+      // neither erases nor compounds with other changes to the shot's damage
+      const g = dmgGain * k;
+      p.mem.amp = Number(p.mem.amp ?? 0) + g - Number(p.mem.growAmp ?? 0);
+      p.mem.growAmp = g;
       p.knockback = 60 + 80 * k;
     },
   };
@@ -490,7 +526,7 @@ export function orbitBehavior(dur = 1.3, radius = 22): ProjBehavior {
         p.mem.orbitDone = 1;
         const e = w.nearestEnemy(p.x, p.y, 220);
         p.angle = e ? angleTo(p.x, p.y, e.x, e.y - e.z) : pl.aim;
-        p.speed = Math.max(220, pl.stats.shotSpeed * 1.15);
+        p.speed = Math.max(220, pl.weaponStats.shotSpeed * 1.15);
         p.syncVel();
         p.traveled = 0;
         p.life = p.age + 3;

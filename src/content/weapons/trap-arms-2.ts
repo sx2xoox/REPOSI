@@ -6,6 +6,7 @@
 //                                       grinding enemies, and whips back on release
 
 import { defineWeapon, type WeaponState } from '../../game/defs';
+import { multishotShare } from '../../game/stats';
 import type { World } from '../../game/world';
 import type { Player } from '../../game/player';
 import type { Renderer } from '../../engine/renderer';
@@ -237,7 +238,8 @@ defineWeapon({
     for (let i = 0; i < n; i++) {
       const a = aim + (i - (n - 1) / 2) * 0.26;
       const l = Math.max(4, rayLength(w, tip.x, tip.y, a, len));
-      const stroke = new InkStroke(p, tip.x, tip.y, tip.x + Math.cos(a) * l, tip.y + Math.sin(a) * l, width, s.damage * INK_PAINT_MULT, s.damage * INK_TICK_MULT, ticks);
+      const share = multishotShare(n);
+      const stroke = new InkStroke(p, tip.x, tip.y, tip.x + Math.cos(a) * l, tip.y + Math.sin(a) * l, width, s.damage * INK_PAINT_MULT * share, s.damage * INK_TICK_MULT * share, ticks);
       while (live.length >= cap) {
         const old = live.shift()!;
         old.dryOut();
@@ -462,7 +464,7 @@ defineWeapon({
     const fallback = ahead ? Math.hypot(ahead.x - p.x, ahead.y - (p.y - 5)) : maxD * 0.7;
     const d0 = aimDistance(w, p, 20, maxD, fallback);
     const h = handPos(p, aim, 8);
-    const tick = YOYO_TICK * clamp(2.6 / Math.max(0.4, p.stats.fireRate), 0.35, 2.5);
+    const tick = YOYO_TICK * clamp(2.6 / Math.max(0.4, p.weaponStats.fireRate), 0.35, 2.5);
     const shots = p.fireProjectiles(w, aim, {
       style: 'none', x: h.x, y: h.y, speed: Math.max(260, s.shotSpeed * 1.3), range: 99999, life: YOYO_HOLD + 3, pierce: 999, bounce: 0, homing: 0,
       radius: Math.max(4, YOYO_REACH - 7 + (s.projSize - 3)), knockback: s.knockback * 0.5, color: '#fff0c8', light: 10, spreadMult: 2.5,

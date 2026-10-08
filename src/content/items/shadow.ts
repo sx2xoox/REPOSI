@@ -6,7 +6,7 @@ import { ramp } from '../../engine/painter';
 import { fx } from '../../engine/rng';
 import { O, addHitStatus, cooldown, enemiesNear, familiarsOf, isAttack, isMelee, itemHit, roll, rollHit, stackMul, syncFamiliars } from './lib';
 import { TwinShadow } from './familiars';
-import { proc, miniBlast } from './lib';
+import { amplify, proc, miniBlast } from './lib';
 import { effectProc } from '../../game/procs';
 import { Entity } from '../../game/entity';
 import type { World } from '../../game/world';
@@ -182,7 +182,7 @@ defineDrawnSprite('icon_black_candle', 16, 16, (p) => {
 defineArtifact({
   id: 'black_candle',
   name: '검은 초',
-  desc: '공격력 +2.5, 행운 -1. 처치 시 가끔 검은 불꽃',
+  desc: '공격력 +1.5, 행운 -1. 처치 시 가끔 검은 불꽃',
   detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   signature: '처치 시 10% 확률로 검은 불꽃이 터져 주변 적을 겁먹게 한다',
   quote: '어둠을 태우는 불도 있다.',
@@ -192,7 +192,7 @@ defineArtifact({
   look: { shot: '#8a5ac8', trail: 'smoke', mote: '#3a2a4a' },
   pools: ['curse', 'shop', 'treasure'],
   stats(m, power) {
-    m.addStat('damage', 2.5 * power);
+    m.addStat('damage', 1.5 * power);
     m.addStat('luck', -power);
   },
   onKill(w, e, power) {
@@ -231,13 +231,15 @@ defineArtifact({
   look: { mote: '#c0a0ff', orbit: '#c0a0ff' },
   pools: ['treasure', 'shop'],
   onAttack(w, angle, power) {
-    if (!w.enemies.some((e) => e.alive && e.vulnerable && !e.hidden) || !effectProc(w, () => true)) return;
+    if (!w.enemies.some((e) => e.alive && e.vulnerable && !e.hidden)) return;
+    // no faster than the keeper's own cadence, whatever the weapon's attack speed
+    if (!cooldown(w, 'rear_eye', 0.9 / Math.max(0.5, w.player.stats.fireRate)) || !effectProc(w, () => true)) return;
     const p = w.player;
     const back = angle + Math.PI;
     if (isMelee(w)) {
       p.swing(w, { angle: back, damage: dmg(w) * 0.6, arc: 1.8, color: '#b08aff', noProc: true });
     } else {
-      for (const pr of p.fireProjectiles(w, back, { fromWeapon: false, count: power, damageMult: 0.7, spreadMult: 1.2 })) { pr.color = '#c0a0ff'; pr.generation = 1; }
+      for (const pr of p.fireProjectiles(w, back, { fromWeapon: false, count: power, damageMult: 0.7, spreadMult: 1.2, generation: 1 })) pr.color = '#c0a0ff';
     }
   },
 });
@@ -260,7 +262,7 @@ defineArtifact({
   id: 'shade_dagger',
   name: '그림자 단검',
   desc: '대시로 적을 통과하면 큰 피해를 주고 출혈시킨다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  detail: '공격력의 160% 피해. 같은 적은 2초에 한 번만 벤다.',
   quote: '그림자는 등 뒤에서 찌른다.',
   rarity: 'rare',
   tags: ['shadow', 'blood'],
@@ -276,9 +278,11 @@ defineArtifact({
     const p = w.player;
     const tag = `__dag${w.vars.__dagId}`;
     for (const e of enemiesNear(w, p.x, p.y, p.r + 7)) {
-      if (e.mem[tag]) continue;
+      // one cut per dash, and the same enemy at most every 2 s (dash spam on a boss)
+      if (e.mem[tag] || (e.mem.__dagCd ?? -1) > w.time) continue;
       e.mem[tag] = 1;
-      itemHit(w, e, dmg(w) * 2.5 * stackMul(power), { knockback: 120, statuses: [{ kind: 'bleed', duration: 3, power: dmg(w) * 0.3 }] });
+      e.mem.__dagCd = w.time + 2;
+      itemHit(w, e, dmg(w) * 1.6 * stackMul(power), { knockback: 120, statuses: [{ kind: 'bleed', duration: 3, power: dmg(w) * 0.3 }] });
       proc(w, 'shade_dagger');
       w.sfx('swing_heavy', { vol: 0.5, pitch: 1.3 });
       w.particles.burst(e.x, e.y - 5, { count: 14, speed: [60, 160], angle: Math.atan2(p.dashDY, p.dashDX), spread: 0.8, life: [0.15, 0.35], colors: ['#ffffff', VIO[4], VIO[3], VIO[1]], shape: 'spark', size: [1, 2] });
@@ -306,7 +310,7 @@ defineDrawnSprite('icon_hollow_mask', 16, 16, (p) => {
 defineArtifact({
   id: 'hollow_mask',
   name: '텅 빈 가면',
-  desc: '10% 확률로 공포를 건다. 겁먹은 적에게 피해 +25%',
+  desc: '10% 확률로 공포를 건다. 겁먹은 적에게 피해 +20%',
   detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '가면 뒤엔 아무도 없다. 그래서 무섭다.',
   rarity: 'rare',
@@ -315,7 +319,7 @@ defineArtifact({
   look: { shot: '#9a7aff', aura: '#4a3a6a', hit: '#d0c0ff' },
   pools: ['treasure', 'curse', 'challenge'],
   modifyHit(w, t, hit, power) {
-    if (t.hasStatus('fear')) hit.damage *= 1.25;
+    if (t.hasStatus('fear')) amplify(hit, 0.2);
     else if (isAttack(hit) && rollHit(w, hit, 0.1, power)) addHitStatus(w, t, hit, { kind: 'fear', duration: 2.5 });
   },
 });
@@ -341,7 +345,7 @@ defineArtifact({
   id: 'twin_shadow',
   name: '쌍둥이 그림자',
   desc: '그림자 분신이 따라다니며 내 공격을 흉내 낸다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  detail: '분신은 내 기본 공격 속도보다 빨리 흉내 내지 않으며 한 번에 공격력의 35% 피해. 중복 시 분신 최대 2명.',
   quote: '그림자가 먼저 움직였다.',
   rarity: 'epic',
   tags: ['shadow'],
@@ -355,7 +359,8 @@ defineArtifact({
     syncFamiliars(w, 'twin_shadow', 0, (w2) => new TwinShadow(w2));
   },
   onAttack(w, angle) {
-    if (!cooldown(w, 'twin_shadow', 0.08)) return;
+    // at most the keeper's own cadence: a fast weapon does not make the shadows faster
+    if (!cooldown(w, 'twin_shadow', 1 / Math.max(0.5, w.player.stats.fireRate))) return;
     const melee = isMelee(w);
     for (const t of familiarsOf<TwinShadow>(w, 'twin_shadow')) {
       t.mimic(w, angle, melee);

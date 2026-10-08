@@ -84,8 +84,8 @@ defineDrawnSprite('icon_wandering_lamp', 16, 16, (p) => {
 /** Farthest the lamp floats from its keeper (px). */
 export const LAMP_MAX = 90;
 /** Damage of the keeper's and the lamp's shot (x weapon damage each). */
-export const LAMP_KEEPER_SHOT = 0.5;
-export const LAMP_SPIRIT_SHOT = 0.68;
+export const LAMP_KEEPER_SHOT = 0.46;
+export const LAMP_SPIRIT_SHOT = 0.63;
 /** The spirit flame bends toward foes (homing, rad/s). */
 export const LAMP_SEEK = 2.5;
 /** How far short of the aimed point the lamp stops, and how far it hovers to the side (px). */

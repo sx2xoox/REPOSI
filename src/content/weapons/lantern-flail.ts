@@ -63,7 +63,7 @@ defineWeapon({
   icon: 'icon_lantern_flail',
   heldSprite: 'w_lantern_flail',
   kind: 'melee',
-  rarity: 'rare',
+  rarity: 'common',
   archetype: '도리깨',
   tags: ['heavy'],
   pools: ['treasure', 'boss'],

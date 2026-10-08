@@ -226,12 +226,17 @@ function hashPlayer(h: StateHasher, p: Player, coop = false): void {
   h.word(-8);
   const s = p.stats as unknown as Record<string, unknown>;
   for (const k in s) if (typeof s[k] === 'number') h.str(k).num(s[k] as number);
+  const a = p.armedStats as unknown as Record<string, unknown>;
+  for (const k in a) if (typeof a[k] === 'number') h.str(k).num(a[k] as number);
 }
 
 function hashActor(h: StateHasher, a: Actor): void {
   h.int(a.id).num(a.x).num(a.y).num(a.z).num(a.vx).num(a.vy).num(a.vz).num(a.r).bool(a.dead).num(a.age);
   h.num(a.hp).num(a.maxHp).num(a.kbx).num(a.kby).num(a.invuln).num(a.lastHurtAt);
-  for (const [k, s] of a.statuses) h.str(k).num(s.time).num(s.power).num(s.tick).int(s.stacks);
+  for (const [k, s] of a.statuses) {
+    h.str(k).num(s.time).num(s.power).num(s.tick).int(s.stacks);
+    for (const e of s.ends ?? []) h.num(e);
+  }
   h.word(-9);
 }
 

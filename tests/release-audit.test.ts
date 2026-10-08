@@ -93,8 +93,9 @@ it.each(['clockmaker','clockwork_dancer'])('late boss still performs attacks aga
     out.pressed=pp.ember>=100?PRESS.release:0;
   };
   const start=w.time;let controlled=0,frames=0;
-  while(boss.alive&&w.time-start<150&&frames<12000){w.update(FIXED_DT);frames++;if(boss.hasStatus('stun')||boss.hasStatus('freeze'))controlled++;}
+  while(boss.alive&&w.time-start<240&&frames<15000){w.update(FIXED_DT);frames++;if(boss.hasStatus('stun')||boss.hasStatus('freeze'))controlled++;}
   console.log(JSON.stringify({boss:id,seconds:w.time-start,dead:!boss.alive,shots,controlledFraction:controlled/frames,releases:w.run.stats.releases}));
   expect(shots).toBeGreaterThan(5);expect(controlled/frames).toBeLessThan(0.3);
-  expect(boss.alive).toBe(false);expect(w.time-start).toBeGreaterThan(10);expect(w.time-start).toBeLessThan(120);
+  // power budget (2026-10-08): this proc-heavy build no longer melts a floor-7 boss whose skill the bot ignores
+  expect(boss.alive).toBe(false);expect(w.time-start).toBeGreaterThan(30);expect(w.time-start).toBeLessThan(240);
 });

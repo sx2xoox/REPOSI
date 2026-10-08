@@ -13,6 +13,7 @@ import { effectInterval, effectProc } from '../../game/procs';
 import {
   O, HazardZone, Starfall, addHitStatus, chainLightning, cooldown, enemiesNear, inflict, isAttack, isPrimary,
   itemHit, miniBlast, roll, rollHit, shout, spawnShards, tickTimeStop, timeStop,
+  amplify,
 } from './lib';
 
 // ------------------------------------------------------------------ 8x8 icons
@@ -190,7 +191,7 @@ resonance('venom', '독', '#8aff5a', 'res_venom', [
   [5, '적이 독 중첩 1당 받는 피해 +5%', {
     modifyHit(_w, t, hit) {
       const s = t.statuses.get('poison');
-      if (s) hit.damage *= 1 + 0.05 * s.stacks;
+      if (s) amplify(hit, 0.05 * s.stacks);
     },
   }],
 ]);
@@ -205,6 +206,8 @@ resonance('storm', '번개', '#ffe95a', 'res_storm', [
   }],
   [3, '대시하면 주변 적 3명에게 번개가 친다', {
     onDash(w) {
+      // dash spam cannot turn it into a damage engine: one storm per second at most
+      if (!cooldown(w, 'res_storm_dash', 1)) return;
       const p = w.player;
       chainLightning(w, p.x, p.y - 6, { jumps: 3, damage: dmg(w) * 0.8, range: 100 });
     },
@@ -227,7 +230,7 @@ resonance('blood', '피', '#e83048', 'res_blood', [
     modifyHit(w, _t, hit) {
       const p = w.player;
       const missing = Math.max(0, p.maxRed - p.red);
-      if (missing > 0) hit.damage *= 1 + Math.min(0.48, missing * 0.04);
+      if (missing > 0) amplify(hit, Math.min(0.48, missing * 0.04));
     },
   }],
   [5, '층마다 한 번, 치명상을 반 칸으로 버틴다', {
@@ -258,7 +261,8 @@ resonance('star', '별빛', '#b8a8ff', 'res_star', [
   [4, '치명타가 별 조각 2개를 흩뿌린다', {
     onHit(w, t, hit) {
       if (!hit.crit || !isPrimary(hit)) return;
-      spawnShards(w, t.x, t.y - t.z - 4, { count: 2, damage: dmg(w) * 0.5, sprite: 'proj_star_shard', color: '#d8c8ff', speed: 170, range: 150, homing: 6, spectral: true });
+      const unit = Math.min(dmg(w), hit.damage / Math.max(1, w.player.stats.critMult));
+      spawnShards(w, t.x, t.y - t.z - 4, { count: 2, damage: unit * 0.35, sprite: 'proj_star_shard', color: '#d8c8ff', speed: 170, range: 150, homing: 6, spectral: true });
     },
   }],
   [6, '적이 있는 방에 들어서면 별똥별이 쏟아진다', {
@@ -291,6 +295,8 @@ resonance('shadow', '그림자', '#9a6aff', 'res_shadow', [
   }],
   [4, '대시 후 1초 안의 첫 공격이 2배 피해를 준다', {
     onDash(w) {
+      // armed at most once per 1.2 s, however short the dash cooldown gets
+      if (!cooldown(w, 'res_shadow_ambush', 1.2)) return;
       w.vars.__ambushT = w.time + w.player.stats.dashTime + 1.0;
     },
     onUpdate(w, dt) {
@@ -300,14 +306,14 @@ resonance('shadow', '그림자', '#9a6aff', 'res_shadow', [
       }
     },
     modifyHit(w, t, hit) {
-      if (!isAttack(hit) || (w.vars.__ambushT ?? 0) <= w.time) return;
+      if (!isPrimary(hit) || (w.vars.__ambushT ?? 0) <= w.time) return;
       w.vars.__ambushT = 0;
-      hit.damage *= 2;
+      amplify(hit, 1);
       w.particles.burst(t.x, t.y - 6, { count: 12, speed: [40, 120], life: [0.2, 0.4], colors: ['#ffffff', '#c8a8ff', '#6a3ad0'], shape: 'spark', size: [1, 2] });
       w.floatText(t.x, t.y - 18, '기습!', '#c8a8ff');
     },
   }],
-  [6, '대시로 꿰뚫은 적이 공포에 빠진다', {
+  [6, '대시로 꿰뚫은 적에게 피해를 주고 공포에 빠뜨린다', {
     onDash(w) {
       w.vars.__shadowPassT = w.time + w.player.stats.dashTime + 0.05;
       w.vars.__shadowPassId = (w.vars.__shadowPassId ?? 0) + 1;
@@ -315,10 +321,12 @@ resonance('shadow', '그림자', '#9a6aff', 'res_shadow', [
     onUpdate(w) {
       if ((w.vars.__shadowPassT ?? 0) < w.time) return;
       const p = w.player;
-      const tag = `__shp${w.vars.__shadowPassId}`;
+      const id = w.vars.__shadowPassId;
       for (const e of enemiesNear(w, p.x, p.y, p.r + 6)) {
-        if (e.mem[tag]) continue;
-        e.mem[tag] = 1;
+        // one cut per dash, and the same enemy at most every 1.5 s
+        if (e.mem.__shp === id || (e.mem.__shpT ?? -1) > w.time) continue;
+        e.mem.__shp = id;
+        e.mem.__shpT = w.time + 1.5;
         itemHit(w, e, dmg(w) * 1.2, { statuses: [{ kind: 'fear', duration: 2.5 }], knockback: 80 });
       }
     },

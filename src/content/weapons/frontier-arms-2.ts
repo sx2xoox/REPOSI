@@ -6,6 +6,7 @@
 //                                             leaves a smouldering incense cloud
 
 import { defineWeapon, type WeaponState } from '../../game/defs';
+import { multishotShare } from '../../game/stats';
 import type { World } from '../../game/world';
 import type { Player } from '../../game/player';
 import type { Renderer } from '../../engine/renderer';
@@ -444,7 +445,7 @@ defineWeapon({
     for (let i = 0; i < n; i++) {
       const a = aim + (i - (n - 1) / 2) * 0.7;
       const cd = rayLength(w, p.x, p.y - 3, a, reach * 0.85);
-      const cloud = new IncenseCloud(p, p.x + Math.cos(a) * cd, p.y - 3 + Math.sin(a) * cd, 22 + (s.projSize - 3) * 2, s.damage * CENSER_TICK_MULT, ticks);
+      const cloud = new IncenseCloud(p, p.x + Math.cos(a) * cd, p.y - 3 + Math.sin(a) * cd, 22 + (s.projSize - 3) * 2, s.damage * CENSER_TICK_MULT * multishotShare(n), ticks);
       while (live.length >= cap) {
         const old = live.shift()!;
         old.fade();
@@ -466,7 +467,7 @@ defineWeapon({
     const pose = swingPose(st, w, meleeRest(st, p.aim));
     const rest = pose.phase === 0;
     const ext = pose.phase === 1 ? 1 : pose.phase === 2 ? 0.92 : pose.phase === 3 ? 0.92 * (1 - pose.t) : 0;
-    const c = censerAt(p, pose.angle, ext, st.mem.reach ?? censerReach(p.stats.range), rest);
+    const c = censerAt(p, pose.angle, ext, st.mem.reach ?? censerReach(p.weaponStats.range), rest);
     // brass chain: alternating links, sagging at rest
     const len = Math.hypot(c.x - c.hx, c.y - c.hy);
     const n = Math.max(2, Math.round(len / 2));

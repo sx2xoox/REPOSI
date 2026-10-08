@@ -3,6 +3,7 @@ import { measureDps, PLAIN_ID } from './dpsharness';
 import { Projectile } from '../src/game/projectile';
 import { Pickup } from '../src/game/pickups';
 import { Artifacts } from '../src/game/defs';
+import { BOOMERANG_RETURN } from '../src/content/items/lib';
 import type { HitInfo } from '../src/game/entity';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
@@ -37,7 +38,7 @@ describe('artifact reworks in the real item system', () => {
       rows,
     }, null, 2));
   }, 120_000);
-  it('a basic zero-pierce shot survives its first hit, returns once at 65%, and cannot proc again', () => {
+  it('a basic zero-pierce shot survives its first hit, returns once at 35%, and cannot proc again', () => {
     const { world: w, dummies } = setup('pendulum_weight');
     const p = w.player.fireProjectiles(w, 0)[0];
     expect(p.pierce).toBe(0);
@@ -46,9 +47,9 @@ describe('artifact reworks in the real item system', () => {
     p.hitActor(w, dummies[0]);
     expect(p.dead).toBe(false);
     expect(p.generation).toBe(1);
-    expect(p.damage).toBeCloseTo(outgoing * 0.65);
+    expect(p.damage).toBeCloseTo(outgoing * BOOMERANG_RETURN);
     p.hitActor(w, dummies[0]);
-    expect(hp - dummies[0].hp).toBeCloseTo(outgoing * 1.65);
+    expect(hp - dummies[0].hp).toBeCloseTo(outgoing * (1 + BOOMERANG_RETURN));
     const after = dummies[0].hp;
     p.hitActor(w, dummies[0]);
     expect(dummies[0].hp).toBe(after);

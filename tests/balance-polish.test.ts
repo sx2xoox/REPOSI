@@ -10,6 +10,9 @@ import { Pedestal } from '../src/game/pickups';
 
 const setup = () => measureDps({ character: PLAIN_ID, weapon: 'lantern_bolt', seconds: 0 });
 
+
+/** Damage of a hit after its item bonus pool (World.applyHit applies HitInfo.amp once). */
+const eff = (h: HitInfo): number => h.damage * (1 + (h.amp ?? 0));
 describe('blessing choices and recovery economy', () => {
   it('offers deterministic, distinct roles and exhausts the remaining pool safely', () => {
     for (let i = 0; i < 100; i++) {
@@ -81,13 +84,13 @@ describe('mixed resonance', () => {
     const target = dummies[0];
     const hooks = GlobalHooks.must('mixed_resonance');
     const hit = (noProc = false): HitInfo => ({ kind: 'melee', damage: 100, noProc });
-    let h = hit(); hooks.modifyHit!(w, target, h, 1); expect(h.damage).toBe(100);
+    let h = hit(); hooks.modifyHit!(w, target, h, 1); expect(eff(h)).toBe(100);
     target.applyStatus({ kind: 'burn', duration: 2, power: 1 }, () => 0);
     target.applyStatus({ kind: 'slow', duration: 2, power: 0.4 }, () => 0);
-    h = hit(); hooks.modifyHit!(w, target, h, 1); expect(h.damage).toBeCloseTo(112);
-    h = hit(true); hooks.modifyHit!(w, target, h, 1); expect(h.damage).toBe(100);
+    h = hit(); hooks.modifyHit!(w, target, h, 1); expect(eff(h)).toBeCloseTo(112);
+    h = hit(true); hooks.modifyHit!(w, target, h, 1); expect(eff(h)).toBe(100);
     w.items.take('rime_shard');
-    h = hit(); hooks.modifyHit!(w, target, h, 1); expect(h.damage).toBe(100);
+    h = hit(); hooks.modifyHit!(w, target, h, 1); expect(eff(h)).toBe(100);
   });
 
   it('previews a completed tier and explains duplicate counting without changing inventory', () => {
@@ -108,18 +111,18 @@ describe('mixed resonance', () => {
       const h: HitInfo = { kind: 'projectile', damage: 100, crit: true };
       if (s.id === 'sepsis') {
         target.applyStatus({ kind: 'poison', duration: 2, power: 1 }, () => 0);
-        hooks.modifyHit!(w, target, h, 1); expect(h.damage).toBe(100);
+        hooks.modifyHit!(w, target, h, 1); expect(eff(h)).toBe(100);
         target.applyStatus({ kind: 'bleed', duration: 2, power: 1 }, () => 0);
       } else {
         hooks.onDash!(w, 1);
         const noncrit: HitInfo = { kind: 'melee', damage: 100 };
-        hooks.modifyHit!(w, target, noncrit, 1); expect(noncrit.damage).toBe(100);
+        hooks.modifyHit!(w, target, noncrit, 1); expect(eff(noncrit)).toBe(100);
       }
       hooks.modifyHit!(w, target, h, 1);
-      expect(h.damage).toBeCloseTo(s.id === 'sepsis' ? 112 : 110);
+      expect(eff(h)).toBeCloseTo(s.id === 'sepsis' ? 112 : 110);
       if (s.id === 'eclipse') {
-        w.time += 2; h.damage = 100;
-        hooks.modifyHit!(w, target, h, 1); expect(h.damage).toBe(100);
+        w.time += 2; h.damage = 100; h.amp = 0;
+        hooks.modifyHit!(w, target, h, 1); expect(eff(h)).toBe(100);
       }
     }
   });

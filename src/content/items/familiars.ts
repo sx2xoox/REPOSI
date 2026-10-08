@@ -302,6 +302,9 @@ export class MirrorShard extends Familiar {
 }
 
 /** A delayed shadow copy of the player that repeats every attack. */
+/** Share of the keeper's damage per shadow attack. */
+export const TWIN_SHADOW_DAMAGE = 0.35;
+
 export class TwinShadow extends Familiar {
   hist: number[] = [];
   frame = '';
@@ -337,10 +340,10 @@ export class TwinShadow extends Familiar {
   mimic(w: World, angle: number, melee: boolean): void {
     const p = w.player;
     if (melee) {
-      const s = this.shoot(w, angle, { damage: dmgOf(w) * 0.5, style: 'sprite', sprite: 'proj_shadow_slash', speed: 210, range: 48, radius: 7, pierce: 6, color: '#9a6aff', knockback: 50 });
+      const s = this.shoot(w, angle, { damage: dmgOf(w) * TWIN_SHADOW_DAMAGE, style: 'sprite', sprite: 'proj_shadow_slash', speed: 210, range: 48, radius: 7, pierce: 6, color: '#9a6aff', knockback: 50 });
       s.z = 4;
     } else {
-      this.shoot(w, angle, { damage: dmgOf(w) * 0.5, color: '#b08aff', speed: p.stats.shotSpeed, radius: Math.max(2, p.stats.projSize * 0.8), range: p.stats.range * 0.9 });
+      this.shoot(w, angle, { damage: dmgOf(w) * TWIN_SHADOW_DAMAGE, color: '#b08aff', speed: p.stats.shotSpeed, radius: Math.max(2, p.stats.projSize * 0.8), range: p.stats.range * 0.9 });
     }
   }
 

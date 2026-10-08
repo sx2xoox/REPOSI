@@ -3,7 +3,7 @@
 // blessing / active resonance tier (so items without raw stats count too).
 // Shown in the HUD (ticks up with a pop) and on the Tab screen.
 
-import type { Stats } from './stats';
+import { MULTISHOT_GAIN, type Stats } from './stats';
 import type { InvComputed } from './inventory';
 import type { Rarity } from './defs';
 
@@ -13,7 +13,7 @@ const RARITY_POINTS: Record<Rarity, number> = { common: 3, rare: 5, epic: 8, leg
 export function estimateDps(s: Stats): number {
   const crit = 1 + Math.max(0, s.critChance) * Math.max(0, s.critMult - 1);
   // extra fan shots don't all connect
-  const shots = 1 + Math.max(0, s.shots - 1) * 0.7;
+  const shots = 1 + Math.max(0, s.shots - 1) * MULTISHOT_GAIN;
   const pierce = 1 + Math.min(3, Math.max(0, s.pierce)) * 0.12;
   return Math.max(0, s.damage) * Math.max(0, s.fireRate) * crit * shots * pierce;
 }

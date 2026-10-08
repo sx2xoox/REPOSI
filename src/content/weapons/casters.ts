@@ -1,4 +1,5 @@
 import { visualHandPos } from '../../game/weapon-pose';
+import { extraShotShare } from '../../game/stats';
 import { armGaleGuard, clearGaleBullets } from './gale-guard';
 // Spread casters:
 //  나팔 산탄총 (scatter_horn, common) — a bell-mouthed blunderbuss: a cone of
@@ -83,7 +84,7 @@ defineWeapon({
       const a = aim + (i / Math.max(1, n - 1) - 0.5) * cone + (w.rng.next() - 0.5) * 0.12;
       p.fireProjectiles(w, a, {
         count: 1, style: 'none', speed: s.shotSpeed * (1.1 + w.rng.next() * 0.35), accel: -420, minSpeed: 120,
-        range: s.range * (0.85 + w.rng.next() * 0.3), damageMult: 0.43, radius: Math.max(2, s.projSize - 0.5),
+        range: s.range * (0.85 + w.rng.next() * 0.3), damageMult: 0.43 * extraShotShare(5, n - 5), radius: Math.max(2, s.projSize - 0.5),
         knockback: s.knockback * 0.6, color: '#ffc050', light: 8, x: h.x, y: h.y, behaviors: [pelletFx],
       });
     }

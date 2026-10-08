@@ -41,7 +41,7 @@ defineWeapon({
   icon: 'icon_fang_blade',
   heldSprite: 'w_fang_blade',
   kind: 'melee',
-  rarity: 'rare',
+  rarity: 'common',
   archetype: '단도',
   tags: ['blade', 'quick'],
   pools: ['treasure', 'shop'],

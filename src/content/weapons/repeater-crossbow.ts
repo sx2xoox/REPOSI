@@ -49,7 +49,7 @@ function bolt(w: World, p: Player, st: WeaponState): void {
   const aim = p.aim + (w.rng.next() - 0.5) * 0.06;
   const h = handPos(p, aim, 12);
   p.fireProjectiles(w, aim, {
-    style: 'sprite', sprite: 'proj_bolt', radius: p.stats.projSize * 0.85, light: 8, color: '#e8e0d0',
+    style: 'sprite', sprite: 'proj_bolt', radius: p.weaponStats.projSize * 0.85, light: 8, color: '#e8e0d0',
     spreadMult: 0.5, x: h.x, y: h.y,
   });
   st.mem.boltAt = w.time;

@@ -102,7 +102,7 @@ defineWeapon({
   icon: 'icon_hunter_bow',
   heldSprite: 'w_hunter_bow',
   kind: 'charge',
-  rarity: 'rare',
+  rarity: 'common',
   tags: ['bow'],
   pools: ['treasure', 'shop'],
   stats(m) {

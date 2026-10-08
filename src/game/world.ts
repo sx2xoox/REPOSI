@@ -19,6 +19,7 @@ import { Characters, Enemies, Floors, RoomTemplates, Themes, Actives, Weapons, P
 import { generateFloor, generateStage, matchingDoor, type FloorMap, type NodeDoor, type RoomNode } from './dungeon';
 import { Room, type Door, type DoorKind } from './room';
 import { Entity, Actor, resetEntityIds, useEntityIds, type EntityIds, type HitInfo, type StatusKind } from './entity';
+import { softBonus } from './stats';
 import { Enemy } from './enemy';
 import { Player, Purse } from './player';
 import { Projectile } from './projectile';
@@ -1213,7 +1214,13 @@ export class World {
       const prevSrc = this.sfxSource;
       this.sfxSource = target;
       try {
-        if (hit.kind !== 'status') this.items.modifyHit(target, hit);
+        if (hit.kind !== 'status') {
+          // item bonuses add up in one pool for the hit (carried from the shot, then modifyHit)
+          const carried = hit.source instanceof Projectile ? Number(hit.source.mem.amp ?? 0) : 0;
+          if (carried) hit.amp = (hit.amp ?? 0) + carried;
+          this.items.modifyHit(target, hit);
+          if (hit.amp) hit.damage *= Math.max(0.1, 1 + softBonus(hit.amp));
+        }
         const before = target.hp;
         const applied = target.takeHit(this, hit);
         if (!applied) return false;
@@ -1222,7 +1229,7 @@ export class World {
         this.run.stats.damageDealt += dealt;
         // bosses fill the gauge at half rate: a release is a burst, not the main boss-killing tool
         const secondary = hit.source instanceof Projectile && hit.source.generation > 0;
-        hit.emberCharge = hit.kind !== 'status' && !hit.noProc && !secondary ? attackEmber(p.stats.damage, dealt, target.isBoss, hit.kind === 'laser') : 0;
+        hit.emberCharge = hit.kind !== 'status' && !hit.noProc && !secondary ? attackEmber(p.stats.damage, dealt, target.isBoss, hit.kind === 'laser', hit.damage) : 0;
         if (hit.emberCharge > 0) p.addEmber(hit.emberCharge * (p.flags.has('kindleBlessing') ? 1.35 : 1));
         this.hitFeedback(target, hit, dealt);
         this.items.onHit(target, hit);

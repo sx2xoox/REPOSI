@@ -11,7 +11,7 @@ import {
   type ArtifactDef, type CharacterDef, type ItemHooks, type ItemPool, type Rarity,
 } from './defs';
 import { LookSystem, type LookSource } from './look';
-import { BASE_STATS, StatMods, computeStats, type Stats } from './stats';
+import { BASE_STATS, POOLED_STATS, StatMods, WEAPON_STATS, computeStats, softBonus, type StatKey, type Stats } from './stats';
 import { makeItem, type InvComputed, type InvItem } from './inventory';
 import type { PedestalItem } from './pickups';
 import type { RNG } from '../engine/rng';
@@ -172,21 +172,57 @@ export class ItemSystem {
     const p = this.p;
     const base: Stats = { ...BASE_STATS, ...(p.character.baseStats ?? {}) };
     base.maxHearts = p.baseHearts;
-    const m = new StatMods();
+    // artifacts, blessings, sets and passives: their damage / attack-speed multipliers add up
+    // in one bonus pool (x1.3 and x1.4 make +70 %, not +82 %; past +100 % at half value,
+    // softBonus), so a pile of bonuses grows slower than linearly instead of compounding;
+    // penalties and their other multipliers multiply
+    const items = new StatMods();
+    const pool: Partial<Record<StatKey, number>> = {};
+    for (const e of this.effects) {
+      const mi = new StatMods();
+      safe(() => e.hooks.stats?.(mi, e.power, w));
+      for (const k of Object.keys(mi.add) as StatKey[]) items.addStat(k, mi.add[k]!);
+      for (const k of Object.keys(mi.mul) as StatKey[]) {
+        if (POOLED_STATS.has(k) && mi.mul[k]! > 1) pool[k] = (pool[k] ?? 0) + (mi.mul[k]! - 1);
+        else items.mulStat(k, mi.mul[k]!);
+      }
+      for (const f of mi.flags) items.flag(f);
+    }
+    for (const k of Object.keys(pool) as StatKey[]) items.mulStat(k, 1 + softBonus(pool[k]!));
+    // the weapon and the keeper's affinity for it: offensive factors go to the weapon's own
+    // attacks only (weaponStats); everything else (move speed, hearts ...) to the keeper too
+    const wm = new StatMods();
     const weapon = Weapons.get(p.weaponId);
-    weapon?.stats?.(m);
+    weapon?.stats?.(wm);
     // favoured weapon class: flag + modest bonus (CharacterDef.affinity)
     const aff = p.character.affinity;
     if (aff && weaponMatchesAffinity(aff, weapon)) {
-      m.flag('affinity');
-      safe(() => aff.stats?.(m));
+      wm.flag('affinity');
+      safe(() => aff.stats?.(wm));
     }
-    for (const e of this.effects) safe(() => e.hooks.stats?.(m, e.power, w));
+    const keeper = new StatMods();
+    const armed = new StatMods();
+    for (const t of [keeper, armed]) {
+      for (const k of Object.keys(items.add) as StatKey[]) t.addStat(k, items.add[k]!);
+      for (const k of Object.keys(items.mul) as StatKey[]) t.mulStat(k, items.mul[k]!);
+      for (const f of items.flags) t.flag(f);
+      for (const f of wm.flags) t.flag(f);
+    }
+    for (const k of Object.keys(wm.add) as StatKey[]) {
+      armed.addStat(k, wm.add[k]!);
+      if (!WEAPON_STATS.has(k)) keeper.addStat(k, wm.add[k]!);
+    }
+    for (const k of Object.keys(wm.mul) as StatKey[]) {
+      armed.mulStat(k, wm.mul[k]!);
+      if (!WEAPON_STATS.has(k)) keeper.mulStat(k, wm.mul[k]!);
+    }
     const oldMax = p.stats ? p.maxRed : -1;
-    p.stats = computeStats(base, m);
+    p.stats = computeStats(base, keeper);
+    p.armedStats = computeStats(base, armed);
     p.stats.maxHearts = Math.max(1, p.stats.maxHearts - (p.vars.__heartContainersSpent ?? 0));
-    p.flags = m.flags;
-    p.flying = m.flags.has('flying');
+    p.armedStats.maxHearts = p.stats.maxHearts;
+    p.flags = keeper.flags;
+    p.flying = keeper.flags.has('flying');
     p.onMaxHeartsChanged(w, oldMax);
   }
 

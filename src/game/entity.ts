@@ -12,7 +12,7 @@ export type StatusKind =
   | 'burn' | 'poison' | 'bleed'      // damage over time
   | 'slow' | 'freeze' | 'stun'       // movement
   | 'charm' | 'fear'                 // AI control
-  | 'weak'                           // takes +35% damage
+  | 'weak'                           // takes +25% damage
   | 'mark';                          // marked: next hit crits
 
 export interface StatusApply {
@@ -32,7 +32,12 @@ export interface StatusState {
   power: number;
   tick: number;
   stacks: number;
+  /** poison / bleed: time left on each stack (every application is its own stack) */
+  ends?: number[];
 }
+
+/** Most poison / bleed stacks one target can carry. */
+export const MAX_DOT_STACKS = 8;
 
 export type DamageKind = 'projectile' | 'melee' | 'explosion' | 'contact' | 'status' | 'laser' | 'spikes' | 'other';
 
@@ -57,6 +62,12 @@ export interface HitInfo {
   noProc?: boolean;
   /** Explicit direct release damage attribution (not passive/familiar damage). */
   release?: boolean;
+  /**
+   * Item damage bonuses for this one hit, summed (+0.3 = +30 %): modifyHit hooks add to it
+   * with `amplify` instead of multiplying, and World.applyHit applies 1 + amp once (with the
+   * bonus the projectile / swing carried from onShoot / onSwing).
+   */
+  amp?: number;
   /** Base direct-hit ember credit, computed from actual damage before onHit hooks. */
   emberCharge?: number;
   /** Actual HP removed, excluding overkill; populated before onHit hooks. */
@@ -299,11 +310,21 @@ export abstract class Actor extends Entity {
     if (cur) {
       cur.time = Math.max(cur.time, s.duration);
       if (s.kind === 'poison' || s.kind === 'bleed') {
-        cur.stacks = Math.min(8, cur.stacks + 1);
+        // each application is a stack with its own timer: stacks follow how often it is
+        // applied instead of piling up for as long as any refresh keeps the status alive
+        const ends = cur.ends ?? (cur.ends = [cur.time]);
+        if (ends.length < MAX_DOT_STACKS) ends.push(s.duration);
+        else {
+          let lo = 0;
+          for (let i = 1; i < ends.length; i++) if (ends[i] < ends[lo]) lo = i;
+          ends[lo] = Math.max(ends[lo], s.duration);
+        }
+        cur.stacks = ends.length;
         cur.power = Math.max(cur.power, power);
       } else cur.power = Math.max(cur.power, power);
     } else {
-      this.statuses.set(s.kind, { time: s.duration, power, tick: 0, stacks: 1 });
+      const dot = s.kind === 'poison' || s.kind === 'bleed';
+      this.statuses.set(s.kind, { time: s.duration, power, tick: 0, stacks: 1, ends: dot ? [s.duration] : undefined });
     }
     return true;
   }
@@ -312,6 +333,10 @@ export abstract class Actor extends Entity {
   updateStatuses(w: World, dt: number): void {
     for (const [k, s] of this.statuses) {
       s.time -= dt;
+      if (s.ends) {
+        for (let i = s.ends.length - 1; i >= 0; i--) if ((s.ends[i] -= dt) <= 0) s.ends.splice(i, 1);
+        s.stacks = Math.max(1, s.ends.length);
+      }
       if (k === 'burn' || k === 'poison' || k === 'bleed') {
         s.tick += dt;
         while (s.tick >= 0.5 && this.alive) {

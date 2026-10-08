@@ -54,6 +54,7 @@ function makeSim(def: WeaponDef, enemyDist: number): Sim {
     const m = new StatMods();
     Weapons.get(p.weaponId)?.stats?.(m);
     p.stats = computeStats(base, m);
+    p.armedStats = p.stats; // fake world: no artifacts, so the keeper and its weapon share one sheet
   };
   p.weaponId = def.id;
   recompute();
@@ -200,7 +201,7 @@ describe('every weapon fires (headless)', () => {
       const attacks = s.events.filter((e) => e === 'attack').length;
       expect(attacks, 'attacks').toBeGreaterThanOrEqual(1);
       expect(s.events[0], 'onAttack comes first').toBe('attack');
-      expect(attacks, 'attack spam').toBeLessThanOrEqual(Math.ceil(4 * s.p.stats.fireRate * 2.5) + 2);
+      expect(attacks, 'attack spam').toBeLessThanOrEqual(Math.ceil(4 * s.p.weaponStats.fireRate * 2.5) + 2);
       expect(s.damage, 'damage').toBeGreaterThan(0);
       if (def.id !== 'void_orbs') {
         const proj = s.events.filter((e) => e === 'projectile').length;

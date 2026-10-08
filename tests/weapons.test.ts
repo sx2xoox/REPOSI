@@ -166,6 +166,7 @@ function sim(def: WeaponDef, charId = 'ria'): Sim {
   const m = new StatMods();
   def.stats?.(m);
   p.stats = computeStats({ ...BASE_STATS, ...(ch.baseStats ?? {}) }, m);
+  p.armedStats = p.stats; // fake world: no artifacts, so the keeper and its weapon share one sheet
   p.weaponId = def.id;
   const s: Sim = { w: null as unknown as World, p, st: newWeaponState(), events: [], spawned: [], hits: 0 };
   const enemy = { alive: true, hidden: false, z: 0, x: 160, y: 95, r: 6, flash: 0, id: 999 };

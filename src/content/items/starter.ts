@@ -5,7 +5,7 @@ import { defineDrawnSprite } from '../../engine/sprites';
 import { ramp } from '../../engine/painter';
 import { RingFx } from '../../game/effects';
 import { Projectile } from '../../game/projectile';
-import { isMelee, proc } from './lib';
+import { amplifyShot, isMelee, proc } from './lib';
 import { effectProc } from '../../game/procs';
 
 const O = '#0c0810';
@@ -21,17 +21,17 @@ defineDrawnSprite('icon_wick', 16, 16, (p) => {
 defineArtifact({
   id: 'long_wick',
   name: '긴 심지',
-  desc: '공격력 +2. 5번째 공격마다 큰 불꽃탄',
+  desc: '공격력 +1.5. 5번째 공격마다 큰 불꽃탄',
   detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '오래 타는 불이 더 뜨겁다.',
-  signature: '5번째 공격마다 크고 뜨거운 불꽃탄이 나간다 (피해 +60%)',
+  signature: '5번째 공격마다 크고 뜨거운 불꽃탄이 나간다 (피해 +40%)',
   rarity: 'common',
   tags: ['flame'],
   icon: 'icon_wick',
   look: { shot: '#ffb040', shape: 'flame', trail: 'ember', step: '#ff9a30' },
   pools: ['treasure', 'shop'],
   stats(m, power) {
-    m.addStat('damage', 2 * power);
+    m.addStat('damage', 1.5 * power);
   },
   onAttack(w, angle) {
     w.vars.__wickN = (w.vars.__wickN ?? 0) + 1;
@@ -51,7 +51,7 @@ defineArtifact({
   },
   onShoot(w, p) {
     if (p.generation > 0 || w.vars.__wickOn !== w.time) return;
-    p.damage *= 1.6;
+    amplifyShot(p, 0.4);
     p.scale *= 1.45;
     p.r *= 1.25;
     p.color = '#ffd060';
@@ -108,7 +108,7 @@ defineDrawnSprite('icon_quick_feather', 16, 16, (p) => {
 defineArtifact({
   id: 'quick_feather',
   name: '재빠른 깃털',
-  desc: '이속 +12%, 공속 +0.5. 대시 후 깃털탄 2발',
+  desc: '이속 +12%, 공속 +0.4. 대시 후 깃털탄 2발',
   detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '바람보다 먼저 닿는다.',
   signature: '대시한 뒤 첫 공격에 적을 쫓는 깃털 2개가 함께 날아간다',
@@ -119,7 +119,7 @@ defineArtifact({
   pools: ['treasure', 'shop'],
   stats(m, power) {
     m.mulStat('moveSpeed', 1 + 0.12 * power);
-    m.addStat('fireRate', 0.5 * power);
+    m.addStat('fireRate', 0.4 * power);
   },
   onDash(w) {
     w.vars.__featherT = w.time + 1.5;
@@ -132,7 +132,7 @@ defineArtifact({
     for (const da of [-0.4, 0.4]) {
       const p = new Projectile({
         team: 'player', x: pl.x + Math.cos(angle + da) * 6, y: pl.y - 6 + Math.sin(angle + da) * 4, angle: angle + da, speed: 250,
-        damage: pl.stats.damage * (0.5 + 0.15 * power), radius: 2, range: 210, owner: pl, color: '#f4f8ff', homing: 3.5, light: 10, style: 'tear',
+        damage: pl.stats.damage * (0.35 + 0.1 * power), radius: 2, range: 210, owner: pl, color: '#f4f8ff', homing: 3.5, light: 10, style: 'tear',
       });
       p.generation = 1;
       w.spawn(p);

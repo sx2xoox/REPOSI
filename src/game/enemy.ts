@@ -193,7 +193,7 @@ export class Enemy extends Actor {
   override takeHit(w: World, hit: HitInfo): boolean {
     if (!this.alive || !this.vulnerable || this.hidden) return false;
     let dmg = hit.damage;
-    if (this.hasStatus('weak')) dmg *= 1.35;
+    if (this.hasStatus('weak')) dmg *= 1.25;
     if (this.hasStatus('freeze') && hit.kind !== 'status') dmg *= 1.2;
     if (this.isBoss && bossRules.filter) dmg = bossRules.filter(this, w, hit, dmg);
     this.hp -= dmg;

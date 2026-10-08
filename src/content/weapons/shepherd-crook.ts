@@ -106,7 +106,7 @@ defineWeapon({
   update(w, p, st, dt, firing, aim) {
     st.anim = Math.max(0, st.anim - dt * 6);
     if (!firing || st.cooldown > 0) return;
-    st.cooldown = 1 / p.stats.fireRate;
+    st.cooldown = 1 / p.weaponStats.fireRate;
     st.sinceAttack = 0;
     w.items.onAttack(aim);
     const n = (st.mem.shots ?? 0) + 1;
@@ -118,11 +118,11 @@ defineWeapon({
     if (whistle) {
       p.fireProjectiles(w, aim, {
         style: 'sprite', sprite: 'proj_whistle_bolt', color: '#9af0e0', light: 26, x, y, damageMult: CROOK_WHISTLE_DMG,
-        speed: p.stats.shotSpeed * 1.2, pierce: p.stats.pierce + 2, radius: p.stats.projSize + 1, knockback: 30, behaviors: [whistleTug],
+        speed: p.weaponStats.shotSpeed * 1.2, pierce: p.weaponStats.pierce + 2, radius: p.weaponStats.projSize + 1, knockback: 30, behaviors: [whistleTug],
       });
       w.sfx('mori_whistle', { vol: 0.45, pitch: 1.3 });
     } else {
-      p.fireProjectiles(w, aim, { style: 'sprite', sprite: 'proj_spirit_bolt', color: '#9af0e0', light: 18, x, y, homing: Math.max(p.stats.homing, 0.8) });
+      p.fireProjectiles(w, aim, { style: 'sprite', sprite: 'proj_spirit_bolt', color: '#9af0e0', light: 18, x, y, homing: Math.max(p.weaponStats.homing, 0.8) });
       w.sfx('shoot_magic', { vol: 0.4, pitch: 1.25 + w.rng.next() * 0.1 });
     }
     muzzle(w, x, y, aim, ['#ffffff', '#9af0e0', '#5ab8a8'], 4);

@@ -7,7 +7,7 @@ import type { World } from './world';
 import type { Renderer } from '../engine/renderer';
 import { Actives, Potions, Weapons, Characters, enemyHitDamage, type CharacterDef, type WeaponState } from './defs';
 import { Inventory } from './inventory';
-import { BASE_STATS, type Stats } from './stats';
+import { BASE_STATS, multishotShare, type Stats } from './stats';
 import { angleOf, clamp, fromAngle, norm } from '../engine/math';
 import { animFrame, hasAnim, hasSprite } from '../engine/sprites';
 import { Projectile, fanAngles, type ProjectileOpts } from './projectile';
@@ -67,6 +67,8 @@ export function newWeaponState(): WeaponState {
 export class Player extends Actor {
   character: CharacterDef;
   stats: Stats = { ...BASE_STATS };
+  /** the keeper's stats with the held weapon's offensive factors (see WEAPON_STATS); read through weaponStats */
+  armedStats: Stats = { ...BASE_STATS };
   flags = new Set<string>();
   /** base red heart containers (character + permanent pickups) */
   baseHearts: number;
@@ -568,16 +570,17 @@ export class Player extends Actor {
     return old;
   }
 
-  get weaponStats(): Stats { return { ...this.stats, damage: this.stats.damage * (1 + Math.max(-3, Math.min(3, Number(this.weapon.mem.temper ?? 0))) * .1) }; }
+  get weaponStats(): Stats { return { ...this.armedStats, damage: this.armedStats.damage * (1 + Math.max(-3, Math.min(3, Number(this.weapon.mem.temper ?? 0))) * .1) }; }
 
   // -------------------------------------------------------------- attacks
   /**
    * Fire the standard volley of player projectiles toward `angle` using current
    * stats (multishot, size, speed, range, pierce, bounce, homing ...).
    */
-  fireProjectiles(w: World, angle: number, o: Partial<ProjectileOpts> & { damageMult?: number; count?: number; spreadMult?: number; noHooks?: boolean } = {}): Projectile[] {
+  fireProjectiles(w: World, angle: number, o: Partial<ProjectileOpts> & { damageMult?: number; count?: number; spreadMult?: number; noHooks?: boolean; generation?: number } = {}): Projectile[] {
     const s = o.fromWeapon === false ? this.stats : this.weaponStats;
     const count = o.count ?? s.shots;
+    const share = o.count === undefined && count > 1 ? multishotShare(count) : 1;
     const out: Projectile[] = [];
     const spread = s.spread * (o.spreadMult ?? 1);
     for (const a of fanAngles(angle, count, spread)) {
@@ -603,8 +606,13 @@ export class Player extends Actor {
         fxMaterial: shotMaterial(this.weaponId),
         ...o,
       });
+      // item-granted extra shots share the attack (see multishotShare); effects a shot
+      // spawns later from mem.weaponDamage (bursts, stakes, saws ...) share it too
+      p.damage *= share;
       if (p.fromWeapon && p.statuses.length) p.statuses = p.statuses.map(status => ({ ...status, procKey: status.procKey ?? `weapon:${this.weaponId}:${status.kind}` }));
-      p.mem.weaponDamage = s.damage;
+      p.mem.weaponDamage = s.damage * share;
+      // item-made volleys are secondary before any onShoot hook sees them
+      if (o.generation) p.generation = o.generation;
       // inherit a little of the player's movement (Isaac feel)
       p.vx += this.vx * 0.25;
       p.vy += this.vy * 0.25;

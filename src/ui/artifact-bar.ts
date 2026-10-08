@@ -98,7 +98,7 @@ export class ArtifactBar {
     }
     this.started = true;
     const p = w.player;
-    if (p?.stats) this.powerVal = powerScore(p.stats, comp);
+    if (p?.stats) this.powerVal = powerScore(p.weaponStats, comp);
     this.power.update(this.powerVal, dt);
   }
 

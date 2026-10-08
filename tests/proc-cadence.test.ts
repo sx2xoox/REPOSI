@@ -138,8 +138,8 @@ describe('passive proc cadence', () => {
     expect(isPrimary(hit(10, 'explosion'))).toBe(false);
     expect(isPrimary({ ...hit(10, 'explosion'), procs: ['weapon-primary'] })).toBe(true);
     expect(isPrimary({ ...hit(10, 'explosion'), procs: ['weapon-primary'], noProc: true })).toBe(false);
-    for (let i = 0; i < 5; i++) { const h = hit(); w.items.modifyHit(dummies[0], h); expect(h.damage).toBeCloseTo(13); }
-    expect(Artifacts.must('heartstring').desc).toContain('30%');
+    for (let i = 0; i < 5; i++) { const h = hit(); w.items.modifyHit(dummies[0], h); expect(h.damage * (1 + (h.amp ?? 0))).toBeCloseTo(12); }
+    expect(Artifacts.must('heartstring').desc).toContain('20%');
   });
 
   it('lets a marked primary weapon explosion receive an artifact status without allowing item explosions to do so', () => {

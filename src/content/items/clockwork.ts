@@ -12,7 +12,7 @@ import {
   syncFamiliars, tickTimeStop, timeStop, timeStopped, watch,
 } from './lib';
 import { GearTurret } from './familiars';
-import { proc } from './lib';
+import { amplifyShot, proc } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 const BRASS = ['#5a3a18', '#8a6028', '#c89848', '#f0d080', '#fff4c0'];
@@ -39,7 +39,7 @@ defineDrawnSprite('icon_cracked_hourglass', 16, 16, (p) => {
 defineArtifact({
   id: 'cracked_hourglass',
   name: '금 간 모래시계',
-  desc: '공격 속도 +0.6, 사거리 -10%. 전투 시작 시 적 둔화',
+  desc: '공격 속도 +0.4, 사거리 -10%. 전투 시작 시 적 둔화',
   detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   signature: '전투가 시작되면 모래시계가 뒤집혀 적이 2초간 느려진다',
   quote: '모래가 새도 시간은 흐른다.',
@@ -49,7 +49,7 @@ defineArtifact({
   look: { trail: 'sand', mote: '#f0d8a0' },
   pools: ['treasure', 'shop', 'boss'],
   stats(m, power) {
-    m.addStat('fireRate', 0.6 * power);
+    m.addStat('fireRate', 0.4 * power);
     m.mulStat('range', Math.pow(0.9, power));
   },
   onRoomEnter(w) {
@@ -183,7 +183,7 @@ defineDrawnSprite('icon_rusted_nail', 16, 16, (p) => {
 defineArtifact({
   id: 'rusted_nail',
   name: '녹슨 못',
-  desc: '공격이 15% 확률로 적을 약화시킨다 (받는 피해 +35%)',
+  desc: '공격이 15% 확률로 적을 약화시킨다 (받는 피해 +25%)',
   detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '작은 상처가 큰 병이 된다.',
   rarity: 'common',
@@ -263,7 +263,7 @@ defineArtifact({
   id: 'pendulum_weight',
   name: '진자 추',
   desc: '탄환이 부메랑처럼 되돌아온다 (탄환 한정). 넉백 +30%',
-  detail: '첫 적중 또는 벽에서 귀환. 같은 적은 왕복 각 1회, 귀환 피해 65%. 귀환탄은 추가 효과를 발동하지 않는다. 광휘의 창 제외.',
+  detail: '첫 적중 또는 벽에서 귀환. 같은 적은 왕복 각 1회, 귀환 피해 35%. 귀환탄은 추가 효과를 발동하지 않는다. 광휘의 창 제외.',
   quote: '떠난 것은 반드시 돌아온다.',
   rarity: 'rare',
   tags: ['clockwork'],
@@ -274,7 +274,8 @@ defineArtifact({
     m.mulStat('knockback', 1.3);
   },
   onShoot(_w, p) {
-    if (p.generation === 0 && !p.mem.lance) p.addBehavior(boomerangBehavior());
+    // shots that carry their own impact payload (shells, mines ...) keep it
+    if (p.generation === 0 && !p.mem.lance && !p.behaviors.some((b) => b.onExpire)) p.addBehavior(boomerangBehavior());
   },
 });
 
@@ -317,11 +318,12 @@ defineArtifact({
       const pl = w.player;
       const p = new Projectile({
         team: 'player', x: pl.x + Math.cos(angle) * 8, y: pl.y - 5 + Math.sin(angle) * 6, angle, speed: 200,
-        damage: dmg(w) * 1.2, radius: 3, range: 200, owner: pl, color: '#ffe880', light: 20,
+        damage: dmg(w) * 0.75, radius: 3, range: 200, owner: pl, color: '#ffe880', light: 20,
       });
       p.generation = 1;
       p.addBehavior(orbitBehavior(1.2, 20));
       w.spawn(p);
+      proc(w, 'armillary', true);
     }
   },
   onShoot(w, p) {
@@ -332,7 +334,7 @@ defineArtifact({
     w.vars.__armIdx = idx;
     p.mem.orbA = Math.atan2(p.y - (w.player.y - 5), p.x - w.player.x) + idx * 2.4;
     p.mem.orbR = 6;
-    p.damage *= 1.5;
+    amplifyShot(p, 0.5);
     p.color = '#ffe880';
     proc(w, 'armillary', true);
     p.lightR = 22;
@@ -367,7 +369,7 @@ function metronomeOn(w: { time: number; player: { lastHurtAt: number } }): boole
 defineArtifact({
   id: 'metronome_heart',
   name: '메트로놈 심장',
-  desc: '3초 동안 피격당하지 않으면 공격 속도 +40%',
+  desc: '3초 동안 피격당하지 않으면 공격 속도 +25%',
   quote: '똑, 딱. 심장도 박자를 탄다.',
   rarity: 'epic',
   tags: ['clockwork'],
@@ -375,7 +377,7 @@ defineArtifact({
   look: { aura: '#ffd080', step: '#ffd080' },
   pools: ['treasure', 'boss'],
   stats(m, power, w) {
-    if (w?.player && metronomeOn(w)) m.mulStat('fireRate', 1 + 0.4 * power);
+    if (w?.player && metronomeOn(w)) m.mulStat('fireRate', 1 + 0.25 * power);
   },
   onUpdate(w, dt) {
     const on = metronomeOn(w) ? 1 : 0;

@@ -98,7 +98,7 @@ defineWeapon({
     const side = st.combo === 0 ? 1 : -1;
     const h = handPos(p, aim + side * 0.5, 7);
     p.fireProjectiles(w, aim + side * 0.03, {
-      style: 'none', color: '#d8e0f0', light: 8, x: h.x, y: h.y, behaviors: [knifeFx], pierce: p.stats.pierce + 1,
+      style: 'none', color: '#d8e0f0', light: 8, x: h.x, y: h.y, behaviors: [knifeFx], pierce: p.weaponStats.pierce + 1,
       statuses: [{ kind: 'bleed', duration: 3, power: p.weaponStats.damage * 0.3, chance: 0.15 }],
     });
     kick(w, aim, 0.5);
@@ -205,8 +205,8 @@ defineWeapon({
     const dir = st.combo === 0 ? 1 : -1;
     const h = handPos(p, aim, 8);
     const shots = p.fireProjectiles(w, aim - dir * 0.7, {
-      style: 'none', speed: 245, range: 99999, life: 2.6, pierce: 999, radius: p.stats.projSize + 4, color: '#e0a040', light: 12,
-      knockback: p.stats.knockback * 0.7, x: h.x, y: h.y, behaviors: [pinwheelBehavior(dir)],
+      style: 'none', speed: 245, range: 99999, life: 2.6, pierce: 999, radius: p.weaponStats.projSize + 4, color: '#e0a040', light: 12,
+      knockback: p.weaponStats.knockback * 0.7, x: h.x, y: h.y, behaviors: [pinwheelBehavior(dir)],
     });
     st.mem.live = live + shots.length;
     st.mem.thrownAt = w.time;

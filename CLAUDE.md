@@ -100,6 +100,19 @@ Commands:
   templates (`RoomTemplate.floors` lists that stop at 5 are skipped deeper down). Keep `def.speed x
   enemySpeed` under the keeper's 92 px/s for regular enemies.
 - **Bosses resist being melted** (`content/bosses/resolve.ts`, hooked through `bossRules` in game/enemy.ts; user request 2026-10-07, together with boss HP ×1.5 in `DIFFICULTY.bossHpMult` — ×1.3 on floors 1–2, user 2026-10-07). Invisible common rules: damage never skips a phase (a hit stops just under the next phase line; the boss is untouchable until its own phase change has played, then a 1.6 s guard) and damage beyond a per-second budget (4 % of max HP on floors 1–2, 3.5 % on 3–4, 3 % from 5) lands at 25 %; releases are exempt from both. On top, **every boss has its own skill** (`defineBossWard(bossId, …)` in `content/bosses/wards-*.ts`, user choice "보스별 고유 버티기 기술"): each asks for a different verb (bell: number of hits; colossus: strike from the flank/back; spore mother: break the healing cocoons; slime queen: catch the crown; chain smith: break anchors or shoot across chains; imugi: hit the head; saint: wait out / melee the ice mirror; commander: lure him off his banner; 무명: come into lantern reach; archivist: stand on the seal glyphs; lighthouse: strike when the lamp flares in the fog; clockmaker: burst during the rewind wind-up; dancer: hit on the beat). Releases pierce every skill; breaking one the intended way dazes the boss (+25 % damage). Deeper skills are harsher and stay up longer. A new boss needs its own ward (tests/boss-resolve.test.ts checks every boss has one) and its phase lines in `GATES` (default one change at half HP). Do not add new attack patterns to bosses for this — the user rejected generic boss patterns twice; deeper bosses get their pressure from tighter pacing of their own patterns (`recover()` in the floor 4/6/7 boss files; floors 6–7 must clearly out-press 1–5 — user 2026-10-07: "6~7층은 6~7층인 이유가 있어야", measure with `BOSS_GAPS=1 npx vitest run tests/boss-bench`).
+- **Power budget** (user 2026-10-08: "전설의 성능을 올릴게 아니라 전체적인 무기, 유물들의 성능을 내려야해"; a tuned nail-gun build
+  must not chew through floor-7 bosses; `tests/power-budget.test.ts`). Item `damage` / `fireRate` multipliers add
+  up in one pool (`POOLED_STATS`), bonuses past +100 % count half (`softBonus`), penalties (x0.75) still multiply.
+  Per-hit item bonuses go through `amplify` / `amplifyShot` / `amplifySwing` (HitInfo.amp, applied once in
+  `World.applyHit` with the same knee) — never `hit.damage *= ...` for a stacking bonus. Copies stack linearly or
+  with `stackMul`, never `Math.pow`. Extra shots split an attack (`multishotShare`, MULTISHOT_GAIN 0.4); a weapon
+  that fires its own volley scales item shots with `extraShotShare`. Weapon factors live in `p.weaponStats`
+  (weapon code reads it); `p.stats` is the keeper (artifact procs, familiars, releases, statuses read it).
+  Per-hit procs roll with `rollHit` (chance x `hitShare`), ember's flat charge follows the hit size, poison /
+  bleed stacks each expire on their own (`MAX_DOT_STACKS`), per-attack spawners run at most at the keeper's
+  cadence, crit-spawned shards are sized from the crit's own hit. Every keeper starts with a common weapon.
+  Measure with `BUILD_CEILING=tove:nail_carbine,... npx vitest run tests/build-ceiling` (greedy best build + deep
+  boss fights) and `ITEM_AUDIT=weapons|artifacts|starters npx vitest run tests/item-audit`.
 - **등불 해방** balance: a release is a burst / crowd-control moment worth ~10–15x `stats.damage` on a
   single target (multi-hit releases use `HitFalloff`), ≤ ~20% of a run's damage.
 - Enemy AI = generator `script(e, w)`: `yield 0.5` waits 0.5s, `yield` waits a frame.

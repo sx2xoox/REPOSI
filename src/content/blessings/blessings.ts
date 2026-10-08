@@ -10,7 +10,7 @@ import { ramp, type PixelPainter } from '../../engine/painter';
 import { Chest, Pickup } from '../../game/pickups';
 import { RingFx } from '../../game/effects';
 import type { ArtifactLook } from '../../game/look';
-import { grantPerCopy, isAttack, proc } from '../items/lib';
+import { grantPerCopy, isAttack, isPrimary, proc } from '../items/lib';
 
 const O = '#140c1c';
 const GOLD = '#ffd060';
@@ -121,10 +121,11 @@ bless({
     if (!w.node.cleared) w.vars.__firstStrike = 1;
   },
   modifyHit(w, _t, hit) {
-    if (!w.vars.__firstStrike || !isAttack(hit)) return;
+    if (!w.vars.__firstStrike || !isPrimary(hit)) return;
     w.vars.__firstStrike = 0;
+    // one hit per room: a plain x3 crit (a natural crit is not multiplied again), not part of the bonus pool
+    hit.damage *= hit.crit ? 3 / Math.max(1, w.player.stats.critMult) : 3;
     hit.crit = true;
-    hit.damage *= 3;
     proc(w, 'bless_first_strike');
   },
 });
@@ -175,18 +176,18 @@ bless({
 });
 
 bless({
-  id: 'bless_might', name: '힘의 축복', desc: '공격력 +15%', quote: '등불이 팔에 힘을 싣는다.',
+  id: 'bless_might', name: '힘의 축복', desc: '공격력 +12%', quote: '등불이 팔에 힘을 싣는다.',
   disk: '#6a1a1a', glyph: (p) => { p.poly([8, 2, 12.5, 7, 9.5, 7, 9.5, 13, 6.5, 13, 6.5, 7, 3.5, 7], '#ff7a60'); p.line(8, 3, 8, 12, '#ffc0a0'); }, look: { grow: 0.5, hit: '#ff8a70' },
   stats(m, power) {
-    m.mulStat('damage', Math.pow(1.15, power));
+    m.mulStat('damage', 1 + 0.12 * power);
   },
 });
 
 bless({
-  id: 'bless_haste', name: '신속의 축복', desc: '공격 속도 +15%', quote: '숨 쉴 틈도 없이.',
+  id: 'bless_haste', name: '신속의 축복', desc: '공격 속도 +12%', quote: '숨 쉴 틈도 없이.',
   disk: '#1a4a5a', glyph: (p) => { p.poly([3, 4, 7, 8, 3, 12, 5, 8], '#c8f0ff'); p.poly([8, 4, 12, 8, 8, 12, 10, 8], '#c8f0ff'); }, look: { trail: 'wind' },
   stats(m, power) {
-    m.mulStat('fireRate', Math.pow(1.15, power));
+    m.mulStat('fireRate', 1 + 0.12 * power);
   },
 });
 
@@ -207,11 +208,11 @@ bless({
 });
 
 bless({
-  id: 'bless_keen', name: '날카로운 눈', desc: '치명타 확률 +8%, 치명타 피해 +20%', quote: '틈은 언제나 있다.',
+  id: 'bless_keen', name: '날카로운 눈', desc: '치명타 확률 +6%, 치명타 피해 +15%', quote: '틈은 언제나 있다.',
   disk: '#2a4a3a', glyph: (p) => { p.ellipse(8, 8, 5.5, 3, '#f0f0e0'); p.circle(8, 8, 2, '#40a070'); p.px(8, 8, '#0c0810'); p.px(7, 7, '#ffffff'); }, look: { hit: '#fff6d0', orbit: '#fff6d0' },
   stats(m, power) {
-    m.addStat('critChance', 0.08 * power);
-    m.addStat('critMult', 0.2 * power);
+    m.addStat('critChance', 0.06 * power);
+    m.addStat('critMult', 0.15 * power);
   },
 });
 
@@ -267,8 +268,9 @@ bless({
 bless({
   id: 'bless_hunter', name: '사냥꾼의 불씨', desc: '처치할 때마다 등불 게이지 +5', quote: '사냥이 등불을 먹인다.',
   disk: '#4a2a10', glyph: (p) => { p.line(4, 4, 7, 12, '#ffb070'); p.line(7, 4, 10, 12, '#ffb070'); p.line(10, 4, 13, 12, '#ffb070'); }, look: { hit: '#ff9a30' },
-  onKill(w, _e, power) {
-    w.player.addEmber(5 * power);
+  onKill(w, e, power) {
+    // boss minions feed it less: releases skip the boss damage budget
+    w.player.addEmber(5 * power * (e.isMinion ? 0.4 : 1));
   },
 });
 

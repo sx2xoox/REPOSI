@@ -91,7 +91,9 @@ defineArtifact({
     proc(w, 'rot_mushroom');
     w.spawn(new RingFx(p.x, p.y - 4, R, 0.5, '#a8e060', 2));
     w.particles.burst(p.x, p.y - 4, { count: 40, speed: [30, 140], life: [0.6, 1.2], colors: ['#e0ffb0', '#a8e060', '#7a3a8a', '#4a8a2a'], size: [1, 3], shape: 'circle', drag: 2.5, fade: true });
-    for (const e of enemiesNear(w, p.x, p.y, R)) inflict(w, e, { kind: 'poison', duration: 4, power: dmg(w) * 0.2 * power });
+    // copies widen and lengthen the spores; the poison itself stays as strong (a status keeps
+    // its strongest power for every stack, so power per copy would multiply all poison)
+    for (const e of enemiesNear(w, p.x, p.y, R)) inflict(w, e, { kind: 'poison', duration: 4 + (power - 1), power: dmg(w) * 0.2 });
   },
 });
 
@@ -167,7 +169,7 @@ defineArtifact({
     m.mulStat('range', 1 + 0.1 * power);
   },
   onShoot(_w, p, power) {
-    if (p.generation === 0) p.addBehavior(growBehavior(2.2, 0.8 + 0.3 * power));
+    if (p.generation === 0) p.addBehavior(growBehavior(2.2, 0.45 + 0.15 * power));
   },
 });
 

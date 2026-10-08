@@ -60,7 +60,7 @@ defineWeapon({
     st.mem.sway = sw + sv * dt;
     st.anim = Math.max(0, st.anim - dt * 6);
     if (!firing || st.cooldown > 0) return;
-    st.cooldown = 1 / p.stats.fireRate;
+    st.cooldown = 1 / p.weaponStats.fireRate;
     st.sinceAttack = 0;
     w.items.onAttack(aim);
     const h = handPos(p, aim, 8);

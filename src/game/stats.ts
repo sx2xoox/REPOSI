@@ -86,19 +86,64 @@ const LIMITS: Partial<Record<StatKey, [number, number]>> = {
   range: [40, 1200],
   shotSpeed: [80, 900],
   moveSpeed: [45, 210],
-  critChance: [0, 1],
+  critChance: [0, 0.6],
   critMult: [1, 10],
   projSize: [1.5, 14],
   shots: [1, 16],
   pierce: [0, 99],
   bounce: [0, 99],
-  dashCooldown: [0.15, 5],
+  dashCooldown: [0.35, 5],
   dashTime: [0.05, 0.5],
   invuln: [0.3, 4],
   dodge: [0, 0.75],
   thrift: [0, 0.9],
   lifesteal: [0, 1],
 };
+
+/**
+ * Stats whose multipliers from items (artifacts, blessings, sets, passives) add up in one
+ * bonus pool instead of compounding (items.recomputeStats). Only bonuses pool: a penalty
+ * (x0.8) still multiplies, so other bonuses cannot water it down. Weapon and affinity
+ * factors still multiply.
+ */
+export const POOLED_STATS: ReadonlySet<StatKey> = new Set<StatKey>(['damage', 'fireRate']);
+
+/**
+ * Diminishing returns of a pooled bonus (+0.3 = +30 %): full value up to +BONUS_KNEE,
+ * half of anything beyond it. Used by the stat pools and by the per-hit bonus pool
+ * (HitInfo.amp), so a pile of "+25 %" items cannot multiply a build without bound.
+ */
+export const BONUS_KNEE = 1;
+export function softBonus(bonus: number): number {
+  return bonus <= BONUS_KNEE ? bonus : BONUS_KNEE + (bonus - BONUS_KNEE) * 0.5;
+}
+
+/**
+ * The weapon's offensive factors (its WeaponDef.stats and the keeper's affinity for it) shape
+ * only the weapon's own attacks (Player.weaponStats). The keeper's stats (Player.stats: what
+ * releases, familiars and artifact effects scale from) leave them out, so picking up a heavy
+ * or a light weapon no longer changes how hard every other effect hits. Weapon changes to
+ * other stats (move speed, hearts, dash ...) still apply to the keeper.
+ */
+export const WEAPON_STATS: ReadonlySet<StatKey> = new Set<StatKey>([
+  'damage', 'fireRate', 'range', 'shotSpeed', 'projSize', 'spread', 'pierce', 'bounce', 'homing', 'knockback', 'shots',
+]);
+
+/**
+ * Extra shots from items split the attack instead of copying it: `base` projectiles plus
+ * `extra` item shots deal base + MULTISHOT_GAIN x extra in total when all connect, so each
+ * projectile carries this share of its normal damage.
+ */
+export const MULTISHOT_GAIN = 0.4;
+export function extraShotShare(base: number, extra: number): number {
+  const b = Math.max(1, base);
+  const x = Math.max(0, Math.floor(extra + 1e-6));
+  return (b + MULTISHOT_GAIN * x) / (b + x);
+}
+/** Per-projectile share when a single-shot weapon fires `shots` projectiles. */
+export function multishotShare(shots: number): number {
+  return extraShotShare(1, shots - 1);
+}
 
 export class StatMods {
   add: Partial<Record<StatKey, number>> = {};

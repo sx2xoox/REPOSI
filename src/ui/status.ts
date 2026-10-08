@@ -254,8 +254,8 @@ export class StatusOverlay implements Scene {
     const nBless = comp?.artifacts.filter((a) => a.def.blessing).length ?? 0;
     const nArts = (comp?.artifacts.length ?? 0) - nBless;
     r.uiSprite('hud_power', 268, 32 + oy, 2, { alpha: k });
-    r.uiText(`위력 ${powerScore(p.stats, comp)}`, 282, 18 + oy, { size: 16, bold: true, color: C.goldHi, outline: C.ink, alpha: k });
-    r.uiText(`초당 피해 약 ${Math.round(estimateDps(p.stats))} · 유물 ${nArts} · 축복 ${nBless}`, 282, 38 + oy, { size: 10, font: 'small', color: C.textFaint, alpha: k });
+    r.uiText(`위력 ${powerScore(p.weaponStats, comp)}`, 282, 18 + oy, { size: 16, bold: true, color: C.goldHi, outline: C.ink, alpha: k });
+    r.uiText(`초당 피해 약 ${Math.round(estimateDps(p.weaponStats))} · 유물 ${nArts} · 축복 ${nBless}`, 282, 38 + oy, { size: 10, font: 'small', color: C.textFaint, alpha: k });
 
     this.drawArtifacts(r, k, oy);
     this.drawEquipment(r, k, oy);
@@ -588,7 +588,7 @@ export class StatusOverlay implements Scene {
     frame(r, x, y, ww, h, 'panel', { alpha: k });
     r.uiText('능력치', x + 12, y + 8, { size: 10, font: 'small', color: C.gold, alpha: k });
     const base = { ...BASE_STATS, ...(p.character.baseStats ?? {}) };
-    const rows = fullStatRows(p.stats, base);
+    const rows = fullStatRows(p.weaponStats, base);
     // show the eight core stats + anything that differs from base
     const core = rows.slice(0, 8);
     const extra = rows.slice(8).filter((rr) => rr[2] !== 0);

@@ -1,4 +1,5 @@
 import { visualHandPos } from '../../game/weapon-pose';
+import { extraShotShare, multishotShare } from '../../game/stats';
 // Arcane and legendary armaments:
 //  반딧불 마도서 (firefly_tome, epic)      — summons firefly spirits that hover, then
 //                                           dart at the nearest enemy
@@ -116,7 +117,7 @@ defineWeapon({
     const h = handPos(p, aim, 9);
     for (let i = 0; i < n; i++) {
       const shots = p.fireProjectiles(w, aim + (i - (n - 1) / 2) * 0.6, {
-        count: 1, style: 'none', speed: 70, range: s.range * 1.6, life: 3.5, radius: Math.max(2.5, s.projSize - 0.5), color: '#d0ff60',
+        count: 1, damageMult: extraShotShare(2, s.shots - 1), style: 'none', speed: 70, range: s.range * 1.6, life: 3.5, radius: Math.max(2.5, s.projSize - 0.5), color: '#d0ff60',
         light: 18, x: h.x, y: h.y - 3, behaviors: [fireflyFx], knockback: s.knockback * 0.5,
       });
       for (const pr of shots) {
@@ -208,7 +209,7 @@ defineWeapon({
     st.cooldown = attackInterval(p);
     const h = handPos(p, aim, 18);
     p.fireProjectiles(w, aim, {
-      style: 'sprite', sprite: 'proj_aegis_slug', spriteRotates: false, radius: p.stats.projSize + 1, color: '#f0c060', light: 16, x: h.x, y: h.y,
+      style: 'sprite', sprite: 'proj_aegis_slug', spriteRotates: false, radius: p.weaponStats.projSize + 1, color: '#f0c060', light: 16, x: h.x, y: h.y,
     });
     muzzle(w, h.x, h.y, aim, ['#ffffff', '#fff0a0', '#f0c060'], 7, [40, 130]);
     w.particles.burst(h.x, h.y, { count: 4, speed: [10, 30], life: [0.4, 0.7], colors: ['#706060', '#504848'], size: [2, 3], sizeEnd: 4, drag: 3, fade: true });
@@ -519,7 +520,7 @@ defineWeapon({
     for (let i = 0; i < smalls; i++) {
       const a = w.rng.next() * Math.PI * 2;
       const rr = 14 + w.rng.next() * 16;
-      w.spawn(new MeteorStrike(free.x + Math.cos(a) * rr, free.y + Math.sin(a) * rr * 0.8, 0.52 + i * 0.14, 15, s.damage * 1.0, false));
+      w.spawn(new MeteorStrike(free.x + Math.cos(a) * rr, free.y + Math.sin(a) * rr * 0.8, 0.52 + i * 0.14, 15, s.damage * extraShotShare(2, s.shots - 1), false));
     }
     const h = handPos(p, aim, 18);
     muzzle(w, h.x, h.y, -Math.PI / 2, ['#ffffff', '#ffe080', '#ff6030'], 8, [40, 120]);

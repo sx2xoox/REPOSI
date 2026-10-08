@@ -52,7 +52,7 @@ defineDrawnSprite('fx_mortar_mark', 15, 7, (p) => {
 
 function shellBehavior(flight: number, radius: number, dmgMult: number): ProjBehavior {
   const lob = lobBehavior(flight, 26, (pr: Projectile, w: World) => {
-    const s = { ...w.player.stats, damage: Number(pr.mem.weaponDamage ?? w.player.stats.damage) };
+    const s = { ...w.player.weaponStats, damage: Number(pr.mem.weaponDamage ?? w.player.weaponStats.damage) };
     blast(w, pr.x, pr.y, radius, s.damage * dmgMult, { colors: ['#ffffff', '#fff0a0', '#ffb030', '#605040'], knockback: 240, shake: 0.22 });
     w.particles.burst(pr.x, pr.y, { count: 10, speed: [60, 140], life: [0.3, 0.6], colors: ['#706050', '#504030'], size: [1, 2], gravity: 320, vz: [60, 140] });
     w.sfx('slam', { vol: 0.35, pitch: 1.4, x: pr.x });
@@ -166,7 +166,7 @@ const rocketFx: ProjBehavior = {
     if (fx.chance(0.7)) w.particles.spawn({ x: bx, y: by, vx: fx.range(-8, 8), vy: fx.range(-12, -2), life: 0.6, colors: ['#a09898', '#706868', '#50484880'], size: 2, sizeEnd: 4, drag: 2, fade: true });
   },
   onExpire(pr, w) {
-    const s = { ...w.player.stats, damage: Number(pr.mem.weaponDamage ?? w.player.stats.damage) };
+    const s = { ...w.player.weaponStats, damage: Number(pr.mem.weaponDamage ?? w.player.weaponStats.damage) };
     blast(w, pr.x, pr.y, 30 + s.projSize * 2, s.damage * 2, { colors: ['#ffffff', '#fff0a0', '#ff7a2a', '#503030'], knockback: 260, shake: 0.28 });
   },
   draw(pr, r) {

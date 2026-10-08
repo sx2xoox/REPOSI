@@ -7,7 +7,7 @@ import { defineDrawnSprite } from '../../engine/sprites';
 import { ramp } from '../../engine/painter';
 import { Bomb, Pickup } from '../../game/pickups';
 import { TAU } from '../../engine/math';
-import { O, addHitStatus, grantPerCopy, isAttack, roll, rollHit, spawnShards, syncFamiliars, watch } from './lib';
+import { O, addHitStatus, grantPerCopy, isAttack, roll, rollHit, spawnShards, stackMul, syncFamiliars, watch } from './lib';
 import { MirrorShard } from './familiars';
 import { proc } from './lib';
 import { Enemy } from '../../game/enemy';
@@ -31,7 +31,7 @@ defineDrawnSprite('icon_gilded_tooth', 16, 16, (p) => {
 defineArtifact({
   id: 'gilded_tooth',
   name: '금니',
-  desc: '동전 +5. 동전 10개당 공격력 +0.4 (최대 +4)',
+  desc: '동전 +5. 동전 10개당 공격력 +0.25 (최대 +2.5)',
   quote: '웃을 때마다 반짝인다.',
   rarity: 'common',
   tags: [],
@@ -40,7 +40,7 @@ defineArtifact({
   pools: ['treasure', 'shop'],
   stats(m, power, w) {
     const coins = w?.player?.coins ?? 0;
-    m.addStat('damage', Math.min(4, Math.floor(coins / 10) * 0.4) * power);
+    m.addStat('damage', Math.min(2.5, Math.floor(coins / 10) * 0.25) * stackMul(power));
   },
   onAcquire(w, power) {
     grantPerCopy(w, 'gilded_tooth', power, () => { w.player.coins = Math.min(999, w.player.coins + 5); });

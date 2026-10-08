@@ -44,7 +44,7 @@ defineWeapon({
   icon: 'icon_void_gaze',
   heldSprite: 'w_void_eye',
   kind: 'beam',
-  rarity: 'epic',
+  rarity: 'common',
   tags: ['arcane'],
   pools: ['secret', 'boss'],
   stats(m) {
@@ -139,7 +139,7 @@ defineWeapon({
       const ex = o.x + Math.cos(a) * len;
       const ey = o.y + Math.sin(a) * len;
       const wob = 1 + 0.18 * Math.sin(w.time * 40) + 0.1 * Math.sin(w.time * 67);
-      const wd = (4 + 3 * focus + p.stats.projSize * 0.6) * wob * fade;
+      const wd = (4 + 3 * focus + p.weaponStats.projSize * 0.6) * wob * fade;
       r.line(o.x, o.y, ex, ey, '#5a20c0', wd + 3, 0.35);
       r.line(o.x, o.y, ex, ey, '#a060ff', wd, 0.9);
       r.line(o.x, o.y, ex, ey, '#e8d0ff', Math.max(1, wd * 0.45), 1);

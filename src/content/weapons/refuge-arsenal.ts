@@ -11,10 +11,10 @@ export interface ArsenalSpec { id:string; name:string; desc:string; shape:Shape;
 export const ARSENAL: readonly ArsenalSpec[] = [
  {id:'brass_revolver',name:'황동 리볼버',desc:'까마귀 부리 모양의 총구로 묵직한 한 발을 쏜다. 연사는 느리지만 탄속이 빠르다.',shape:'revolver',color:'#d9af69',rarity:'common',rate:.82,damage:1.22,speed:1.3},
  {id:'nail_carbine',name:'연발 못총',desc:'딱정벌레 등껍질 아래의 총열로 가벼운 못을 빠르게 연사한다.',shape:'rifle',color:'#78af94',rarity:'common',rate:1.55,damage:.65,speed:1.15},
- {id:'bell_blunderbuss',name:'종탑 산탄총',desc:'작은 종 모양의 총구에서 산탄 다섯 발을 넓게 쏜다. 가까이서 맞혀야 강하다.',shape:'shotgun',color:'#d6b67c',rarity:'rare',rate:.65,damage:.46,pellets:5,spread:.12,range:.82},
+ {id:'bell_blunderbuss',name:'종탑 산탄총',desc:'작은 종 모양의 총구에서 산탄 다섯 발을 넓게 쏜다. 가까이서 맞혀야 강하다.',shape:'shotgun',color:'#d6b67c',rarity:'rare',rate:.65,damage:.42,pellets:5,spread:.12,range:.82},
  {id:'ember_musket',name:'심지 화승총',desc:'누르면 화약을 준비하고 떼면 발사한다. 끝까지 누르면 자동으로 강한 관통탄을 쏜다.',shape:'rifle',color:'#e89461',rarity:'rare',rate:1,damage:1.95,pierce:1,charge:.58,speed:1.7},
  {id:'pearl_crossbow',name:'경량 쇠뇌',desc:'조개껍데기 활대에서 나란한 두 발을 쏜다. 짧은 거리에서 두 발을 모두 맞히기 쉽다.',shape:'crossbow',color:'#c7d5e2',rarity:'common',rate:.95,damage:.58,pellets:2,spread:.04,speed:1.15},
- {id:'crescent_bow',name:'초승달 장궁',desc:'초승달 모양의 활로 긴 사거리의 화살을 쏜다. 적 하나를 관통한다.',shape:'bow',color:'#b8abed',rarity:'rare',rate:.9,damage:1.12,pierce:1,range:1.35,speed:1.25},
+ {id:'crescent_bow',name:'초승달 장궁',desc:'초승달 모양의 활로 긴 사거리의 화살을 쏜다. 적 하나를 관통한다.',shape:'bow',color:'#b8abed',rarity:'common',rate:.9,damage:1.12,pierce:1,range:1.35,speed:1.25},
  {id:'thorn_shortbow',name:'장미 가시활',desc:'가시 화살을 빠르게 쏜다. 20% 확률로 2초간 약한 독을 남긴다.',shape:'bow',color:'#d887a4',rarity:'rare',rate:1.15,damage:.86,status:'poison',speed:1.2},
  {id:'glacier_arbalest',name:'빙하 중쇠뇌',desc:'누르면 장전하고 떼면 발사한다. 완충 시 자동 발사하며 적을 관통하고 잠시 느리게 한다.',shape:'crossbow',color:'#8dd6e8',rarity:'epic',rate:1,damage:2.1,charge:.58,pierce:2,status:'slow',speed:1.6},
  {id:'copper_sabre',name:'구리 곡도',desc:'꼬리처럼 휘어진 칼날로 빠르게 번갈아 벤다. 넓이와 속도가 균형 잡힌 검.',shape:'sabre',color:'#e4a56d',rarity:'common',rate:1.15,damage:.9,reach:36,arc:2.3},

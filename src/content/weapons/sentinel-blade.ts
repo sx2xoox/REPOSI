@@ -40,7 +40,7 @@ defineWeapon({
   icon: 'icon_sentinel_blade',
   heldSprite: 'w_sentinel_blade',
   kind: 'melee',
-  rarity: 'rare',
+  rarity: 'common',
   tags: ['blade'],
   pools: ['treasure', 'boss'],
   stats(m) {

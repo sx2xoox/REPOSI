@@ -112,9 +112,11 @@ describe('blessing offers and one expedition reroll', () => {
   it('standing still activates after 0.6s and lasts only 0.3s after movement; the fired shot keeps its snapshot', () => {
     const w = solo(), blessing = Artifacts.must('bless_footing');
     const shoot = () => { const p = new Projectile({ team: 'player', x: 0, y: 0, angle: 0, speed: 100, damage: 10 }); blessing.onShoot!(w, p, 1); return p; };
-    blessing.onRoomEnter!(w, 1); w.time = .59; blessing.onUpdate!(w, .59, 1); expect(shoot().damage).toBe(10);
-    w.time = .6; blessing.onUpdate!(w, .01, 1); const enhanced = shoot(); expect(enhanced.damage).toBe(13);
-    w.player.x += 2; w.time = .89; blessing.onUpdate!(w, .29, 1); expect(shoot().damage).toBe(13);
-    w.time = .91; blessing.onUpdate!(w, .02, 1); expect(shoot().damage).toBe(10); expect(enhanced.damage).toBe(13);
+    // the bonus rides on the shot (mem.amp) and is applied once when it hits (World.applyHit)
+    const bonus = (p: Projectile) => Number(p.mem.amp ?? 0);
+    blessing.onRoomEnter!(w, 1); w.time = .59; blessing.onUpdate!(w, .59, 1); expect(bonus(shoot())).toBe(0);
+    w.time = .6; blessing.onUpdate!(w, .01, 1); const enhanced = shoot(); expect(bonus(enhanced)).toBeCloseTo(.2);
+    w.player.x += 2; w.time = .89; blessing.onUpdate!(w, .29, 1); expect(bonus(shoot())).toBeCloseTo(.2);
+    w.time = .91; blessing.onUpdate!(w, .02, 1); expect(bonus(shoot())).toBe(0); expect(bonus(enhanced)).toBeCloseTo(.2);
   });
 });

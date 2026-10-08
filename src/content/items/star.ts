@@ -11,7 +11,7 @@ import { fx } from '../../engine/rng';
 import type { World } from '../../game/world';
 import { O, addHitStatus, isAttack, isMelee, isPrimary, roll, rollHit, spawnShards, syncFamiliars } from './lib';
 import { LanternSun, MoonSatellite } from './familiars';
-import { proc } from './lib';
+import { amplifyShot, proc } from './lib';
 import { effectProc } from '../../game/procs';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
@@ -230,8 +230,8 @@ defineDrawnSprite('icon_comet_tail', 16, 16, (p) => {
 defineArtifact({
   id: 'comet_tail',
   name: '혜성 꼬리',
-  desc: '치명타 배율 +0.5. 직접 치명타 시 별 조각 3개',
-  detail: '예: 치명타 ×1.8 → ×2.3. 추가 파편은 별 조각을 다시 만들지 않는다. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '치명타 배율 +0.35. 직접 치명타 시 별 조각 3개',
+  detail: '예: 치명타 ×1.8 → ×2.15. 별 조각 하나는 그 공격의 기본 피해 30%. 추가 파편은 별 조각을 다시 만들지 않는다. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '빛은 지나간 자리에 남는다.',
   rarity: 'epic',
   tags: ['star'],
@@ -239,11 +239,13 @@ defineArtifact({
   look: { trail: 'comet', shot: '#d8c8ff', grow: 0.5 },
   pools: ['treasure', 'boss', 'shrine', 'challenge'],
   stats(m, power) {
-    m.addStat('critMult', 0.5 * power);
+    m.addStat('critMult', 0.35 * power);
   },
   onHit(w, t, hit, power) {
     if (!hit.crit || !isPrimary(hit)) return;
-    spawnShards(w, t.x, t.y - t.z - 4, { count: 2 + power, damage: dmg(w) * 0.55, sprite: 'proj_star_shard', color: '#d8c8ff', speed: 180, range: 160, homing: 6, spectral: true });
+    // each shard: 30 % of the crit's own (pre-crit) hit, so small hits make small shards
+    const unit = Math.min(dmg(w), hit.damage / Math.max(1, w.player.stats.critMult));
+    spawnShards(w, t.x, t.y - t.z - 4, { count: 2 + power, damage: unit * 0.3, sprite: 'proj_star_shard', color: '#d8c8ff', speed: 180, range: 160, homing: 6, spectral: true });
   },
 });
 
@@ -279,9 +281,9 @@ function makeLance(w: World, p: Projectile, power: number): void {
   p.pierce += 99;
   p.spectral = true;
   p.angle = w.player.aim;
-  p.speed = Math.max(p.speed, w.player.stats.shotSpeed) * 1.3;
+  p.speed = Math.max(p.speed, w.player.weaponStats.shotSpeed) * 1.3;
   p.syncVel();
-  p.damage *= 1 + 0.25 * (power - 1);
+  amplifyShot(p, 0.25 * (power - 1));
   p.r = Math.max(p.r, 4);
   p.color = '#ffe890';
   p.lightR = 34;

@@ -10,9 +10,9 @@ import { foundryTrail, drawFoundryWeapon, foundryImpact } from './foundry-presen
 import type { ArsenalSpec } from './refuge-arsenal';
 
 export const FOUNDRY_WEAPONS: readonly ArsenalSpec[] = [
-  { id: 'sunset_rifle', name: '노을 사냥총', rarity: 'rare', shape: 'rifle', color: '#edbc77', rate: .5, damage: 2.2,
+  { id: 'sunset_rifle', name: '노을 사냥총', rarity: 'rare', shape: 'rifle', color: '#edbc77', rate: .5, damage: 2.05,
     desc: '느리고 정확한 대구경 사격. 강한 탄환이 적 두 마리를 관통하며 먼 적을 겨눈다.' },
-  { id: 'gatekeeper_shotgun', name: '문지기 산탄총', rarity: 'epic', shape: 'shotgun', color: '#d4ac7b', rate: 1, damage: .295,
+  { id: 'gatekeeper_shotgun', name: '문지기 산탄총', rarity: 'epic', shape: 'shotgun', color: '#d4ac7b', rate: 1, damage: .28,
     desc: '산탄 여섯 발을 두 번 빠르게 쏜 뒤 재장전한다. 가까이서 탄을 모아 맞히면 강하다.' },
   { id: 'dawn_pike', name: '여명 관통창', rarity: 'epic', shape: 'spear', color: '#e9d196', rate: .72, damage: 1.23,
     desc: '긴 사거리로 일직선의 적을 꿰뚫는다. 세 번째 찌르기는 더 멀리 뻗고 두 배의 피해를 준다. 적 탄환을 막거나 반사하지 못한다.' },
@@ -142,7 +142,7 @@ function maul(w: World, p: Player, st: WeaponState, firing: boolean, aim: number
   st.mem.winding = 1;
   st.mem.windAim = aim;
   st.mem.windStart = w.time;
-  st.mem.impactAt = w.time + Math.max(.075, .18 * 2.6 / p.stats.fireRate);
+  st.mem.impactAt = w.time + Math.max(.075, .18 * 2.6 / p.weaponStats.fireRate);
 }
 
 function bow(w: World, p: Player, st: WeaponState, dt: number, firing: boolean, aim: number): void {

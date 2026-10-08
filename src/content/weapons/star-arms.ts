@@ -7,6 +7,7 @@
 // (떠도는 등령 and 점착 폭탄 쇠뇌 live in star-lamps.ts; shared helpers in arms-kit.ts.)
 
 import { defineWeapon } from '../../game/defs';
+import { multishotShare } from '../../game/stats';
 import type { World } from '../../game/world';
 import type { Player } from '../../game/player';
 import type { Renderer } from '../../engine/renderer';
@@ -332,12 +333,12 @@ defineWeapon({
       // extra stars (multishot) fan out across the aim line
       const off = (i - (n - 1) / 2) * 14;
       const at = w.room.nearestFree(t.x - Math.sin(aim) * off, t.y + Math.cos(aim) * off, 3);
-      const star = trackOwned(w, w.spawn(new StarMark(p, at.x, at.y, s.damage)));
+      const star = trackOwned(w, w.spawn(new StarMark(p, at.x, at.y, s.damage * multishotShare(n))));
       placed.push(star);
       for (const e of [...w.enemies]) {
         if (!e.alive || e.hidden) continue;
         if (Math.hypot(e.x - at.x, e.y - at.y) > STAR_RADIUS + e.r) continue;
-        keeperHit(w, p, e, s.damage * STAR_PLACE, { src: star, kind: 'laser', fromX: at.x, fromY: at.y - 20, knockback: 40 });
+        keeperHit(w, p, e, star.mem.dmg * STAR_PLACE, { src: star, kind: 'laser', fromX: at.x, fromY: at.y - 20, knockback: 40 });
       }
       w.particles.burst(at.x, at.y - 6, { count: 6, speed: [20, 70], life: [0.15, 0.35], colors: ['#ffffff', '#fff6d0', '#9ab8ff'], size: [1, 1], shape: 'spark', additive: true });
     }

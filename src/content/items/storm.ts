@@ -113,7 +113,7 @@ defineDrawnSprite('icon_paper_fan', 16, 16, (p) => {
 defineArtifact({
   id: 'paper_fan',
   name: '바람 접부채',
-  desc: '탄환 +2. 공격력 -20%, 공격 속도 -10%',
+  desc: '탄환 +2 (피해 분산). 공격력 -25%, 공격 속도 -10%',
   quote: '바람을 가르면 세 갈래가 된다.',
   rarity: 'rare',
   tags: ['storm'],
@@ -122,7 +122,7 @@ defineArtifact({
   pools: ['treasure', 'shop', 'boss', 'challenge'],
   stats(m, power) {
     m.addStat('shots', 1 + power);
-    m.mulStat('damage', 0.8);
+    m.mulStat('damage', 0.75);
     m.mulStat('fireRate', 0.9);
     m.mulStat('spread', 1.15);
   },

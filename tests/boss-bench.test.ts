@@ -33,12 +33,15 @@ export interface BossFight {
   shotsPerSec: number;
 }
 
+/** Optional keeper / weapon / artifacts for a fight (default: the plain keeper with the lantern). */
+export interface FightKit { character?: string; weapon?: string; artifacts?: string[] }
+
 /** One boss fight on its floor at `power` × the keeper's damage (rules on/off). */
-export function bossFight(bossId: string, power: number, rules = true, seed = 'BOSS-BENCH', limit = 150, startPhase2 = false): BossFight {
+export function bossFight(bossId: string, power: number, rules = true, seed = 'BOSS-BENCH', limit = 150, startPhase2 = false, kit: FightKit = {}): BossFight {
   if (!renderer) renderer = new Renderer(fakeDisplay(1280, 720));
   const def = Enemies.must(bossId);
   const floor = def.bossFloors![0];
-  const run = new RunState(`${seed}-${bossId}`, PLAIN_ID);
+  const run = new RunState(`${seed}-${bossId}`, kit.character ?? PLAIN_ID);
   run.seeded = true;
   const w = new World(renderer, run, host);
   w.setQuality({ lighting: false, particles: 0 });
@@ -108,6 +111,8 @@ export function bossFight(bossId: string, power: number, rules = true, seed = 'B
     w.start();
     if (floor > 1) w.startFloor(floor);
     const p = w.player;
+    if (kit.weapon && p.weaponId !== kit.weapon) p.equipWeapon(w, kit.weapon);
+    for (const id of kit.artifacts ?? []) w.items.give(id);
     p.stats.maxHearts = 40;
     const node = w.map.nodes.find((n) => n.kind === 'boss')!;
     // force this boss: the boss room picks by seed, so swap the pick when needed

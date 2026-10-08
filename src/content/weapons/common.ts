@@ -99,12 +99,12 @@ export function meleeRest(st: WeaponState, aim: number): number {
 // ------------------------------------------------------------------ attack timing
 /** Seconds per attack from the fire-rate stat, with a weapon multiplier. */
 export function attackInterval(p: Player, mult = 1): number {
-  return mult / Math.max(0.2, p.stats.fireRate);
+  return mult / Math.max(0.2, p.weaponStats.fireRate);
 }
 
 /** Fraction 0..1 of a charge that takes `full` seconds at base fire rate (faster with fire rate). */
 export function chargeTime(p: Player, full: number): number {
-  return full * clamp(2.6 / Math.max(0.4, p.stats.fireRate), 0.35, 2.5);
+  return full * clamp(2.6 / Math.max(0.4, p.weaponStats.fireRate), 0.35, 2.5);
 }
 
 // ------------------------------------------------------------------ raycasts

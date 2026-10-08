@@ -6,7 +6,7 @@ import { RingFx } from '../../game/effects';
 import { O, addHitStatus, cooldown, enemiesNear, grantPerCopy, inflict, isAttack, roll, rollHit, spawnShards, syncFamiliars } from './lib';
 import { effectInterval } from '../../game/procs';
 import { WinterOrb } from './familiars';
-import { proc } from './lib';
+import { amplify, proc } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 const ICE = ['#2a6a9a', '#4aa0d8', '#8fd8f8', '#d8f6ff', '#ffffff'];
@@ -62,7 +62,7 @@ defineDrawnSprite('icon_frostbite_ring', 16, 16, (p) => {
 defineArtifact({
   id: 'frostbite_ring',
   name: '동상 반지',
-  desc: '둔화되거나 얼어붙은 적에게 주는 피해 +30%',
+  desc: '둔화되거나 얼어붙은 적에게 주는 피해 +20%',
   quote: '차가운 것은 더 잘 부서진다.',
   rarity: 'common',
   tags: ['frost'],
@@ -71,7 +71,7 @@ defineArtifact({
   pools: ['treasure', 'shop', 'boss'],
   modifyHit(_w, t, hit, power) {
     if (t.hasStatus('slow') || t.hasStatus('freeze')) {
-      hit.damage *= 1 + 0.3 * power;
+      amplify(hit, 0.2 * power);
       proc(_w, 'frostbite_ring', true);
     }
   },

@@ -46,6 +46,8 @@ export interface SwingOpts {
   /** hits skip item hooks and ember gain (special moves) */
   noProc?: boolean;
   release?: boolean;
+  /** item damage bonus carried by this swing (summed into the hit's amp; see HitInfo.amp) */
+  amp?: number;
   /** extra callback per enemy hit */
   onHit?: (w: World, target: Actor, hit: HitInfo) => void;
 }
@@ -65,7 +67,7 @@ export class MeleeSwing extends Entity {
     this.owner = owner;
     this.o = {
       knockback: 140, duration: 0.1, visual: 0.18, color: '#ffffff', deflect: true, reflect: false, thrust: false, swingDir: 1,
-      style: 'smear', hitKick: 1.5, noProc: false, release: false, respectWalls: false,
+      style: 'smear', hitKick: 1.5, noProc: false, release: false, respectWalls: false, amp: 0,
       ...o,
     };
     this.x = owner.x;
@@ -137,6 +139,7 @@ export class MeleeSwing extends Entity {
             dirX: (e.x - this.x) / d, dirY: (e.y - this.y) / d, knockback: this.o.knockback, statuses: this.o.statuses,
             noProc: this.o.noProc || undefined,
             release: this.o.release || undefined,
+            amp: this.o.amp || undefined,
           };
           if (w.applyHit(e, hit)) {
             this.hits++;

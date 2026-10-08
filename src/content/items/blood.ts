@@ -6,7 +6,10 @@ import { ramp } from '../../engine/painter';
 import { RingFx } from '../../game/effects';
 import { fx } from '../../engine/rng';
 import { O, addHitStatus, enemiesNear, isAttack, itemHit, roll, rollHit, spawnShards, stackMul } from './lib';
-import { proc } from './lib';
+import { amplify, amplifyShot, proc } from './lib';
+
+/** Pierce bonuses one shot can collect from 무쇠 깃촉. */
+export const IRON_QUILL_MAX = 3;
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 const RED = ['#4a0812', '#8a1020', '#c81c30', '#ff4a5a', '#ffb0b8'];
@@ -128,6 +131,7 @@ defineArtifact({
   id: 'iron_quill',
   name: '무쇠 깃촉',
   desc: '관통 +1. 관통할 때마다 피해 +20% (탄환 한정)',
+  detail: '관통 보너스는 한 발에 최대 3번(+60%). 탄속 +10%.',
   quote: '펜은 칼보다 깊이 박힌다.',
   rarity: 'common',
   tags: ['blood'],
@@ -143,7 +147,11 @@ defineArtifact({
     pr.addBehavior({
       id: 'iron_quill',
       onHit(p2, w2) {
-        p2.damage *= 1.2;
+        // +20 % per enemy pierced, three times at most: a shot that keeps grinding the same
+        // foe (boomerangs, yoyos, saws) no longer compounds without end
+        if ((p2.mem.quill ?? 0) >= IRON_QUILL_MAX) return;
+        p2.mem.quill = (p2.mem.quill ?? 0) + 1;
+        amplifyShot(p2, 0.2);
         proc(w2, 'iron_quill', true);
       },
     });
@@ -209,7 +217,7 @@ defineDrawnSprite('icon_heartstring', 16, 16, (p) => {
 defineArtifact({
   id: 'heartstring',
   name: '심장 실',
-  desc: '빨간 체력 최대 시 공격 피해 +30% (지속 제외)',
+  desc: '빨간 체력 최대 시 공격 피해 +20% (지속 제외)',
   quote: '온전할 때, 가장 강하다.',
   rarity: 'rare',
   tags: ['blood'],
@@ -223,7 +231,7 @@ defineArtifact({
   modifyHit(w, _t, hit, power) {
     const p = w.player;
     if (p.maxRed > 0 && p.red >= p.maxRed && hit.kind !== 'status') {
-      hit.damage *= 1 + 0.3 * power;
+      amplify(hit, 0.2 * power);
       proc(w, 'heartstring', true);
     }
   },
@@ -249,7 +257,7 @@ defineDrawnSprite('icon_blood_pact', 16, 16, (p) => {
 defineArtifact({
   id: 'blood_pact',
   name: '피의 서약',
-  desc: '공격력 ×1.4, 최대 체력 -1칸. 피격 후 2회 치명타',
+  desc: '공격력 +25%, 최대 체력 -1칸. 피격 후 2회 치명타',
   detail: '보유 중 최대 빨간 체력이 감소한다. 버리면 최대치는 복구되지만 잃은 체력은 회복되지 않는다.',
   quote: '서명은 피로 한다.',
   signature: '피격당하면 다음 공격 2회가 반드시 치명타가 된다',
@@ -258,8 +266,9 @@ defineArtifact({
   icon: 'icon_blood_pact',
   look: { aura: '#c01828', step: '#ff4a5a', grow: 0.5 },
   pools: ['curse', 'secret'],
+  unique: true,
   stats(m, power) {
-    m.mulStat('damage', Math.pow(1.4, power));
+    m.mulStat('damage', 1 + 0.25 * power);
     m.addStat('maxHearts', -power);
   },
   onHurt(w, _a, power) {

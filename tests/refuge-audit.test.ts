@@ -84,13 +84,13 @@ describe('attack timing and charged weapon audit',()=>{
  });
  it('the next-attack melee bonus is snapshotted before travel, not read at hit time',()=>{
   const {world:w}=setup();const b=Artifacts.must('bless_afterstep');
-  b.onDash!(w,1);b.onAttack!(w,0,1);const sw=w.player.swing(w,{angle:0,damage:10});b.onSwing!(w,sw,1);expect(sw.o.damage).toBe(13.5);
-  w.time+=1;b.onAttack!(w,0,1);const h={damage:sw.o.damage,kind:'melee' as const,attacker:w.player,source:sw};b.modifyHit!(w,w.player,h,1);expect(h.damage).toBe(13.5);
+  b.onDash!(w,1);b.onAttack!(w,0,1);const sw=w.player.swing(w,{angle:0,damage:10});b.onSwing!(w,sw,1);expect(sw.o.damage).toBe(10);expect(sw.o.amp).toBeCloseTo(.25);
+  w.time+=1;b.onAttack!(w,0,1);const h={damage:sw.o.damage,kind:'melee' as const,attacker:w.player,source:sw};b.modifyHit!(w,w.player,h,1);expect(h.damage).toBe(10);expect((h as {amp?:number}).amp??0).toBe(0);
  });
  it('standing still enhances a fired shot; walking afterward cannot remove it',()=>{
   const {world:w}=setup(),b=Artifacts.must('bless_footing');b.onUpdate!(w,.6,1);
-  const p=new Projectile({team:'player',x:0,y:0,angle:0,speed:100,damage:10});b.onShoot!(w,p,1);expect(p.damage).toBeCloseTo(13);
-  w.player.x+=2;w.time+=.31;b.onUpdate!(w,.31,1);const h={damage:p.damage,kind:'projectile' as const,attacker:w.player,source:p};b.modifyHit!(w,w.player,h,1);expect(h.damage).toBeCloseTo(13);
+  const p=new Projectile({team:'player',x:0,y:0,angle:0,speed:100,damage:10});b.onShoot!(w,p,1);expect(p.mem.amp).toBeCloseTo(.2);
+  w.player.x+=2;w.time+=.31;b.onUpdate!(w,.31,1);const h={damage:p.damage,kind:'projectile' as const,attacker:w.player,source:p};b.modifyHit!(w,w.player,h,1);expect(h.damage).toBeCloseTo(10);expect((h as {amp?:number}).amp??0).toBe(0);expect(p.mem.amp).toBeCloseTo(.2);
  });
  it('secondary shots cannot inherit attack-only bonuses',()=>{
   const {world:w}=setup();w.vars.baUntil=10;w.vars.bcUntil=10;w.vars.bfStill=1;w.vars.btUntil=10;

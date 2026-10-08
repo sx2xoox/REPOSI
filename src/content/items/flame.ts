@@ -11,7 +11,7 @@ import { fx } from '../../engine/rng';
 import {
   O, HazardZone, addHitStatus, enemiesNear, isAttack, hitWeight, isPrimary, itemHit, miniBlast, roll, rollHit, shout, stackMul,
 } from './lib';
-import { proc } from './lib';
+import { amplify, proc } from './lib';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 
@@ -76,7 +76,7 @@ defineDrawnSprite('icon_smoldering_coal', 16, 16, (p) => {
 defineArtifact({
   id: 'smoldering_coal',
   name: '꺼지지 않는 숯',
-  desc: '불타는 적에게 주는 피해 +30%',
+  desc: '불타는 적에게 주는 피해 +20%',
   quote: '식은 줄 알았지?',
   rarity: 'common',
   tags: ['flame'],
@@ -85,7 +85,7 @@ defineArtifact({
   pools: ['treasure', 'shop', 'boss'],
   modifyHit(_w, t, hit, power) {
     if (t.hasStatus('burn')) {
-      hit.damage *= 1 + 0.3 * power;
+      amplify(hit, 0.2 * power);
       proc(_w, 'smoldering_coal', true);
     }
   },
@@ -113,7 +113,7 @@ defineDrawnSprite('icon_bellows', 16, 16, (p) => {
 defineArtifact({
   id: 'bellows',
   name: '작은 풀무',
-  desc: '직접 공격의 등불 기본 충전량 +40%',
+  desc: '직접 공격의 등불 기본 충전량 +30%',
   detail: '광선·보스 대상의 충전 감쇠 적용. 추가 파편·지속 피해·해방은 충전 제외.',
   quote: '숨을 불어넣으면 불은 대답한다.',
   rarity: 'common',
@@ -123,7 +123,7 @@ defineArtifact({
   pools: ['treasure', 'shop', 'shrine'],
   onHit(w, t, hit, power) {
     if (!isPrimary(hit)) return;
-    w.player.addEmber(0.4 * power * (hit.emberCharge ?? attackEmber(w.player.stats.damage, hit.damage, t instanceof Enemy && t.isBoss, hit.kind === 'laser')));
+    w.player.addEmber(0.3 * power * (hit.emberCharge ?? attackEmber(w.player.stats.damage, hit.damage, t instanceof Enemy && t.isBoss, hit.kind === 'laser', hit.damage)));
     proc(w, 'bellows', true);
   },
 });
@@ -203,7 +203,7 @@ defineArtifact({
   id: 'kiln_core',
   name: '가마의 심장',
   desc: '직접 공격 적중 시 작은 폭발이 일어난다',
-  detail: '최소 간격 0.2초. 직전 폭발 이후 모인 직접 피해의 45%로 폭발(공격력의 35~150%). 느린 강타는 큰 폭발. 추가 파편 제외. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  detail: '최소 간격 0.2초. 직전 폭발 이후 모인 직접 피해의 30%로 폭발(공격력의 25~100%). 느린 강타는 큰 폭발. 추가 파편 제외. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
   quote: '그 안의 불은 천 년째 꺼지지 않았다.',
   rarity: 'epic',
   tags: ['flame'],
@@ -214,7 +214,7 @@ defineArtifact({
     if (!isPrimary(hit)) return;
     const base = dmg(w);
     w.vars.__kilnBank = Math.min(base * 3.34, (w.vars.__kilnBank ?? 0) + Math.max(0, hit.dealtDamage ?? hit.damage));
-    const blast = Math.max(base * 0.35, Math.min(base * 1.5, w.vars.__kilnBank * 0.45)) * stackMul(power);
+    const blast = Math.max(base * 0.25, Math.min(base, w.vars.__kilnBank * 0.3)) * stackMul(power);
     if (miniBlast(w, t.x, t.y - 3, 20 + 3 * (power - 1), blast, '#ff8a30')) w.vars.__kilnBank = 0;
   },
 });
@@ -288,7 +288,7 @@ defineDrawnSprite('icon_ember_reservoir', 16, 16, (p) => {
 defineArtifact({
   id: 'ember_reservoir',
   name: '불씨 저장고',
-  desc: '등불 해방 후 6초간 공격력 +40%, 공격 속도 +25%',
+  desc: '등불 해방 후 6초간 공격력 +25%, 공격 속도 +15%',
   quote: '모아둔 불씨는 한꺼번에 쏟아진다.',
   rarity: 'rare',
   tags: ['flame'],
@@ -296,13 +296,13 @@ defineArtifact({
   look: { mote: '#ff8a30', hit: '#ffe080' },
   pools: ['treasure', 'shrine'],
   onRelease(w, power) {
-    const k = 1 + 0.4 * power;
+    const k = 1 + 0.25 * power;
     w.items.addBuff({
       key: 'ember_reservoir', time: 6, label: '불씨 폭주', icon: 'icon_ember_reservoir',
       hooks: {
         stats(m) {
           m.mulStat('damage', k);
-          m.mulStat('fireRate', 1.25);
+          m.mulStat('fireRate', 1.15);
         },
         onUpdate(w2, dt) {
           if (fx.chance(dt * 25)) {
@@ -351,11 +351,17 @@ defineArtifact({
     w.vars.__twinWickT = w.time + 0.55;
     w.vars.__twinWickN = Math.min(2, power);
   },
+  onRoomEnter(w) {
+    w.vars.__twinWickT = 0;
+  },
   onUpdate(w) {
     const t = w.vars.__twinWickT ?? 0;
     if (t <= 0 || w.time < t) return;
     const p = w.player;
-    if (!p.alive) return;
+    if (!p.alive) {
+      w.vars.__twinWickT = 0;
+      return;
+    }
     w.vars.__twinWickN = (w.vars.__twinWickN ?? 1) - 1;
     w.vars.__twinWickT = w.vars.__twinWickN > 0 ? w.time + 0.55 : 0;
     shout(w, '한 번 더!', '#ffd080');

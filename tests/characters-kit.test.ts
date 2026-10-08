@@ -190,7 +190,8 @@ describe('세린 — 사냥 감각 / 도약', () => {
     const { w, dummy } = sim('serin', 'hunter_bow');
     const p = w.player;
     expect(p.flags.has('affinity')).toBe(true);
-    expect(p.stats.pierce).toBe(1);
+    // the affinity's pierce is a weapon factor: it shapes the bow's shots, not the keeper's stats
+    expect(p.weaponStats.pierce).toBe(1);
     const dmg0 = w.run.stats.damageDealt;
     let crits = 0;
     const orig = w.applyHit.bind(w);

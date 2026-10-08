@@ -212,7 +212,7 @@ defineWeapon({
     const h = handPos(p, aim, 9);
     p.fireProjectiles(w, aim, {
       style: 'sprite', sprite: 'proj_star_arrow', color: '#fff0a0', light: 24, x: h.x, y: h.y, behaviors: [starTrail],
-      radius: Math.max(2.5, p.stats.projSize - 0.5), spreadMult: 0.5,
+      radius: Math.max(2.5, p.weaponStats.projSize - 0.5), spreadMult: 0.5,
     });
     muzzle(w, h.x, h.y, aim, ['#ffffff', '#fff0a0', '#8a9ad8'], 8, [60, 180]);
     st.anim = 1;
@@ -226,7 +226,7 @@ defineWeapon({
     // sighting line: dotted, brightening as the next shot gets ready
     const ready = st.cooldown <= 0;
     const h = visualHandPos(p, a, 9);
-    const len = Math.min(rayLength(w, h.x, h.y, a, p.stats.range * 0.75), 220);
+    const len = Math.min(rayLength(w, h.x, h.y, a, p.weaponStats.range * 0.75), 220);
     const steps = Math.floor(len / 6);
     const k = ready ? 1 : Math.max(0, 1 - st.cooldown / Math.max(0.01, attackInterval(p)));
     const col = ready ? '#fff0a0' : '#8a9ad8';

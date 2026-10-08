@@ -43,8 +43,8 @@ function setup(distance = 80) {
 describe('titan greatsword enlarged reach through real combat', () => {
   it('holds its completed charge, reaches an 80px target once, and retains its damage and recovery', () => {
     const s = setup(80), hp = s.target.hp;
-    expect(s.p.stats.damage).toBeCloseTo(9.8);
-    expect(s.p.stats.fireRate).toBeCloseTo(1.82);
+    expect(s.p.weaponStats.damage).toBeCloseTo(9.8);
+    expect(s.p.weaponStats.fireRate).toBeCloseTo(1.82);
     const frames = s.charge();
     expect(frames * FIXED_DT).toBeGreaterThanOrEqual(.85);
     expect(frames * FIXED_DT).toBeLessThanOrEqual(.89);
@@ -52,14 +52,14 @@ describe('titan greatsword enlarged reach through real combat', () => {
     expect(s.swings).not.toHaveBeenCalled();
     expect(s.target.hp).toBe(hp);
     const sw = s.release();
-    expect(sw.o.damage).toBeCloseTo(s.p.stats.damage * 3);
+    expect(sw.o.damage).toBeCloseTo(s.p.weaponStats.damage * 3);
     expect(sw.o.duration).toBe(.12);
     expect(sw.o.visual).toBe(.26);
-    expect(s.p.weapon.cooldown).toBeCloseTo(.45 / s.p.stats.fireRate);
+    expect(s.p.weapon.cooldown).toBeCloseTo(.45 / s.p.weaponStats.fireRate);
     s.tick(20);
     expect(sw.hits).toBe(1);
     expect(sw.hitIds.has(s.target.id)).toBe(true);
-    expect(hp - s.target.hp).toBeCloseTo(s.p.stats.damage * 3);
+    expect(hp - s.target.hp).toBeCloseTo(s.p.weaponStats.damage * 3);
     expect(s.swings).toHaveBeenCalledTimes(1);
   });
 
@@ -78,10 +78,10 @@ describe('titan greatsword enlarged reach through real combat', () => {
     const sw = s.release();
     expect(sw.o.arc).toBeCloseTo(2.4);
     expect(sw.o.duration).toBe(.09);
-    expect(s.p.weapon.cooldown).toBeCloseTo(1 / s.p.stats.fireRate);
+    expect(s.p.weapon.cooldown).toBeCloseTo(1 / s.p.weaponStats.fireRate);
     s.tick(20);
     expect(sw.hits).toBe(1);
-    expect(hp - s.target.hp).toBeCloseTo(s.p.stats.damage * 1.4);
+    expect(hp - s.target.hp).toBeCloseTo(s.p.weaponStats.damage * 1.4);
   });
 
   it.each([['wall', Tile.WALL], ['rock', Tile.ROCK], ['metal block', Tile.BLOCK]] as const)(
@@ -97,13 +97,13 @@ describe('titan greatsword enlarged reach through real combat', () => {
       const sw = s.release(); s.tick(3);
       expect(s.target.hp).toBe(blockedHp);
       expect(sw.hitIds.has(s.target.id)).toBe(false);
-      expect(openHp - open.hp).toBeCloseTo(s.p.stats.damage * 3);
+      expect(openHp - open.hp).toBeCloseTo(s.p.weaponStats.damage * 3);
       expect(hiddenBullet.dead).toBe(false);
       expect(hiddenBullet.team).toBe('enemy');
       expect(hiddenBullet.damage).toBe(1);
       expect(exposedBullet.team).toBe('player');
       expect(exposedBullet.owner).toBe(s.p);
-      expect(exposedBullet.damage).toBeCloseTo(s.p.stats.damage * .4);
+      expect(exposedBullet.damage).toBeCloseTo(s.p.stats.damage * .4); // reflections hit with the keeper's damage
     },
   );
 
@@ -165,7 +165,7 @@ describe('titan greatsword enlarged reach through real combat', () => {
       s.p.stats.critChance = 0;
       const hp = s.target.hp;
       s.charge(); const sw = s.release(); s.tick(15);
-      return { damage: hp - s.target.hp, range: s.p.stats.range, sw };
+      return { damage: hp - s.target.hp, range: s.p.weaponStats.range, sw };
     };
     const plain = attempt(false), enhanced = attempt(true);
     expect(plain.damage).toBe(0);

@@ -1,4 +1,5 @@
 import { visualHandPos } from '../../game/weapon-pose';
+import { multishotShare } from '../../game/stats';
 // Staves:
 //  수정 연사봉   (crystal_gatling, epic) — spins up into a hail of crystal shards
 //  프리즘 광선봉 (prism_staff, rare)     — instant rainbow beam that pierces all
@@ -251,7 +252,7 @@ defineWeapon({
         for (const e of enemiesOnSegment(w, o.x, o.y, ex, ey, width)) {
           if (hit.has(e.id)) continue;
           hit.add(e.id);
-          strike(w, e, s.damage, Math.cos(a), Math.sin(a), s.knockback * 0.6, { kind: 'laser' });
+          strike(w, e, s.damage * multishotShare(count), Math.cos(a), Math.sin(a), s.knockback * 0.6, { kind: 'laser' });
         }
         for (const h of [...w.hittables]) if (segDist(h.x, h.y, o.x, o.y, ex, ey).d < h.r + width / 2) h.takeHit(w, { damage: s.damage, kind: 'laser', attacker: p });
         left -= len;
@@ -365,7 +366,7 @@ defineWeapon({
       const h = handPos(p, aim, 20);
       const shots = p.fireProjectiles(w, a, {
         count: s.shots, style: 'none', speed: 190 + w.rng.next() * 60, accel: -230, minSpeed: 45, range: 90 + s.range * 0.18,
-        damageMult: 0.27, pierce: s.pierce + 3, radius: s.projSize + 2, knockback: 16, light: 18, color: '#ff9a30',
+        damageMult: 0.27 * multishotShare(s.shots), pierce: s.pierce + 3, radius: s.projSize + 2, knockback: 16, light: 18, color: '#ff9a30',
         statuses: [{ kind: 'burn', duration: 2.5, power: s.damage * 0.45, chance: 0.4 }], behaviors: [breathFx], x: h.x, y: h.y,
       });
       if (st.mem.pc === 0) for (const pr of shots) pr.mem.patch = 1;
