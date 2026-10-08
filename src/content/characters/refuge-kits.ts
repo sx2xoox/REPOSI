@@ -270,7 +270,8 @@ export const REFUGE_AFFINITIES: AffinityDef[] = [
   },
   {
     name: '창 / 방패',
-    desc: '전방 방벽이 넓어져 3발까지 막고 1.8초마다 회복한다. 막은 적탄은 앞의 적에게 3배로 되쏜다.',
+    // two lines on the select screen (Galmuri9 10px, 186 px wide)
+    desc: '방벽이 넓어져 3발까지 막고 1.8초마다 회복. 막은 적탄은 3배로 되쏜다.',
     families: ['spear', 'shield'],
   },
   {
