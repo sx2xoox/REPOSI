@@ -1,0 +1,14 @@
+# 등불지기 speedrun leaderboard (Cloudflare Worker + D1). See README.md.
+name = "lanternkeeper-ranking"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[vars]
+# origins allowed to submit records (the public game + local dev servers)
+ALLOWED_ORIGINS = "https://sx2xoox.github.io,http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lanternkeeper-ranking"
+# filled in by `npm run setup` (the id of the database in your Cloudflare account; not a secret)
+database_id = "00000000-0000-0000-0000-000000000000"

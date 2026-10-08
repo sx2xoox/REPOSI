@@ -1,0 +1,14 @@
+{
+  "name": "lanternkeeper-leaderboard",
+  "private": true,
+  "type": "module",
+  "description": "등불지기 스피드런 온라인 랭킹 서버 (Cloudflare Worker + D1)",
+  "scripts": {
+    "setup": "node setup.mjs",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev --local"
+  },
+  "devDependencies": {
+    "wrangler": "4.148.0"
+  }
+}
