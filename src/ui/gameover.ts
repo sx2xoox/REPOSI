@@ -1,6 +1,9 @@
 // Death / victory screen: dying (or blazing) lantern title, cause of death with
 // the killer's sprite, run summary with counting numbers, every item carried
 // (staggered pop-in), seed & time, and retry / same seed / title.
+// Speedrun: the items card becomes the per-floor split table (clear time of
+// floors 1..N, the boss fight, personal best / online rank) and the times read
+// m:ss.cc.
 
 import { RankingScene } from './ranking';
 import type { Scene } from './scene';
@@ -15,7 +18,9 @@ import { clamp, ease } from '../engine/math';
 import { Actives, Enemies, Weapons, lastFloorIndex } from '../game/defs';
 import { animFrame, hasAnim, hasSprite } from '../engine/sprites';
 import { sfx } from '../audio/audio';
-import { C, formatTime, splitFloorName } from './theme';
+import { C, formatSplit, formatTime, splitFloorName } from './theme';
+import { ticksToMs } from '../game/speedrun';
+import { clockText } from './cards';
 import { divider, fitScale, frame, glow, spriteCentered } from './frame';
 import { appear } from './anim';
 import { SYNERGIES, synergyActive } from '../game/synergies';
@@ -105,7 +110,11 @@ export class GameOverOverlay implements Scene {
     r.uiSprite(won ? animFrame('ui_lantern', this.t) : flick > 0.3 ? 'ui_lantern_0' : 'ui_lantern_off', lx, ty + 18, 2.5, { alpha: ta });
     r.uiText(titleText, UI_W / 2 + 10, ty, { size: 32, bold: true, align: 'center', color: col, outline: won ? '#4a2a06' : '#3a0408', alpha: ta });
     const [no, fname] = splitFloorName(w.floor.name);
-    const sub = won ? `${countWord(lastFloorIndex())} 개의 층을 모두 정화하고, 마을로 돌아간다.` : `${no} ${fname}에서 쓰러졌다.`;
+    const sr = run.speedrun;
+    const finalMs = this.speedrunMs();
+    const sub = won
+      ? sr ? `${countWord(lastFloorIndex())} 개의 층을 ${formatSplit(finalMs)} 만에 모두 정화했다.` : `${countWord(lastFloorIndex())} 개의 층을 모두 정화하고, 마을로 돌아간다.`
+      : `${no} ${fname}에서 쓰러졌다.`;
     r.uiText(sub, UI_W / 2, ty + 44, { size: 12, align: 'center', color: C.textDim, alpha: ta });
     divider(r, UI_W / 2, ty + 64, 320, won ? C.gold : '#7a2a30', ta);
 
@@ -117,11 +126,20 @@ export class GameOverOverlay implements Scene {
     const x0 = UI_W / 2 - (cw * 3 + gap * 2) / 2;
     this.drawCause(r, x0, cy, cw, ca);
     this.drawSummary(r, x0 + cw + gap, cy, cw, ca);
-    this.drawItems(r, x0 + (cw + gap) * 2, cy, cw, ca);
+    if (sr) this.drawSplits(r, x0 + (cw + gap) * 2, cy, cw, ca);
+    else this.drawItems(r, x0 + (cw + gap) * 2, cy, cw, ca);
 
     // ---- footer
     const ch = w.player.character;
-    r.uiText(`${ch.name} · 시드 ${run.seed}${run.seeded ? ' (지정)' : ''}`, UI_W / 2, 302, { size: 10, font: 'small', align: 'center', color: C.textFaint, alpha: ca });
+    if (sr) {
+      const head = `${ch.name} · 스피드런 · 시드 ${run.seed}`;
+      const tail = this.game.speedrunRanked ? '' : '  ·  랭킹 미반영';
+      const hw = r.measureText(head, 10, false, 'small');
+      const tw = tail ? r.measureText(tail, 10, false, 'small') : 0;
+      const fx = UI_W / 2 - (hw + tw) / 2;
+      r.uiText(head, fx, 302, { size: 10, font: 'small', color: C.textFaint, alpha: ca });
+      if (tail) r.uiText(tail, fx + hw, 302, { size: 10, font: 'small', color: '#c86a70', alpha: ca });
+    } else r.uiText(`${ch.name} · 시드 ${run.seed}${run.seeded ? ' (지정)' : ''}`, UI_W / 2, 302, { size: 10, font: 'small', align: 'center', color: C.textFaint, alpha: ca });
     if (this.menuShown) this.menu.draw(r, appear(this.menu.t, 0.3));
   }
 
@@ -177,7 +195,7 @@ export class GameOverOverlay implements Scene {
     r.uiText('하강 기록', x + w / 2, y + 12, { size: 10, font: 'small', align: 'center', color: C.gold, alpha: a });
     const rows: [string, string, number, (v: number) => string][] = [
       ['ui_door', '도달 층', run.floor, (v) => `${Math.round(v)}층`],
-      ['ui_hourglass', '시간', s.timeSec, (v) => formatTime(v)],
+      run.speedrun ? ['ui_hourglass', '기록', this.speedrunMs(), (v) => formatSplit(v)] : ['ui_hourglass', '시간', s.timeSec, (v) => formatTime(v)],
       ['ui_swords', '처치', s.kills, (v) => `${Math.round(v)}`],
       ['ui_chest', '획득 아이템', s.itemsTaken, (v) => `${Math.round(v)}`],
       ['ui_crown', '보스 처치', s.bossesKilled, (v) => `${Math.round(v)}`],
@@ -191,6 +209,65 @@ export class GameOverOverlay implements Scene {
       r.uiText(label, x + 36, ry, { size: 12, color: C.textDim, alpha: a * Math.min(1, k * 3) });
       r.uiText(fmt(target * k), x + w - 16, ry, { size: 12, align: 'right', color: C.text, alpha: a * Math.min(1, k * 3) });
     });
+  }
+
+  /** Speedrun clock at the end: the last floor's split on a win, else where the run stopped (ms). */
+  private speedrunMs(): number {
+    const sr = this.game.run.speedrun;
+    if (!sr) return 0;
+    const fin = sr.splits.find((s) => s.floor === lastFloorIndex());
+    return ticksToMs(fin ? fin.splitTicks : sr.ticks);
+  }
+
+  /** Speedrun: one row per floor — clear time of floors 1..N, the boss fight, best / online rank. */
+  private drawSplits(r: Renderer, x: number, y: number, w: number, a: number): void {
+    const run = this.game.run;
+    const sr = run.speedrun;
+    if (!sr) return;
+    frame(r, x, y, w, 176, 'panel', { alpha: a });
+    r.uiText('구간 기록', x + w / 2, y + 12, { size: 10, font: 'small', align: 'center', color: C.gold, alpha: a });
+    const last = lastFloorIndex();
+    const notes = new Map(this.game.hud.splitNotices.map((e) => [e.n.floor, e.n]));
+    // columns: floor · clear time of floors 1..N · boss fight · marks
+    const cT = x + 108;
+    const cB = x + 164;
+    const cM = x + w - 12;
+    const hy = y + 30;
+    r.uiText('누적', cT, hy, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: a });
+    r.uiText('보스전', cB, hy, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: a });
+    r.uiRect(x + 12, hy + 13, w - 24, 1, C.rimDark, a);
+    const rowH = Math.min(18, Math.floor(124 / last));
+    for (let f = 1; f <= last; f++) {
+      const k = ease.outCubic(clamp((this.t - 0.8 - f * 0.07) / 0.4, 0, 1));
+      if (k <= 0) continue;
+      const ra = a * k;
+      const ry = hy + 20 + (f - 1) * rowH;
+      const split = sr.splits.find((s) => s.floor === f);
+      const n = notes.get(f);
+      const fell = !split && !this.info.won && f === run.floor;
+      const pb = !!n?.personalBest;
+      if (pb) r.uiRect(x + 8, ry - 2, w - 16, rowH - 2, '#ffd060', 0.07 * ra);
+      r.uiText(`${f}층`, x + 16, ry, { size: 10, font: 'small', color: split ? C.textDim : fell ? '#c86a70' : C.textMute, alpha: ra });
+      if (split) {
+        clockText(r, formatSplit(ticksToMs(split.splitTicks)), cT, ry - 1, { size: 12, align: 'right', color: pb ? C.goldHi : C.text, alpha: ra });
+        clockText(r, formatSplit(ticksToMs(split.bossTicks)), cB, ry, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: ra });
+      } else {
+        r.uiText('—', cT, ry - 1, { size: 12, align: 'right', color: C.textMute, alpha: ra });
+        r.uiText('—', cB, ry, { size: 10, font: 'small', align: 'right', color: C.textMute, alpha: ra });
+      }
+      // marks: the online rank (or its state), a crown for a new personal best, a skull where the run ended
+      let mx = cM;
+      if (n && n.ranked && n.online === 'ok' && n.onlineRank) {
+        const rk = `${n.onlineRank}위`;
+        r.uiText(rk, mx, ry, { size: 10, font: 'small', align: 'right', color: n.onlineRank <= 3 ? C.goldHi : C.info, alpha: ra });
+        mx -= r.measureText(rk, 10, false, 'small') + 3;
+      } else if (n && n.ranked && n.online === 'pending') {
+        r.uiText('…', mx, ry, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: ra });
+        mx -= 10;
+      }
+      if (pb) r.uiSprite('ui_crown', mx - 7, ry + 5, 1.5, { alpha: ra });
+      if (fell) r.uiSprite('ui_skull', mx - 7, ry + 5, 1, { alpha: ra });
+    }
   }
 
   private drawItems(r: Renderer, x: number, y: number, w: number, a: number): void {

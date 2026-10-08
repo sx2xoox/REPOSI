@@ -19,7 +19,8 @@ import { sfx } from '../audio/audio';
 import { clamp } from '../engine/math';
 import { BASE_STATS } from '../game/stats';
 import { potionSpriteFor } from '../game/pickups';
-import { C, formatTime, roman, splitFloorName } from './theme';
+import { C, formatSplit, formatTime, roman, splitFloorName } from './theme';
+import { ticksToMs } from '../game/speedrun';
 import { fitScale, frame, gauge, iconSlot, keyHintRow, keyHintWidth, keycap, spriteCentered } from './frame';
 import { Repeater, Spring, appear } from './anim';
 import { characterKitRows, fullStatRows, gridMove, scrollToRow } from './logic';
@@ -247,7 +248,14 @@ export class StatusOverlay implements Scene {
     const [no, fname] = splitFloorName(w.floor.name);
     const hx = UI_W_BASE - 30 - (touchUiActive() ? 46 : 0); // leave room for the touch ✕ button
     r.uiText(`${no} · ${fname}`, hx, 20 + oy, { size: 12, align: 'right', color: C.textDim, alpha: k });
-    r.uiText(`${formatTime(w.run.stats.timeSec)}  ·  처치 ${w.run.stats.kills}  ·  시드 ${w.run.seed}`, hx, 37 + oy, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: k });
+    const sr = w.run.speedrun;
+    if (sr) {
+      // speedrun: the run clock (m:ss.cc) stands out in gold
+      const rest = `  ·  처치 ${w.run.stats.kills}  ·  시드 ${w.run.seed}`;
+      const rw = r.measureText(rest, 10, false, 'small');
+      r.uiText(rest, hx, 37 + oy, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: k });
+      r.uiText(`스피드런 ${formatSplit(ticksToMs(sr.ticks))}`, hx - rw, 37 + oy, { size: 10, font: 'small', align: 'right', color: C.gold, alpha: k });
+    } else r.uiText(`${formatTime(w.run.stats.timeSec)}  ·  처치 ${w.run.stats.kills}  ·  시드 ${w.run.seed}`, hx, 37 + oy, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: k });
 
     // power: grows with every artifact / blessing (also shown in the HUD)
     const comp = w.items.computed;

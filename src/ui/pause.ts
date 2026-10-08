@@ -1,5 +1,7 @@
 // Pause menu (Esc): resume / settings / quit (with confirm), plus a run card
 // (keeper, floor, time, kills, seed, collected items) and a controls reference.
+// Speedrun: the card shows the run clock (m:ss.cc) and a strip of the floor
+// splits so far (floors 1..7, the current one highlighted).
 // Online co-op: the world keeps running behind it; 계속 / 설정 / 방 나가기, and
 // for the host 하강 종료 (ends the run for everyone, a lockstep command).
 
@@ -15,7 +17,10 @@ import { sfx } from '../audio/audio';
 import { Actives, Weapons } from '../game/defs';
 import { clamp } from '../engine/math';
 import { animFrame, hasAnim } from '../engine/sprites';
-import { C, formatTime, splitFloorName } from './theme';
+import { C, formatSplit, formatTime, splitFloorName } from './theme';
+import { ticksToMs } from '../game/speedrun';
+import { lastFloorIndex } from '../game/defs';
+import { speedrunStore } from '../engine/speedrun-store';
 import { divider, fitScale, frame, glow, keycap, spriteCentered } from './frame';
 import { appear } from './anim';
 import { CONTROL_ROWS, PAD_NAMES, controlKeys, touchControlRows } from './keys';
@@ -34,9 +39,12 @@ export class PauseOverlay implements Scene {
   private confirmQuit = false;
   private confirmEnd = false;
   private closing = -1;
+  /** speedrun: this device's best clear time of the current floor (ms), read once */
+  private floorBest: number | null = null;
 
   constructor(game: GameScene) {
     this.game = game;
+    if (game.run.speedrun) this.floorBest = speedrunStore.best(game.run.floor)?.splitMs ?? null;
     if (game.online) {
       const host = !!game.net?.isHost;
       const items: ConstructorParameters<typeof Menu>[0] = [
@@ -166,9 +174,10 @@ export class PauseOverlay implements Scene {
     r.uiText(ch.name, rx + 90, ry + 16, { size: 16, bold: true, color: ch.color, alpha: k });
     r.uiText(ch.title, rx + 90, ry + 36, { size: 10, font: 'small', color: C.textFaint, alpha: k });
     const [no, fname] = splitFloorName(w.floor.name);
+    const sr = run.speedrun;
     const facts: [string, string, string][] = [
       ['ui_door', '층', `${no} ${fname}`],
-      ['ui_hourglass', '시간', formatTime(run.stats.timeSec)],
+      sr ? ['ui_hourglass', '기록', formatSplit(ticksToMs(sr.ticks))] : ['ui_hourglass', '시간', formatTime(run.stats.timeSec)],
       ['ui_swords', '처치', `${run.stats.kills}`],
       ['ui_flame', '해방', `${run.stats.releases}회`],
     ];
@@ -189,16 +198,32 @@ export class PauseOverlay implements Scene {
     const act = p.activeId ? Actives.get(p.activeId) : undefined;
     if (act) items.push(act.icon);
     for (const a of w.items.computed?.artifacts ?? []) items.push(a.def.icon);
-    const iy = ry + 100;
-    r.uiText('지닌 것', rx + 14, iy, { size: 10, font: 'small', color: C.gold, alpha: k });
-    const perRow = Math.floor((rw - 28) / 24);
-    items.slice(0, perRow * 3).forEach((icon, i) => {
-      const cx = rx + 26 + (i % perRow) * 24;
-      const cy = iy + 24 + Math.floor(i / perRow) * 24;
-      frame(r, cx - 11, cy - 11, 22, 22, i < (wdef ? 1 : 0) + (w2 ? 1 : 0) + (act ? 1 : 0) ? 'slotHi' : 'slot', { alpha: k });
-      spriteCentered(r, icon, cx, cy, fitScale(icon, 18, 1), { alpha: k });
-    });
-    if (items.length > perRow * 3) r.uiText(`+${items.length - perRow * 3}`, rx + rw - 14, iy, { size: 10, font: 'small', align: 'right', color: C.textDim, alpha: k });
+    const gear = (wdef ? 1 : 0) + (w2 ? 1 : 0) + (act ? 1 : 0);
+    if (sr) {
+      // speedrun: the floor splits so far, then the items in two rows beside their label
+      this.drawSplitStrip(r, rx, ry + 92, rw, k);
+      const iy = ry + 144;
+      r.uiText('지닌 것', rx + 14, iy, { size: 10, font: 'small', color: C.gold, alpha: k });
+      const perRow = Math.floor((rw - 76) / 24);
+      items.slice(0, perRow * 2).forEach((icon, i) => {
+        const cx = rx + 74 + (i % perRow) * 24;
+        const cy = iy + 6 + Math.floor(i / perRow) * 24;
+        frame(r, cx - 11, cy - 11, 22, 22, i < gear ? 'slotHi' : 'slot', { alpha: k });
+        spriteCentered(r, icon, cx, cy, fitScale(icon, 18, 1), { alpha: k });
+      });
+      if (items.length > perRow * 2) r.uiText(`+${items.length - perRow * 2}`, rx + 14, iy + 24, { size: 10, font: 'small', color: C.textDim, alpha: k });
+    } else {
+      const iy = ry + 100;
+      r.uiText('지닌 것', rx + 14, iy, { size: 10, font: 'small', color: C.gold, alpha: k });
+      const perRow = Math.floor((rw - 28) / 24);
+      items.slice(0, perRow * 3).forEach((icon, i) => {
+        const cx = rx + 26 + (i % perRow) * 24;
+        const cy = iy + 24 + Math.floor(i / perRow) * 24;
+        frame(r, cx - 11, cy - 11, 22, 22, i < gear ? 'slotHi' : 'slot', { alpha: k });
+        spriteCentered(r, icon, cx, cy, fitScale(icon, 18, 1), { alpha: k });
+      });
+      if (items.length > perRow * 3) r.uiText(`+${items.length - perRow * 3}`, rx + rw - 14, iy, { size: 10, font: 'small', align: 'right', color: C.textDim, alpha: k });
+    }
 
     // ---- controls
     const cy0 = ry + 204;
@@ -223,5 +248,39 @@ export class PauseOverlay implements Scene {
       const kw = keycap(r, keys, cx, cyy, { align: 'left', alpha: k, pad });
       r.uiText(row.label, cx + kw + 6, cyy - 6, { size: 10, font: 'small', color: C.textDim, alpha: k });
     });
+  }
+
+  /**
+   * Speedrun: one cell per floor (1..last) with the clear time of floors 1..N, gold for a new
+   * personal best; the current floor highlighted, floors ahead dashed out.
+   */
+  private drawSplitStrip(r: Renderer, x: number, y: number, w: number, k: number): void {
+    const run = this.game.run;
+    const sr = run.speedrun;
+    if (!sr) return;
+    const last = lastFloorIndex();
+    const boss = sr.bossStartTick >= 0;
+    const cur = sr.has(run.floor) ? run.floor + 1 : run.floor;
+    const pbs = new Set(this.game.hud.splitNotices.filter((e) => e.n.personalBest).map((e) => e.n.floor));
+    r.uiText('구간 기록', x + 14, y, { size: 10, font: 'small', color: C.gold, alpha: k });
+    if (this.floorBest !== null && !sr.has(run.floor)) {
+      r.uiText(`${run.floor}층 최고 ${formatSplit(this.floorBest)}`, x + w - 14, y, { size: 10, font: 'small', align: 'right', color: C.textFaint, alpha: k });
+    }
+    const gap = 4;
+    const cw = Math.floor((w - 28 - gap * (last - 1)) / last);
+    const x0 = x + 14 + Math.floor((w - 28 - (cw * last + gap * (last - 1))) / 2);
+    const cy = y + 13;
+    const ch = 32;
+    for (let f = 1; f <= last; f++) {
+      const cx = x0 + (f - 1) * (cw + gap);
+      const split = sr.splits.find((s) => s.floor === f);
+      const now = !split && f === cur;
+      frame(r, cx, cy, cw, ch, now ? 'slotHi' : 'slot', { alpha: k * (split || now ? 1 : 0.55) });
+      r.uiText(`${f}층`, cx + cw / 2, cy + 5, { align: 'center', size: 10, font: 'small', color: now ? C.goldHi : split ? C.textDim : C.textMute, alpha: k });
+      if (split && pbs.has(f)) r.uiSprite('ui_crown', cx + cw - 11, cy + 9, 1, { alpha: k });
+      const v = split ? formatSplit(ticksToMs(split.splitTicks)) : now ? (boss ? '보스전' : '진행 중') : '—';
+      const col = split ? (pbs.has(f) ? C.goldHi : C.text) : now ? (boss ? '#ff9aa0' : C.emberHi) : C.textMute;
+      r.uiText(v, cx + cw / 2, cy + 17, { size: 10, font: 'small', align: 'center', color: col, alpha: k });
+    }
   }
 }

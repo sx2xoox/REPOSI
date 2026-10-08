@@ -1,5 +1,5 @@
 // Title screen: animated stairwell backdrop, glowing pixel logo, main menu
-// (새 게임 / 시드 입력 / 도감 / 설정 / 크레딧), custom-seed entry modal, run
+// (새 게임 / 시드 입력 / 도감 / 랭킹 / 설정 / 크레딧), custom-seed entry modal, run
 // record line and version text. Character select lives in charselect.ts.
 
 import type { Scene, TouchButtonSpec } from './scene';
@@ -25,6 +25,10 @@ import { consumeRoomLink } from './lobby';
 import { Characters } from '../game/defs';
 import { appear } from './anim';
 import { SaveSlotsScene } from './save-slots';
+import { RankingScene, type RankingOptions } from './ranking';
+import { speedrunStore } from '../engine/speedrun-store';
+import { speedrunName } from './nickname-prompt';
+import { lastFloorIndex } from '../game/defs';
 
 export { CharacterSelectScene } from './charselect';
 
@@ -66,9 +70,10 @@ export class TitleScene implements Scene {
       { label: '새 게임 / 이어하기', action: () => app.scenes.set(new SaveSlotsScene()), hint: '네 개의 세이브 중 하나를 골라 마을로 향합니다.' },
       { label: '시드 입력', action: () => this.openSeed(), hint: '같은 시드는 같은 던전을 만듭니다. (기록에는 남지 않음)' },
       { label: '도감', action: () => app.scenes.push(new CollectionScene()), hint: '발견한 유물과 마주친 적들의 기록.' },
+      { label: '랭킹', action: () => app.scenes.push(new RankingScene()), hint: '스피드런 순위 · 1층부터 각 층 보스를 쓰러뜨리기까지 걸린 시간.' },
       { label: '설정', action: () => app.scenes.push(new SettingsOverlay({ fromTitle: true })), hint: '소리, 화면, 조작 설정.' },
       { label: '크레딧', action: () => app.scenes.push(new CreditsScene()), hint: '등불지기를 만든 사람들.' },
-    ], UI_W / 2, 226, { width: 196, size: 13, lineH: 25, hintY: 382 });
+    ], UI_W / 2, 216, { width: 196, size: 13, lineH: 25, hintY: 382 });
     const last = save.history[0]?.character;
     const ch = (last && Characters.get(last)) || Characters.all()[0];
     if (ch) backdrop().keeper = ch.spritePrefix;
@@ -160,7 +165,7 @@ export class TitleScene implements Scene {
     const mA = a * appear(this.t, 0.6, 0.5);
     const d = r.dctx;
     d.save();
-    const grd = d.createRadialGradient(UI_W / 2, 296, 10, UI_W / 2, 296, 150);
+    const grd = d.createRadialGradient(UI_W / 2, 290, 10, UI_W / 2, 290, 150);
     grd.addColorStop(0, 'rgba(5,3,10,0.8)');
     grd.addColorStop(1, 'rgba(5,3,10,0)');
     d.globalAlpha = mA;
@@ -215,6 +220,14 @@ interface UiDebug {
   openSettings(): void;
   openCharSelect(): void;
   seedCollection(): void;
+  /** open the speedrun ranking (options as from the game-over screen) */
+  openRanking(o?: RankingOptions): void;
+  /**
+   * Write sample speedrun records to this device's store (screenshots; marked as already
+   * handled online so nothing is ever sent). `name` also sets the ranking nickname.
+   * Returns the sample run ids, the most recent first.
+   */
+  seedRanking(name?: string, runs?: number): string[];
 }
 
 function installUiDebug(title: TitleScene): void {
@@ -225,6 +238,8 @@ function installUiDebug(title: TitleScene): void {
     openCredits: () => app.scenes.push(new CreditsScene()),
     openSettings: () => app.scenes.push(new SettingsOverlay({ fromTitle: true })),
     openCharSelect: () => app.scenes.set(new CharacterSelectScene()),
+    openRanking: (o) => app.scenes.push(new RankingScene(o)),
+    seedRanking: (name, runs = 12) => seedRankingRecords(name, runs),
     seedCollection: () => {
       // mark a sample of content as discovered (debug only)
       void import('../game/defs').then(({ Artifacts, Enemies, Weapons, Actives }) => {
@@ -235,4 +250,39 @@ function installUiDebug(title: TitleScene): void {
     },
   };
   (window as unknown as { __lkui: UiDebug }).__lkui = api;
+}
+
+/** Debug: sample speedrun records on this device (deterministic numbers, today's dates). */
+function seedRankingRecords(name: string | undefined, runs: number): string[] {
+  if (name) {
+    save.settings.nickname = name;
+    save.saveSettings();
+  }
+  const me = speedrunName() || '등불지기';
+  const chars = Characters.all();
+  const last = lastFloorIndex();
+  let s = 0x2f6b1d;
+  const rnd = () => ((s = (Math.imul(s, 1103515245) + 12345) >>> 0) / 4294967296);
+  const ids: string[] = [];
+  const now = Date.now();
+  for (let i = 0; i < runs; i++) {
+    const ch = chars[i % chars.length];
+    const runId = `rdebug${String(i).padStart(3, '0')}${Math.floor(rnd() * 1e6).toString(36)}`;
+    const reach = Math.max(1, Math.min(last, Math.round(1 + rnd() * rnd() * 1.6 * last)));
+    const seed = `${Math.floor(rnd() * 1679616).toString(36).toUpperCase().padStart(4, 'Q')}-${Math.floor(rnd() * 1679616).toString(36).toUpperCase().padStart(4, '7')}`;
+    const date = new Date(now - i * 31 * 3600 * 1000).toISOString();
+    let split = 0;
+    for (let f = 1; f <= reach; f++) {
+      const seg = Math.round(68_000 + f * 14_000 + rnd() * 70_000);
+      const boss = Math.round(Math.min(seg - 8_000, 26_000 + f * 5_000 + rnd() * 24_000));
+      split += seg;
+      speedrunStore.add({
+        runId, floor: f, splitMs: split, bossMs: boss, bossId: '', character: ch.id, weapon: ch.weapon,
+        seed, name: i === 5 || i === 9 ? '옛닉네임' : me, date, build: 'dev', season: 1,
+        sent: i % 4 === 3 ? 2 : 1, rank: i % 4 === 3 ? undefined : 1 + Math.floor(rnd() * 40),
+      });
+    }
+    ids.push(runId);
+  }
+  return ids;
 }

@@ -147,7 +147,8 @@ export class NicknamePrompt implements Scene {
     if (shown) r.uiText(shown, UI_W_BASE / 2 + sx, y + 53, { size: 16, align: 'center', color: C.text, alpha: a });
     else r.uiText(touchUi ? '눌러서 입력' : '닉네임을 입력하세요', UI_W_BASE / 2 + sx, y + 55, { size: 12, align: 'center', color: C.textMute, alpha: a });
     if (shown && Math.floor(this.t * 2.2) % 2 === 0) r.uiRect(UI_W_BASE / 2 + sx + r.measureText(shown, 16) / 2 + 2, y + 52, 2, 18, C.goldHi, a);
-    r.uiText(this.o.note ?? '최대 10자 · 스피드런 랭킹에 모두에게 보이는 이름이에요', UI_W_BASE / 2, y + 88, { size: 10, font: 'small', align: 'center', color: C.textFaint, alpha: a });
+    const note = (this.o.note ?? '최대 10자 · 스피드런 랭킹에 모두에게 보이는 이름이에요').split('\n');
+    note.forEach((line, i) => r.uiText(line, UI_W_BASE / 2, y + 86 + i * 12 - (note.length - 1) * 4, { size: 10, font: 'small', align: 'center', color: C.textFaint, alpha: a }));
     for (const bt of this.buttons()) {
       const by = bt.y + (1 - k) * 14;
       frame(r, bt.x, by, bt.w, bt.h, bt.ok ? 'buttonHi' : 'button', { alpha: a });

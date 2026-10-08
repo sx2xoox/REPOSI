@@ -14,7 +14,7 @@ import { speedrunStore, type SpeedrunEntry } from '../engine/speedrun-store';
 import { FLOORS, validate, type Submission } from '../../server/leaderboard/src/logic';
 
 /** The deployed Worker (empty until the server is set up: rankings then show this device only). */
-export const LEADERBOARD_URL = '';
+export const LEADERBOARD_URL = 'https://lanternkeeper-ranking.lanternkeeper.workers.dev';
 /** Bump when balance changes make old times incomparable (the server keeps seasons apart). */
 export const SEASON = 1;
 export const LEADERBOARD_FLOORS = FLOORS;

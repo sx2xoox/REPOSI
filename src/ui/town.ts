@@ -71,7 +71,7 @@ export class TownScene implements Scene {
     this.menu = null;
     const go = () => app.startRun(randomSeedString(), this.c.character, false, { speedrun: true });
     if (speedrunName()) go();
-    else app.scenes.push(new NicknamePrompt((name) => { if (name) go(); }, { note: '최대 10자 · 랭킹에 모두에게 보이는 이름이에요 (나중에 랭킹 화면에서 바꿀 수 있어요)' }));
+    else app.scenes.push(new NicknamePrompt((name) => { if (name) go(); }, { note: '최대 10자 · 랭킹에 모두에게 보이는 이름이에요\n나중에 랭킹 화면에서 바꿀 수 있어요' }));
   }
   private resident(i: number): void {
     this.path=[];this.destination=null;this.moving=false;

@@ -11,6 +11,9 @@
 //              (rarity rim + gem), active item + charge wick, potion
 //   bottom     boss bar with name and damage trail (center)
 // plus banners, floor / boss cards, room-clear feedback and first-run hints.
+// Speedrun mode adds a timer plate in the left column under the life gauge and
+// the buff row (run clock, the running floor segment or boss fight, the live
+// delta to this device's best) and a split card under it for every floor boss.
 // The UI space widens with the screen (UI_W = 2 * VIEW_W); corner elements are
 // anchored to the edges of the device safe area (`Renderer.uiSafe`). With the
 // touch controls shown, the weapon / active / potion live on their buttons, so
@@ -28,14 +31,17 @@ import { storyObjective } from '../game/story';
 import { potionSpriteFor } from '../game/pickups';
 import { EMBER_MAX } from '../game/player';
 import { input } from '../engine/input';
-import { ChangeTracker, envelope, heartbeat, popScale } from './anim';
+import { ChangeTracker, envelope, follow, heartbeat, popScale } from './anim';
 import { MinimapView } from './minimap';
-import { drawBanners, drawBossIntro, drawFloorCard, drawRoomClear } from './cards';
+import { clockText, clockWidth, deltaColor, drawBanners, drawBossIntro, drawFloorCard, drawRoomClear, drawSplitCard, formatDelta } from './cards';
 import { HintSystem } from './hints';
 import { fitScale, frame, gauge, glow, keycap, spriteCentered } from './frame';
 import { blitArt, drawLantern, lanternSpec, plateCanvas, rarityAccent } from './hud-gear';
 import { FireGaugeFx, drawFireGauge, fireGaugeLayout } from './hud-fire';
-import { C, PX, splitFloorName } from './theme';
+import { C, PX, formatSplit, splitFloorName } from './theme';
+import { ticksToMs, type SpeedrunRun } from '../game/speedrun';
+import { lastFloorIndex } from '../game/defs';
+import { speedrunStore } from '../engine/speedrun-store';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
 import { ItemTooltip } from './item-tooltip';
@@ -63,6 +69,30 @@ const GAUGE_Y = 8;
 /** the release lantern stands in the bottom-left corner (desktop; touch has its own release button) */
 const LANTERN_X = 8;
 const LANTERN_BOTTOM = 10;
+
+// ---- speedrun panel (left column, UI units inside the safe area)
+/** timer plate: fixed y under the life gauge (8..32) and the buff row (40..69), so it never jumps */
+const SR_X = GAUGE_X;
+const SR_Y = 76;
+const SR_W = 164;
+const SR_H = 46;
+/** a split card shows at least this long (s); longer while the online answer is still coming */
+const SPLIT_LIFE = 4.2;
+const SPLIT_MAX = 9;
+
+/** A floor split as the HUD keeps it: the notice (online fields fill in later) and its card's clock. */
+export interface SplitEntry {
+  n: SplitNotice;
+  /** HUD time since the split (s) */
+  t: number;
+  /** best clear time of the floor before this split (ms), for the delta */
+  cmp?: number;
+  /** card age when the online answer arrived (-1: still pending) */
+  settled: number;
+  /** card height shown / its layout height (UI; eased when an online line arrives) */
+  h: number;
+  hTarget: number;
+}
 
 /** Purse (coins / bombs / keys) row under the minimap block: its height (UI). */
 const PURSE_H = 20;
@@ -93,12 +123,50 @@ function counterBusy(tr: ChangeTracker): boolean {
 }
 
 export class Hud {
-  /** speedrun: split popups (HUD-local, aged with the HUD's own dt) */
-  readonly splitNotices: { n: SplitNotice; t: number }[] = [];
+  /**
+   * Speedrun: every split of this run, in order (HUD-local, aged with the HUD's own dt, so a
+   * card waits while a menu is open); the newest shows as a card for a few seconds. The game
+   * over screen reads them for its per-floor table.
+   */
+  readonly splitNotices: SplitEntry[] = [];
+  /** speedrun: this device's best clear time per floor (ms, null = none), read once per floor */
+  private srBest = new Map<number, number | null>();
+  private readonly lySr = new UiLayer();
+  /** speedrun plate inputs of this frame (for the cached paint) */
+  private srLabel = '';
+  private srTarget = 0;
+  private srBoss = false;
+  /** speedrun panel opacity: it fades while a keeper, an enemy or an enemy shot is under it */
+  private srFade = 1;
+  private srFadeT = 0;
 
   /** Speedrun: a floor boss fell (GameScene.onBossSplit). */
   speedrunSplit(n: SplitNotice): void {
-    this.splitNotices.push({ n, t: 0 });
+    // the comparison: the best before this split (a practice run is not in the store)
+    const cmp = n.ranked ? n.previousBestMs : this.bestMs(n.floor) ?? undefined;
+    this.splitNotices.push({ n, t: 0, cmp, settled: n.online === 'pending' ? -1 : 0, h: 0, hTarget: 0 });
+    this.srBest.clear();
+  }
+
+  /** This device's best clear time of floors 1..`floor` (ms), or null. */
+  private bestMs(floor: number): number | null {
+    let v = this.srBest.get(floor);
+    if (v === undefined) {
+      v = speedrunStore.best(floor)?.splitMs ?? null;
+      this.srBest.set(floor, v);
+    }
+    return v;
+  }
+
+  /** How long a split card stays (s): its answer from the online board gets a moment of its own. */
+  private splitLife(e: SplitEntry): number {
+    return Math.min(SPLIT_MAX, Math.max(SPLIT_LIFE, e.settled < 0 ? Infinity : e.settled + 1.8));
+  }
+
+  /** The split card on screen now (the newest one, while it lasts). */
+  private activeSplit(): SplitEntry | null {
+    const e = this.splitNotices[this.splitNotices.length - 1];
+    return e && e.t < this.splitLife(e) ? e : null;
   }
 
   t = 0;
@@ -173,6 +241,11 @@ export class Hud {
 
   update(w: World, dt: number): void {
     this.t += dt;
+    for (const e of this.splitNotices) {
+      e.t += dt;
+      if (e.settled < 0 && e.n.online !== 'pending') e.settled = e.t;
+      e.h = e.h > 0 ? (e.h < e.hTarget ? Math.min(e.hTarget, e.h + dt * 160) : e.hTarget) : e.hTarget;
+    }
     const p = w.player;
     if (!p) return;
     // ---- life gauge
@@ -315,11 +388,18 @@ export class Hud {
     this.cw = null;
     if (w.coop) this.coop.draw(r, w, A, sa.l, sa.t, this.W, this.H, MINIMAP_MARGIN + MINIMAP_H + 34 + PURSE_H + 4);
     this.artifacts.draw(r, w, A, sa.l, sa.t, 196, this.W - MINIMAP_W - MINIMAP_MARGIN - 10);
+    // speedrun timer + split card (left column): under the item tooltip, but above the floor
+    // card's band and the boss intro, which must not dim it
+    const sr = w.run.speedrun;
+    const split = sr ? this.activeSplit() : null;
+    const srLate = !!(w.floorCard || w.bossIntro);
+    if (sr && !srLate) this.drawSpeedrunLayer(r, w, sr, split);
     this.tooltip.draw(r, w, A);
     drawBanners(r, w);
-    if (this.clearT >= 0) drawRoomClear(r, this.clearT, w.banners.length === 0 && !w.floorCard);
+    if (this.clearT >= 0) drawRoomClear(r, this.clearT, w.banners.length === 0 && !w.floorCard && !split);
     if (w.floorCard) drawFloorCard(r, w.floorCard);
     if (w.bossIntro) drawBossIntro(r, w, w.bossIntro);
+    if (sr && srLate) this.drawSpeedrunLayer(r, w, sr, split);
     if (!w.bossIntro && !this.tooltip.hasCompactHint(w)) this.hints.draw(r, w, (this.bossShown > 0.05 ? UI_H - 56 : UI_H - 18) - sa.b);
     if (save.settings.showFps) r.uiText(`${Math.round(fps)} FPS`, UI_W / 2, 4, { size: 10, font: 'small', align: 'center', color: '#80ff80' });
   }
@@ -577,6 +657,132 @@ export class Hud {
       keycap(r, actionLabel(input.bindings, 'consumable', pad), x - 2, y + POT_S - 2, { align: 'left', alpha: A * 0.95, pad });
     }
   }
+
+  // ================================================================ speedrun
+  /** The speedrun panel inside the safe-area translate (binds the renderer for the cached paint). */
+  private drawSpeedrunLayer(r: Renderer, w: World, sr: SpeedrunRun, split: SplitEntry | null): void {
+    const sa = r.uiSafe;
+    const d = r.dctx;
+    d.save();
+    d.translate(sa.l, sa.t);
+    this.cr = r;
+    this.cw = w;
+    this.drawSpeedrun(r, w, sr, split, sa.l, sa.t);
+    this.cr = null;
+    this.cw = null;
+    d.restore();
+  }
+
+  /** Timer plate (static parts cached, digits live) and the current split card under it. */
+  private drawSpeedrun(r: Renderer, w: World, sr: SpeedrunRun, split: SplitEntry | null, ox: number, oy: number): void {
+    const last = lastFloorIndex();
+    const done = sr.splits.find((s) => s.floor === last);
+    const floor = w.run.floor;
+    const boss = sr.bossStartTick >= 0 && !done;
+    // the floor whose split the clock is running toward (the next one once this floor's boss fell)
+    const target = done ? 0 : boss ? floor : sr.has(floor) ? Math.min(last, floor + 1) : floor;
+    const nowMs = ticksToMs(done ? done.splitTicks : sr.ticks);
+    const prev = sr.splits[sr.splits.length - 1];
+    const segTicks = boss ? sr.ticks - sr.bossStartTick : sr.ticks - (prev?.splitTicks ?? 0);
+    const label = done ? '완주 기록' : boss ? `${floor}층 보스` : `${target}층`;
+    const taint = !!sr.taint;
+    const x = SR_X;
+    const y = SR_Y;
+    // the plate, its labels and the floor pips change rarely: cached
+    this.srLabel = label;
+    this.srTarget = target;
+    this.srBoss = boss;
+    const key = `${label}|${taint ? 1 : 0}|${sr.splits.length}|${target}|${boss ? 1 : 0}`;
+    const cardH = split ? split.h + (taint ? 18 : 6) : taint ? 14 : 0;
+    const A = this.speedrunFade(r, w, ox + x, oy + y, SR_W, SR_H + cardH);
+    this.lySr.draw(r, key, ox, oy, x - 2, y - 2, SR_W + 4, SR_H + (taint ? 18 : 4), A, this.paintSpeedrun);
+    // ---- live: the run clock (fixed-advance digits; the hundredths smaller)
+    const sk = split ? clamp(1 - split.t / 0.9, 0, 1) : 0;
+    const clockCol = done ? C.goldHi : sk > 0 ? mixColor(C.text, C.goldHi, sk) : C.text;
+    const main = formatSplit(nowMs);
+    const dot = main.lastIndexOf('.');
+    const hw = clockText(r, main.slice(0, dot), x + 10, y + 7, { size: 16, bold: true, color: clockCol, outline: C.ink, alpha: A });
+    clockText(r, main.slice(dot), x + 10 + hw, y + 11, { size: 12, bold: true, color: done ? C.gold : C.textDim, outline: C.ink, alpha: A });
+    // a split sweeps the plate gold
+    if (sk > 0) r.uiRect(x + 4, y + 4, SR_W - 8, SR_H - 8, '#ffe8a0', 0.16 * sk * A);
+    // ---- line 2: this floor's segment (or the boss fight) and the delta
+    const lw = r.measureText(label, 10, false, 'small');
+    const segEnd = x + 10 + lw + (done ? 0 : 5 + clockText(r, formatSplit(ticksToMs(segTicks)), x + 10 + lw + 5, y + 30, { size: 10, font: 'small', color: boss ? '#ffc8cc' : C.text, alpha: A }));
+    const delta = this.speedrunDelta(nowMs, target);
+    if (delta !== null) {
+      const ds = formatDelta(delta);
+      // (an hour-long gap would not fit beside an hour-long segment: then the segment wins)
+      if (x + SR_W - 14 - clockWidth(r, ds, { size: 10, font: 'small' }) > segEnd + 6) clockText(r, ds, x + SR_W - 14, y + 30, { size: 10, font: 'small', align: 'right', color: deltaColor(delta), alpha: A });
+    }
+    // ---- the split card under the plate
+    if (split) {
+      const life = this.splitLife(split);
+      const inK = ease.outCubic(clamp(split.t / 0.35, 0, 1));
+      const outK = clamp((life - split.t) / 0.35, 0, 1);
+      const a = Math.min(inK, outK) * A;
+      if (a > 0.01) {
+        const slide = (1 - inK) * -24 + (1 - outK) * -12;
+        split.hTarget = drawSplitCard(r, split, x + slide, y + SR_H + (taint ? 18 : 6), SR_W, split.t, a, split.h);
+      }
+    }
+  }
+
+  /**
+   * Opacity of the speedrun panel (UI rect, safe-area included): it sits over the room's
+   * top-left corner, so it fades while a keeper, an enemy or an enemy shot is under it.
+   * Reads the world only.
+   */
+  private speedrunFade(r: Renderer, w: World, ux: number, uy: number, uw: number, uh: number): number {
+    const toWorld = (u: number, v: number) => r.displayToWorld(r.uiOffsetX + u * r.uiScale, r.uiOffsetY + v * r.uiScale);
+    const a = toWorld(ux, uy);
+    const b = toWorld(ux + uw, uy + uh);
+    const under = (x: number, y: number, pad: number) => x > a.x - pad && x < b.x + pad && y > a.y - pad && y < b.y + pad;
+    let cover = false;
+    for (const p of w.players) if (p.alive && under(p.x, p.y, 10)) cover = true;
+    if (!cover) for (const e of w.enemies) if (!e.dead && under(e.x, e.y, 8)) { cover = true; break; }
+    if (!cover) for (const q of w.projectiles) if (!q.dead && q.team === 'enemy' && under(q.x, q.y, 4)) { cover = true; break; }
+    const dt = clamp(this.t - this.srFadeT, 0, 0.1);
+    this.srFadeT = this.t;
+    this.srFade = follow(this.srFade, cover ? 0.28 : 1, 12, dt);
+    return this.srFade;
+  }
+
+  /**
+   * The pace shown on the timer (LiveSplit style): once the clock has passed this device's best
+   * clear time of the target floor, the live loss (red, growing); before that, how the last
+   * split compared with the best of its floor; null when there is nothing to compare.
+   */
+  private speedrunDelta(nowMs: number, target: number): number | null {
+    const best = target ? this.bestMs(target) : null;
+    if (best !== null && nowMs > best) return nowMs - best;
+    const e = this.splitNotices[this.splitNotices.length - 1];
+    return e && e.cmp !== undefined ? e.n.splitMs - e.cmp : null;
+  }
+
+  /** Static part of the timer plate (cached by lySr): plate, labels, floor pips, practice note. */
+  private readonly paintSpeedrun = () => {
+    const r = this.cr;
+    const sr = this.cw?.run.speedrun;
+    if (!r || !sr) return;
+    const x = SR_X;
+    const y = SR_Y;
+    blitArt(r, plateCanvas(SR_W / PX, SR_H / PX, 13), x, y);
+    // "스피드런" over the floor pips (right): one pip per floor, gold once its boss fell
+    r.uiText('스피드런', x + SR_W - 15, y + 6, { size: 10, font: 'small', align: 'right', color: C.gold });
+    const last = lastFloorIndex();
+    const pw = 6;
+    const px0 = x + SR_W - 15 - last * pw + 2;
+    for (let f = 1; f <= last; f++) {
+      const px = px0 + (f - 1) * pw;
+      const done = sr.has(f);
+      const cur = !done && f === this.srTarget;
+      r.uiRect(px - 1, y + 18, 6, 6, C.ink);
+      r.uiRect(px, y + 19, 4, 4, done ? C.gold : cur ? (this.srBoss ? '#ff6a70' : C.ember) : '#2e2340');
+      if (done || cur) r.uiRect(px, y + 19, 2, 1, done ? C.goldHi : '#ffe0b0');
+    }
+    r.uiText(this.srLabel, x + 10, y + 30, { size: 10, font: 'small', color: this.srBoss ? '#ff9aa0' : this.srLabel === '완주 기록' ? C.goldHi : C.textFaint });
+    if (sr.taint) r.uiText('연습 · 랭킹 미반영', x + 4, y + SR_H + 2, { size: 10, font: 'small', color: C.textFaint, outline: C.ink });
+  };
 
   private drawBoss(r: Renderer, A: number): void {
     if (this.bossShown <= 0.01 || A <= 0.01) return;
