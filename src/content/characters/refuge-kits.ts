@@ -1,5 +1,5 @@
 import { defineDrawnSprite } from '../../engine/sprites';
-import type { PassiveDef, DashDef } from '../../game/defs';
+import type { AffinityDef, PassiveDef, DashDef } from '../../game/defs';
 import { Enemy } from '../../game/enemy';
 import type { World } from '../../game/world';
 import type { Player } from '../../game/player';
@@ -10,7 +10,7 @@ import { releaseOpen } from './kit-common';
 import { aimPoint, directContribution, REFUGE_COLORS, supportFamily, refugeVisualOpacity, refugeHit, visible } from './refuge-common';
 import { segDist } from '../weapons/common';
 import { strikeImpact } from './refuge-impact-fx';
-import { RefugeCharge, RefugeWeave, RefugeSupport, RefugeGuard, RefugeSeal, RefugeFootwork } from './refuge-devices';
+import { RefugeCharge, RefugeWeave, RefugeSupport, RefugeGuard, RefugeSeal, RefugeFootwork, VES_ECHO_AFFINITY, VES_ECHO_DELAY, TOVE_MINES, TOVE_MINES_AFFINITY } from './refuge-devices';
 export { REFUGE_COLORS } from './refuge-common';
 export { RefugeCharge, RefugeWeave, RefugeSupport, RefugeGuard, RefugeSeal } from './refuge-devices';
 
@@ -59,10 +59,11 @@ function guard(w: World, p: Player): RefugeGuard {
   const next = w.spawn(new RefugeGuard(w, p)); p.vars.rfOrtGuard = next.id;
   return next;
 }
-function placeSeal(w: World, p: Player, x: number, y: number): void {
+/** `anchor`: the enemy the seal opens on (pinned while Mira holds a favoured weapon). */
+function placeSeal(w: World, p: Player, x: number, y: number, anchor = 0): void {
   const effect = w.entityById(p.vars.rfMiraSeal);
-  if (effect instanceof RefugeSeal && effect.owner === p && effect.valid(w)) effect.place(w, x, y);
-  else { const next = w.spawn(new RefugeSeal(w, p, x, y)); p.vars.rfMiraSeal = next.id; }
+  if (effect instanceof RefugeSeal && effect.owner === p && effect.valid(w)) effect.place(w, x, y, anchor);
+  else { const next = w.spawn(new RefugeSeal(w, p, x, y, anchor)); p.vars.rfMiraSeal = next.id; }
   proc(w, 'passive:mira', true);
 }
 function flushWeave(w: World): void {
@@ -137,7 +138,10 @@ export const REFUGE_PASSIVES: PassiveDef[] = [
         p.vars.rfVesPool = 0;
         p.vars.rfVesLast = w.time;
         p.vars.rfVesNext = w.time + 1.2;
-        w.spawn(new RefugeSupport(w, p, supportFamily(p.weapon2Id), target, damage));
+        const family = supportFamily(p.weapon2Id);
+        w.spawn(new RefugeSupport(w, p, family, target, damage));
+        // favoured weapon: the other hand follows up with the same technique
+        if (p.flags.has('affinity')) w.spawn(new RefugeSupport(w, p, family, target, damage * VES_ECHO_AFFINITY, VES_ECHO_DELAY));
         proc(w, 'passive:ves', true);
         return true;
       });
@@ -161,7 +165,7 @@ export const REFUGE_PASSIVES: PassiveDef[] = [
       // inside the release dome, Mira's own hits are written down for its closing
       const stasis = w.entityById(w.player.vars.rfMiraStasis);
       if (stasis instanceof RefugeRelease && stasis.owner === w.player) stasis.record(w, target, contribution);
-      runProc(w, 'keeper:mira:place', () => { placeSeal(w, w.player, target.x, target.y); return true; }, 1.6);
+      runProc(w, 'keeper:mira:place', () => { placeSeal(w, w.player, target.x, target.y, target.id); return true; }, 1.6);
     },
     onRoomEnter(w) { w.vars.rfMiraSeal = 0; w.vars.rfMiraStasis = 0; },
   },
@@ -175,7 +179,8 @@ export const REFUGE_DASHES: DashDef[] = [
     start(w, p) {
       runProc(w, 'keeper:tove:mine', () => {
         const mines = w.entities.filter(e => e instanceof RefugeCharge && e.owner === p && !e.dead && e.mem.mine && !e.mem.fired);
-        if (mines.length >= 2) mines[0].dead = true;
+        const cap = p.flags.has('affinity') ? TOVE_MINES_AFFINITY : TOVE_MINES;
+        while (mines.length >= cap) mines.shift()!.dead = true;
         w.spawn(new RefugeCharge(w, p, p.x, p.y, p.stats.damage * 1.1, 0, true));
         return true;
       });
@@ -238,3 +243,38 @@ export const REFUGE_RELEASES = ids.map((id, mode) => (w: World, p: Player): void
     return true;
   });
 });
+
+/**
+ * Favoured weapon classes (CharacterDef.affinity). The bonus upgrades each keeper's own
+ * device, never the weapon's damage (measured: about +20-25 % over the same keeper and
+ * weapon without the affinity; tests/affinity-c.test.ts).
+ */
+export const REFUGE_AFFINITIES: AffinityDef[] = [
+  {
+    name: '총·폭약',
+    desc: '터진 폭약이 휘말린 적에게 옮겨 붙어 한 번 더 터진다. 지뢰 3개.',
+    tags: ['gun', 'explosive'],
+    ids: ['thunder_mortar', 'comet_tube', 'firework_barrel'],
+  },
+  {
+    name: '마법봉·사슬',
+    desc: '실이 5명까지 이어지고, 전달할 때마다 맞은 적에게 겹매듭이 조여진다.',
+    ids: ['amber_wand', 'tide_staff', 'cinder_sceptre', 'stormhorn_rod', 'frost_wand', 'bubble_wand', 'ink_brush', 'thorn_whip', 'chain_sickle'],
+  },
+  {
+    name: '한 손 칼',
+    desc: '지원 기술마다 반대 손이 같은 기술로 한 번 더 이어 친다.',
+    ids: ['copper_sabre', 'rose_rapier', 'moon_katana', 'fang_blade', 'twin_daggers', 'throwing_knives', 'dusk_knives', 'return_blade'],
+  },
+  {
+    name: '방패·창',
+    desc: '넓은 방벽·내구 3·회복 1.8초. 막은 적탄은 앞의 적에게 2.5배로 되쏜다.',
+    tags: ['spear'],
+    ids: ['mirror_buckler', 'aegis_cannon', 'iron_spear', 'fang_spear', 'crescent_bow'],
+  },
+  {
+    name: '봉인 도구',
+    desc: '결계를 펼친 적을 묶어 그 적만 0.2초마다 맥동한다(평소 0.5초).',
+    ids: ['brass_revolver', 'twin_lamp', 'stasis_arbalest', 'gravity_orb', 'ink_brush', 'firefly_tome', 'constellation_staff'],
+  },
+];

@@ -22,8 +22,8 @@ function idle(w: World, frames: number): void {
   };
   for (let i = 0; i < frames; i++) w.update(FIXED_DT);
 }
-function sim(id = 'tove'): { w: World; target: Enemy } {
-  const result = measureDps({ character: id, weapon: Characters.must(id).weapon, seconds: 0, dist: 55 });
+function sim(id = 'tove', weapon = Characters.must(id).weapon): { w: World; target: Enemy } {
+  const result = measureDps({ character: id, weapon, seconds: 0, dist: 55 });
   const w = result.world;
   for (let y = 2; y < w.room.h - 2; y++) for (let x = 2; x < w.room.w - 2; x++) w.room.setTile(x, y, Tile.FLOOR);
   w.player.x = 80; w.player.y = 96; w.player.aim = 0;
@@ -67,7 +67,8 @@ describe('refuge keeper rework: usable without stopping or weapon swapping', () 
   });
 
   it('tove mines arm after 0.2 s, cap at two and do not explode through walls', () => {
-    const { w, target } = sim();
+    // outside the favoured class (three mines and relayed charges with it: tests/affinity-c)
+    const { w, target } = sim('tove', 'lantern_bolt');
     for (let i = 0; i < 3; i++) { w.withIds(() => REFUGE_DASHES[0].start!(w, w.player)); idle(w, 14); }
     const mines = w.entities.filter(e => e instanceof RefugeCharge && e.mem.mine && !e.dead) as RefugeCharge[];
     expect(mines).toHaveLength(2);
@@ -93,7 +94,8 @@ describe('refuge keeper rework: usable without stopping or weapon swapping', () 
   });
 
   it('luen’s next ordinary hit after a dash moves the weave and gains one knot, without repeated-dash stacking', () => {
-    const { w, target } = sim('luen');
+    // outside the favoured class (the double knot adds to this: tests/affinity-c)
+    const { w, target } = sim('luen', 'lantern_bolt');
     REFUGE_DASHES[1].start!(w, w.player);
     REFUGE_DASHES[1].start!(w, w.player);
     const hp = target.hp, damage = w.player.stats.damage;

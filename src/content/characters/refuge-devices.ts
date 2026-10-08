@@ -10,12 +10,47 @@ import { RefugeOwned, nearby, visible, refugeHit, onLane, refugeVisualOpacity, t
 import { drawBlast, drawCharge, drawThreadKnot, drawShield, drawSeal, drawSupport } from './refuge-burst-fx';
 import { blastImpact, pageImpact, shieldImpact, strikeImpact, threadPulse } from './refuge-impact-fx';
 
+// Favoured weapon (CharacterDef.affinity, p.flags 'affinity'): each keeper's own device
+// gets stronger instead of the weapon hitting harder (see REFUGE_AFFINITIES).
+/** 토브: a blast hands a fresh charge to an enemy it caught (that one never relays), and more mines */
+export const TOVE_RELAY_SHARE = 1.2;
+export const TOVE_RELAY_FUSE = .45;
+/** the handed-on charge is a tighter blast (charges 30 px, mines 35 px) */
+export const TOVE_RELAY_RADIUS = 22;
+export const TOVE_MINES = 2;
+export const TOVE_MINES_AFFINITY = 3;
+/** 루엔: linked enemies, and the double knot tied on the struck enemy at every transfer (share of the pool) */
+export const LUEN_LINKS = 3;
+export const LUEN_LINKS_AFFINITY = 5;
+export const LUEN_KNOT_AFFINITY = 1.1;
+/** 베스: with a favoured weapon each support technique is followed by the other hand's (delay s, share of its damage) */
+export const VES_ECHO_DELAY = .22;
+export const VES_ECHO_AFFINITY = 1.08;
+/** 오르트: shield durability, refill time (s), and the blocked shot sent back (x keeper damage) */
+export const ORT_CHARGES = 2;
+export const ORT_CHARGES_AFFINITY = 3;
+export const ORT_REFILL = 2.4;
+export const ORT_REFILL_AFFINITY = 1.8;
+export const ORT_REFLECT_AFFINITY = 2.5;
+/** half-width of the shield face (px): a favoured weapon raises a broader shield */
+export const ORT_WIDTH = 17;
+export const ORT_WIDTH_AFFINITY = 23;
+/** 미라: seal pulse interval (s); with a favoured weapon the enemy the seal was opened on is pinned and pulsed every MIRA_PIN s */
+export const MIRA_PULSE = .5;
+export const MIRA_PIN_AFFINITY = .2;
+/** a pin pulse's damage, x the ordinary pulse (0.2x keeper damage) */
+export const MIRA_PIN_SHARE = 1.05;
+
+const favoured = (p: Player): boolean => p.flags.has('affinity');
+
 export class RefugeCharge extends RefugeOwned {
-  constructor(w: World, p: Player, x: number, y: number, damage: number, targetId = 0, mine = false) {
+  /** `relay`: a charge handed on by another blast (favoured weapon); it does not hand on again */
+  constructor(w: World, p: Player, x: number, y: number, damage: number, targetId = 0, mine = false, relay = false) {
     super(w, p);
     this.x = x; this.y = y;
-    Object.assign(this.mem, { damage, targetId, mine: Number(mine), fired: 0, firedAt: 0, life: mine ? 3.2 : .68, primed: 0 });
+    Object.assign(this.mem, { damage, targetId, mine: Number(mine), fired: 0, firedAt: 0, life: mine ? 3.2 : relay ? TOVE_RELAY_FUSE : .68, primed: 0, relay: Number(relay) });
   }
+  get radius(): number { return this.mem.mine ? 35 : this.mem.relay ? TOVE_RELAY_RADIUS : 30; }
   /** Tove's release: go off `delay` s from now at double power (once). */
   prime(delay: number): boolean {
     const m = this.mem;
@@ -37,16 +72,27 @@ export class RefugeCharge extends RefugeOwned {
     if (!m.mine && this.age < (m.primed > 0 ? Math.min(m.life, m.primed) : m.life)) return;
     runProc(w, m.mine ? 'keeper:tove:mine:burst' : 'keeper:tove:charge:burst', () => {
       m.fired = 1; m.firedAt = this.age;
-      for (const enemy of nearby(w, this.x, this.y, m.mine ? 35 : 30)) refugeHit(w, this.owner, enemy, m.damage, this, false, 45);
+      const caught = nearby(w, this.x, this.y, this.radius);
+      for (const enemy of caught) refugeHit(w, this.owner, enemy, m.damage, this, false, 45);
       w.sfx('explosion', { vol: .3, pitch: m.mine ? 1 : 1.3, x: this.x });
-      blastImpact(w, this.owner, this.x, this.y, m.mine ? 35 : 30, false);
+      blastImpact(w, this.owner, this.x, this.y, this.radius, false);
+      if (!m.relay && favoured(this.owner)) this.relay(w, caught);
       proc(w, 'passive:tove', true);
       return true;
     });
   }
+  /** Favoured weapon: the blast hands a fresh charge to an enemy it caught (a neighbour first, else the same one). */
+  private relay(w: World, caught: Enemy[]): void {
+    const alive = caught.filter(e => e.alive && !e.hidden && e.vulnerable);
+    const next = alive.find(e => e.id !== this.mem.targetId) ?? alive[0];
+    if (!next) return;
+    // the release's double power stays with the charge it primed
+    const damage = this.mem.primed > 0 ? this.mem.damage / 2 : this.mem.damage;
+    w.spawn(new RefugeCharge(w, this.owner, next.x, next.y, damage * TOVE_RELAY_SHARE, next.id, false, true));
+  }
   protected paint(r: Renderer): void {
     const m = this.mem;
-    if (m.fired) { drawBlast(r, this.x, this.y, this.age - m.firedAt, m.mine ? 35 : 30); return; }
+    if (m.fired) { drawBlast(r, this.x, this.y, this.age - m.firedAt, this.radius); return; }
     const pulse = .65 + .35 * Math.sin(this.age * (m.mine ? 7 : 24));
     const remaining = Math.max(0, 1 - this.age / m.life);
     if (m.mine) {
@@ -75,15 +121,16 @@ export class RefugeCharge extends RefugeOwned {
   }
 }
 
-/** Three linked targets; damage is a shared budget, never multiplied by edge count. */
+/** Three linked targets (five with a favoured weapon); damage is a shared budget, never multiplied by edge count. */
 export class RefugeWeave extends RefugeOwned {
   constructor(w: World, p: Player) {
     super(w, p);
-    Object.assign(this.mem, { target0: 0, target1: 0, target2: 0, pool: 0, last: -99, source: 0, flash: -99 });
+    Object.assign(this.mem, { target0: 0, target1: 0, target2: 0, target3: 0, target4: 0, pool: 0, last: -99, source: 0, flash: -99, knot: -99 });
   }
+  links(): number { return favoured(this.owner) ? LUEN_LINKS_AFFINITY : LUEN_LINKS; }
   targets(w: World): Enemy[] {
     const out: Enemy[] = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0, n = this.links(); i < n; i++) {
       const e = w.enemies.find(t => t.id === this.mem['target' + i] && t.alive && !t.hidden && t.vulnerable);
       if (e && Math.hypot(e.x - this.owner.x, e.y - this.owner.y) < 260 && visible(w, this.owner.x, this.owner.y, e.x, e.y, e.r) &&
         (!out.length || visible(w, out[0].x, out[0].y, e.x, e.y, e.r))) out.push(e);
@@ -95,8 +142,8 @@ export class RefugeWeave extends RefugeOwned {
     const retie = !!p.vars.rfLuenRetie;
     const members = this.targets(w);
     if (p.vars.rfLuenRetie || w.time - m.last > 1.4 || !members.some(e => e.id === target.id)) {
-      const next = nearby(w, target.x, target.y, 95).slice(0, 3);
-      for (let i = 0; i < 3; i++) m['target' + i] = next[i]?.id ?? 0;
+      const next = nearby(w, target.x, target.y, 95).slice(0, this.links());
+      for (let i = 0; i < LUEN_LINKS_AFFINITY; i++) m['target' + i] = next[i]?.id ?? 0;
       p.vars.rfLuenRetie = 0;
     }
     m.source = target.id;
@@ -114,10 +161,17 @@ export class RefugeWeave extends RefugeOwned {
     runProc(w, 'keeper:luen:weave', () => {
       const others = members.filter(e => e.id !== m.source);
       const receivers = others.length ? others : members.slice(0, 1);
-      const damage = m.pool / receivers.length;
+      const pool = m.pool, damage = pool / receivers.length;
       m.pool = 0;
       let hit = false;
       for (const target of receivers) hit = refugeHit(w, this.owner, target, damage, this) || hit;
+      // favoured weapon: the thread is pulled tight on the struck enemy as well (a double knot)
+      const knot = favoured(this.owner) ? members.find(e => e.id === m.source) ?? members[0] : undefined;
+      if (knot && refugeHit(w, this.owner, knot, pool * LUEN_KNOT_AFFINITY, this)) {
+        hit = true;
+        m.knot = w.time;
+        threadPulse(w, this.owner, knot.x, knot.y - knot.r - 7);
+      }
       if (hit) {
         m.flash = w.time; proc(w, 'passive:luen', true); w.sfx('paper_flutter', { vol: .15, pitch: 1.45 });
         for (const target of receivers) threadPulse(w, this.owner, target.x, target.y - target.r - 7);
@@ -150,6 +204,10 @@ export class RefugeWeave extends RefugeOwned {
       }
     }
     for (const e of targets) drawThreadKnot(r, e.x, e.y - e.r - 7, this.age, 4 + lit * 2, .7 + lit * .3);
+    // the double knot: a second, wider loop cinches around the struck enemy
+    const tight = Math.max(0, 1 - (w.time - this.mem.knot) / .32);
+    const knotted = tight > 0 ? targets.find(e => e.id === this.mem.source) ?? targets[0] : undefined;
+    if (knotted) drawThreadKnot(r, knotted.x, knotted.y - knotted.r - 7, -this.age, 9 - tight * 3, tight);
   }
   override light(w: World): void {
     const lit = Math.max(0, 1 - (w.time - this.mem.flash) / .3);
@@ -159,19 +217,32 @@ export class RefugeWeave extends RefugeOwned {
 
 /** A bounded, explicit off-hand skill. No weapon update, item shoot hook or copied projectile. */
 export class RefugeSupport extends RefugeOwned {
-  constructor(w: World, p: Player, family: SupportFamily, target: Enemy, damage: number) {
+  /** `delay` > 0: the other hand's follow-up (favoured weapon), aimed again when it starts */
+  constructor(w: World, p: Player, family: SupportFamily, target: Enemy, damage: number, delay = 0) {
     super(w, p);
-    const a = Math.atan2(target.y - p.y, target.x - p.x);
+    Object.assign(this.mem, { family, damage, phase: 0, targetId: target.id, wait: delay, echo: Number(delay > 0) });
+    this.aim(w, target);
+  }
+  private aim(w: World, target: Enemy): void {
+    const p = this.owner, a = Math.atan2(target.y - p.y, target.x - p.x);
     const length = Math.max(0, rayLength(w, p.x, p.y, a, Math.min(200, Math.hypot(target.x - p.x, target.y - p.y))) - 2);
-    Object.assign(this.mem, { family, damage, ax: p.x, ay: p.y, angle: a,
-      tx: p.x + Math.cos(a) * length, ty: p.y + Math.sin(a) * length, phase: 0 });
+    Object.assign(this.mem, { ax: p.x, ay: p.y, angle: a, tx: p.x + Math.cos(a) * length, ty: p.y + Math.sin(a) * length });
   }
   override update(w: World, dt: number): void {
     if (!this.valid(w)) return;
+    const m = this.mem;
+    if (m.wait > 0) {
+      m.wait -= dt;
+      if (m.wait > 1e-9) return;
+      m.wait = 0;
+      // the follow-up starts from where Ves stands now (a fallen target leaves the first aim)
+      const target = w.enemies.find(e => e.id === m.targetId && e.alive && !e.hidden && e.vulnerable);
+      if (target) this.aim(w, target);
+    }
     this.age += dt;
-    const m = this.mem, times = m.family === 3 ? [.12, .34, .56] : [m.family === 2 ? .24 : .12];
+    const times = m.family === 3 ? [.12, .34, .56] : [m.family === 2 ? .24 : .12];
     if (m.phase < times.length && this.age >= times[m.phase]) {
-      runProc(w, 'keeper:ves:support:impact', () => {
+      runProc(w, m.echo ? 'keeper:ves:support:echo' : 'keeper:ves:support:impact', () => {
         const factor = m.family === 3 ? 1 / 3 : 1;
         for (const target of w.enemies) {
           if (!target.alive || target.hidden || !target.vulnerable) continue;
@@ -190,6 +261,7 @@ export class RefugeSupport extends RefugeOwned {
     if (this.age > (m.family === 3 ? .82 : .62)) this.dead = true;
   }
   protected paint(r: Renderer): void {
+    if (this.mem.wait > 0) return;
     const m = this.mem, wind = Math.max(0, 1 - this.age / (m.family === 2 ? .24 : .12));
     if (wind > 0) {
       const nx = Math.cos(m.angle), ny = Math.sin(m.angle);
@@ -207,13 +279,17 @@ export class RefugeSupport extends RefugeOwned {
 export class RefugeGuard extends RefugeOwned {
   constructor(w: World, p: Player) {
     super(w, p);
-    Object.assign(this.mem, { angle: p.aim, parkUntil: -1, flash: -99 });
+    Object.assign(this.mem, { angle: p.aim, parkUntil: -1, flash: -99, sentAt: -99, sx: 0, sy: 0, ex: 0, ey: 0 });
     const length = Math.max(0, rayLength(w, p.x, p.y, p.aim, 18) - 2);
     this.x = p.x + Math.cos(p.aim) * length;
     this.y = p.y + Math.sin(p.aim) * length;
-    p.vars.rfOrtCharges ??= 2;
-    p.vars.rfOrtRefill ??= w.time + 2.4;
+    p.vars.rfOrtCharges ??= ORT_CHARGES;
+    p.vars.rfOrtRefill ??= w.time + this.refill();
   }
+  /** durability (3 with a favoured weapon) */
+  maxCharges(): number { return favoured(this.owner) ? ORT_CHARGES_AFFINITY : ORT_CHARGES; }
+  refill(): number { return favoured(this.owner) ? ORT_REFILL_AFFINITY : ORT_REFILL; }
+  width(): number { return favoured(this.owner) ? ORT_WIDTH_AFFINITY : ORT_WIDTH; }
   park(w: World): void { this.mem.parkUntil = w.time + 1.1; }
   /** Ort's release raises the tower shield: the small one stands aside meanwhile. */
   towerUp(w: World): boolean {
@@ -223,12 +299,14 @@ export class RefugeGuard extends RefugeOwned {
   override update(w: World, dt: number): void {
     if (!this.valid(w)) return;
     this.age += dt;
-    const p = this.owner, m = this.mem;
-    if ((p.vars.rfOrtCharges ?? 0) < 2 && w.time >= p.vars.rfOrtRefill) {
+    const p = this.owner, m = this.mem, max = this.maxCharges();
+    // swapping off a favoured weapon drops the third plate
+    if (p.vars.rfOrtCharges > max) p.vars.rfOrtCharges = max;
+    if ((p.vars.rfOrtCharges ?? 0) < max && w.time >= p.vars.rfOrtRefill) {
       p.vars.rfOrtCharges++;
-      p.vars.rfOrtRefill = w.time + 2.4;
+      p.vars.rfOrtRefill = w.time + this.refill();
     }
-    if (p.vars.rfOrtCharges >= 2) p.vars.rfOrtRefill = w.time + 2.4;
+    if (p.vars.rfOrtCharges >= max) p.vars.rfOrtRefill = w.time + this.refill();
     if (w.time >= m.parkUntil) {
       m.angle = p.aim;
       const length = Math.max(0, rayLength(w, p.x, p.y, p.aim, 18) - 2);
@@ -248,12 +326,13 @@ export class RefugeGuard extends RefugeOwned {
       if (front + speed * step > bullet.r + 3 || prior < -bullet.r - 3) continue;
       const cross = Math.max(-step, Math.min(step, -front / speed));
       const tangent = -(dx + bullet.vx * cross) * ny + (dy + bullet.vy * cross) * nx;
-      if (Math.abs(tangent) > 17 + bullet.r || !visible(w, this.x, this.y, bullet.x, bullet.y, bullet.r)) continue;
+      if (Math.abs(tangent) > this.width() + bullet.r || !visible(w, this.x, this.y, bullet.x, bullet.y, bullet.r)) continue;
       if (runProc(w, 'keeper:ort:guard', () => {
         bullet.dead = true;
         p.vars.rfOrtCharges--;
         m.flash = w.time;
         shieldImpact(w, p, bullet.x, bullet.y, m.angle, false);
+        if (favoured(p)) this.sendBack(w, bullet.x, bullet.y);
         // a held line builds toward the release
         p.addEmber(4);
         w.sfx('parry', { vol: .3, pitch: .9, x: this.x });
@@ -262,7 +341,29 @@ export class RefugeGuard extends RefugeOwned {
       })) break;
     }
   }
+  /** Favoured weapon: the blocked shot flies back at the nearest enemy ahead of the shield. */
+  private sendBack(w: World, x: number, y: number): void {
+    const p = this.owner, m = this.mem, nx = Math.cos(m.angle), ny = Math.sin(m.angle);
+    let ahead: Enemy | undefined, best = Infinity;
+    for (const e of w.enemies) {
+      if (!e.alive || e.hidden || !e.vulnerable) continue;
+      const ex = e.x - this.x, ey = e.y - this.y, d = Math.hypot(ex, ey) || 1;
+      if (d > 240 || (ex * nx + ey * ny) / d <= .2 || !visible(w, this.x, this.y, e.x, e.y, e.r)) continue;
+      if (d < best || d === best && ahead && e.id < ahead.id) { best = d; ahead = e; }
+    }
+    if (!ahead || !refugeHit(w, p, ahead, p.stats.damage * ORT_REFLECT_AFFINITY, this, false, 20)) return;
+    Object.assign(m, { sentAt: w.time, sx: x, sy: y, ex: ahead.x, ey: ahead.y - 4 });
+    shieldImpact(w, p, ahead.x, ahead.y - 4, Math.atan2(ahead.y - y, ahead.x - x), false);
+  }
   protected paint(r: Renderer, w: World): void {
+    // the shot sent back: a bright streak from the shield face to the enemy it struck
+    const sent = Math.max(0, 1 - (w.time - this.mem.sentAt) / .16);
+    if (sent > 0) {
+      const m = this.mem, k = Math.min(1, (1 - sent) * 2.4), x = m.sx + (m.ex - m.sx) * k, y = m.sy + (m.ey - m.sy) * k;
+      r.pixelLine(m.sx, m.sy, x, y, '#263a35', 3, sent * .7);
+      r.pixelLine(m.sx, m.sy, x, y, '#c9ecbd', 1, sent);
+      r.rect(x - 1, y - 1, 3, 3, '#fff4cf', sent);
+    }
     if (this.towerUp(w) && this.mem.parkUntil <= w.time) return;
     const lit = Math.max(0, 1 - (w.time - this.mem.flash) / .24), parked = this.mem.parkUntil > w.time;
     const nx = Math.cos(this.mem.angle), ny = Math.sin(this.mem.angle), sx = -ny, sy = nx;
@@ -271,7 +372,7 @@ export class RefugeGuard extends RefugeOwned {
       r.pixelLine(x - nx * 4, y - ny * 4, x + nx * 3, y + ny * 3, '#263a35', 4, .8);
       r.pixelLine(x - nx * 3, y - ny * 3 - 1, x + nx * 2, y + ny * 2 - 1, '#c3d6ae', 1, .7);
     }
-    drawShield(r, this.x - nx * lit * 2, this.y - ny * lit * 2, this.mem.angle, 17, this.owner.vars.rfOrtCharges, .75 + lit * .25);
+    drawShield(r, this.x - nx * lit * 2, this.y - ny * lit * 2, this.mem.angle, this.width(), this.owner.vars.rfOrtCharges, .75 + lit * .25, this.maxCharges());
     if (lit > 0) for (let i = 0; i < 4; i++) {
       const side = i % 2 ? 1 : -1, spread = (1 - lit) * (5 + i * 2);
       const x = this.x + nx * (5 + spread) + sx * side * (2 + spread), y = this.y + ny * (5 + spread) + sy * side * (2 + spread);
@@ -319,18 +420,26 @@ export function slowSealEnemy(w: World, target: Enemy): boolean {
     target.alive && target.applyStatus({ kind: 'slow', duration: .62, power: target.isBoss ? .12 : .3 }, () => w.rng.next()));
 }
 
+/** Mira's page seal. `anchor`: the enemy it was opened on (pinned with a favoured weapon); 0 = none (dash). */
 export class RefugeSeal extends RefugeOwned {
-  constructor(w: World, p: Player, x: number, y: number) {
+  constructor(w: World, p: Player, x: number, y: number, anchor = 0) {
     super(w, p);
     this.x = x; this.y = y;
-    Object.assign(this.mem, { until: w.time + 2.8, damage: p.stats.damage, radius: 42, pulse: -99 });
+    Object.assign(this.mem, { until: w.time + 2.8, damage: p.stats.damage, radius: 42, pulse: -99, anchor, pin: -99 });
     this.layer = 0;
   }
-  place(w: World, x: number, y: number): void {
+  place(w: World, x: number, y: number, anchor = 0): void {
     this.x = x; this.y = y;
     this.mem.until = w.time + 2.8;
     this.mem.damage = this.owner.stats.damage;
+    this.mem.anchor = anchor;
     this.age = 0;
+  }
+  /** Favoured weapon: the enemy the seal was opened on, while it stays inside. */
+  pinned(w: World): Enemy | undefined {
+    if (!this.mem.anchor || !favoured(this.owner)) return undefined;
+    const e = w.enemies.find(t => t.id === this.mem.anchor);
+    return e && e.alive && !e.hidden && e.vulnerable && this.contains(w, e.x, e.y, e.r) ? e : undefined;
   }
   contains(w: World, x: number, y: number, radius = 0): boolean {
     return Math.hypot(x - this.x, y - this.y) <= this.mem.radius + radius && visible(w, this.x, this.y, x, y, radius);
@@ -340,14 +449,22 @@ export class RefugeSeal extends RefugeOwned {
     this.age += dt;
     if (w.time >= this.mem.until) { this.dead = true; return; }
     slowSealBullets(w, (x, y, r) => this.contains(w, x, y, r), .7);
+    const pinned = this.pinned(w);
     runProc(w, 'keeper:mira:seal:pulse', () => {
-      const targets = nearby(w, this.x, this.y, this.mem.radius);
+      // a pinned enemy has its own, faster pulse below
+      const targets = nearby(w, this.x, this.y, this.mem.radius).filter(e => e !== pinned);
       if (!targets.length) return false;
       for (const target of targets) { slowSealEnemy(w, target); refugeHit(w, this.owner, target, this.mem.damage * .2, this); }
       this.mem.pulse = w.time;
       pageImpact(w, this.owner, this.x, this.y - 2, false);
       return true;
-    }, .5);
+    }, MIRA_PULSE);
+    if (pinned) runProc(w, 'keeper:mira:seal:pin', () => {
+      slowSealEnemy(w, pinned);
+      if (!refugeHit(w, this.owner, pinned, this.mem.damage * .2 * MIRA_PIN_SHARE, this)) return false;
+      this.mem.pin = w.time;
+      return true;
+    }, MIRA_PIN_AFFINITY);
   }
   protected paint(r: Renderer, w: World): void {
     const fade = Math.min(1, this.age / .15) * Math.min(1, (this.mem.until - w.time) / .35);
@@ -357,6 +474,19 @@ export class RefugeSeal extends RefugeOwned {
       const x = this.x + side * (4 + (1 - opening) * 10), y = this.y - 3 - Math.sin(opening * Math.PI) * 5;
       r.pixelLine(this.x, this.y - 2, x, y - 4, '#e4e8ee', 2, opening * .8);
       r.pixelLine(x, y - 4, x + side * 2, y + 2, '#8faed3', 1, opening * .7);
+    }
+    // the pinned enemy: four page corners close around it, flashing with each pin pulse
+    const pinned = this.pinned(w);
+    if (pinned) {
+      const lit = Math.max(0, 1 - (w.time - this.mem.pin) / .18), d = pinned.r + 5 - lit * 2;
+      const cx = pinned.x, cy = pinned.y - pinned.r * .6;
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2 + Math.PI / 4 + this.age * .8, nx = Math.cos(a), ny = Math.sin(a);
+        const x = cx + nx * d, y = cy + ny * d * .8;
+        r.pixelLine(x - ny * 3, y + nx * 3, x, y, '#3c415b', 3, fade * .7);
+        r.pixelLine(x - ny * 3, y + nx * 3, x, y, lit > 0 ? '#f0e5cd' : '#b3c9ee', 1, fade * (.75 + lit * .25));
+        r.pixelLine(x, y, x + ny * 3, y - nx * 3, '#d5e1f3', 1, fade * (.55 + lit * .45));
+      }
     }
   }
   override light(w: World): void {

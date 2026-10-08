@@ -31,7 +31,8 @@ describe('refuge expansion',()=>{
  // The old turret is replaced by charges/mines; retain its boundedness, terminal
  // damage, no-ember and render-purity guarantees instead of retaining its job.
  it('charges and mines are bounded, cannot recursively build or refill ember, and drawing is pure',()=>{
-  const {world:w,dummies}=sim();idle(w,1);const pas=REFUGE_PASSIVES[0];
+  // a weapon outside 토브's favoured class: no relayed charges, two mines (affinity: tests/affinity-c)
+  const {world:w,dummies}=sim('tove','lantern_bolt');idle(w,1);const pas=REFUGE_PASSIVES[0];
   for(let i=0;i<30;i++)pas.onHit!(w,dummies[0],hit(w),1);
   idle(w,1);expect(w.entities.filter(e=>e instanceof RefugeCharge&&!e.dead)).toHaveLength(1);
   const energy=w.vars.rfToveEnergy,hp=dummies[0].hp;w.player.ember=0;

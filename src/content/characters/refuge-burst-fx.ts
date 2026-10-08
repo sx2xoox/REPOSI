@@ -179,7 +179,7 @@ export function drawThreadCut(r: Renderer, x: number, y: number, t: number, stag
 }
 
 /** Faceted metal body, turned rim and two readable durability notches. */
-export function drawShield(r: Renderer, x: number, y: number, angle: number, radius: number, charges: number, alpha = 1): void {
+export function drawShield(r: Renderer, x: number, y: number, angle: number, radius: number, charges: number, alpha = 1, max = 2): void {
   const strength = charges > 0 ? 1 : .35;
   const shape: [number, number][] = [[-4, -radius], [3, -radius + 3], [8, -radius * .38], [9, 0], [8, radius * .38], [3, radius - 3], [-4, radius], [-7, radius * .55], [-7, -radius * .55], [-4, -radius]];
   // A narrow translucent body, with an opaque bevel only on its leading edge.
@@ -193,9 +193,11 @@ export function drawShield(r: Renderer, x: number, y: number, angle: number, rad
     line(r, x, y, angle, 0, side * (radius - 5), 2, side * (radius - 5), '#f4ddb0', 2, alpha * strength);
   }
   diamond(r, x + Math.cos(angle) * 2, y + Math.sin(angle) * 2, 4, '#ead7a8', alpha * strength, angle);
-  for (let i = 0; i < 2; i++) {
-    line(r, x, y, angle, -4, i ? 6 : -6, 1, i ? 6 : -6, '#243d38', 3, alpha);
-    line(r, x, y, angle, -3, i ? 6 : -6, 0, i ? 6 : -6, i < charges ? '#e2edc7' : '#49685b', 1, alpha);
+  // durability pips (a third, centre one with a favoured weapon)
+  const pips = max > 2 ? [-8, 0, 8] : [-6, 6];
+  for (let i = 0; i < pips.length; i++) {
+    line(r, x, y, angle, -4, pips[i], 1, pips[i], '#243d38', 3, alpha);
+    line(r, x, y, angle, -3, pips[i], 0, pips[i], i < charges ? '#e2edc7' : '#49685b', 1, alpha);
   }
 }
 
