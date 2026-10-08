@@ -159,6 +159,6 @@ describe('artifact reworks in the real item system', () => {
     expect(dummies.every(e => !e.hasStatus('freeze'))).toBe(true);
     w.time = 1.5; w.items.onHurt(1);
     expect(dummies.every(e => e.hasStatus('freeze'))).toBe(true);
-    expect(Artifacts.must('hoarfrost_mantle').detail).toContain('0.5초');
+    expect(Artifacts.must('hoarfrost_mantle').desc).toContain('주변 적을 얼리');
   });
 });

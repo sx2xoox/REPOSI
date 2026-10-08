@@ -28,8 +28,7 @@ defineDrawnSprite('icon_rime_shard', 16, 16, (p) => {
 defineArtifact({
   id: 'rime_shard',
   name: '서리 조각',
-  desc: '공격이 15% 확률로 적을 둔화시킨다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격하면 15% 확률로 적을 둔화시킨다.',
   quote: '만지면 손끝이 시리다.',
   rarity: 'common',
   tags: ['frost'],
@@ -62,7 +61,7 @@ defineDrawnSprite('icon_frostbite_ring', 16, 16, (p) => {
 defineArtifact({
   id: 'frostbite_ring',
   name: '동상 반지',
-  desc: '둔화되거나 얼어붙은 적에게 주는 피해 +20%',
+  desc: '둔화되거나 얼어붙은 적에게 주는 피해가 20% 늘어난다.',
   quote: '차가운 것은 더 잘 부서진다.',
   rarity: 'common',
   tags: ['frost'],
@@ -96,8 +95,7 @@ defineDrawnSprite('icon_crystal_spiral', 16, 16, (p) => {
 defineArtifact({
   id: 'crystal_spiral',
   name: '빙정 나선',
-  desc: '사거리 +20%. 공격할 때 측면 서리탄 2발',
-  detail: '조준한 본체 탄환은 직진한다. 0.8초마다 좌우 서리탄(피해 20%, 1.2초 둔화). 상태 재부여 0.5초. 추가탄은 유물 발동 제외. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '사거리 +20%. 공격하면 양옆으로 서리탄이 나간다.',
   quote: '곧게 가는 것만이 길은 아니다.',
   rarity: 'common',
   tags: ['frost'],
@@ -137,8 +135,7 @@ defineDrawnSprite('icon_glacier_lens', 16, 16, (p) => {
 defineArtifact({
   id: 'glacier_lens',
   name: '빙하 렌즈',
-  desc: '탄환이 커지고 느려진다. 공격이 10% 확률로 적을 얼린다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '탄환이 커지고 느려진다. 공격하면 10% 확률로 적을 얼린다.',
   quote: '세상이 얼어붙어 보인다.',
   rarity: 'rare',
   tags: ['frost'],
@@ -182,8 +179,7 @@ defineDrawnSprite('icon_winter_orb', 16, 16, (p) => {
 defineArtifact({
   id: 'winter_orb',
   name: '겨울을 품은 구슬',
-  desc: '얼음 구슬이 주위를 돌며 적 탄환을 막고 적을 얼린다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '얼음 구슬이 주위를 돌며 적 탄환을 막고 적을 얼린다.',
   quote: '작은 구슬 속에서 눈이 그치지 않는다.',
   rarity: 'rare',
   tags: ['frost'],
@@ -217,8 +213,7 @@ defineDrawnSprite('icon_hoarfrost_mantle', 16, 16, (p) => {
 defineArtifact({
   id: 'hoarfrost_mantle',
   name: '상고대 망토',
-  desc: '영혼 하트 +1. 피격 시 주변 적을 얼리고 탄환을 지운다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '영혼 하트 +1. 피격당하면 주변 적을 얼리고 탄환을 지운다.',
   quote: '상처가 닿는 곳마다 서리가 핀다.',
   rarity: 'epic',
   tags: ['frost'],

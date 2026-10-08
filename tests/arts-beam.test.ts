@@ -147,9 +147,10 @@ describe('beam arts: definitions', () => {
       const a = Artifacts.must(id);
       expect([a.rarity, a.tags[0]], id).toEqual(want[id]);
       expect(a.tags.length, id).toBe(1);
-      expect(a.desc.startsWith('광선 무기: '), id).toBe(true);
+      // glance-readable: one plain sentence that names the weapon type (the old '광선 무기: ' label is gone)
+      expect(a.desc, id).toContain('광선 무기');
       expect(a.desc.length, id).toBeLessThanOrEqual(36);
-      expect(a.detail ?? '', id).toMatch(/[가-힣]/);
+      if (a.detail) expect(a.detail, id).toMatch(/[가-힣]/);
       expect(a.quote ?? '', id).toMatch(/[가-힣]/);
       expect(hasSprite(a.icon), id).toBe(true);
       expect(lookIsVisible(a.look), id).toBe(true);

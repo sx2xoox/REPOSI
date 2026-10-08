@@ -60,6 +60,17 @@ describe('passive artifacts', () => {
     }
   });
 
+  it('texts stay glance-readable (user 2026-10-08: "그냥 대충 보고 알아먹을 정도로만")', () => {
+    // the UI shows desc + ' ' + detail; the exact numbers / timings are left for the player to discover
+    for (const a of arts) {
+      if (a.hidden || a.blessing) continue;
+      const detail = a.detail ?? '';
+      expect(detail.length, `${a.id} detail: ${detail}`).toBeLessThanOrEqual(40);
+      const shown = detail ? `${a.desc} ${detail}` : a.desc;
+      expect(shown.length, `${a.id}: ${shown}`).toBeLessThanOrEqual(80);
+    }
+  });
+
   it('names are unique', () => {
     const names = arts.map((a) => a.name);
     expect(names.filter((n, i) => names.indexOf(n) !== i)).toEqual([]);

@@ -31,7 +31,7 @@ defineDrawnSprite('icon_gilded_tooth', 16, 16, (p) => {
 defineArtifact({
   id: 'gilded_tooth',
   name: '금니',
-  desc: '동전 +5. 동전 10개당 공격력 +0.25 (최대 +2.5)',
+  desc: '동전 5개를 얻고, 동전이 많을수록 공격력이 오른다.',
   quote: '웃을 때마다 반짝인다.',
   rarity: 'common',
   tags: [],
@@ -75,8 +75,7 @@ defineDrawnSprite('icon_alchemist_scale', 16, 16, (p) => {
 defineArtifact({
   id: 'alchemist_scale',
   name: '연금술사의 저울',
-  desc: '20금 모을 때마다 폭탄·열쇠를 번갈아 보급',
-  detail: '획득한 동전의 금액을 누적(탐욕 적용). 중복 1개당 필요 금액 -3, 최소 10금. 남은 진행은 방·무기 교체에도 유지된다.',
+  desc: '20금 모을 때마다 폭탄과 열쇠를 번갈아 얻는다.',
   quote: '동전 한 닢의 무게는 생각보다 다양하다.',
   rarity: 'common',
   tags: [],
@@ -122,7 +121,7 @@ defineDrawnSprite('icon_paper_ward', 16, 16, (p) => {
 defineArtifact({
   id: 'paper_ward',
   name: '종이 부적',
-  desc: '전투가 시작될 때마다 피해 1회를 막는 보호막을 얻는다',
+  desc: '전투마다 피해를 한 번 막는 보호막이 생긴다.',
   quote: '한 번은 막아준다. 딱 한 번.',
   rarity: 'common',
   tags: [],
@@ -173,7 +172,7 @@ defineDrawnSprite('icon_soul_wax', 16, 16, (p) => {
 defineArtifact({
   id: 'soul_wax',
   name: '영혼 밀랍',
-  desc: '영혼 하트 +1. 새 층에 도착할 때마다 영혼 하트 반 칸',
+  desc: '영혼 하트를 하나 얻고, 새 층마다 반 칸씩 더 얻는다.',
   quote: '영혼을 녹여 굳힌 밀랍.',
   rarity: 'common',
   tags: [],
@@ -215,7 +214,7 @@ defineDrawnSprite('icon_stone_amulet', 16, 16, (p) => {
 defineArtifact({
   id: 'stone_amulet',
   name: '돌거북 부적',
-  desc: '최대 체력 +1, 피격 무적 +30%. 피격 시 탄환 제거',
+  desc: '최대 체력이 늘고, 맞으면 주변 탄환을 지우고 무적이 길어진다.',
   signature: '피격당하면 돌 파편이 튀어 주변 적 탄환을 지운다',
   quote: '느리지만, 단단하다.',
   rarity: 'common',
@@ -255,7 +254,7 @@ defineDrawnSprite('icon_lamp_oil', 16, 16, (p) => {
 defineArtifact({
   id: 'lamp_oil',
   name: '등잔 기름',
-  desc: '방을 클리어할 때마다 등불 게이지 +20%',
+  desc: '방을 클리어할 때마다 등불 게이지가 20% 찬다.',
   quote: '등불은 기름으로 산다.',
   rarity: 'common',
   tags: [],
@@ -288,7 +287,7 @@ defineDrawnSprite('icon_jade_marble', 16, 16, (p) => {
 defineArtifact({
   id: 'jade_marble',
   name: '옥구슬',
-  desc: '탄환이 벽에 2번 튕긴다 (탄환 한정). 사거리 +15%',
+  desc: '탄환이 벽에 두 번 튕기고, 사거리가 늘어난다.',
   quote: '튕길 때마다 맑은 소리가 난다.',
   rarity: 'common',
   tags: [],
@@ -320,7 +319,7 @@ defineDrawnSprite('icon_greedy_purse', 16, 16, (p) => {
 defineArtifact({
   id: 'greedy_purse',
   name: '탐욕의 지갑',
-  desc: '처치 시 12% 확률로 동전. 피격 시 동전 2개를 흘린다',
+  desc: '적을 처치하면 가끔 동전이 나오지만, 맞으면 동전을 흘린다.',
   quote: '주머니가 무거울수록 발은 느려진다.',
   rarity: 'rare',
   tags: [],
@@ -364,8 +363,7 @@ defineDrawnSprite('icon_mirror_shard', 16, 16, (p) => {
 defineArtifact({
   id: 'mirror_shard',
   name: '거울 파편',
-  desc: '거울 조각이 주위를 돌며 적 탄환을 되돌려 보낸다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '거울 조각이 주위를 돌며 적 탄환을 되돌려 보낸다.',
   quote: '깨진 거울도 빛은 되돌려준다.',
   rarity: 'rare',
   tags: [],
@@ -400,8 +398,8 @@ defineDrawnSprite('icon_sweet_sachet', 16, 16, (p) => {
 defineArtifact({
   id: 'sweet_sachet',
   name: '달콤한 향주머니',
-  desc: '건강한 일반 적을 첫 타격에 4초간 매혹',
-  detail: '체력 절반 이상이며 이번 공격을 버틸 일반 적을 확정 매혹. 간격 6초(중복당 -1초, 최소 3초). 보스 무효. 추가 공격 제외. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '체력이 넉넉한 적을 공격하면 가끔 매혹한다.',
+  detail: '보스는 매혹되지 않는다.',
   quote: '적도 향기에는 약하다.',
   rarity: 'rare',
   tags: [],
@@ -446,8 +444,7 @@ const bombWatch = new WeakMap<World, Map<Bomb, unknown>>();
 defineArtifact({
   id: 'cluster_powder',
   name: '산탄 화약통',
-  desc: '폭탄 +2. 내 폭탄이 터지면 불붙은 파편이 사방으로 튄다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '폭탄 2개를 얻고, 내 폭탄이 터지면 불붙은 파편이 튄다.',
   quote: '하나가 터지면 여럿이 터진다.',
   rarity: 'epic',
   tags: [],

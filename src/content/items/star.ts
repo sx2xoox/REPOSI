@@ -45,8 +45,7 @@ defineDrawnSprite('icon_fallen_star', 16, 16, (p) => {
 defineArtifact({
   id: 'fallen_star',
   name: '떨어진 별 조각',
-  desc: '행운 +1, 치명타 +6%p. 직접 치명타로 불씨 충전',
-  detail: '기본 충전 +3. 광선·보스 대상은 각각 절반. 추가 파편 제외. 행운 보정 적용.',
+  desc: '행운과 치명타 확률이 오르고, 치명타로 등불 게이지가 찬다.',
   signature: '치명타가 터지면 별빛이 번쩍이며 등불 게이지가 찬다',
   quote: '소원은 이미 이루어졌다. 아마도.',
   rarity: 'common',
@@ -86,8 +85,7 @@ defineDrawnSprite('icon_constellation_needle', 16, 16, (p) => {
 defineArtifact({
   id: 'constellation_needle',
   name: '별바늘',
-  desc: '공격이 15% 확률로 별표식을 새긴다 (다음 공격 치명타)',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격하면 15% 확률로 그 적이 다음에 치명타를 맞는다.',
   quote: '별자리를 꿰매는 바늘.',
   rarity: 'common',
   tags: ['star'],
@@ -119,7 +117,7 @@ defineDrawnSprite('icon_star_chart', 16, 16, (p) => {
 defineArtifact({
   id: 'star_chart',
   name: '성도',
-  desc: '탄환이 적을 쫓아간다 (탄환 한정). 사거리 +10%',
+  desc: '탄환이 적을 쫓아가고 사거리가 늘어난다.',
   quote: '길을 잃은 탄환은 없다.',
   rarity: 'rare',
   tags: ['star'],
@@ -152,8 +150,7 @@ defineDrawnSprite('icon_moon_satellite', 16, 16, (p) => {
 defineArtifact({
   id: 'moon_satellite',
   name: '작은 달',
-  desc: '작은 달이 주위를 돌며 적 탄환을 막고 적을 친다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '작은 달이 주위를 돌며 적 탄환을 막고 적을 친다.',
   quote: '작은 달에게도 중력은 있다.',
   rarity: 'rare',
   tags: ['star'],
@@ -195,7 +192,7 @@ defineDrawnSprite('icon_fortune_moth', 16, 16, (p) => {
 defineArtifact({
   id: 'fortune_moth',
   name: '복나방',
-  desc: '행운 +2. 방 클리어 시 25% 확률로 보상이 하나 더',
+  desc: '행운 +2. 일반 방을 클리어하면 가끔 보상이 하나 더 나온다.',
   quote: '불빛을 따라온 행운.',
   rarity: 'rare',
   tags: ['star'],
@@ -230,8 +227,7 @@ defineDrawnSprite('icon_comet_tail', 16, 16, (p) => {
 defineArtifact({
   id: 'comet_tail',
   name: '혜성 꼬리',
-  desc: '치명타 배율 +0.35. 직접 치명타 시 별 조각 3개',
-  detail: '예: 치명타 ×1.8 → ×2.15. 별 조각 하나는 그 공격의 기본 피해 30%. 추가 파편은 별 조각을 다시 만들지 않는다. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '치명타 피해가 늘고, 치명타가 터지면 별 조각이 날아간다.',
   quote: '빛은 지나간 자리에 남는다.',
   rarity: 'epic',
   tags: ['star'],
@@ -302,8 +298,8 @@ function makeLance(w: World, p: Projectile, power: number): void {
 defineArtifact({
   id: 'radiant_lance',
   name: '광휘의 창',
-  desc: '전방 무기 탄환을 관통 빛의 창으로 합친다',
-  detail: '근접 공격에는 창을 추가 발사한다. 광선과 추가 파편에는 적용되지 않는다. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '무기 탄환이 하나로 합쳐져 관통하는 빛의 창이 된다.',
+  detail: '근접 무기로 공격하면 빛의 창을 따로 날린다.',
   quote: '흩어진 빛을 모으면 창이 된다.',
   rarity: 'legendary',
   tags: ['star'],
@@ -368,8 +364,7 @@ defineDrawnSprite('icon_lantern_sun', 16, 16, (p) => {
 defineArtifact({
   id: 'lantern_sun',
   name: '품 안의 태양',
-  desc: '작은 태양이 주위를 돌며 탄환을 녹이고 적을 태운다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '작은 태양이 주위를 돌며 적 탄환을 녹이고 적을 태운다.',
   quote: '등불 속에 태양을 가두었다. 이제 태양이 등불을 지킨다.',
   rarity: 'legendary',
   tags: ['flame', 'star'],

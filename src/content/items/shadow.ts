@@ -95,7 +95,7 @@ defineDrawnSprite('icon_smoke_veil', 16, 16, (p) => {
 defineArtifact({
   id: 'smoke_veil',
   name: '연기 베일',
-  desc: '10% 확률로 피해 회피. 대시하면 연막이 탄환을 지움',
+  desc: '10% 확률로 피해를 피하고, 대시하면 연막이 적 탄환을 지운다.',
   signature: '대시한 자리에 연막이 남아 적 탄환을 지운다',
   quote: '보이지 않으면 맞지도 않는다.',
   rarity: 'common',
@@ -135,7 +135,7 @@ defineDrawnSprite('icon_night_slippers', 16, 16, (p) => {
 defineArtifact({
   id: 'night_slippers',
   name: '밤의 덧신',
-  desc: '대시 쿨다운 -25%, 이속 +8%. 대시 무적 연장',
+  desc: '대시 쿨다운 -25%. 이동 속도와 대시 무적이 늘어난다.',
   signature: '대시하면 보랏빛 잔상이 남고 무적 시간이 조금 길어진다',
   quote: '발소리조차 잠들었다.',
   rarity: 'common',
@@ -182,9 +182,9 @@ defineDrawnSprite('icon_black_candle', 16, 16, (p) => {
 defineArtifact({
   id: 'black_candle',
   name: '검은 초',
-  desc: '공격력 +1.5, 행운 -1. 처치 시 가끔 검은 불꽃',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
-  signature: '처치 시 10% 확률로 검은 불꽃이 터져 주변 적을 겁먹게 한다',
+  desc: '공격력 +1.5. 처치하면 가끔 검은 불꽃이 터져 적을 겁준다.',
+  detail: '대신 행운이 줄어든다.',
+  signature: '처치하면 가끔 검은 불꽃이 터져 적을 겁준다',
   quote: '어둠을 태우는 불도 있다.',
   rarity: 'common',
   tags: ['shadow', 'flame'],
@@ -222,8 +222,7 @@ defineDrawnSprite('icon_rear_eye', 16, 16, (p) => {
 defineArtifact({
   id: 'rear_eye',
   name: '등 뒤의 눈',
-  desc: '공격할 때 등 뒤로도 약한 공격이 나간다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격하면 등 뒤로도 약한 공격이 나간다.',
   quote: '등 뒤에도 눈이 있다.',
   rarity: 'common',
   tags: ['shadow'],
@@ -261,8 +260,7 @@ defineDrawnSprite('icon_shade_dagger', 16, 16, (p) => {
 defineArtifact({
   id: 'shade_dagger',
   name: '그림자 단검',
-  desc: '대시로 적을 통과하면 큰 피해를 주고 출혈시킨다',
-  detail: '공격력의 160% 피해. 같은 적은 2초에 한 번만 벤다.',
+  desc: '대시로 적을 통과하면 큰 피해를 주고 출혈시킨다.',
   quote: '그림자는 등 뒤에서 찌른다.',
   rarity: 'rare',
   tags: ['shadow', 'blood'],
@@ -310,8 +308,8 @@ defineDrawnSprite('icon_hollow_mask', 16, 16, (p) => {
 defineArtifact({
   id: 'hollow_mask',
   name: '텅 빈 가면',
-  desc: '10% 확률로 공포를 건다. 겁먹은 적에게 피해 +20%',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격하면 가끔 적을 겁주고, 겁먹은 적은 피해를 더 받는다.',
+  detail: '보스는 겁먹지 않는다.',
   quote: '가면 뒤엔 아무도 없다. 그래서 무섭다.',
   rarity: 'rare',
   tags: ['shadow'],
@@ -344,8 +342,7 @@ defineDrawnSprite('icon_twin_shadow', 16, 16, (p) => {
 defineArtifact({
   id: 'twin_shadow',
   name: '쌍둥이 그림자',
-  desc: '그림자 분신이 따라다니며 내 공격을 흉내 낸다',
-  detail: '분신은 내 기본 공격 속도보다 빨리 흉내 내지 않으며 한 번에 공격력의 35% 피해. 중복 시 분신 최대 2명.',
+  desc: '그림자 분신이 따라다니며 내 공격을 약하게 흉내 낸다.',
   quote: '그림자가 먼저 움직였다.',
   rarity: 'epic',
   tags: ['shadow'],

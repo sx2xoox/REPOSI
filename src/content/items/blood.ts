@@ -40,7 +40,7 @@ defineDrawnSprite('icon_leech_tooth', 16, 16, (p) => {
 defineArtifact({
   id: 'leech_tooth',
   name: '거머리 이빨',
-  desc: '공격력 +1. 처치 시 5% 확률로 체력 반 칸 회복',
+  desc: '공격력 +1. 적을 처치하면 가끔 체력을 회복한다.',
   quote: '조금씩, 꾸준히.',
   signature: '처치한 적의 핏방울이 날아와 스며든다',
   rarity: 'common',
@@ -92,8 +92,7 @@ defineDrawnSprite('icon_bramble_corset', 16, 16, (p) => {
 defineArtifact({
   id: 'bramble_corset',
   name: '가시덩굴 코르셋',
-  desc: '피격 시 가시가 터져 주변 적에게 피해와 출혈을 준다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '피격당하면 가시가 터져 주변 적에게 피해와 출혈을 준다.',
   quote: '안아주려는 자에게도 가시가 돋는다.',
   rarity: 'common',
   tags: ['blood'],
@@ -130,8 +129,7 @@ defineDrawnSprite('icon_iron_quill', 16, 16, (p) => {
 defineArtifact({
   id: 'iron_quill',
   name: '무쇠 깃촉',
-  desc: '관통 +1. 관통할 때마다 피해 +20% (탄환 한정)',
-  detail: '관통 보너스는 한 발에 최대 3번(+60%). 탄속 +10%.',
+  desc: '관통 +1. 적을 꿰뚫을 때마다 탄환 피해가 커진다.',
   quote: '펜은 칼보다 깊이 박힌다.',
   rarity: 'common',
   tags: ['blood'],
@@ -184,8 +182,7 @@ defineDrawnSprite('icon_crimson_edge', 16, 16, (p) => {
 defineArtifact({
   id: 'crimson_edge',
   name: '진홍 칼날',
-  desc: '공격이 15% 확률로 출혈을 일으킨다. 출혈은 중첩된다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격하면 15% 확률로 적에게 출혈을 일으킨다.',
   quote: '베인 자리가 오래 아프다.',
   rarity: 'rare',
   tags: ['blood'],
@@ -217,7 +214,7 @@ defineDrawnSprite('icon_heartstring', 16, 16, (p) => {
 defineArtifact({
   id: 'heartstring',
   name: '심장 실',
-  desc: '빨간 체력 최대 시 공격 피해 +20% (지속 제외)',
+  desc: '빨간 체력이 가득 차 있으면 피해가 20% 늘어난다.',
   quote: '온전할 때, 가장 강하다.',
   rarity: 'rare',
   tags: ['blood'],
@@ -257,8 +254,8 @@ defineDrawnSprite('icon_blood_pact', 16, 16, (p) => {
 defineArtifact({
   id: 'blood_pact',
   name: '피의 서약',
-  desc: '공격력 +25%, 최대 체력 -1칸. 피격 후 2회 치명타',
-  detail: '보유 중 최대 빨간 체력이 감소한다. 버리면 최대치는 복구되지만 잃은 체력은 회복되지 않는다.',
+  desc: '공격력 +25%. 피격당하면 다음 공격이 치명타가 된다.',
+  detail: '대신 최대 체력이 한 칸 줄어든다.',
   quote: '서명은 피로 한다.',
   signature: '피격당하면 다음 공격 2회가 반드시 치명타가 된다',
   rarity: 'epic',
@@ -309,8 +306,7 @@ defineDrawnSprite('fx_blood_moon_small', 7, 7, (p) => {
 defineArtifact({
   id: 'blood_moon',
   name: '핏빛 달',
-  desc: '공격력 +1. 처치 시 핏빛 화살 4발이 다른 적을 쫓는다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격력 +1. 적을 처치하면 핏빛 화살이 다른 적을 쫓는다.',
   quote: '달이 붉게 물드는 밤엔, 사냥꾼도 사냥감이 된다.',
   rarity: 'legendary',
   tags: ['blood', 'shadow'],

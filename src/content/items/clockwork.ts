@@ -39,8 +39,8 @@ defineDrawnSprite('icon_cracked_hourglass', 16, 16, (p) => {
 defineArtifact({
   id: 'cracked_hourglass',
   name: '금 간 모래시계',
-  desc: '공격 속도 +0.4, 사거리 -10%. 전투 시작 시 적 둔화',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격 속도 +0.4. 전투가 시작되면 적이 잠시 느려진다.',
+  detail: '대신 사거리가 조금 줄어든다.',
   signature: '전투가 시작되면 모래시계가 뒤집혀 적이 2초간 느려진다',
   quote: '모래가 새도 시간은 흐른다.',
   rarity: 'common',
@@ -91,7 +91,7 @@ defineDrawnSprite('icon_wind_up_key', 16, 16, (p) => {
 defineArtifact({
   id: 'wind_up_key',
   name: '태엽 열쇠',
-  desc: '열쇠 +2. 가진 열쇠 1개당 공격력 +0.25 (최대 +3)',
+  desc: '열쇠 +2. 가진 열쇠가 많을수록 공격력이 오른다.',
   quote: '감을수록 단단해진다.',
   rarity: 'common',
   tags: ['clockwork'],
@@ -134,8 +134,7 @@ defineDrawnSprite('icon_tick_bomb', 16, 16, (p) => {
 defineArtifact({
   id: 'tick_bomb',
   name: '째깍 폭탄 꾸러미',
-  desc: '폭탄 +3. 폭탄을 놓으면 주변 적이 잠시 멈춘다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '폭탄 +3. 폭탄을 놓으면 주변 적이 잠시 멈춘다.',
   quote: '째깍, 째깍, 쾅.',
   rarity: 'common',
   tags: ['clockwork'],
@@ -183,8 +182,7 @@ defineDrawnSprite('icon_rusted_nail', 16, 16, (p) => {
 defineArtifact({
   id: 'rusted_nail',
   name: '녹슨 못',
-  desc: '공격이 15% 확률로 적을 약화시킨다 (받는 피해 +25%)',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격하면 15% 확률로 적이 약해져 피해를 더 받는다.',
   quote: '작은 상처가 큰 병이 된다.',
   rarity: 'common',
   tags: ['clockwork'],
@@ -226,8 +224,7 @@ defineDrawnSprite('icon_gear_turret', 16, 16, (p) => {
 defineArtifact({
   id: 'gear_turret',
   name: '톱니 포탑',
-  desc: '태엽 포탑이 졸졸 따라다니며 가까운 적을 쏜다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '태엽 포탑이 따라다니며 가까운 적을 쏜다.',
   quote: '태엽이 다 풀릴 때까지 쏜다.',
   rarity: 'rare',
   tags: ['clockwork'],
@@ -262,8 +259,8 @@ defineDrawnSprite('icon_pendulum_weight', 16, 16, (p) => {
 defineArtifact({
   id: 'pendulum_weight',
   name: '진자 추',
-  desc: '탄환이 부메랑처럼 되돌아온다 (탄환 한정). 넉백 +30%',
-  detail: '첫 적중 또는 벽에서 귀환. 같은 적은 왕복 각 1회, 귀환 피해 35%. 귀환탄은 추가 효과를 발동하지 않는다. 광휘의 창 제외.',
+  desc: '탄환이 부메랑처럼 되돌아오고 넉백이 세진다.',
+  detail: '되돌아오는 탄환은 피해가 약하다.',
   quote: '떠난 것은 반드시 돌아온다.',
   rarity: 'rare',
   tags: ['clockwork'],
@@ -302,8 +299,8 @@ defineDrawnSprite('icon_armillary', 16, 16, (p) => {
 defineArtifact({
   id: 'armillary',
   name: '작은 혼천의',
-  desc: '3번째 공격마다 탄환이 주위를 돌다 강해져 날아간다',
-  detail: '무기 탄환에 적용. 근접은 회전탄을 추가 발사하며 광선에는 미적용. 2개 이상이면 2번째마다.',
+  desc: '세 번째 공격마다 탄환이 주위를 돌다 강해져 날아간다.',
+  detail: '광선 무기에는 효과가 없다.',
   quote: '하늘의 길을 손안에 담았다.',
   rarity: 'epic',
   tags: ['clockwork', 'star'],
@@ -369,7 +366,7 @@ function metronomeOn(w: { time: number; player: { lastHurtAt: number } }): boole
 defineArtifact({
   id: 'metronome_heart',
   name: '메트로놈 심장',
-  desc: '3초 동안 피격당하지 않으면 공격 속도 +25%',
+  desc: '한동안 피격당하지 않으면 공격 속도가 25% 오른다.',
   quote: '똑, 딱. 심장도 박자를 탄다.',
   rarity: 'epic',
   tags: ['clockwork'],
@@ -426,8 +423,7 @@ defineDrawnSprite('fx_abyss_glass', 7, 9, (p) => {
 defineArtifact({
   id: 'abyssal_hourglass',
   name: '심연의 모래시계',
-  desc: '공격 속도 +0.5. 피격 시 적의 시간 3초 정지',
-  detail: '적과 적 탄환에 적용. 재사용 대기 6초.',
+  desc: '공격 속도 +0.5. 피격당하면 적의 시간이 잠시 멈춘다.',
   quote: '시간도 심연 앞에서는 걸음을 멈춘다.',
   rarity: 'legendary',
   tags: ['clockwork', 'shadow'],

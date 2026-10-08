@@ -214,8 +214,7 @@ function waxFlourish(w: World): void {
 defineArtifact({
   id: 'bowstring_wax',
   name: '시위 밀랍',
-  desc: '충전 무기: 가득 충전한 공격 피해 +12%',
-  detail: '끝까지 모아 쏜 탄환과 거인의 대검 회전 베기에만 붙고 호박색으로 빛난다. 덜 모은 공격, 해방·다른 유물의 공격, 충전하지 않는 무기에는 없다. 중복 시 +12%씩 더해진다.',
+  desc: '충전 무기로 가득 모은 공격의 피해가 12% 오른다.',
   quote: '잘 먹인 시위는 소리부터 다르다.',
   rarity: 'common',
   tags: ['venom'],
@@ -336,8 +335,7 @@ function breathTick(w: World): void {
 defineArtifact({
   id: 'steady_breath',
   name: '숨 고르기',
-  desc: '충전 무기: 가득 찬 순간 0.8초간 주변 적·적탄 50% 둔화',
-  detail: '반경 90, 보스는 30%이고 얼지 않는다. 자동 발사 무기는 쏘는 순간 발동. 재사용 대기 3초, 적이 없으면 발동하지 않는다. 중복 시 지속 +0.3초·반경 +10.',
+  desc: '충전 무기가 가득 차는 순간 주변 적과 적탄이 느려진다.',
   quote: '쏘기 전에 한 번, 깊게.',
   rarity: 'rare',
   tags: ['frost'],
@@ -447,8 +445,7 @@ function venomFor(w: World, c: number, power: number) {
 defineArtifact({
   id: 'venom_fletch',
   name: '독 깃',
-  desc: '충전 무기: 모은 만큼 독 (최대 3초간 공격력 39%)',
-  detail: '거인의 대검 베기를 포함해 맞힌 모든 적에게 묻고, 덜 모으면 모은 비율만큼 약하다. 같은 적에게는 0.5초마다 한 번, 독 중첩 규칙(최대 8중첩)을 따른다. 중복 시 지속 +50%.',
+  desc: '충전 무기로 맞힌 적은 모은 만큼 강한 독에 걸린다.',
   quote: '깃털 끝에 한 방울이면 충분하다.',
   rarity: 'rare',
   tags: ['venom'],
@@ -535,8 +532,7 @@ const thunderCrackle: ProjBehavior = {
 defineArtifact({
   id: 'thunder_fletching',
   name: '낙뢰 깃털',
-  desc: '충전 무기: 가득 충전 공격이 맞힌 적에 낙뢰 (55%)',
-  detail: '벼락은 공격력의 55%에 0.25초 기절, 가까운 적 2명에게 번개가 튄다(35%부터 15%씩 약해짐). 공격마다 한 번, 공격 속도 간격보다 자주는 없다. 중복 시 벼락 1.6배·1.95배.',
+  desc: '충전 무기로 가득 모은 공격이 맞힌 적에게 벼락이 떨어진다.',
   quote: '깃털 하나가 하늘을 끌어내린다.',
   rarity: 'epic',
   tags: ['storm'],
@@ -787,8 +783,8 @@ function meteorReset(w: World): void {
 defineArtifact({
   id: 'meteor_string',
   name: '별똥 시위',
-  desc: '충전 무기: 가득 찬 뒤 0.5초 더 모으면 과충전',
-  detail: '(공격 속도가 빠르면 더 짧다) 자동 발사 무기도 기다렸다 쏜다. 탄환이 별똥 하나로 뭉쳐 크기 2배·피해 +50%, 처음 맞힌 적에서 폭발(반경 30, 그 적 80%·주변 40%). 대검은 회전 베기 +50%·충격파 90%.',
+  desc: '충전 무기가 가득 찬 뒤 더 모으면 터지는 별똥 일격이 나간다.',
+  detail: '자동으로 쏘는 무기도 별똥이 될 때까지 기다렸다 쏜다.',
   quote: '가장 오래 버틴 별이 가장 멀리 떨어진다.',
   rarity: 'legendary',
   tags: ['star'],

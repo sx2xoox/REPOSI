@@ -161,12 +161,13 @@ function lateGain(weapon: string, id: string, dash?: number): number {
 
 // ---------------------------------------------------------------- definitions
 describe('whirl-arts: definitions', () => {
-  const want: Record<string, { rarity: string; tag: string; prefix: string }> = {
-    whirl_grip: { rarity: 'epic', tag: 'storm', prefix: '근접 무기:' },
-    skysplit_sheath: { rarity: 'legendary', tag: 'star', prefix: '근접 무기:' },
-    craftsman_file: { rarity: 'rare', tag: 'clockwork', prefix: '근접·광선·충전 무기:' },
-    cross_crest: { rarity: 'epic', tag: 'blood', prefix: '무기 교체:' },
-    steel_pulse: { rarity: 'epic', tag: 'storm', prefix: '근접·충전 무기:' },
+  // `names`: the weapon types (or the swap) the one-sentence desc must still name
+  const want: Record<string, { rarity: string; tag: string; names: string }> = {
+    whirl_grip: { rarity: 'epic', tag: 'storm', names: '근접 무기' },
+    skysplit_sheath: { rarity: 'legendary', tag: 'star', names: '근접 무기' },
+    craftsman_file: { rarity: 'rare', tag: 'clockwork', names: '근접·광선·충전 무기' },
+    cross_crest: { rarity: 'epic', tag: 'blood', names: '무기를 바꿔' },
+    steel_pulse: { rarity: 'epic', tag: 'storm', names: '근접·충전 무기' },
   };
   it('declares the five artifacts with Korean texts, icons, looks and pools', () => {
     for (const id of IDS) {
@@ -174,9 +175,10 @@ describe('whirl-arts: definitions', () => {
       const wnt = want[id];
       expect(a.rarity, id).toBe(wnt.rarity);
       expect(a.tags, id).toEqual([wnt.tag]);
-      expect(a.desc.startsWith(wnt.prefix), `${id}: ${a.desc}`).toBe(true);
+      expect(a.desc.includes(wnt.names), `${id}: ${a.desc}`).toBe(true);
       expect(a.desc.length, id).toBeLessThanOrEqual(36);
-      for (const t of [a.name, a.desc, a.detail ?? '', a.quote ?? '']) expect(t, id).toMatch(HANGUL);
+      for (const t of [a.name, a.desc, a.quote ?? '']) expect(t, id).toMatch(HANGUL);
+      if (a.detail) expect(a.detail, id).toMatch(HANGUL);
       expect(hasSprite(a.icon), id).toBe(true);
       expect(lookIsVisible(a.look), id).toBe(true);
       expect(a.pools.length, id).toBeGreaterThan(0);

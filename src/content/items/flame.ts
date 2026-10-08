@@ -43,8 +43,7 @@ defineDrawnSprite('icon_tinder_pouch', 16, 16, (p) => {
 defineArtifact({
   id: 'tinder_pouch',
   name: '부싯깃 주머니',
-  desc: '공격이 15% 확률로 적을 불태운다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격하면 15% 확률로 적을 불태운다.',
   quote: '작은 불씨 하나면 충분하다.',
   rarity: 'common',
   tags: ['flame'],
@@ -76,7 +75,7 @@ defineDrawnSprite('icon_smoldering_coal', 16, 16, (p) => {
 defineArtifact({
   id: 'smoldering_coal',
   name: '꺼지지 않는 숯',
-  desc: '불타는 적에게 주는 피해 +20%',
+  desc: '불타는 적에게 주는 피해가 20% 늘어난다.',
   quote: '식은 줄 알았지?',
   rarity: 'common',
   tags: ['flame'],
@@ -113,8 +112,7 @@ defineDrawnSprite('icon_bellows', 16, 16, (p) => {
 defineArtifact({
   id: 'bellows',
   name: '작은 풀무',
-  desc: '직접 공격의 등불 기본 충전량 +30%',
-  detail: '광선·보스 대상의 충전 감쇠 적용. 추가 파편·지속 피해·해방은 충전 제외.',
+  desc: '적을 공격하면 등불 게이지가 30% 더 빨리 찬다.',
   quote: '숨을 불어넣으면 불은 대답한다.',
   rarity: 'common',
   tags: ['flame', 'clockwork'],
@@ -149,8 +147,7 @@ defineDrawnSprite('icon_ashwalk_boots', 16, 16, (p) => {
 defineArtifact({
   id: 'ashwalk_boots',
   name: '잿불 장화',
-  desc: '대시한 자리에 불길이 남아 적을 태운다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '대시한 길을 따라 불길이 남아 적을 태운다.',
   quote: '걸음마다 잿더미.',
   rarity: 'rare',
   tags: ['flame', 'shadow'],
@@ -202,8 +199,7 @@ defineDrawnSprite('icon_kiln_core', 16, 16, (p) => {
 defineArtifact({
   id: 'kiln_core',
   name: '가마의 심장',
-  desc: '직접 공격 적중 시 작은 폭발이 일어난다',
-  detail: '최소 간격 0.2초. 직전 폭발 이후 모인 직접 피해의 30%로 폭발(공격력의 25~100%). 느린 강타는 큰 폭발. 추가 파편 제외. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격이 적에게 맞으면 작은 폭발이 일어난다.',
   quote: '그 안의 불은 천 년째 꺼지지 않았다.',
   rarity: 'epic',
   tags: ['flame'],
@@ -237,8 +233,7 @@ defineDrawnSprite('icon_rekindle_plume', 16, 16, (p) => {
 defineArtifact({
   id: 'rekindle_plume',
   name: '재점화 깃털',
-  desc: '쓰러지면 불길 속에서 체력 2칸으로 되살아난다 (1회)',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '쓰러지면 불길 속에서 한 번 되살아난다.',
   quote: '재가 된 것은 다시 타오를 수 있다.',
   rarity: 'epic',
   tags: ['flame', 'blood'],
@@ -288,7 +283,7 @@ defineDrawnSprite('icon_ember_reservoir', 16, 16, (p) => {
 defineArtifact({
   id: 'ember_reservoir',
   name: '불씨 저장고',
-  desc: '등불 해방 후 6초간 공격력 +25%, 공격 속도 +15%',
+  desc: '등불을 해방하면 잠시 공격력과 공격 속도가 오른다.',
   quote: '모아둔 불씨는 한꺼번에 쏟아진다.',
   rarity: 'rare',
   tags: ['flame'],
@@ -339,8 +334,7 @@ defineDrawnSprite('icon_twin_wick', 16, 16, (p) => {
 defineArtifact({
   id: 'twin_wick',
   name: '쌍심지',
-  desc: '해방 0.55초 뒤 추가 발동 (최대 2회)',
-  detail: '1개 보유 시 1회, 2개 이상이면 2회. 추가 해방은 해방 발동 유물을 다시 발동시키지 않는다.',
+  desc: '등불 해방이 잠시 뒤 한 번 더 발동된다.',
   quote: '눈에 쌍심지를 켜고 덤벼라.',
   rarity: 'epic',
   tags: ['flame'],

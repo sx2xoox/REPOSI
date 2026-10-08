@@ -206,8 +206,9 @@ describe('charge arts: definitions', () => {
       const a = Artifacts.must(id);
       expect(a.name, id).toMatch(/[가-힣]/);
       expect(a.desc.length, id).toBeLessThanOrEqual(36);
-      expect(a.desc, id).toMatch(/^충전 무기: /);
-      expect(a.detail ?? '', id).toMatch(/[가-힣]/);
+      // glance-readable: one plain sentence that names the weapon type (the old '충전 무기: ' label is gone)
+      expect(a.desc, id).toContain('충전 무기');
+      if (a.detail) expect(a.detail, id).toMatch(/[가-힣]/);
       expect(a.quote ?? '', id).toMatch(/[가-힣]/);
       expect(hasSprite(a.icon), id).toBe(true);
       expect(lookIsVisible(a.look), id).toBe(true);

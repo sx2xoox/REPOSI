@@ -33,8 +33,8 @@ defineDrawnSprite('icon_copper_coil', 16, 16, (p) => {
 defineArtifact({
   id: 'copper_coil',
   name: '구리 코일',
-  desc: '공격이 10% 확률로 근처 적에게 번개를 튕긴다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격하면 10% 확률로 근처 적에게 번개가 튄다.',
+  detail: '혼자 남은 적에겐 튀지 않는다.',
   quote: '감긴 만큼 튀어 오른다.',
   rarity: 'common',
   tags: ['storm'],
@@ -69,8 +69,7 @@ defineDrawnSprite('icon_static_cape', 16, 16, (p) => {
 defineArtifact({
   id: 'static_cape',
   name: '정전기 망토',
-  desc: '대시가 빨라진다. 대시하면 주변 적에게 번개가 친다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '대시가 빨라지고, 대시하면 주변 적에게 번개가 친다.',
   quote: '옷깃만 스쳐도 찌릿하다.',
   rarity: 'common',
   tags: ['storm', 'shadow'],
@@ -113,7 +112,7 @@ defineDrawnSprite('icon_paper_fan', 16, 16, (p) => {
 defineArtifact({
   id: 'paper_fan',
   name: '바람 접부채',
-  desc: '탄환 +2 (피해 분산). 공격력 -25%, 공격 속도 -10%',
+  desc: '탄환이 2발 늘지만 공격력과 공격 속도가 줄어든다.',
   quote: '바람을 가르면 세 갈래가 된다.',
   rarity: 'rare',
   tags: ['storm'],
@@ -150,8 +149,8 @@ defineDrawnSprite('icon_thunder_drum', 16, 16, (p) => {
 defineArtifact({
   id: 'thunder_drum',
   name: '천둥 북',
-  desc: '방의 첫 전투가 시작되면 적 전체에 벼락',
-  detail: '실제 적이 나타날 때 발동. 방마다 1회이며 재입장·후속 웨이브로 초기화되지 않는다. 동일 적 상태 재부여 0.5초. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '전투가 시작되면 모든 적에게 벼락이 떨어진다.',
+  detail: '방마다 한 번뿐이다.',
   quote: '북이 울리면 하늘이 대답한다.',
   rarity: 'rare',
   tags: ['storm'],
@@ -196,8 +195,7 @@ defineDrawnSprite('icon_ball_lightning', 16, 16, (p) => {
 defineArtifact({
   id: 'ball_lightning',
   name: '구전 정령',
-  desc: '번개 정령이 따라다니며 가까운 적을 감전시킨다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '번개 정령이 따라다니며 가까운 적에게 번개를 쏜다.',
   quote: '말은 안 통하지만, 마음은 통한다.',
   rarity: 'rare',
   tags: ['storm'],
@@ -232,8 +230,8 @@ defineDrawnSprite('icon_stormcaller_rod', 16, 16, (p) => {
 defineArtifact({
   id: 'stormcaller_rod',
   name: '폭풍 부름 지팡이',
-  desc: '치명타 확률 +6%. 치명타가 연쇄 번개를 일으킨다',
-  detail: '직접 치명타만 발동. 처음 맞힌 적을 제외한 주변 적에게 번개가 튄다. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '치명타 확률이 오르고, 치명타가 터지면 주변 적에게 번개가 튄다.',
+  detail: '혼자 남은 적에겐 튀지 않는다.',
   quote: '번개는 가장 높은 곳에 떨어진다.',
   rarity: 'epic',
   tags: ['storm', 'star'],
@@ -270,8 +268,8 @@ defineDrawnSprite('icon_tempest_heart', 16, 16, (p) => {
 defineArtifact({
   id: 'tempest_heart',
   name: '폭풍의 심장',
-  desc: '직접 공격이 번개를 튕긴다. 공격 속도 +20%',
-  detail: '최소 간격 0.2초. 처음 맞힌 적을 제외한 주변 적에게 적용. 추가 파편은 발동 제외. 상태 재부여 0.5초. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격 속도가 오르고, 맞힐 때마다 주변 적에게 번개가 튄다.',
+  detail: '혼자 남은 적에겐 튀지 않는다.',
   quote: '이 심장은 천둥으로 뛴다.',
   rarity: 'legendary',
   tags: ['storm'],

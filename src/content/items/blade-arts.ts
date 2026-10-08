@@ -109,8 +109,7 @@ defineDrawnSprite('icon_whetstone_chip', 16, 16, (p) => {
 defineArtifact({
   id: 'whetstone_chip',
   name: '숫돌 조각',
-  desc: '근접 무기: 근접 사거리 +12%, 근접 피해 +8%',
-  detail: '들고 있는 근접 무기(거인의 대검 포함)의 휘두르기·찌르기·파동에만 적용된다. 해방, 캐릭터 기술, 다른 유물이 만든 베기와 탄환·광선 무기에는 효과가 없다. 중복 시 수치가 그대로 더해진다.',
+  desc: '근접 무기의 사거리와 피해가 늘어난다.',
   quote: '한 번 갈 때마다 칼끝이 한 치씩 멀어진다.',
   rarity: 'common',
   tags: ['blood'],
@@ -209,8 +208,7 @@ function beatFlourish(w: World, x: number, y: number, angle: number): void {
 defineArtifact({
   id: 'rhythm_scabbard',
   name: '박자 칼집',
-  desc: '근접 무기: 3번째 공격마다 피해 +30%, 넉백 +60%',
-  detail: '근접 무기(거인의 대검 포함)의 공격만 센다. 원거리·광선 공격은 세지 않고, 방에 들어가면 처음부터 다시 센다. 세 번째 공격의 휘두르기와 근접 일격(질주 베기·충격파 등)이 모두 강해진다. 강타는 금빛 궤적과 째깍 소리로, 박자는 발밑의 눈금 세 칸으로 보인다. 중복 시 피해 보너스가 더해진다.',
+  desc: '근접 무기의 세 번째 공격마다 더 세게 치고 멀리 밀친다.',
   quote: '하나, 둘, 베어라.',
   rarity: 'common',
   tags: ['clockwork'],
@@ -357,8 +355,7 @@ function riposteLook(pr: Projectile): void {
 defineArtifact({
   id: 'riposte_edge',
   name: '되받는 날',
-  desc: '근접 무기: 쳐낸 적탄을 되받아친다. 해방 게이지 +2',
-  detail: '근접 무기의 휘두르기나 방패로 쳐낸 적 탄환이 서리 칼날이 되어 쏜 적에게 되돌아간다(공격력의 50%, 초당 최대 2발). 원래 탄환을 되돌리는 무기는 되돌린 탄환이 서리 칼날이 되어 최소 그만큼 강해진다. 쳐낼 때마다 해방 게이지 +2(보스 탄환 +1, 초당 최대 +3). 되돌아간 칼날은 다른 유물 효과나 게이지 충전을 일으키지 않는다. 중복 시 칼날 피해 +30%p씩.',
+  desc: '근접 무기로 쳐낸 적탄이 칼날로 되돌아가고 해방 게이지가 찬다.',
   quote: '받은 것은 돌려준다. 조금 더 차갑게.',
   rarity: 'rare',
   tags: ['frost'],
@@ -497,8 +494,7 @@ export function inSweetSpot(sw: MeleeSwing, t: Actor): boolean {
 defineArtifact({
   id: 'spear_tip',
   name: '창끝 별',
-  desc: '근접 무기: 끝부분 적중 시 피해 +15%, 치명타 +10%',
-  detail: '근접 무기의 휘두르기·찌르기가 사거리 바깥 35% 안에서 적을 맞히면 발동한다(공명 종은 고리가 가장 크게 퍼진 반경 기준). 금빛 별이 튀면 성공. 해방·캐릭터 기술·다른 유물의 베기에는 적용되지 않는다. 중복 시 피해 보너스가 더해지고 치명타 확률은 조금씩 덜 오른다.',
+  desc: '근접 무기 끝으로 맞히면 피해가 오르고 치명타가 잘 터진다.',
   quote: '창은 끝에서 빛난다.',
   rarity: 'rare',
   tags: ['star'],
@@ -593,8 +589,7 @@ function gripOn(w: World): boolean {
 defineArtifact({
   id: 'grip_wrap',
   name: '손에 익은 끈',
-  desc: '모든 무기: 무기를 바꾼 직후 첫 공격 피해 +40%',
-  detail: '무기를 바꾸거나 새로 집은 뒤 2초 안에 시작한 첫 공격에 적용된다(발동 간격 1.5초, 간격 안의 첫 공격은 보너스 없이 지나간다). 방금 보너스를 받은 무기로 곧장 되돌아오면 발동하지 않는다. 탄환·휘두르기는 그 공격 한 번, 광선은 0.6초 동안의 적중이 강해진다. 다른 유물이 만든 탄환·베기에는 적용되지 않는다. 중복 시 보너스가 더해진다.',
+  desc: '무기를 바꾼 직후 첫 공격의 피해가 40% 오른다.',
   quote: '익숙한 손잡이는 망설이지 않는다.',
   rarity: 'common',
   tags: ['shadow'],

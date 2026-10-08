@@ -31,8 +31,7 @@ defineDrawnSprite('icon_viper_fang', 16, 16, (p) => {
 defineArtifact({
   id: 'viper_fang',
   name: '독사의 송곳니',
-  desc: '공격이 20% 확률로 적을 중독시킨다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격하면 20% 확률로 적을 중독시킨다.',
   quote: '한 번 물면 놓지 않는다.',
   rarity: 'common',
   tags: ['venom'],
@@ -67,8 +66,7 @@ defineDrawnSprite('icon_rot_mushroom', 16, 16, (p) => {
 defineArtifact({
   id: 'rot_mushroom',
   name: '썩은 버섯',
-  desc: '최대 체력 +1. 전투가 시작되면 포자로 적을 중독시킨다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '최대 체력이 늘고, 전투가 시작되면 주변 적을 중독시킨다.',
   quote: '유통기한은 묻지 마라.',
   rarity: 'common',
   tags: ['venom'],
@@ -121,7 +119,7 @@ defineDrawnSprite('icon_toad_idol', 16, 16, (p) => {
 defineArtifact({
   id: 'toad_idol',
   name: '두꺼비 우상',
-  desc: '행운 +1. 중독된 적이 죽으면 15% 확률로 동전을 떨군다',
+  desc: '행운이 오르고, 중독된 적이 죽으면 가끔 동전이 나온다.',
   quote: '두꺼비는 복을 물어 온다고 했다.',
   rarity: 'common',
   tags: ['venom', 'star'],
@@ -158,7 +156,7 @@ defineDrawnSprite('icon_swelling_seed', 16, 16, (p) => {
 defineArtifact({
   id: 'swelling_seed',
   name: '부푸는 씨앗',
-  desc: '사거리 +10%. 탄환이 갈수록 커지고 세진다 (탄환 한정)',
+  desc: '사거리가 늘고, 탄환이 날아갈수록 커지고 세진다.',
   quote: '작게 시작해 크게 끝난다.',
   rarity: 'common',
   tags: ['venom'],
@@ -198,8 +196,7 @@ defineDrawnSprite('icon_plague_censer', 16, 16, (p) => {
 defineArtifact({
   id: 'plague_censer',
   name: '역병 향로',
-  desc: '독 안개를 둘러 가까이 온 적을 계속 중독시킨다',
-  detail: '추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '독 안개를 둘러 가까이 온 적을 계속 중독시킨다.',
   quote: '향이 퍼지면, 숨 쉬는 것들이 쓰러진다.',
   rarity: 'rare',
   tags: ['venom'],
@@ -243,8 +240,7 @@ defineDrawnSprite('icon_toxin_splitter', 16, 16, (p) => {
 defineArtifact({
   id: 'toxin_splitter',
   name: '맹독 분열낭',
-  desc: '적중 시 독 방울이 사방으로 튄다 (탄환 3개, 근접 2개)',
-  detail: '직접 공격만 발동한다. 광선은 3개. 독 방울은 처음 맞힌 적을 다시 맞히지 않는다. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '공격이 맞으면 독 방울이 튀어 다른 적을 중독시킨다.',
   quote: '터뜨리면 안 되는 주머니였다.',
   rarity: 'rare',
   tags: ['venom'],
@@ -284,8 +280,7 @@ defineDrawnSprite('icon_nightshade_wreath', 16, 16, (p) => {
 defineArtifact({
   id: 'nightshade_wreath',
   name: '까마중 화관',
-  desc: '중독된 적이 죽으면 독이 번지고 등불 게이지가 찬다',
-  detail: '중독된 적 처치 시 기본 충전 +5, 주변 적에게 독 전파. 행운으로 충전량 증가. 추가 효과 최소 간격 0.2초, 같은 적 상태 재부여 0.5초. 중복·무기 교체 시 간격 공유.',
+  desc: '중독된 적이 죽으면 독이 번지고 등불 게이지가 찬다.',
   quote: '아름다운 것엔 독이 있다.',
   rarity: 'epic',
   tags: ['venom'],
