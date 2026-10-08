@@ -6,7 +6,9 @@
 //     are "herded" and take +25% damage from the keeper's attacks.
 //   dash 비켜서기: a quick sidestep; the sheep keep the spot the keeper left as a
 //     pen for 1.5 s and herd enemies toward it (away from her).
-//   affinity 지팡이: staves add a third sheep and faster headbutts
+//   affinity 지팡이: staves add a third sheep, and an enemy a sheep has
+//     headbutted counts as herded for MORI_MARK_TIME s even when it stands alone
+//     (bosses and stragglers take the herd bonus too)
 //   release 양몰이 돌격 (releaseStampede): a whistle pulls enemies into a pen at
 //     the aim, then a stampede of spectral sheep tramples through it.
 
@@ -28,9 +30,12 @@ import { EnemyOverlay, O, ensureOverlay } from './kit';
 
 export const MORI_SHEEP = 2;
 export const MORI_SHEEP_AFFINITY = 3;
-/** headbutt: damage (x player damage), cooldown (s; x0.8 with the affinity), nudge toward the herd point */
+/** affinity: a headbutted enemy counts as herded for this long (s), alone or not */
+export const MORI_MARK_TIME = 2;
+/** headbutt: damage (x player damage), cooldown (s; x MORI_HEADBUTT_CD_AFFINITY with a staff), nudge toward the herd point */
 export const MORI_HEADBUTT_DMG = 0.38;
 export const MORI_HEADBUTT_CD = 0.75;
+export const MORI_HEADBUTT_CD_AFFINITY = 0.8;
 export const MORI_HEADBUTT_KNOCK = 110;
 /** sheep only work enemies this close to the herd point */
 export const MORI_HERD_RANGE = 120;
@@ -130,6 +135,21 @@ export function herdPoint(w: World): { x: number; y: number } {
   return { x: p.x + Math.cos(p.aim) * MORI_HERD_FRONT, y: p.y + Math.sin(p.aim) * MORI_HERD_FRONT * 0.8 };
 }
 
+/** Is the context keeper holding a staff (the favoured class)? */
+export function moriAffinity(w: World): boolean {
+  return w.player.flags.has('affinity');
+}
+
+/** Affinity mark: a sheep headbutted `e` within the last MORI_MARK_TIME s. */
+export function isMarked(w: World, e: Enemy): boolean {
+  return (e.mem.__moriMark ?? -1) > w.time;
+}
+
+/** Does `e` take the herd bonus from the context keeper (grouped, or marked while she holds a staff)? */
+export function isHerded(w: World, e: Enemy): boolean {
+  return isGrouped(w, e) || (moriAffinity(w) && isMarked(w, e));
+}
+
 /** Another living enemy within MORI_GROUP_DIST of `e`? */
 export function isGrouped(w: World, e: Enemy): boolean {
   const d2 = (MORI_GROUP_DIST + e.r) * (MORI_GROUP_DIST + e.r);
@@ -207,11 +227,13 @@ export class SpiritSheep extends Familiar {
     // the headbutt: a nudge toward the herd point plus a little damage
     this.mem.cd = Math.max(0, this.mem.cd - dt);
     if (target && this.mem.cd <= 0 && dist(this.x, this.y, target.x, target.y) <= target.r + 8) {
-      this.mem.cd = MORI_HEADBUTT_CD * (this.power > 1 ? 0.8 : 1);
+      this.mem.cd = MORI_HEADBUTT_CD * (moriAffinity(w) ? MORI_HEADBUTT_CD_AFFINITY : 1);
       const hx = h.x - target.x;
       const hy = h.y - target.y;
       const hd = Math.hypot(hx, hy) || 1;
       itemHit(w, target, p.stats.damage * MORI_HEADBUTT_DMG, { from: this, knockback: 0, kind: 'melee' });
+      // with a staff the bump marks it: herded even when alone
+      if (moriAffinity(w) && target.alive) target.mem.__moriMark = w.time + MORI_MARK_TIME;
       if (target.alive) target.knock(hx / hd, hy / hd, MORI_HEADBUTT_KNOCK);
       this.face = target.x > this.x ? 1 : -1;
       w.sfx('mori_baa', { vol: 0.35, pitch: 0.95 + this.slot * 0.08 + fx.range(-0.04, 0.04), x: this.x });
@@ -234,11 +256,16 @@ export class SpiritSheep extends Familiar {
   }
 }
 
-/** Soft rings under herded (grouped) enemies (cosmetic). */
+/** Soft rings under herded enemies; a staff's headbutt mark adds a little post above (cosmetic). */
 class HerdMarks extends EnemyOverlay {
   drawMark(r: Renderer, w: World, e: Enemy): void {
-    if (!isGrouped(w, e)) return;
+    if (!isHerded(w, e)) return;
     r.ring(e.x, e.y + 1, e.r + 3, '#9af0e0', 1, 0.3 + 0.1 * Math.sin(this.age * 5));
+    if (isGrouped(w, e) || !isMarked(w, e)) return;
+    const left = (e.mem.__moriMark ?? 0) - w.time;
+    const a = Math.min(1, left / 0.4);
+    r.ring(e.x, e.y + 1, e.r + 5, '#e0fff8', 1, 0.25 * a);
+    r.sprite('fx_mori_post', e.x, e.y - e.z - e.r - 9 + Math.sin(this.age * 4) * 0.6, { alpha: 0.85 * a });
   }
 }
 
@@ -249,12 +276,12 @@ export const MORI_PASSIVE: PassiveDef = {
   icon: 'icon_mori_passive',
   look: { mote: '#9af0e0', aura: '#bff5ea', hit: '#e0fff8' },
   onUpdate(w) {
-    const n = w.player.flags.has('affinity') ? MORI_SHEEP_AFFINITY : MORI_SHEEP;
-    syncFamiliars(w, 'mori_sheep', n, (ww) => new SpiritSheep(ww), w.player.flags.has('affinity') ? 2 : 1);
-    if (w.enemies.length > 1) ensureOverlay(w, 'mori_herd', (ww) => new HerdMarks(ww));
+    const aff = moriAffinity(w);
+    syncFamiliars(w, 'mori_sheep', aff ? MORI_SHEEP_AFFINITY : MORI_SHEEP, (ww) => new SpiritSheep(ww));
+    if (w.enemies.length > 1 || (aff && w.enemies.length > 0)) ensureOverlay(w, 'mori_herd', (ww) => new HerdMarks(ww));
   },
   modifyHit(w, t, hit) {
-    if (!isAttack(hit) || !(t instanceof Enemy) || !isGrouped(w, t)) return;
+    if (!isAttack(hit) || !(t instanceof Enemy) || !isHerded(w, t)) return;
     amplify(hit, MORI_GROUP_BONUS);
     proc(w, 'passive:mori', true);
   },
@@ -296,12 +323,9 @@ export const MORI_DASH: DashDef = {
 // ------------------------------------------------------------------ affinity
 export const MORI_AFFINITY: AffinityDef = {
   name: '지팡이',
-  desc: '지팡이를 들면 혼령 양이 세 마리가 되고 박치기가 빨라진다. 사거리 +5%.',
+  desc: '양이 셋, 박치기가 빨라지고 받힌 적은 혼자여도 2초간 뭉친 적으로 친다.',
   tags: ['staff'],
   ids: ['shepherd_crook', 'crystal_gatling', 'prism_staff', 'dragon_breath', 'thunder_rod', 'meteor_staff', 'flame_staff'],
-  stats(m) {
-    m.mulStat('range', 1.05);
-  },
 };
 
 // ------------------------------------------------------------------ release: 양몰이 돌격

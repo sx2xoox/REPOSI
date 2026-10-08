@@ -6,8 +6,10 @@
 //     guaranteed critical, and for 1.6 s (반격) all damage is x1.5. Bullets that
 //     pass through the dashing keeper inside the window count as well.
 //   dash 찰나 걸음: a short sidestep (36 px)
-//   affinity 단도·도: short blades widen the window (+0.05 s), lengthen 반격
-//     (+0.6 s) and give +8% move speed
+//   affinity 단도·도: short blades widen the window (+0.05 s) and the bullet
+//     return (48 -> 72 px), lengthen 반격 (+0.6 s) and follow the counter slash
+//     with a second, crossing one at the same target (also a guaranteed
+//     critical); +8% move speed as flavour
 //   release 섬광 연참 (releaseFlashSlashes): six teleporting slashes, then a finisher
 
 import type { World } from '../../game/world';
@@ -40,8 +42,13 @@ export const BAEKGU_COUNTER_DMG = 1.5;
 export const BAEKGU_STRIKE_DMG = 1.8;
 export const BAEKGU_STRIKE_REACH = 34;
 export const BAEKGU_STRIKE_RANGE = 70;
+/** affinity: the second (crossing) counter slash — delay after the first (s), damage (x player damage) */
+export const BAEKGU_STRIKE2_DELAY = 0.14;
+export const BAEKGU_STRIKE2_DMG = 1.8;
 /** bullets within this radius are reflected (damage x player damage) */
 export const BAEKGU_REFLECT_RADIUS = 48;
+/** affinity: the perfect dodge returns bullets from this far instead */
+export const BAEKGU_REFLECT_RADIUS_AFFINITY = 72;
 export const BAEKGU_REFLECT_DMG = 1.2;
 /** enemy slow-motion after a perfect dodge: duration (s), time scale */
 export const BAEKGU_SLOW_TIME = 0.4;
@@ -227,22 +234,43 @@ export function perfectDodge(w: World, p: Player): void {
   w.spawn(new RingFx(p.x, p.y - 6, 24, 0.25, '#c8d8ff', 2));
   w.particles.burst(p.x, p.y - 6, { count: 24, speed: [60, 180], life: [0.15, 0.35], colors: WHITE, shape: 'spark', size: [1, 2], additive: true, light: 6 });
   w.lights.glow(p.x, p.y - 6, 80, '#ffffff', 0.8);
-  const reflected = reflectAround(w, p.x, p.y, BAEKGU_REFLECT_RADIUS);
+  const reflected = reflectAround(w, p.x, p.y, hasAffinity(w) ? BAEKGU_REFLECT_RADIUS_AFFINITY : BAEKGU_REFLECT_RADIUS);
   if (reflected) w.sfx('parry', { vol: 0.6, pitch: 1.2 });
-  // the counter slash at the nearest enemy
-  const t = w.nearestEnemy(p.x, p.y, BAEKGU_STRIKE_RANGE);
-  if (t) {
-    const a = angleTo(p.x, p.y, t.x, t.y);
-    const s = p.stats;
-    const sw = p.swing(w, {
-      angle: a, arc: 1.7, reach: BAEKGU_STRIKE_REACH + s.range * 0.03, damage: s.damage * BAEKGU_STRIKE_DMG, knockback: s.knockback * 3,
-      color: '#ffffff', reflect: true, visual: 0.18, duration: 0.1, hitKick: 2.5,
-    });
+  // the counter slash at the nearest enemy (with a short blade, a second one crosses it)
+  w.vars.__bgStrikeTarget = 0;
+  counterSlash(w, p, false);
+  w.vars.__bgStrike2At = hasAffinity(w) ? w.time + BAEKGU_STRIKE2_DELAY : 0;
+  proc(w, 'passive:baekgu');
+}
+
+/**
+ * The counter slash at the nearest enemy (always a critical). `second`: the affinity's crossing
+ * follow-up — it goes after the first slash's target and lunges as far as the sidestep carried
+ * her from it (up to the strike range), so it lands where the first one did.
+ */
+function counterSlash(w: World, p: Player, second: boolean): void {
+  const prev = second ? w.enemies.find((e) => e.id === w.vars.__bgStrikeTarget && e.alive && !e.hidden && e.vulnerable) : undefined;
+  const t = prev && dist(p.x, p.y, prev.x, prev.y) <= BAEKGU_STRIKE_RANGE ? prev : w.nearestEnemy(p.x, p.y, BAEKGU_STRIKE_RANGE);
+  if (!t) return;
+  const a = angleTo(p.x, p.y, t.x, t.y);
+  const s = p.stats;
+  const base = BAEKGU_STRIKE_REACH + s.range * 0.03;
+  const reach = second ? Math.max(base, dist(p.x, p.y, t.x, t.y) + 4) : base;
+  if (!second) w.vars.__bgStrikeTarget = t.id;
+  const sw = p.swing(w, {
+    angle: a, arc: 1.7, reach, damage: s.damage * (second ? BAEKGU_STRIKE2_DMG : BAEKGU_STRIKE_DMG), knockback: s.knockback * (second ? 2 : 3),
+    color: second ? '#c8d8ff' : '#ffffff', reflect: true, visual: 0.18, duration: 0.1, hitKick: 2.5,
+  });
+  if (second) {
+    w.vars.__bgStrike2Id = sw.id;
+    w.sfx('baekgu_counter', { vol: 0.75, pitch: 1.18 });
+    w.spawn(new RingFx(t.x, t.y - t.z - 4, 14, 0.2, '#c8d8ff', 2));
+    w.particles.burst(t.x, t.y - t.z - 4, { count: 10, speed: [60, 160], angle: a + Math.PI / 2, spread: 0.5, life: [0.1, 0.22], colors: WHITE, shape: 'spark', size: [1, 2], additive: true });
+  } else {
     w.vars.__bgStrikeId = sw.id;
     w.sfx('baekgu_counter', { vol: 0.9 });
-    p.aim = a;
   }
-  proc(w, 'passive:baekgu');
+  p.aim = a;
 }
 
 /** Try to count the current dash as a perfect dodge (once per dash). */
@@ -264,8 +292,8 @@ export const BAEKGU_PASSIVE: PassiveDef = {
   },
   modifyHit(w, t, hit) {
     if (!isAttack(hit) || !(t instanceof Enemy)) return;
-    // the counter slash is always a critical
-    if (hit.source && hit.source.id === w.vars.__bgStrikeId && !hit.crit) {
+    // the counter slashes are always critical
+    if (hit.source && (hit.source.id === w.vars.__bgStrikeId || hit.source.id === w.vars.__bgStrike2Id) && !hit.crit) {
       hit.crit = true;
       hit.damage *= w.player.stats.critMult;
     }
@@ -276,6 +304,11 @@ export const BAEKGU_PASSIVE: PassiveDef = {
     if ((w.vars.__bgSlowUntil ?? 0) > 0 && w.time >= w.vars.__bgSlowUntil!) {
       if (!timeStopped(w) && Math.abs(w.enemyTimeScale - (w.vars.__bgSlowScale ?? -1)) < 1e-9) w.enemyTimeScale = 1;
       w.vars.__bgSlowUntil = 0;
+    }
+    // the short blade's crossing follow-up slash
+    if ((w.vars.__bgStrike2At ?? 0) > 0 && w.time >= w.vars.__bgStrike2At!) {
+      w.vars.__bgStrike2At = 0;
+      if (p.alive && hasAffinity(w)) counterSlash(w, p, true);
     }
     watch(w, 'bgCounter', inCounter(w) ? 1 : 0);
     if (inCounter(w) && p.alive && fx.chance(dt * 10)) {
@@ -323,7 +356,7 @@ export const BAEKGU_DASH: DashDef = {
 // ------------------------------------------------------------------ affinity
 export const BAEKGU_AFFINITY: AffinityDef = {
   name: '단도·도',
-  desc: '짧은 칼을 들면 간파 창이 넓어지고 반격이 길어진다. 이동 속도 +8%.',
+  desc: '간파 창·반사 범위가 넓어지고, 반격이 길어지며 베기가 두 번 들어간다.',
   tags: ['quick'],
   ids: ['fang_blade', 'twin_daggers', 'moon_katana', 'chain_sickle', 'return_blade'],
   stats(m) {

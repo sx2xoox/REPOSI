@@ -8,8 +8,9 @@
 //     heavy (knockback resistance).
 //   dash 몸통 밀치기: a short, heavy shove; a shield wall in front blocks bullets
 //     and shoves enemies for ~0.3 s
-//   affinity 묵직한 무기: +10% damage, +30% knockback and double room-clear
-//     barrel charges with heavy weapons
+//   affinity 묵직한 무기: with a heavy weapon the body block stands longer and
+//     wider and shoves harder (longer stun), and every weapon hit pours a little
+//     into the barrel (by the hit's size); +30% knockback as flavour
 //   release 구조의 울음 (releaseRescueHowl): a howl that stuns and knocks every
 //     enemy around, heals, then a lantern beacon pulses for 2.4 s
 //
@@ -28,7 +29,8 @@ import { defineDrawnSprite } from '../../engine/sprites';
 import { fx } from '../../engine/rng';
 import { clamp } from '../../engine/math';
 import { glowSprite } from '../weapons/common';
-import { bossSafe, cooldown, proc } from '../items/lib';
+import { bossSafe, cooldown, hitShare, isAttack, proc } from '../items/lib';
+import { Enemy } from '../../game/enemy';
 import { HitFalloff, clearBullets, releaseHit } from './releases';
 import { KitTimeline, everyTick, releaseOpen } from './kit-common';
 import { O } from './kit';
@@ -47,10 +49,19 @@ export const BORI_DRINK_HEAL = 2;
 export const BORI_SHIELD_CAP = 2;
 /** knockback resistance (Entity.mass; 1 = a normal keeper) */
 export const BORI_MASS = 2.6;
-/** body block: duration (s), shove damage (fraction of player damage), knockback */
+/** body block: duration (s), bullet-block radius, shove damage (fraction of player damage), stun (s), knockback */
 export const BORI_BLOCK_TIME = 0.32;
+export const BORI_BLOCK_RADIUS = 20;
 export const BORI_SHOVE_DMG = 0.6;
+export const BORI_SHOVE_STUN = 0.3;
 export const BORI_SHOVE_KNOCK = 320;
+/** affinity (heavy weapon): the body block's duration, radius, shove damage and stun */
+export const BORI_BLOCK_TIME_AFFINITY = 0.45;
+export const BORI_BLOCK_RADIUS_AFFINITY = 24;
+export const BORI_SHOVE_DMG_AFFINITY = 1.2;
+export const BORI_SHOVE_STUN_AFFINITY = 0.6;
+/** affinity: barrel poured in per weapon hit, x the hit's size (hitShare: 1 = one plain hit) */
+export const BORI_HIT_CHARGE = 0.01;
 /** release: howl damage, beacon pulses (damage each, with falloff), final pulse */
 export const BORI_HOWL_DMG = 3;
 export const BORI_HOWL_RADIUS = 95;
@@ -104,6 +115,11 @@ defineDrawnSprite('fx_bori_charge', 5, 6, (p) => {
 for (let d = 20; d <= 44; d += 4) glowSprite(d, '#ffb86a');
 
 // ------------------------------------------------------------------ barrel
+/** Is the context keeper holding a heavy weapon (the favoured class)? */
+export function boriAffinity(w: World): boolean {
+  return w.player.flags.has('affinity');
+}
+
 /** Barrel charges (0..BORI_MAX_CHARGES, fractional while filling). */
 export function barrel(w: World): number {
   return w.vars.__boriBarrel ?? 0;
@@ -259,7 +275,13 @@ export const BORI_PASSIVE: PassiveDef = {
     if (overflow > 0) addBarrel(w, overflow / 2);
   },
   onRoomClear(w) {
-    addBarrel(w, BORI_ROOM_CHARGE * (w.player.flags.has('affinity') ? 2 : 1), true);
+    addBarrel(w, BORI_ROOM_CHARGE, true);
+  },
+  onHit(w, t, hit) {
+    // a heavy weapon's every blow pours a little into the barrel (by the hit's size)
+    if (!boriAffinity(w) || !(t instanceof Enemy) || !isAttack(hit) || hit.release) return;
+    if (!hit.source || hit.source instanceof BodyBlock || hit.attacker !== w.player) return;
+    addBarrel(w, BORI_HIT_CHARGE * hitShare(w, hit), true);
   },
   onHurt(w) {
     // the barrel tips over when she is hit: a puddle to stand in
@@ -295,7 +317,12 @@ export const BORI_PASSIVE: PassiveDef = {
 export class BodyBlock extends Entity {
   dx: number;
   dy: number;
-  life = BORI_BLOCK_TIME;
+  life: number;
+  /** bullet-block radius; the heavy weapon's wall is wider */
+  R: number;
+  /** shove damage (x player damage) and stun (s) */
+  shove: number;
+  stun: number;
   blocked = 0;
   constructor(w: World) {
     super();
@@ -307,6 +334,11 @@ export class BodyBlock extends Entity {
     this.layer = 2;
     this.tileCollide = false;
     this.team = 'player';
+    const heavy = boriAffinity(w);
+    this.life = heavy ? BORI_BLOCK_TIME_AFFINITY : BORI_BLOCK_TIME;
+    this.R = heavy ? BORI_BLOCK_RADIUS_AFFINITY : BORI_BLOCK_RADIUS;
+    this.shove = heavy ? BORI_SHOVE_DMG_AFFINITY : BORI_SHOVE_DMG;
+    this.stun = heavy ? BORI_SHOVE_STUN_AFFINITY : BORI_SHOVE_STUN;
   }
 
   override update(w: World, dt: number): void {
@@ -319,7 +351,7 @@ export class BodyBlock extends Entity {
       return;
     }
     // bullets in the front half-disc are blocked
-    const R = 20;
+    const R = this.R;
     for (const pr of w.projectiles) {
       if (pr.dead || pr.team !== 'enemy' || pr.delay > 0) continue;
       const rx = pr.x - p.x;
@@ -336,13 +368,13 @@ export class BodyBlock extends Entity {
       w.renderer.kick(this.dx * 0.8, this.dy * 0.8);
     }
     // enemies in front get shoved once
-    const d = p.stats.damage * BORI_SHOVE_DMG;
+    const d = p.stats.damage * this.shove;
     for (const e of w.enemies) {
       if (!e.alive || e.hidden || !e.vulnerable || e.z > 12) continue;
       if ((e.mem.__boriShoveAt ?? -99) > w.time - 0.5) continue;
       const rx = e.x - p.x;
       const ry = e.y - p.y;
-      const rr = p.r + e.r + 7;
+      const rr = p.r + e.r + 7 + (this.R - BORI_BLOCK_RADIUS);
       if (rx * rx + ry * ry > rr * rr) continue;
       const l = Math.hypot(rx, ry) || 1;
       if ((rx * this.dx + ry * this.dy) / l < -0.3) continue;
@@ -350,7 +382,7 @@ export class BodyBlock extends Entity {
       const kx = (rx / l) * 0.4 + this.dx;
       const ky = (ry / l) * 0.4 + this.dy;
       const kl = Math.hypot(kx, ky) || 1;
-      const stun = bossSafe(e, { kind: 'stun', duration: 0.3 });
+      const stun = bossSafe(e, { kind: 'stun', duration: this.stun });
       if (w.applyHit(e, { damage: d, kind: 'melee', attacker: p, dirX: kx / kl, dirY: ky / kl, knockback: BORI_SHOVE_KNOCK, statuses: stun ? [stun] : undefined })) {
         w.sfx('hit_metal', { vol: 0.4, pitch: 0.75, x: e.x });
         w.spawn(new RingFx(e.x, e.y - e.z - 4, 16, 0.22, '#ffd9b0', 2));
@@ -366,6 +398,8 @@ export class BodyBlock extends Entity {
     const a = Math.atan2(this.dy, this.dx);
     const cx = this.x + Math.cos(a) * 9;
     const cy = this.y - 4 + Math.sin(a) * 7;
+    const rad = 11 + (this.R - BORI_BLOCK_RADIUS) * 0.5;
+    const heavy = this.R > BORI_BLOCK_RADIUS;
     // a translucent shield arc in front of the keeper
     const c = r.ctx;
     c.save();
@@ -374,12 +408,21 @@ export class BodyBlock extends Entity {
     c.strokeStyle = '#ffd9b0';
     c.lineWidth = 2;
     c.beginPath();
-    c.arc(0, 0, 11, a - 1.25, a + 1.25);
+    c.arc(0, 0, rad, a - 1.25, a + 1.25);
     c.stroke();
+    if (heavy) {
+      // the heavy weapon's wall: a second, golden rim (the barrel's bands)
+      c.globalAlpha = 0.45 * k + 0.15;
+      c.strokeStyle = '#f0c050';
+      c.lineWidth = 1;
+      c.beginPath();
+      c.arc(0, 0, rad + 2, a - 1.1, a + 1.1);
+      c.stroke();
+    }
     c.globalAlpha = 0.25 * k;
     c.fillStyle = '#ffe8c0';
     c.beginPath();
-    c.arc(0, 0, 11, a - 1.25, a + 1.25);
+    c.arc(0, 0, rad, a - 1.25, a + 1.25);
     c.lineTo(0, 0);
     c.fill();
     c.restore();
@@ -407,11 +450,10 @@ export const BORI_DASH: DashDef = {
 // ------------------------------------------------------------------ affinity
 export const BORI_AFFINITY: AffinityDef = {
   name: '묵직한 무기',
-  desc: '무거운 무기를 들면 피해 +10%, 넉백 +30%, 방을 치울 때 통이 두 배로 찬다.',
+  desc: '밀치기 방패가 크고 오래 서며 더 세게 밀친다. 칠 때마다 통이 조금씩 찬다.',
   tags: ['heavy'],
   ids: ['great_hammer', 'titan_greatsword', 'quake_mace', 'reaper_scythe', 'lantern_flail'],
   stats(m) {
-    m.mulStat('damage', 1.1);
     m.mulStat('knockback', 1.3);
   },
 };
