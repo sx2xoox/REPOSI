@@ -11,7 +11,7 @@ import {
   type ArtifactDef, type CharacterDef, type ItemHooks, type ItemPool, type Rarity,
 } from './defs';
 import { LookSystem, type LookSource } from './look';
-import { BASE_STATS, POOLED_STATS, StatMods, WEAPON_STATS, computeStats, softBonus, type StatKey, type Stats } from './stats';
+import { BASE_STATS, POOLED_STATS, StatMods, WEAPON_DAMAGE_SCALE, WEAPON_STATS, computeStats, softBonus, type StatKey, type Stats } from './stats';
 import { makeItem, type InvComputed, type InvItem } from './inventory';
 import type { PedestalItem } from './pickups';
 import type { RNG } from '../engine/rng';
@@ -216,6 +216,7 @@ export class ItemSystem {
       armed.mulStat(k, wm.mul[k]!);
       if (!WEAPON_STATS.has(k)) keeper.mulStat(k, wm.mul[k]!);
     }
+    armed.mulStat('damage', WEAPON_DAMAGE_SCALE);
     const oldMax = p.stats ? p.maxRed : -1;
     p.stats = computeStats(base, keeper);
     p.armedStats = computeStats(base, armed);

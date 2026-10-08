@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { WEAPON_DAMAGE_SCALE } from '../src/game/stats';
 import { bestDps, DUMMY_ID, measureDps, PLAIN_ID } from './dpsharness';
 import { Weapons } from '../src/game/defs';
 import { FIXED_DT } from '../src/game/constants';
@@ -43,7 +44,7 @@ function setup(distance = 80) {
 describe('titan greatsword enlarged reach through real combat', () => {
   it('holds its completed charge, reaches an 80px target once, and retains its damage and recovery', () => {
     const s = setup(80), hp = s.target.hp;
-    expect(s.p.weaponStats.damage).toBeCloseTo(9.8);
+    expect(s.p.weaponStats.damage).toBeCloseTo(9.8 * WEAPON_DAMAGE_SCALE);
     expect(s.p.weaponStats.fireRate).toBeCloseTo(1.82);
     const frames = s.charge();
     expect(frames * FIXED_DT).toBeGreaterThanOrEqual(.85);

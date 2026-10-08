@@ -1,4 +1,5 @@
 import './headless';
+import { WEAPON_DAMAGE_SCALE } from '../src/game/stats';
 import { it,expect } from 'vitest';
 import { fakeDisplay } from './headless';
 import { Renderer } from '../src/engine/renderer';
@@ -40,8 +41,8 @@ it('cannot spend at a distance, in another stage, with changed materials or insu
 });
 it('weapon damage scales without altering artifact/character stats and survives a slot swap and checkpoint',()=>{
  const {w}=setup('refinery'),p=w.player;p.weapon.mem.temper=3;const base=p.stats.damage;
- expect(p.weaponStats.damage).toBeCloseTo(base*1.3);expect(p.stats.damage).toBe(base);
- expect(p.fireProjectiles(w,0,{count:1})[0].damage).toBeCloseTo(base*1.3);
+ expect(p.weaponStats.damage).toBeCloseTo(base*1.3*WEAPON_DAMAGE_SCALE);expect(p.stats.damage).toBe(base);
+ expect(p.fireProjectiles(w,0,{count:1})[0].damage).toBeCloseTo(base*1.3*WEAPON_DAMAGE_SCALE);
  expect(p.fireProjectiles(w,0,{count:1,fromWeapon:false})[0].damage).toBeCloseTo(base);
  p.equipWeapon(w,'iron_spear');expect(p.weapon.mem.temper??0).toBe(0);expect(p.weapon2.mem.temper).toBe(3);swapWeapons(w,p,true);
  const cp=captureCheckpoint(w),other=setup('refinery').w;restoreCheckpoint(other,cp);expect(other.player.weapon.mem.temper).toBe(3);expect(other.player.weapon2.mem.temper??0).toBe(0);

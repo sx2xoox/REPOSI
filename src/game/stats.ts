@@ -125,6 +125,14 @@ export function softBonus(bonus: number): number {
  * or a light weapon no longer changes how hard every other effect hits. Weapon changes to
  * other stats (move speed, hearts, dash ...) still apply to the keeper.
  */
+/**
+ * Every weapon's own attacks deal this share of their damage (user 2026-10-08: late in a run
+ * the keeper pick stopped mattering — weapons down 15 %, the keeper's favoured weapon class
+ * upgrades its own kit instead, see CharacterDef.affinity). Keeper kits, releases and artifact
+ * procs read p.stats and are not scaled.
+ */
+export const WEAPON_DAMAGE_SCALE = 0.85;
+
 export const WEAPON_STATS: ReadonlySet<StatKey> = new Set<StatKey>([
   'damage', 'fireRate', 'range', 'shotSpeed', 'projSize', 'spread', 'pierce', 'bounce', 'homing', 'knockback', 'shots',
 ]);
