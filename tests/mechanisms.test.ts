@@ -14,12 +14,13 @@ import { endEncounter } from '../src/content/rooms/encounter-kit';
 import { inBeam, vaultAlarm, beamDistance } from '../src/content/rooms/vault-alarm';
 import { Entity } from '../src/game/entity';
 import { runCoop } from './coopsim';
+import { HuntDevice } from '../src/content/rooms/hunt';
 loadContent();
-function setup(kind:'relay'|'workshop'|'vault'|'elite'|'challenge',players=1){
+function setup(kind:'relay'|'workshop'|'vault'|'hunt'|'elite'|'challenge',players=1){
  const run=new RunState('NEW-ROOMS','ria');run.staged=true;
  const w=new World(new Renderer(fakeDisplay(1280,720)),run,{openInventory(){},onGameOver(){}});
  if(players===1)w.start();else w.startParty(Array.from({length:players},(_,slot)=>({slot,characterId:'ria',name:'P'+slot})),0);
- const n=w.map.nodes.find(n=>n.id!==w.map.startId)!;n.kind=kind;n.templateId=['relay','workshop','vault'].includes(kind)?kind+'_alcove':kind==='elite'?'elite_arena':'';n.visited=false;n.cleared=false;w.enterRoom(n,null);
+ const n=w.map.nodes.find(n=>n.id!==w.map.startId)!;n.kind=kind;n.templateId=['relay','workshop','vault'].includes(kind)?kind+'_alcove':kind==='hunt'?'hunt_den':kind==='elite'?'elite_arena':'';n.visited=false;n.cleared=false;w.enterRoom(n,null);
  for(const p of w.players)p.god=true;
  return w;
 }
@@ -190,4 +191,12 @@ it('a workshop shift always brings temperature events, spaced and never in the l
   expect(Math.max(...starts)).toBeLessThan(55);
   expect(d.mem.phase).toBe(4);
  }
+});
+
+it('the hunt room builds its lamp tree and holds the room until it is used',()=>{
+ const w=setup('hunt'),d=w.entities.find(e=>e instanceof HuntDevice) as HuntDevice;
+ expect(d).toBeTruthy();expect(d.previewable()).toBe(true);w.update(1/60);expect(w.node.cleared).toBe(false);
+ w.player.x=d.x;w.player.y=d.y+10;expect(d.interact(w)).toBe(true);expect(d.mem.phase).toBe(1);
+ expect(w.room.doors.some(door=>door.state==='closed')).toBe(true);
+ endEncounter(w,d,false);expect(w.node.cleared).toBe(true);expect(d.previewable()).toBe(false);
 });

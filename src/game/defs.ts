@@ -62,6 +62,8 @@ export interface EnemyDef {
   /** sound when hurt / dying (defaults: enemy_hurt / enemy_die) */
   hurtSfx?: SfxName;
   dieSfx?: SfxName;
+  /** objective enemies: boss-style freeze/stun/slow caps, fear/charm refused */
+  controlResist?: boolean;
   /** called once after creation */
   init?(e: Enemy, w: World): void;
   /** main AI script (generator). */

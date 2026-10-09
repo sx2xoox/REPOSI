@@ -3,6 +3,7 @@ import { DEFAULT_PROGRESS, newCampaign, save } from '../src/engine/save';
 import type { Checkpoint } from '../src/game/checkpoint';
 import './headless';
 import { encounterCount, encounterHP, rewardRarity } from '../src/content/rooms/encounter-kit';
+import { MISSION_DIFFICULTY } from '../src/game/mission-difficulty';
 import { ALARM_CYCLE, alarmPattern, alarmStage, beamDistance, vaultAlarm, type AlarmBox } from '../src/content/rooms/vault-alarm';
 
 describe('explicit expedition abandonment', () => {
@@ -31,8 +32,9 @@ describe('mission difficulty', () => {
  it('scales population and HP once, and guarantees difficulty-based crate rarity',()=>{
   expect([1,2,3,4].map(encounterCount)).toEqual([1,1.5,2,2.5]);
   expect([1,2,3,4].map(encounterHP)).toEqual([1,1.35,1.6,1.85]);
-  expect(['relay','workshop','vault'].map(k=>rewardRarity(k,1))).toEqual(['common','rare','epic']);
-  expect(['relay','workshop','vault'].map(k=>rewardRarity(k,4))).toEqual(['rare','epic','legendary']);
+  expect(['relay','workshop','vault','hunt'].map(k=>rewardRarity(k,1))).toEqual(['common','rare','epic','rare']);
+  expect(['relay','workshop','vault','hunt'].map(k=>rewardRarity(k,4))).toEqual(['rare','epic','legendary','epic']);
+  expect(MISSION_DIFFICULTY.hunt.label).toBe('보통');
  });
  const BOX:AlarmBox={x0:32,y0:32,x1:304,y1:176,vx:168,vy:104};
  it('warns for a full second before firing and resets each cycle',()=>{

@@ -1210,6 +1210,7 @@ const SPECIAL_DOOR: Partial<Record<DoorKind, DoorLook>> = {
   relay: { frame: ['#0c1e20', '#24504e', '#4e8c86', '#a8e8e0'], leaf: '#1c3a38', metal: '#8de4dc', inner: '#040c0c' },
   workshop: { frame: ['#1e1208', '#4e3218', '#8a5e2e', '#f6cf88'], leaf: '#3a2614', metal: '#ffb058', inner: '#0c0602' },
   vault: { frame: ['#160e22', '#3a2a52', '#6a5290', '#cdb4f4'], leaf: '#2a1e3e', metal: '#bf9dea', inner: '#08040e' },
+  hunt: { frame: ['#121e08', '#2e4a18', '#5c8a30', '#cdf0a0'], leaf: '#22361a', metal: '#b6e36e', inner: '#060c02' },
   elite: { frame: ['#200a06', '#5a2010', '#a0482a', '#f0a868'], leaf: '#401a0e', metal: '#efab68', inner: '#0e0402' },
 };
 
@@ -1486,6 +1487,13 @@ function paintDoorOrnament(p: PixelPainter, kind: DoorKind, look: DoorLook): voi
       p.line(DOX - 1, 3, DOX + 1, 5, '#e8d8ff');
       p.px(DOX, 4, '#ffffff');
       for (const x of [DOX - 13, DOX + 12]) { p.px(x, 14, '#bf9dea'); p.px(x, 13, '#f4ecff'); }
+      break;
+    }
+    case 'hunt': {
+      // a bandit mask with two glinting eyes
+      p.rect(DOX - 3, 3, 7, 2, '#120a12');
+      p.px(DOX - 2, 3, '#ffe27a'); p.px(DOX + 2, 3, '#ffe27a');
+      for (const x of [DOX - 13, DOX + 12]) { p.px(x, 14, '#b6e36e'); p.px(x, 13, '#f0ffd8'); }
       break;
     }
     case 'elite': {

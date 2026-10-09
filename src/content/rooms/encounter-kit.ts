@@ -30,7 +30,7 @@ export function encounterRewards(w: World, mask: number, kind: string) {
   const rarity = rewardRarity(kind, w.floor.index);
   const weapons = Weapons.all().filter(d => d.rarity === rarity && d.pools.length && !isContentTemporarilyLocked(d.id));
   const artifacts = Artifacts.all().filter(d => !d.hidden && !d.blessing && d.pools.length && d.rarity === rarity && !isContentTemporarilyLocked(d.id));
-  const mixed = ['relay', 'workshop', 'vault', 'elite'].includes(kind);
+  const mixed = ['relay', 'workshop', 'vault', 'hunt', 'elite'].includes(kind);
   const n=partySize(mask);
   for(let i=0;i<n;i++) {
     const x=w.room.centerX+(i-(n-1)/2)*58,y=w.room.centerY+30;

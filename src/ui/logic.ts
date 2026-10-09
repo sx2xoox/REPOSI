@@ -254,7 +254,7 @@ export const ROOM_LABELS: Record<RoomKind, string> = {
   challenge: '도전방',
   shrine: '성소',
   curse: '저주방',
-  relay: '등불 회랑', workshop: '잿불 대장간', vault: '경보 금고',
+  relay: '등불 회랑', workshop: '잿불 대장간', vault: '경보 금고', hunt: '도둑 사냥',
   refinery: '제련방', fusion: '합성방', well: '우물방', elite: '엘리트방',
 };
 
@@ -266,7 +266,7 @@ export const ROOM_ICONS: Partial<Record<RoomKind, string>> = {
   challenge: 'map_challenge',
   shrine: 'map_shrine',
   curse: 'map_curse',
-  relay: 'map_relay', workshop: 'map_workshop', vault: 'map_vault',
+  relay: 'map_relay', workshop: 'map_workshop', vault: 'map_vault', hunt: 'map_hunt',
   refinery: 'map_refinery', fusion: 'map_fusion', well: 'map_well', elite: 'map_elite',
 };
 

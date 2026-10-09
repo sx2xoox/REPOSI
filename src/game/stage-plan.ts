@@ -7,7 +7,7 @@ export function stageRoomPlan(rng: RNG): RoomKind[] {
   const kinds: RoomKind[] = [];
   if (rng.chance(.75)) kinds.push(rng.pick(['treasure', 'shop']));
   kinds.push(rng.pick(['shrine', 'curse', 'challenge']));
-  if (rng.chance(.5)) kinds.push(rng.pick(['relay', 'workshop', 'vault']));
+  if (rng.chance(.5)) kinds.push(rng.pick(['relay', 'workshop', 'vault', 'hunt']));
   if (rng.chance(.3)) kinds.push('secret');
   const forge = rng.next();
   kinds.push(forge < .4 ? 'refinery' : forge < .8 ? 'well' : 'fusion');

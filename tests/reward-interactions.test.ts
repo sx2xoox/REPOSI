@@ -34,7 +34,7 @@ function press(w: World, pressed: number) {
 }
 const rewards = (w: World) => w.entities.filter(e => !e.dead && (e instanceof WeaponChest || e instanceof Pedestal && e.item?.kind === 'artifact')) as (WeaponChest | Pedestal)[];
 
-for (const kind of ['relay', 'workshop', 'vault', 'elite'] as const) {
+for (const kind of ['relay', 'workshop', 'vault', 'hunt', 'elite'] as const) {
   it(`${kind} independently rolls weapons/artifacts at the same rarity and scales free stock`, () => {
     vi.stubEnv('PROD', true);
     const w = setup('ria', 4), rng = new RNG('MIXED-' + kind);

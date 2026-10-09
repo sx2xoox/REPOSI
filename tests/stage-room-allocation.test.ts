@@ -22,7 +22,7 @@ it('preserves every group draw across layout retries and all 21 stages',()=>{
 it('draw probabilities match the requested independent groups',()=>{
  const counts:Record<string,number>={};let both=0;
  for(let seed=0;seed<30000;seed++){const p=stageRoomPlan(new RNG('odds'+seed));for(const k of p)counts[k]=(counts[k]??0)+1;if(p.includes('elite')&&p.includes('secret'))both++;}
- for(const [k,p] of Object.entries({treasure:.375,shop:.375,shrine:1/3,curse:1/3,challenge:1/3,relay:1/6,workshop:1/6,vault:1/6,secret:.3,refinery:.4,well:.4,fusion:.2,elite:.4}))expect(Math.abs(counts[k]/30000-p),k).toBeLessThan(.013);
+ for(const [k,p] of Object.entries({treasure:.375,shop:.375,shrine:1/3,curse:1/3,challenge:1/3,relay:1/8,workshop:1/8,vault:1/8,hunt:1/8,secret:.3,refinery:.4,well:.4,fusion:.2,elite:.4}))expect(Math.abs(counts[k]/30000-p),k).toBeLessThan(.013);
  expect(both/30000).toBeCloseTo(.12,2);
  expect(normalizeStage(4)).toBe(3);expect(normalizeStage(2)).toBe(2);
 });

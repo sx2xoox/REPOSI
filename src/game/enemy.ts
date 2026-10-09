@@ -178,7 +178,9 @@ export class Enemy extends Actor {
   }
 
   override applyStatus(s: StatusApply, roll: () => number): boolean {
-    if (!this.isBoss) return super.applyStatus(s, roll);
+    if (!this.isBoss && !this.def.controlResist) return super.applyStatus(s, roll);
+    // objective enemies (EnemyDef.controlResist) cannot be turned or led away at all
+    if (!this.isBoss && (s.kind === 'fear' || s.kind === 'charm')) return false;
     // Bosses can be interrupted briefly, but repeated procs cannot stop their AI forever.
     if (s.kind === 'freeze' || s.kind === 'stun') {
       if (this.age < (this.mem.__controlReady ?? 0)) return false;

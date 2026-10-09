@@ -34,7 +34,7 @@ export const SHAPE_CELLS: Record<RoomShape, [number, number]> = {
 
 export type RoomKind =
   | 'start' | 'normal' | 'boss' | 'treasure' | 'shop' | 'secret'
-  | 'challenge' | 'shrine' | 'curse' | 'relay' | 'workshop' | 'vault' | 'refinery' | 'fusion' | 'well' | 'elite';
+  | 'challenge' | 'shrine' | 'curse' | 'relay' | 'workshop' | 'vault' | 'hunt' | 'refinery' | 'fusion' | 'well' | 'elite';
 
 /** Total tile grid size (incl. walls) for a room of cw x ch cells. */
 export function roomTileSize(cw: number, ch: number): { w: number; h: number } {

@@ -10,7 +10,7 @@ import { RNG } from '../engine/rng';
 import { clamp } from '../engine/math';
 import { drawDoor, drawSpikes, renderRoomBackground } from './roomart';
 
-export type DoorKind = 'normal' | 'treasure' | 'shop' | 'boss' | 'secret' | 'challenge' | 'shrine' | 'curse' | 'start' | 'relay' | 'workshop' | 'vault' | 'elite';
+export type DoorKind = 'normal' | 'treasure' | 'shop' | 'boss' | 'secret' | 'challenge' | 'shrine' | 'curse' | 'start' | 'relay' | 'workshop' | 'vault' | 'hunt' | 'elite';
 export type DoorState = 'open' | 'closed' | 'locked' | 'hidden';
 
 export interface Door {

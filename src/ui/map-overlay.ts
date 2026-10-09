@@ -18,7 +18,7 @@ import { ROOM_ICONS, ROOM_LABELS } from './logic';
 import { actionLabel } from './keys';
 import { touchUiActive } from './touch-mode';
 
-const LEGEND: RoomKind[] = ['boss', 'treasure', 'shop', 'secret', 'challenge', 'shrine', 'curse', 'relay', 'workshop', 'vault', 'refinery', 'well', 'fusion', 'elite'];
+const LEGEND: RoomKind[] = ['boss', 'treasure', 'shop', 'secret', 'challenge', 'shrine', 'curse', 'relay', 'workshop', 'vault', 'hunt', 'refinery', 'well', 'fusion', 'elite'];
 
 export class MapOverlay implements Scene {
   transparent = true;
