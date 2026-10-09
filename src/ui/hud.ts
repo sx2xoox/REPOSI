@@ -415,12 +415,12 @@ export class Hud {
     // purse under the minimap block
     if (counterBusy(this.coins) || counterBusy(this.bombs) || counterBusy(this.keys)) this.drawConsumables(r, w, A);
     else this.lyPurse.draw(r, `${p.coins}|${p.bombs}|${p.keys}|${this.W}`, ox, oy, this.W - 150, this.purseY() - 4, 150, PURSE_H + 18, A, this.paintPurse);
-    // minimap (+ floor name, seed); the current-room pulse is drawn live on top
+    // minimap (+ floor name, seed): one cached blit at rest; the current room's glow / flame / pips live on top
     if (!this.minimap.settled) this.drawMinimap(r, w, A);
     else {
       const key = `${this.minimap.signature(w)}|${w.floor.name}|${w.run.stage}|${w.run.seed}|${save.progress.campaign?.seen.length ?? 0}|${this.W}`;
       this.lyMap.draw(r, key, ox, oy, this.W - MINIMAP_W - MINIMAP_MARGIN - 40, MINIMAP_MARGIN - 2, MINIMAP_W + MINIMAP_MARGIN + 40, MINIMAP_H + 32, A, this.paintMap);
-      this.minimap.drawPulse(r, w, this.W - MINIMAP_W - MINIMAP_MARGIN, MINIMAP_MARGIN, MINIMAP_W, MINIMAP_H, this.t, A);
+      this.minimap.drawLive(r, w, this.W - MINIMAP_W - MINIMAP_MARGIN, MINIMAP_MARGIN, MINIMAP_W, MINIMAP_H, this.t, A);
     }
     if (touchUi) return; // the touch buttons carry the weapon, active item and potion
     // ---- equipment slots

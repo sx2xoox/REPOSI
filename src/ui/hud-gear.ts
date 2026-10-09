@@ -183,7 +183,8 @@ function roundBox(p: PixelPainter, w: number, h: number, outline: string, fill: 
   p.rect(1, 2, w - 2, h - 4, fill);
 }
 
-function rivet(p: PixelPainter, x: number, y: number): void {
+/** Brass rivet (2x2 art) of the HUD plates (also the minimap plate's window bolts). */
+export function rivet(p: PixelPainter, x: number, y: number): void {
   p.px(x, y, '#ffe09a');
   p.px(x + 1, y, '#b8843c');
   p.px(x, y + 1, '#b8843c');
