@@ -6,7 +6,9 @@
 //    an opening that faces the spider unless rocks block that way), then the threads ignite and the ring tightens
 //    until it snaps. Leave through the opening (toward the spider), break out through a
 //    thread (one hit, thrown outward), or kill / stun the weaver: the web dies with it.
-//    Only one web hangs in a room at a time; a champion's web turns as it closes.
+//    Only one web hangs in a room at a time; a champion's web turns as it closes. It only
+//    weaves around a keeper it can see, and only when the opening has a walkable way out
+//    (no rock, pit or wall in it); the web runs on enemy time (a time stop holds it).
 // Pure helpers (web radius, knots, thread hit test) are unit-tested in
 // tests/enemies-extra-f5.test.ts.
 
@@ -309,16 +311,21 @@ export class StarWeb extends Entity {
     }
   }
 
-  override update(w: World, dt: number): void {
+  override update(w: World, dtWorld: number): void {
+    // an enemy attack: it runs on enemy time (a time stop freezes it with its weaver)
+    const dt = dtWorld * w.enemyTimeScale;
     this.age += dt;
     if (this.brokenT > 0) {
-      this.brokenT += dt;
+      // (a slack web fades on world time: it is already harmless)
+      this.brokenT += dtWorld;
       if (this.brokenT > 0.35) this.dead = true;
       return;
     }
     const o = this.owner;
     if (!o.alive || o.dead || weaverBusy(o)) {
       this.breakWeb(w, false);
+      // its warning flash goes with it
+      if (o.mem.web === this) o.telegraphT = 0;
       return;
     }
     if (this.age < WEB.mark) return;
@@ -454,23 +461,41 @@ export function webCentre(w: World, x: number, y: number): { x: number; y: numbe
   };
 }
 
-/** Direction of the opening: toward the weaver, turned toward open floor if that way is blocked. */
-export function pickGap(w: World, cx: number, cy: number, toward: number): number {
-  const room = w.room;
-  for (const d of [0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2.1, -2.1, Math.PI]) {
-    const a = toward + d;
-    let ok = true;
-    for (const rr of [WEB.r0 * 0.55, WEB.r0 + 10]) {
-      const x = cx + Math.cos(a) * rr;
-      const y = cy + Math.sin(a) * rr;
-      if (!room.isFree(x, y, 5)) {
-        ok = false;
-        break;
-      }
-    }
-    if (ok) return a;
+/** The tile queries the opening needs (a Room). */
+interface FloorQuery {
+  isFree(x: number, y: number, r?: number): boolean;
+}
+
+/**
+ * Is there a walkable way out through an opening at angle `a` of a web centred on (cx, cy):
+ * a straight walk from the keeper at (kx, ky) to the opening's mouth, then open floor
+ * along the opening until past the ring (no rock, pit or wall in the way)?
+ */
+export function laneClear(room: FloorQuery, cx: number, cy: number, a: number, kx: number, ky: number): boolean {
+  const ex = Math.cos(a);
+  const ey = Math.sin(a);
+  const mx = cx + ex * 20;
+  const my = cy + ey * 20;
+  const n = Math.ceil(Math.hypot(mx - kx, my - ky) / 4);
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    if (!room.isFree(kx + (mx - kx) * t, ky + (my - ky) * t, 5)) return false;
   }
-  return toward;
+  for (let d = 24; d <= WEB.r0 + 8; d += 4) if (!room.isFree(cx + ex * d, cy + ey * d, 5)) return false;
+  return true;
+}
+
+/** Turns tried for the opening, nearest the weaver's direction first. */
+const GAP_TURNS = [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.75, -1.75, 2.1, -2.1, 2.45, -2.45, 2.8, -2.8, Math.PI];
+
+/**
+ * Direction of the opening: toward the weaver, turned toward open floor if rocks, pits or
+ * walls block that way. null when no opening has a walkable way out (then no web is spun:
+ * the keeper must always be able to walk out without a hit).
+ */
+export function pickGap(w: World, cx: number, cy: number, toward: number, kx: number, ky: number): number | null {
+  for (const d of GAP_TURNS) if (laneClear(w.room, cx, cy, toward + d, kx, ky)) return toward + d;
+  return null;
 }
 
 /** The live (unbroken) web a weaver is holding, if any. */
@@ -523,25 +548,37 @@ function* hopBack(e: Enemy, w: World): Script {
   yield 0.2;
 }
 
-/** Rear up, trace the web around the keeper, then hold it while it tightens. */
-function* weave(e: Enemy, w: World): Script {
-  const tg = e.target(w);
+/** Rear up, trace the web around (cx, cy) with its opening at `gap`, then hold it while it tightens. */
+function* weave(e: Enemy, w: World, cx: number, cy: number, gap: number, kx: number, ky: number): Script {
   e.halt();
   e.setAnim('sweaver_weave');
-  const c = webCentre(w, tg.x, tg.y);
-  const gap = pickGap(w, c.x, c.y, Math.atan2(e.y - c.y, e.x - c.x));
-  const web = w.spawn(new StarWeb(e, c.x, c.y, gap, e.champion ? WEB.knotsChamp : WEB.knots, e.champion ? WEB.spinChamp * w.rng.sign() : 0));
+  let spin = 0;
+  if (e.champion) {
+    // a champion's web turns; it turns the way that keeps its opening on open floor
+    spin = WEB.spinChamp * w.rng.sign();
+    if (!laneClear(w.room, cx, cy, gap + Math.sign(spin) * 0.5, kx, ky) && laneClear(w.room, cx, cy, gap - Math.sign(spin) * 0.5, kx, ky)) spin = -spin;
+  }
+  const web = w.spawn(new StarWeb(e, cx, cy, gap, e.champion ? WEB.knotsChamp : WEB.knots, spin));
   e.mem.web = web;
   e.mem.weaving = 1;
   e.telegraph(WEB.mark);
   w.sfx('beam_charge', { vol: 0.35, pitch: 1.7, x: e.x });
-  for (let el = 0; el < WEB.mark; el += 0.15) {
-    gather(w, e.x, e.y - 16, [SILK.hot, SILK.mid, CAR[4]], 3, 12);
-    yield 0.15;
+  // rear up while the web is traced (on the web's own clock, so a time stop holds both)
+  let puff = 0;
+  while (heldWeb(e) && web.age < WEB.mark) {
+    if ((puff -= w.dt * w.enemyTimeScale) <= 0) {
+      gather(w, e.x, e.y - 16, [SILK.hot, SILK.mid, CAR[4]], 3, 12);
+      puff = 0.15;
+    }
+    yield;
   }
-  e.setAnim('sweaver_hold');
-  // hold the web taut while it tightens (a punish window)
-  while (heldWeb(e)) yield;
+  if (heldWeb(e)) {
+    e.setAnim('sweaver_hold');
+    // hold the web taut while it tightens (a punish window)
+    while (heldWeb(e)) yield;
+  }
+  // (a web broken early — stun, freeze, bullet-clear — also ends the warning flash)
+  e.telegraphT = 0;
   e.mem.web = undefined;
   e.mem.weaving = 0;
   e.setAnim('sweaver_idle');
@@ -598,12 +635,18 @@ defineEnemy({
         wait = 0.5;
         continue;
       }
-      // (a charmed weaver cannot hold a web taut, so it does not start one)
-      if (othersWeaving(w, e) || e.distToTarget(w) > 170 || e.hasStatus('charm')) {
+      // (a charmed weaver cannot hold a web taut, so it does not start one; it only weaves
+      // around a keeper it can see, and only when the web has an opening to walk out of)
+      const tg = e.target(w);
+      const c = webCentre(w, tg.x, tg.y);
+      const gap = othersWeaving(w, e) || e.distToTarget(w) > 170 || e.hasStatus('charm') || !w.room.lineOfSight(e.x, e.y - 4, tg.x, tg.y)
+        ? null
+        : pickGap(w, c.x, c.y, Math.atan2(e.y - c.y, e.x - c.x), tg.x, tg.y);
+      if (gap === null) {
         wait = 0.6;
         continue;
       }
-      yield* weave(e, w);
+      yield* weave(e, w, c.x, c.y, gap, tg.x, tg.y);
       wait = w.rng.range(1.3, 1.9);
     }
   },

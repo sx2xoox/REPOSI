@@ -8,7 +8,7 @@ import './headless';
 import { fakeDisplay } from './headless';
 import { describe, expect, it } from 'vitest';
 import { loadContent } from '../src/content';
-import { Enemies, Floors } from '../src/game/defs';
+import { Enemies, Floors, RoomTemplates, Themes } from '../src/game/defs';
 import { Enemy } from '../src/game/enemy';
 import { World } from '../src/game/world';
 import { RunState } from '../src/game/run';
@@ -19,7 +19,12 @@ import { stateHash } from '../src/game/statehash';
 import { getAnim, getSprite, hasAnim, hasSprite } from '../src/engine/sprites';
 import { RNG, fx } from '../src/engine/rng';
 import { angleDiff } from '../src/engine/math';
-import { onWeb, StarWeb, WEB, webKnots, webRadius } from '../src/content/enemies/abyss-extra';
+import { laneClear, onWeb, pickGap, StarWeb, WEB, webKnots, webRadius } from '../src/content/enemies/abyss-extra';
+import { Room } from '../src/game/room';
+import { Tile } from '../src/game/tiles';
+import { TILE } from '../src/game/constants';
+import { timeStop } from '../src/content/items/lib';
+import type { RoomNode } from '../src/game/dungeon';
 
 loadContent();
 
@@ -495,6 +500,157 @@ describe('star weaver in the real World (floor 5)', () => {
   });
 });
 
+// ---------------------------------------------------------------- review fixes
+/** A floor-5 room built from a room template (no doors), to swap into a test World. */
+function templateRoom(w: World, id: string): Room {
+  const t = RoomTemplates.must(id);
+  const [cw, ch] = t.shape.split('x').map(Number);
+  const node = { id: 900, gx: 0, gy: 0, cw, ch, kind: 'normal', templateId: id, seed: 7, depth: 1, visited: true, cleared: false, discovered: true, locked: false, doors: [] } as unknown as RoomNode;
+  return new Room(node, Themes.get(w.floor.theme) ?? Themes.all()[0], t);
+}
+
+/** Every floor-5 template, a keeper who reacts after 0.25 s and walks out through the opening. */
+function dodgeRun(w: World, kx: number, ky: number, sx: number, sy: number, champion: boolean): { webs: number; hits: number } {
+  const p = w.player;
+  p.x = kx;
+  p.y = ky;
+  const e = w.spawnEnemy(ID, sx, sy)!;
+  if (champion) {
+    e.champion = true;
+    e.championColor = '#ff4040';
+  }
+  const calls = spyHurt(w);
+  let react = 0;
+  w.inputSource = (ww, pl, o) => {
+    clearInput(o);
+    const web = liveWebs(ww)[0];
+    if (!web) {
+      react = 0;
+      return;
+    }
+    react += FIXED_DT;
+    if (react < 0.25 || Math.hypot(pl.x - web.x, pl.y - web.y) > web.radius + 9) return;
+    const dx = web.x + Math.cos(web.gapDir) * (WEB.r0 + 18) - pl.x;
+    const dy = web.y + Math.sin(web.gapDir) * (WEB.r0 + 18) - pl.y;
+    const l = Math.hypot(dx, dy);
+    if (l > 2) {
+      o.mx = dx / l;
+      o.my = dy / l;
+    }
+  };
+  const seen = new Set<StarWeb>();
+  steps(w, secs(12), () => {
+    for (const s of webs(w)) seen.add(s);
+    p.soul = Math.max(p.soul, 40);
+  });
+  return { webs: seen.size, hits: calls.filter((c) => c.web && c.applied).length };
+}
+
+describe('star weaver review fixes', () => {
+  it('the opening always leads to open floor: laneClear / pickGap refuse rocks, pits and walls', () => {
+    const w = world('f5x-lane');
+    const room = w.room;
+    const cx = room.centerX;
+    const cy = room.centerY;
+    // open floor: the weaver's own direction is kept
+    expect(laneClear(room, cx, cy, 0, cx, cy)).toBe(true);
+    expect(pickGap(w, cx, cy, 0, cx, cy)).toBe(0);
+    // a rock 3 tiles out along the opening (between the two points the old check sampled) blocks it
+    const tx = Math.floor((cx + 48) / TILE);
+    const ty = Math.floor(cy / TILE);
+    room.setTile(tx, ty, Tile.ROCK);
+    expect(laneClear(room, cx, cy, 0, cx, cy)).toBe(false);
+    const g = pickGap(w, cx, cy, 0, cx, cy)!;
+    expect(g).not.toBeNull();
+    expect(Math.abs(angleDiff(g, 0))).toBeGreaterThan(0.2);
+    expect(laneClear(room, cx, cy, g, cx, cy)).toBe(true);
+    // a keeper boxed in by pits: no way out, so no web at all
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) === 2) room.setTile(Math.floor(cx / TILE) + dx, Math.floor(cy / TILE) + dy, Tile.PIT);
+    }
+    expect(pickGap(w, cx, cy, 0, cx, cy)).toBeNull();
+    // ... and a weaver facing that keeper never spins one
+    const e = spawn(w, ID, 90, 0);
+    let seen = 0;
+    steps(w, secs(6), () => {
+      seen += webs(w).length;
+    });
+    expect(e.alive).toBe(true);
+    expect(seen).toBe(0);
+  });
+
+  it('it only weaves around a keeper it can see (no web through a wall of rocks)', () => {
+    const w = world('f5x-los');
+    const room = w.room;
+    const p = w.player;
+    const tx = Math.floor((p.x + 40) / TILE);
+    for (let ty = Math.floor(room.interiorY / TILE); ty < Math.floor((room.interiorY + room.interiorH) / TILE); ty++) room.setTile(tx, ty, Tile.BLOCK);
+    w.player.god = true;
+    spawn(w, ID, 90, 0);
+    let seen = 0;
+    steps(w, secs(6), () => {
+      seen += webs(w).length;
+    });
+    expect(seen).toBe(0);
+  });
+
+  it('a keeper who walks out through the opening is never hurt, in every floor-5 room template (champion too)', () => {
+    const ids = RoomTemplates.all().filter((t) => t.kinds.includes('normal') && (!t.floors || t.floors.includes(5))).map((t) => t.id);
+    expect(ids.length).toBeGreaterThan(20);
+    let total = 0;
+    for (const id of ids) {
+      for (const champion of [false, true]) {
+        const w = world(`f5x-tpl-${id}`);
+        w.room = templateRoom(w, id);
+        const rng = new RNG(`${id}:${champion}`);
+        const k = w.room.randomFreePos(rng, 6);
+        const s = w.room.randomFreePos(rng, 8, { x: k.x, y: k.y, dist: 80 });
+        const r = dodgeRun(w, k.x, k.y, s.x, s.y, champion);
+        expect(r.hits, `${id} champion=${champion}`).toBe(0);
+        total += r.webs;
+      }
+    }
+    // it still weaves in most rooms
+    expect(total).toBeGreaterThan(ids.length * 2);
+  }, 60000);
+
+  it('a time stop holds the web with its weaver', () => {
+    const w = world('f5x-stop');
+    w.player.god = true;
+    const e = spawn(w);
+    const web = untilWeb(w)!;
+    steps(w, secs(WEB.mark + 0.3));
+    expect(web.armed).toBe(true);
+    const r0 = web.radius;
+    const ex = e.x;
+    timeStop(w, 1);
+    steps(w, secs(0.6));
+    expect(r0 - web.radius).toBeLessThan(1.5);
+    expect(Math.abs(e.x - ex)).toBeLessThan(1);
+    steps(w, secs(1));
+    // time runs again: it tightens again
+    const r1 = web.radius;
+    steps(w, secs(0.2));
+    expect(r1 - web.radius).toBeGreaterThan(3);
+  });
+
+  it('a web broken while being traced ends the weaver’s warning and pose at once', () => {
+    const w = world('f5x-stuntrace');
+    w.player.god = true;
+    const e = spawn(w);
+    const web = untilWeb(w)!;
+    steps(w, 6);
+    expect(e.telegraphT).toBeGreaterThan(0.3);
+    e.applyStatus({ kind: 'stun', duration: 0.1 }, () => 0);
+    steps(w, 2);
+    expect(web.armed).toBe(false);
+    expect(e.telegraphT).toBeLessThanOrEqual(0);
+    steps(w, secs(0.15));
+    expect(e.anim).toBe('sweaver_idle');
+    expect(e.mem.weaving).toBe(0);
+  });
+});
+
 // ---------------------------------------------------------------- draw purity / lockstep
 describe('star weaver draw purity and determinism', () => {
   function strafe(w: World): void {
@@ -536,6 +692,7 @@ describe('star weaver draw purity and determinism', () => {
       w.player.god = true;
       strafe(w);
       spawn(w, ID, 70, -10);
+      spawn(w, ID, -60, 30).champion = true;
       spawn(w, 'void_eye', -70, -20);
       const hs: number[] = [];
       for (let i = 0; i < 720; i++) {
