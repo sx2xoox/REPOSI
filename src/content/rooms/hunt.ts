@@ -45,6 +45,12 @@ export const EMBER_FLIGHT = 0.45;
 export const CLAIM_EMBER = 15;
 /** tree light that the weasel stays out of, by embers returned */
 const LIGHT_R = [0, 36, 52];
+/**
+ * Minion waves per hunt (opening, knockdowns and trickle together). A normal hunt (under a
+ * minute) never reaches it; it stops a stalled hunt (thief cornered, embers left lying, or
+ * every escape cancelled with a tumble) from becoming an endless kill / drop farm.
+ */
+export const MAX_WAVES = 10;
 
 // ================================================================== rooms
 defineRoom({ id: 'hunt_den', shape: '1x1', kinds: ['hunt'], rows: ['p...............p', '.................', '...XX.......XX...', '.................', '.................', '.................', '...XX.......XX...', '.................', 'p...............p'] });
@@ -82,15 +88,18 @@ function crackDrawPos(x: number, y: number, face: number): { x: number; y: numbe
 type HuntMem = {
   phase: number; used: boolean; pending: number; members: number; clock: number; progress: number; held: number;
   weasel: number; wx: number; wy: number; nextEscape: number; escCrack: number; escState: number; chanT: number; chanHp: number;
-  sealed: number; cornered: number; nextTrickle: number; nextWave: number; lightR: number; band: number; interval: number;
+  sealed: number; cornered: number; nextTrickle: number; nextWave: number; waves: number; lightR: number; band: number; interval: number;
   c0x: number; c0y: number; c1x: number; c1y: number; c2x: number; c2y: number; c0f: number; c1f: number; c2f: number;
 };
+
+/** Coins that pop from the tree for each claimed ember: 2, +1 per extra hunter. */
+export const claimCoins = (members: number): number => 2 + (partySize(members) - 1);
 
 /** The iron lamp tree: start, ember claims, escapes, minion waves and the outcome. */
 export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
   mem: HuntMem = {
     phase: 0, used: false, pending: 0, members: 1, clock: 0, progress: 0, held: 3, weasel: 0, wx: 0, wy: 0,
-    nextEscape: 15, escCrack: -1, escState: 0, chanT: 0, chanHp: 0, sealed: 0, cornered: 0, nextTrickle: 12, nextWave: 0.5, lightR: 0, band: 0, interval: 16,
+    nextEscape: 15, escCrack: -1, escState: 0, chanT: 0, chanHp: 0, sealed: 0, cornered: 0, nextTrickle: 12, nextWave: 0.5, waves: 0, lightR: 0, band: 0, interval: 16,
     c0x: 0, c0y: 0, c1x: 0, c1y: 0, c2x: 0, c2y: 0, c0f: 0, c1f: 0, c2f: 0,
   };
 
@@ -104,7 +113,7 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
 
   override interactionInfo() {
     if (this.mem.phase > 0) return { name: HUNT_TITLE, icon: 'map_hunt', desc: '', compactHint: '사냥 중' };
-    return { name: `${HUNT_TITLE} · ${LABEL}`, icon: 'map_hunt', desc: '족제비를 쓰러뜨려 떨군 불씨 3개를 되찾으세요. 틈으로 빠져나가면 실패 · 한 번만 도전할 수 있습니다.' };
+    return { name: `${HUNT_TITLE} · ${LABEL}`, icon: 'map_hunt', desc: '족제비를 쓰러뜨려 떨군 불씨 3개를 되찾으세요. 틈으로 숨어들 때 붙잡거나 세게 치면 틈이 막힙니다. 빠져나가면 실패 · 한 번만 도전할 수 있습니다.' };
   }
 
   override interact(w: World): boolean {
@@ -119,6 +128,7 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
     s.nextEscape = 15;
     s.nextWave = 0.5;
     s.nextTrickle = 12;
+    s.waves = 0;
     s.held = 3;
     s.progress = 0;
     w.room.setDoorsClosed(true);
@@ -253,7 +263,8 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
   /** One wave of the floor's own enemies, placed away from the hunters and the tree. */
   private wave(w: World): void {
     const s = this.mem;
-    if (this.minions(w) + s.pending >= this.cap()) return;
+    if (s.waves >= MAX_WAVES || this.minions(w) + s.pending >= this.cap()) return;
+    s.waves++;
     const room = w.room;
     const place: WavePlacer = () => {
       const hs = hunters(w, s.members);
@@ -288,7 +299,8 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
         w.sfx('clock_chime', { vol: 0.55, pitch: 1.2 });
         w.sfx('coin', { vol: 0.4 });
         w.asPlayer(p, () => p.addEmber(CLAIM_EMBER));
-        for (let i = 0; i < 2 + (s.progress - 1); i++) {
+        // the partial credit: coins per ember, more for a bigger party (as the rewards are)
+        for (let i = 0; i < claimCoins(s.members); i++) {
           const c = w.spawn(new Pickup('coin', this.x, this.y - 10)).pop();
           c.encounterId = this.id;
         }
@@ -296,7 +308,7 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
     }
   }
 
-  /** The weasel is gone without escaping (killed some other way, room left): its embers spill out. */
+  /** The weasel is gone without escaping (removed some other way in this room, e.g. a kill-all): its embers spill out. */
   private lostWeasel(w: World): void {
     const s = this.mem;
     s.weasel = 0;
@@ -340,6 +352,17 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
     }
   }
 
+  /**
+   * Back in the room while the hunt was on (the thief is not kept when the room is left):
+   * it got away meanwhile. Spilling its embers instead would hand out a free win.
+   */
+  abandoned(w: World): void {
+    const s = this.mem;
+    if (s.used || s.phase !== 1 || this.weasel(w)) return;
+    s.weasel = 0;
+    this.finish(w, false);
+  }
+
   private escaped(w: World, e: Enemy): void {
     w.particles.burst(e.x, e.y - 3, { count: 18, speed: [10, 50], life: [0.4, 0.9], colors: ['#c9a0ff', ESCAPE_COLOR, '#3a1c58'], size: [1, 3], sizeEnd: 4, gravity: -40, fade: true });
     w.sfx('teleport', { vol: 0.6, pitch: 0.8 });
@@ -379,7 +402,8 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
       this.seal(w, e);
       return;
     }
-    s.chanT += dt;
+    // the squeeze is the thief's own doing: a keeper's time stop / slow holds it too
+    s.chanT += dt * w.enemyTimeScale;
     if (s.chanT >= this.channelTime()) this.escaped(w, e);
   }
 
@@ -962,6 +986,11 @@ registerRoomHandler('hunt', {
   },
   onEnter(w) {
     if (w.node.cleared) return;
+    const d = w.entities.find((e) => e instanceof HuntDevice) as HuntDevice | undefined;
+    if (d && d.mem.phase === 1 && !d.mem.used) {
+      d.abandoned(w);
+      return;
+    }
     w.holdClear = Math.max(w.holdClear, 1);
     w.banner(`${HUNT_TITLE} · ${LABEL}`, '장치 가까이에서 진행 방법을 확인하세요 · 시작 전에는 자유롭게 나갈 수 있습니다', { small: true });
   },

@@ -1727,10 +1727,13 @@ export class World {
   /** Door checks for one keeper; true when it went through a door. */
   private checkDoorsFor(p: Player): boolean {
     if (!p.alive || this.transitioning) return false;
+    // doors shut for a fight / mission: a key door stays locked (and the key kept) until they open,
+    // so a lockdown can't be walked out of (as with a secret door blown open mid-fight)
+    const lockdown = this.room.doors.some((x) => x.state === 'closed');
     for (const d of this.room.doors) {
       // unlock with key
       if (d.state === 'locked') {
-        if (dist(p.x, p.y, d.x, d.y) < 16 && p.keys > 0) {
+        if (!lockdown && dist(p.x, p.y, d.x, d.y) < 16 && p.keys > 0) {
           p.keys--;
           d.state = 'open';
           this.map.nodes[d.to].locked = false;

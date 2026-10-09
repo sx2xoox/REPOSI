@@ -54,6 +54,8 @@ export const DOWN_TIME = 1.2;
 export const FLARE_WIND = 0.55;
 export const HOP_COOLDOWN = 1.5;
 const SPEED_CAP = 88;
+/** how much slower than the quickest hunter it stays at most */
+const SPEED_MARGIN = 4;
 const FAN = 16;
 
 /** The mission device as the weasel sees it (implemented by HuntDevice in hunt.ts). */
@@ -129,10 +131,20 @@ function spotScore(w: World, hs: Player[], link: HuntLink | null, x: number, y: 
   return s;
 }
 
+/**
+ * Top speed: under the quickest hunter's own move speed (SPEED_CAP at the usual 92), so a
+ * slow keeper (bori 80, bern 86) can still run it down instead of chasing a faster quarry.
+ */
+export function speedCap(hs: Player[]): number {
+  let fastest = 0;
+  for (const p of hs) fastest = Math.max(fastest, p.stats.moveSpeed);
+  return fastest > 0 ? Math.min(SPEED_CAP, fastest - SPEED_MARGIN) : SPEED_CAP;
+}
+
 /** Final move speed (px/s after the floor's enemySpeed), expressed as the want-speed Enemy.update scales. */
-function speedOf(w: World, held: number, mult: number): number {
+function speedOf(w: World, hs: Player[], held: number, mult: number): number {
   const es = w.floor?.enemySpeed ?? 1;
-  return Math.min(SPEED_CAP, (66 + 6 * (3 - held)) * mult * es) / es;
+  return Math.min(speedCap(hs), (66 + 6 * (3 - held)) * mult * es) / es;
 }
 
 function heldOf(e: Enemy, link: HuntLink | null): number {
@@ -289,7 +301,7 @@ function update(e: Enemy, w: World, dt: number): void {
       break;
     }
     case ST.dash: {
-      e.moveAngle(m.da, speedOf(w, held, 1) * 1.6);
+      e.moveAngle(m.da, speedOf(w, hs, held, 1) * 1.6);
       m.t -= dt;
       if (m.t <= 0) { m.state = ST.flee; m.repick = 0; }
       break;
@@ -311,13 +323,13 @@ function update(e: Enemy, w: World, dt: number): void {
       if (!em) { m.state = ST.flee; m.repick = 0; break; }
       m.rx = em.x;
       m.ry = em.y;
-      moveTo(e, em.x, em.y, speedOf(w, held, 1.15));
+      moveTo(e, em.x, em.y, speedOf(w, hs, held, 1.15));
       if (m.stuck >= 0.25) { m.state = ST.flee; m.repick = 0; }
       break;
     }
     case ST.escape: {
       const c = link!.crack(link!.mem.escCrack);
-      const d = moveTo(e, c.x, c.y, speedOf(w, held, 1.1));
+      const d = moveTo(e, c.x, c.y, speedOf(w, hs, held, 1.1));
       if (d <= 4) {
         e.halt();
         e.x = c.x;
@@ -357,7 +369,7 @@ function update(e: Enemy, w: World, dt: number): void {
       if (trot && (m.best ?? 0) - spotScore(w, hs, link, e.x, e.y) < 16) {
         e.stop();
         m.taunt = 1;
-      } else moveTo(e, m.wpx, m.wpy, speedOf(w, held, trot ? 0.55 : 1));
+      } else moveTo(e, m.wpx, m.wpy, speedOf(w, hs, held, trot ? 0.55 : 1));
       if (!link) break;
       if (near120) dropCaltrops(e, w, link, dt);
       if (m.press >= 0.5 && m.cd <= 0) {

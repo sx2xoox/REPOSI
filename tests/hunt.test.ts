@@ -206,7 +206,8 @@ describe('embers', () => {
     expect(d.mem.progress).toBe(1);
     expect(em.dead).toBe(true);
     expect(p0.ember - ember0).toBeCloseTo(15, 6);
-    expect(coins(w, d)).toHaveLength(2);
+    // 2 coins per ember, +1 per extra hunter (two here)
+    expect(coins(w, d)).toHaveLength(3);
     expect(d.mem.lightR).toBe(36);
     // a tie: the weasel and a keeper both on the next ember in one step
     const e = knock(w, d);
@@ -219,10 +220,11 @@ describe('embers', () => {
     e.y = em2.y;
     p0.x = em2.x;
     p0.y = em2.y;
+    const paid = coins(w, d).length;
     w.update(DT);
     expect(d.mem.progress).toBe(2);
     expect(d.mem.held).toBe(1);
-    expect(coins(w, d).length).toBeGreaterThanOrEqual(3);
+    expect(coins(w, d).length - paid).toBe(3);
   });
 
   it('after its tumble the weasel races back for a nearby ember and takes it back', () => {
