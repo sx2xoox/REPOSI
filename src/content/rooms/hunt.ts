@@ -51,6 +51,8 @@ const LIGHT_R = [0, 36, 52];
  * every escape cancelled with a tumble) from becoming an endless kill / drop farm.
  */
 export const MAX_WAVES = 10;
+/** seconds between top-up waves (sent only while fewer than half the cap are up) */
+export const TRICKLE = 20;
 
 // ================================================================== rooms
 defineRoom({ id: 'hunt_den', shape: '1x1', kinds: ['hunt'], rows: ['p...............p', '.................', '...XX.......XX...', '.................', '.................', '.................', '...XX.......XX...', '.................', 'p...............p'] });
@@ -99,7 +101,7 @@ export const claimCoins = (members: number): number => 2 + (partySize(members) -
 export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
   mem: HuntMem = {
     phase: 0, used: false, pending: 0, members: 1, clock: 0, progress: 0, held: 3, weasel: 0, wx: 0, wy: 0,
-    nextEscape: 15, escCrack: -1, escState: 0, chanT: 0, chanHp: 0, sealed: 0, cornered: 0, nextTrickle: 12, nextWave: 0.5, waves: 0, lightR: 0, band: 0, interval: 16,
+    nextEscape: 15, escCrack: -1, escState: 0, chanT: 0, chanHp: 0, sealed: 0, cornered: 0, nextTrickle: TRICKLE, nextWave: 0.5, waves: 0, lightR: 0, band: 0, interval: HUNT_BAND.interval[0],
     c0x: 0, c0y: 0, c1x: 0, c1y: 0, c2x: 0, c2y: 0, c0f: 0, c1f: 0, c2f: 0,
   };
 
@@ -127,7 +129,7 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
     s.interval = Math.max(10, HUNT_BAND.interval[s.band] - (partySize(s.members) - 1));
     s.nextEscape = 15;
     s.nextWave = 0.5;
-    s.nextTrickle = 12;
+    s.nextTrickle = TRICKLE;
     s.waves = 0;
     s.held = 3;
     s.progress = 0;
@@ -452,7 +454,7 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
       this.wave(w);
     }
     if (s.clock >= s.nextTrickle) {
-      s.nextTrickle += 12;
+      s.nextTrickle += TRICKLE;
       if (this.minions(w) < Math.ceil(this.cap() / 2)) this.wave(w);
     }
   }

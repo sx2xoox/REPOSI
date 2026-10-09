@@ -27,6 +27,8 @@ export interface HuntRunOptions {
   full?: boolean;
   /** keeper (default 'ria') */
   character?: string;
+  /** party size (default 1): every keeper runs the same bot */
+  players?: number;
 }
 
 /** One solo hunt on `floor` with `weapon` at `power` x damage, driven by a simple chase bot. */
@@ -37,9 +39,12 @@ export function huntRun(floor: number, weapon: string, seed: string, power = 1, 
   const w = new World(renderer, run, { openInventory() {}, onGameOver() {} });
   if (!opts.full) w.setQuality({ lighting: false, particles: 0 });
   w.rules = fixedRules({ hitStop: false });
-  const charge = { t: 0 };
-  let dashT = 0;
+  const charges = new Map<number, { t: number }>();
+  const dashes = new Map<number, number>();
   w.inputSource = (ww: World, p, out: PlayerInput) => {
+    const charge = charges.get(p.slot) ?? { t: 0 };
+    charges.set(p.slot, charge);
+    let dashT = dashes.get(p.slot) ?? 0;
     out.mx = out.my = out.ax = out.ay = 0;
     out.held = 0;
     out.pressed = 0;
@@ -63,6 +68,7 @@ export function huntRun(floor: number, weapon: string, seed: string, power = 1, 
       goal = d > want ? weasel : { x: p.x - (weasel.x - p.x) / d * 10, y: p.y - (weasel.y - p.y) / d * 10 };
       dashT -= FIXED_DT;
       if ((d > 70 || weasel.mem.state === ST.escape) && dashT <= 0) { out.pressed |= PRESS.dash; dashT = casual ? 2.2 : 1.1; }
+      dashes.set(p.slot, dashT);
     }
     // a minion right on top of the keeper gets shot first
     for (const e of ww.enemies) if (e.alive && e.def.id !== WEASEL_ID && Math.hypot(e.x - p.x, e.y - p.y) < 34) { aim = e; break; }
@@ -108,13 +114,18 @@ export function huntRun(floor: number, weapon: string, seed: string, power = 1, 
       } else out.held = HELD.fire | HELD.cursorAim;
     }
   };
-  w.start();
+  const party = opts.players ?? 1;
+  if (party > 1) w.startParty(Array.from({ length: party }, (_, slot) => ({ slot, characterId: opts.character ?? 'ria', name: 'P' + slot })), 0);
+  else w.start();
   if (floor > 1) w.startFloor(floor);
   const p = w.player;
-  if (p.weaponId !== weapon) p.equipWeapon(w, weapon);
-  p.stats.maxHearts = 40;
-  p.red = p.maxRed;
-  p.soul = 20;
+  const all = party > 1 ? w.players : [p];
+  for (const q of all) {
+    if (q.weaponId !== weapon) w.asPlayer(q, () => q.equipWeapon(w, weapon));
+    q.stats.maxHearts = 40;
+    q.red = q.maxRed;
+    q.soul = 20;
+  }
   const n = w.map.nodes.find((x) => x.id !== w.map.startId && x.kind === 'normal')!;
   n.kind = 'hunt';
   n.templateId = 'hunt_den';
@@ -123,26 +134,28 @@ export function huntRun(floor: number, weapon: string, seed: string, power = 1, 
   w.enterRoom(n, null);
   const applyHit = w.applyHit.bind(w);
   w.applyHit = (target, hit) => {
-    if (hit.attacker === p || (hit.source && 'team' in hit.source && (hit.source as { team: string }).team === 'player')) hit.damage *= power;
+    if (all.includes(hit.attacker as never) || (hit.source && 'team' in hit.source && (hit.source as { team: string }).team === 'player')) hit.damage *= power;
     return applyHit(target, hit);
   };
   const d = w.entities.find((e) => e instanceof HuntDevice) as HuntDevice;
   const sources: Record<string, number> = {};
-  const hurt = p.hurt.bind(p);
-  p.hurt = (ww, n, src = '?', raw, origin) => {
-    const ok = hurt(ww, n, src, raw, origin);
-    if (ok) sources[src] = (sources[src] ?? 0) + 1;
-    return ok;
-  };
+  for (const q of all) {
+    const hurt = q.hurt.bind(q);
+    q.hurt = (ww, n, src = '?', raw, origin) => {
+      const ok = hurt(ww, n, src, raw, origin);
+      if (ok) sources[src] = (sources[src] ?? 0) + 1;
+      return ok;
+    };
+  }
   const knocks: number[] = [];
-  p.x = d.x - 20;
-  p.y = d.y + 10;
+  all.forEach((q, i) => { q.x = d.x - 20 + (i % 2) * 40; q.y = d.y + 10 + (i >> 1) * 16; });
   d.interact(w);
   let attempts = 0;
   let regrabs = 0;
   let prevEsc = 0;
   let prevHeld = 3;
-  const hp0 = p.red + p.soul;
+  const hpOf = () => all.reduce((a, q) => a + q.red + q.soul, 0);
+  const hp0 = hpOf();
   const steps = Math.round(limit / FIXED_DT);
   for (let i = 0; i < steps && !d.mem.used; i++) {
     w.update(FIXED_DT);
@@ -152,9 +165,9 @@ export function huntRun(floor: number, weapon: string, seed: string, power = 1, 
     if (d.mem.held < prevHeld) knocks.push(Math.round(d.mem.clock * 10) / 10);
     prevEsc = d.mem.escState;
     prevHeld = d.mem.held;
-    if (!p.alive) break;
+    if (!all.some((q) => q.alive)) break;
   }
   const seals = [0, 1, 2].filter((i) => d.mem.sealed & (1 << i)).length;
-  return { time: d.mem.clock, success: d.mem.phase === 4, attempts, seals, regrabs, hurt: hp0 - (p.red + p.soul), knocks, sources };
+  return { time: d.mem.clock, success: d.mem.phase === 4, attempts, seals, regrabs, hurt: hp0 - hpOf(), knocks, sources };
 }
 

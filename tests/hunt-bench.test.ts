@@ -4,7 +4,7 @@
 // escape attempts, seals, escapes (fails), regrabs and damage taken.
 //
 //   HUNT_BENCH=1 npx vitest run tests/hunt-bench
-//   (HUNT_WEAPONS / HUNT_FLOORS / HUNT_SEEDS / HUNT_CASUAL=1 / HUNT_CHAR=bori to vary it)
+//   (HUNT_WEAPONS / HUNT_FLOORS / HUNT_SEEDS / HUNT_CASUAL=1 / HUNT_CHAR=bori / HUNT_PARTY=4 to vary it)
 
 import './headless';
 import { describe, expect, it } from 'vitest';
@@ -16,14 +16,14 @@ describe.skipIf(!process.env.HUNT_BENCH)('hunt bench', () => {
     const floors = (process.env.HUNT_FLOORS ?? '1,4,7').split(',').map(Number);
     const seeds = Number(process.env.HUNT_SEEDS ?? 4);
     const casual = !!process.env.HUNT_CASUAL;
-    const opts = { character: process.env.HUNT_CHAR || 'ria' };
+    const opts = { character: process.env.HUNT_CHAR || 'ria', players: Number(process.env.HUNT_PARTY ?? 1) };
     const rows: string[] = [];
     let all = 0;
     let fails = 0;
     const times: number[] = [];
     for (const floor of floors) for (const weapon of weapons) {
       const res: HuntRun[] = [];
-      for (let s = 0; s < seeds; s++) res.push(huntRun(floor, weapon, `HUNT-${floor}-${s}`, ({ 1: 1.3, 4: 3.6, 7: 7.7 }[floor] ?? 1.3) / 1.3, 120, casual, opts));
+      for (let s = 0; s < seeds; s++) res.push(huntRun(floor, weapon, `HUNT-${floor}-${s}`, ({ 1: 1.3, 4: 3.6, 7: 7.7 }[floor] ?? 1.3) / 1.3, 150, casual, opts));
       const ok = res.filter((r) => r.success);
       all += res.length;
       fails += res.length - ok.length;
@@ -32,7 +32,7 @@ describe.skipIf(!process.env.HUNT_BENCH)('hunt bench', () => {
       rows.push(`F${floor} ${weapon.padEnd(14)} win ${ok.length}/${res.length}  time ${ok.length ? (ok.reduce((a, r) => a + r.time, 0) / ok.length).toFixed(1) : '-'}s  tries ${avg((r) => r.attempts)}  seals ${avg((r) => r.seals)}  regrabs ${avg((r) => r.regrabs)}  hurt ${avg((r) => r.hurt)}  [${res.map((r) => (r.success ? '' : 'X') + r.time.toFixed(0)).join(' ')}]`);
     }
     if (process.env.HUNT_VERBOSE) for (const floor of floors) for (const weapon of weapons) for (let s = 0; s < seeds; s++) {
-      const r = huntRun(floor, weapon, `HUNT-${floor}-${s}`, ({ 1: 1.3, 4: 3.6, 7: 7.7 }[floor] ?? 1.3) / 1.3, 120, casual, opts);
+      const r = huntRun(floor, weapon, `HUNT-${floor}-${s}`, ({ 1: 1.3, 4: 3.6, 7: 7.7 }[floor] ?? 1.3) / 1.3, 150, casual, opts);
       rows.push(`  F${floor} ${weapon} #${s}: knocks ${r.knocks.join(',')} end ${r.time.toFixed(1)} hurt ${JSON.stringify(r.sources)}`);
     }
     times.sort((a, b) => a - b);

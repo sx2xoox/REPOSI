@@ -5,7 +5,7 @@
 // embers when crowded, and every so often runs for a shadow crack in the wall.
 //
 // Bringing its bar down never kills it while it belongs to a hunt: the hit that would
-// stops at 1 HP, the weasel tumbles (1.2 s, untouchable) and drops one ember (the
+// stops at 1 HP, the weasel tumbles (1 s, untouchable) and drops one ember (the
 // mission device's `knockdown`). Standalone (debug spawn, detsim) it is a plain critter.
 //
 // The art is code-drawn (2026-10-07 direction): 22x14 side frames (run / crouch / down /
@@ -34,24 +34,34 @@ export const ST = { flee: 0, hop: 1, flare: 2, dash: 3, down: 4, race: 5, escape
 
 /** Floor band b = min(2, floor((floor - 1) / 3)): floors 1–3 / 4–6 / 7+. */
 export const huntBand = (floor: number): number => Math.max(0, Math.min(2, Math.floor((floor - 1) / 3)));
+// Balance (hunt bench, 2026-10-09, solo bots on floors 1 / 4 / 7): a sharp hunter clears in
+// ~30–39 s and a casual one in ~39–49 s depending on the keeper, and roughly 1 in 8 (sharp)
+// to 1 in 5 (casual) thieves get away. The tougher later bars, the snatch-back race and the
+// escape sprint carry the length; the slower trickle / caltrop / flare cadences and the smaller
+// floor-7 waves keep the damage taken within ~1.3x of the earlier, shorter hunt's.
 export const HUNT_BAND = {
   /** seconds between escape attempts (−1 s per extra hunter, at least 10) */
-  interval: [16, 14, 12],
+  interval: [20, 19, 18],
   /** how long it sinks into a crack before it is gone */
-  channel: [2.6, 2.3, 2.0],
+  channel: [3.0, 2.9, 2.8],
   /** caltrop cadence (x0.8 once cornered) */
-  caltrop: [0.7, 0.55, 0.45],
+  caltrop: [0.8, 0.7, 0.65],
   /** flare ring size */
   flare: [8, 10, 12],
   /** minion wave base (x encounterCount) */
-  wave: [2, 3, 4],
+  wave: [2, 3, 3],
 } as const;
-/** Bar size by embers already lost (k = 3 - held). */
-export const BAR_MULT = [1, 1.15, 1.3];
+/** Bar size by embers already lost (k = 3 - held): it comes back tougher after every tumble. */
+export const BAR_MULT = [1, 1.25, 1.5];
 /** a hit that drops the bar by this share of its max during a channel drags the weasel out */
-export const DRAG_OUT = 0.3;
-export const DOWN_TIME = 1.2;
+export const DRAG_OUT = 0.25;
+export const DOWN_TIME = 1.0;
 export const FLARE_WIND = 0.55;
+/** seconds between flares (1.8 once cornered) */
+export const FLARE_COOLDOWN = 3;
+/** speed x on the dash back for a dropped ember and on the sprint for a crack (both under speedCap) */
+export const RACE_SPEED = 1.3;
+export const ESCAPE_SPEED = 1.3;
 export const HOP_COOLDOWN = 1.5;
 const SPEED_CAP = 88;
 /** how much slower than the quickest hunter it stays at most */
@@ -294,7 +304,7 @@ function update(e: Enemy, w: World, dt: number): void {
         m.da = p ? Math.atan2(e.y - p.y, e.x - p.x) : w.rng.angle();
         m.state = ST.dash;
         m.t = 0.3;
-        m.cd = link && link.mem.cornered ? 1.8 : 2.5;
+        m.cd = link && link.mem.cornered ? 1.8 : FLARE_COOLDOWN;
         m.press = 0;
         w.sfx('whoosh', { vol: 0.45 });
       }
@@ -323,13 +333,13 @@ function update(e: Enemy, w: World, dt: number): void {
       if (!em) { m.state = ST.flee; m.repick = 0; break; }
       m.rx = em.x;
       m.ry = em.y;
-      moveTo(e, em.x, em.y, speedOf(w, hs, held, 1.15));
+      moveTo(e, em.x, em.y, speedOf(w, hs, held, RACE_SPEED));
       if (m.stuck >= 0.25) { m.state = ST.flee; m.repick = 0; }
       break;
     }
     case ST.escape: {
       const c = link!.crack(link!.mem.escCrack);
-      const d = moveTo(e, c.x, c.y, speedOf(w, hs, held, 1.1));
+      const d = moveTo(e, c.x, c.y, speedOf(w, hs, held, ESCAPE_SPEED));
       if (d <= 4) {
         e.halt();
         e.x = c.x;
@@ -803,7 +813,7 @@ export function callout(w: World, x: number, y: number, text: string, color: str
 defineEnemy({
   id: WEASEL_ID,
   name: '등불 족제비',
-  hp: 45,
+  hp: 80,
   radius: 6,
   mass: 1.4,
   speed: 66,

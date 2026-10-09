@@ -141,7 +141,7 @@ describe('the weasel', () => {
     expect(w.entities.filter((x) => x instanceof HuntEmber && !x.dead)).toHaveLength(1);
     // still untouchable during the tumble
     park(w);
-    step(w, 60, () => clearMinions(w));
+    step(w, Math.round(DOWN_TIME / DT) - 16, () => clearMinions(w));
     expect(w.applyHit(e, { damage: 1e7, kind: 'projectile', attacker: w.player })).toBe(false);
     expect(e.hp).toBe(1);
     let refilled = 0;
@@ -220,11 +220,12 @@ describe('embers', () => {
     e.y = em2.y;
     p0.x = em2.x;
     p0.y = em2.y;
-    const paid = coins(w, d).length;
+    // the first claim's coins are swept up first (one may lie right where this keeper stands)
+    for (const c of coins(w, d)) c.dead = true;
     w.update(DT);
     expect(d.mem.progress).toBe(2);
     expect(d.mem.held).toBe(1);
-    expect(coins(w, d).length - paid).toBe(3);
+    expect(coins(w, d)).toHaveLength(3);
   });
 
   it('after its tumble the weasel races back for a nearby ember and takes it back', () => {
@@ -276,7 +277,7 @@ describe('escapes', () => {
     expect(w.room.doors.every((door) => door.state !== 'closed')).toBe(true);
   });
 
-  it('drag-outs (30 % damage or a touch) board the crack; a tumble cancels; three boards corner it for good', () => {
+  it('drag-outs (25 % damage or a touch) board the crack; a tumble cancels; three boards corner it for good', () => {
     const { w, d } = setup();
     begin(w, d);
     const e = untilHittable(w, d);
@@ -286,12 +287,13 @@ describe('escapes', () => {
       expect(d.mem.escState).toBe(2);
     };
     const sealedCount = () => [0, 1, 2].filter((i) => d.mem.sealed & (1 << i)).length;
-    // 1) a hit worth 30 % of the bar
+    // 1) a hit worth 25 % of the bar
     channel();
     e.hp = e.maxHp;
-    w.applyHit(e, { damage: 0.31 * e.maxHp, kind: 'projectile', attacker: w.player, crit: false });
+    w.applyHit(e, { damage: 0.26 * e.maxHp, kind: 'projectile', attacker: w.player, crit: false });
     expect(e.hp).toBeGreaterThanOrEqual(1);
-    w.update(DT);
+    // (a hit that size starts a short hit-stop: the world catches up within a few frames)
+    for (let i = 0; i < 10 && !sealedCount(); i++) w.update(DT);
     expect(sealedCount()).toBe(1);
     expect(d.mem.escState).toBe(0);
     expect(d.mem.nextEscape).toBeCloseTo(d.mem.clock + d.mem.interval, 1);
@@ -337,8 +339,8 @@ describe('outcomes', () => {
     begin(w, d);
     // co-op scaling
     const e0 = weasel(w, d)!;
-    expect(e0.maxHp).toBe(Math.round(45 * w.floor.hpMult * encounterHP(players)));
-    expect(d.mem.interval).toBe(Math.max(10, [16, 14, 12][Math.min(2, Math.floor((floor - 1) / 3))] - (players - 1)));
+    expect(e0.maxHp).toBe(Math.round(80 * w.floor.hpMult * encounterHP(players)));
+    expect(d.mem.interval).toBe(Math.max(10, [20, 19, 18][Math.min(2, Math.floor((floor - 1) / 3))] - (players - 1)));
     for (let k = 0; k < 3; k++) {
       knock(w, d);
       park(w);
@@ -456,7 +458,8 @@ describe('presentation', () => {
     d.mem.nextEscape = d.mem.clock;
     for (let i = 0; i < 60 * 20 && d.mem.escState !== 2; i++) { park(w); clearMinions(w); w.update(DT); if (i === 5) drawAll(); }
     drawAll();
-    expect(DOWN_TIME).toBeGreaterThan(1);
+    // the draw 40 steps after the knockdown happened mid-tumble
+    expect(DOWN_TIME).toBeGreaterThan(40 * DT);
   });
 });
 
