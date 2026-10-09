@@ -9,7 +9,7 @@ import { generateFloor, generateStage, type FloorMap } from '../src/game/dungeon
 import { ROOM_ICONS } from '../src/ui/logic';
 import {
   BEAD, BOARD_IN_H, BOARD_IN_W, CORNER, EMBLEM, FLAME3, FLAME5, FLAME7, HOT, LOCK, MINI_LAYOUT, MINI_SIZE, SIGIL5, SIGIL7, SMOULDER,
-  paintBoardStatic, paintEmblemMedallion, paintFlame, paintMapPlate, paintMiniBackground, paintPip, paintRooms, paintStageBead,
+  paintBoardStatic, paintCompass, paintEmblemMedallion, paintFlame, paintMapPlate, paintMiniBackground, paintPip, paintRooms, paintStageBead,
   paintVignette, plateRect, type SigilKey,
 } from '../src/ui/map-art';
 import { MAP_LOOK, deriveLook, lookFor, type MapLook } from '../src/ui/map-look';
@@ -163,6 +163,7 @@ describe('paintRooms', () => {
       expect(() => {
         paintBoardStatic(look);
         paintEmblemMedallion(look);
+        paintCompass(look);
         paintMiniBackground(look);
         paintVignette(look, 108, 70, 54, 35, 11, 40);
         for (const s of ['past', 'current', 'future'] as const) paintStageBead(look, s, true);

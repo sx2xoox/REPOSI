@@ -44,7 +44,7 @@ export const SIGIL7: Partial<Record<SigilKey, string[]>> = {
   refinery: rows('......./hhhhhh./mmmmmmh/.dmmmd./..mmm../.mmmmm./ddddddd'),
   well: rows('...h.../..hmh../.hmmmd./hmmmmmd/hmhmmmd/.dmmmd./..ddd..'),
   fusion: rows('h.....h/.m...m./..m.m../...h.../..hmm../.mmmmd./ddddddd'),
-  exit: rows('hhhhhhh/hkkmkkd/hkkmkkd/hmmmmmd/hkkmkkd/hkkmkkd/ddddddd'),
+  exit: rows('..hmd../..hmd../hhhmmdd/.hmmmd./..hmd../......./hmmmmmd'),
 };
 
 /** 5x5 sigils (minimap, small boards). */
@@ -64,10 +64,10 @@ export const SIGIL5: Partial<Record<SigilKey, string[]>> = {
   refinery: rows('hhhh./mmmmh/.dmd./.mmm./ddddd'),
   well: rows('..h../.hmm./hmmmd/hhmmd/.ddd.'),
   fusion: rows('h...h/.m.m./..h../.hmd./ddddd'),
-  exit: rows('hhhhd/hkmkd/hmmmd/hkmkd/ddddd'),
+  exit: rows('..h../..h../hhmmm/.hmm./..m..'),
 };
 
-/** The trapdoor hatch (stage passage, defeated boss) is the exit sigil. */
+/** The way down (stage passage, a defeated boss's trapdoor) is the exit sigil: an arrow dropping through the floor. */
 export const HATCH7 = SIGIL7.exit!;
 export const HATCH5 = SIGIL5.exit!;
 
@@ -197,6 +197,18 @@ function roundBox(p: PixelPainter, w: number, h: number, outline: string, fill: 
   p.rect(1, 2, w - 2, h - 4, fill);
 }
 
+/**
+ * A pane's glass: a solid lit band across the top third, two dithered rows
+ * of transition, then the deeper body colour (clean at 1 art px, no noise).
+ */
+function paneFill(p: PixelPainter, x: number, y: number, w: number, h: number, top: string, bottom: string): void {
+  const band = Math.max(1, Math.round(h * 0.3));
+  for (let v = 0; v < h; v++) {
+    const t = v < band ? 1 : v === band ? 0.5 : v === band + 1 ? 0.25 : 0;
+    for (let u = 0; u < w; u++) p.px(x + u, y + v, t >= 1 || (t > 0 && bayer(x + u, y + v) < t) ? top : bottom);
+  }
+}
+
 /** Ordered-dither vertical gradient over a rect: `top` share falls from `amount` to 0. */
 function ditherV(p: PixelPainter, x: number, y: number, w: number, h: number, top: string, bottom: string, amount: number): void {
   const span = Math.max(1, h - 1);
@@ -232,7 +244,7 @@ export interface PlateOpts {
 }
 
 /** The hot ramp of the current room (constant on every floor). */
-export const HOT = { top: '#fff0c8', bottom: '#e8b870', shade: '#8a4a1e', rim: '#ffe9a8', ring: '#c07a30' };
+export const HOT = { top: '#fff0c8', bottom: '#e8b870', shade: '#8a4a1e', rim: '#ffe9a8', ring: '#f0a24c' };
 export const SMOULDER = { top: '#6e2a34', bottom: '#4a1822', shade: '#2a0c14', rim: '#a04252', eye: '#ff4a5a', eyeHi: '#ffb0b4', eyeMini: '#ff6a70' };
 const SEEN = { fill: '#0e0a14', dither: '#1a1424', top: '#2a2236', topMini: '#3e3450', left: '#211a2c', ember: '#6a2c12', emberHi: '#e07a2a' };
 
@@ -279,11 +291,19 @@ export function paintRoomPlate(p: PixelPainter, x: number, y: number, w: number,
   const iw = w - 2;
   const ih = h - 2;
   const c = paneCols(o);
+  const board = o.lod === 'board';
   if (o.state === 'seen') {
     p.rect(ix, iy, iw, ih, SEEN.fill);
     for (let xx = 0; xx < iw; xx++) if (bayer(ix + xx, iy + 1) < 0.5) p.px(ix + xx, iy + 1, SEEN.dither);
-  } else ditherV(p, ix, iy, iw, ih, c.top, c.bottom, c.amount);
-  if (o.motif && o.state === 'visited' && !o.special && o.lod === 'board') paintMotif(p, o.look, ix + 1, iy + 1, iw - 2, ih - 2, o.id ?? 0);
+  } else {
+    // each row of cells of a big room is its own pane (lit band under every mullion)
+    let y0 = iy;
+    for (const my of [...(o.splitsY ?? []).filter((v) => v > iy && v < iy + ih - 1).sort((a, b) => a - b), iy + ih]) {
+      if (my > y0) paneFill(p, ix, y0, iw, my - y0, c.top, c.bottom);
+      y0 = my + 1;
+    }
+  }
+  if (o.motif && o.state === 'visited' && !o.special && board) paintMotif(p, o.look, ix + 1, iy + 1, iw - 2, ih - 2, o.id ?? 0);
   // mullions between the cells of a big room
   for (const mx of o.splitsX ?? []) if (mx > ix && mx < ix + iw - 1) p.rect(mx, iy, 1, ih, c.mullion);
   for (const my of o.splitsY ?? []) if (my > iy && my < iy + ih - 1) p.rect(ix, my, iw, 1, c.mullion);
@@ -294,6 +314,15 @@ export function paintRoomPlate(p: PixelPainter, x: number, y: number, w: number,
   }
   p.rect(ix, iy, 1, ih - (c.shade ? 1 : 0), c.rimL);
   p.rect(ix, iy, iw - (c.shade ? 1 : 0), 1, c.rimT);
+  // glass glint: a short diagonal shine just inside the lit corner (board panes that are lit)
+  if (board && o.state !== 'seen' && iw >= 9 && ih >= 9) {
+    const gl = mix(c.top, '#ffffff', o.state === 'current' && !o.special ? 0.7 : 0.32);
+    p.px(ix + 1, iy + 3, gl);
+    p.px(ix + 2, iy + 2, gl);
+    p.px(ix + 3, iy + 1, gl);
+    p.px(ix + 1, iy + 5, mix(c.top, gl, 0.5));
+    p.px(ix + 2, iy + 4, mix(c.top, gl, 0.5));
+  }
   if (o.centre === false || o.special) return;
   const cx = o.cx ?? ix + Math.floor((iw - 1) / 2);
   const cy = o.cy ?? iy + Math.floor((ih - 1) / 2);
@@ -306,9 +335,18 @@ export function paintRoomPlate(p: PixelPainter, x: number, y: number, w: number,
     }
   } else if (o.state === 'visited') {
     if (mini) p.px(cx, cy, o.look.thread);
-    else {
+    else if (iw < 8 || ih < 8) {
       p.rect(cx, cy, 2, 2, o.look.light);
       p.px(cx, cy, mix(o.look.thread, '#ffffff', 0.5));
+    } else {
+      // the room's lantern, lit: a small round orb of the floor's light
+      const core = mix(o.look.thread, '#ffffff', 0.55);
+      const halo = o.look.light;
+      p.rect(cx, cy - 1, 2, 4, halo);
+      p.rect(cx - 1, cy, 4, 2, halo);
+      p.rect(cx, cy, 2, 2, core);
+      p.px(cx, cy, '#ffffff');
+      p.px(cx + 1, cy + 1, mix(core, halo, 0.5));
     }
   } else if (o.state === 'uncleared') {
     if (mini) {
@@ -326,62 +364,72 @@ export function paintRoomPlate(p: PixelPainter, x: number, y: number, w: number,
 
 /** Quiet floor-material motif inside a lit pane (board only). (x, y, w, h): inside the bevel. */
 export function paintMotif(p: PixelPainter, look: MapLook, x: number, y: number, w: number, h: number, id: number): void {
-  if (w < 3 || h < 3) return;
+  if (w < 5 || h < 5) return;
   const g = look.glass;
   const r = h32(id, 0x6d61, look.id.length);
   const at = (k: number, span: number) => ((r >>> k) & 0xffff) % Math.max(1, span);
+  /** a seam darker than the pane body */
+  const seam = mix(g[1], g[0], 0.6);
+  /** the lit lip under a seam */
+  const lip = mix(g[1], g[2], 0.55);
+  const hline = (v: number, u0: number, u1: number, c: string) => {
+    for (let u = Math.max(0, u0); u <= Math.min(w - 1, u1); u++) p.px(x + u, y + v, c);
+  };
+  const vline = (u: number, v0: number, v1: number, c: string) => {
+    for (let v = Math.max(0, v0); v <= Math.min(h - 1, v1); v++) p.px(x + u, y + v, c);
+  };
   switch (look.motif) {
     case 'flag': {
-      const seam = mix(g[1], g[0], 0.5);
-      for (let v = 0; v < h; v++) {
-        const course = Math.floor(v / 4);
-        for (let u = 0; u < w; u++) {
-          if (v % 4 === 3 || (u + course * 2) % 5 === 4) p.px(x + u, y + v, seam);
-        }
-      }
+      // two courses of flagstones: one seam across, joints staggered
+      const hs = Math.round(h * 0.5);
+      hline(hs, 0, w - 1, seam);
+      hline(hs + 1, 0, w - 1, lip);
+      vline(Math.floor(w * 0.3), 0, hs - 1, seam);
+      vline(Math.floor(w * 0.72), hs + 1, h - 1, seam);
       break;
     }
     case 'moss': {
-      for (let v = Math.max(0, h - 2); v < h; v++) for (let u = 0; u < w; u++) if (bayer(x + u, y + v) < 0.35) p.px(x + u, y + v, '#2c4c3a');
-      p.px(x + at(0, w), y + at(8, Math.max(1, h - 2)), '#a0f0d0');
+      for (let v = Math.max(0, h - 2); v < h; v++) for (let u = 0; u < w; u++) if (bayer(x + u, y + v) < (v === h - 1 ? 0.6 : 0.3)) p.px(x + u, y + v, '#2c4c3a');
+      p.px(x + at(0, w), y + h - 2, '#4a8a62');
+      p.px(x + at(8, Math.max(1, w)), y + at(16, Math.max(1, h - 4)), '#a0f0d0');
       break;
     }
     case 'rivet': {
-      for (const [u, v] of [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]]) p.px(x + u, y + v, look.metal[1]);
-      const u0 = 1 + at(0, Math.max(1, w - 4));
-      const v0 = 1 + at(8, Math.max(1, h - 3));
-      p.px(x + u0, y + v0, '#c0300a');
-      p.px(x + u0 + 1, y + v0 + 1, '#ff8020');
-      p.px(x + u0 + 2, y + v0 + 1, '#c0300a');
+      // a riveted iron plate with a soot-dark foot
+      for (const [u, v] of [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]]) p.px(x + u, y + v, look.metal[2]);
+      for (let u = 0; u < w; u++) if (bayer(x + u, y + h - 2) < 0.4) p.px(x + u, y + h - 2, seam);
+      vline(Math.floor(w / 2) - (at(0, 2) ? 3 : -3), 0, Math.round(h * 0.3) - 1, seam);
       break;
     }
     case 'frost': {
-      for (let v = 0; v < h; v++) for (let u = 0; u < w; u++) {
-        if (bayer(x + u, y + v) < 0.25) p.px(x + u, y + v, ((u >> 1) + (v >> 1)) & 1 ? g[1] : g[2]);
-      }
-      const gl = mix(g[2], '#c8e8ff', 0.5);
-      for (let i = 0; i < 3; i++) p.px(x + 1 + i, y + Math.min(h - 1, 3) - i, gl);
+      // rime creeping in from two corners
+      const fr = mix(g[2], '#e8f4ff', 0.55);
+      const fr2 = mix(g[1], '#c8e8ff', 0.35);
+      for (const [u, v, c] of [[w - 1, 0, fr], [w - 2, 0, fr], [w - 1, 1, fr], [w - 3, 0, fr2], [w - 1, 2, fr2], [w - 2, 1, fr2], [0, h - 1, fr], [1, h - 1, fr], [0, h - 2, fr], [2, h - 1, fr2], [0, h - 3, fr2], [1, h - 2, fr2]] as [number, number, string][]) p.px(x + u, y + v, c);
       break;
     }
     case 'vein': {
       const vc = mix(g[1], '#7a30d0', 0.6);
-      const base = 1 + at(0, Math.max(1, h - 3));
-      for (let u = 0; u < w; u++) p.px(x + u, y + base + ((u >> 1) & 1), vc);
-      p.px(x + at(8, w), y + (base + 3 < h ? base + 3 : 0), '#c070ff');
+      const base = Math.round(h * 0.55) + at(0, 2);
+      for (let u = 0; u < w; u++) p.px(x + u, y + Math.min(h - 1, base + ((u >> 1) & 1)), vc);
+      p.px(x + 1 + at(8, Math.max(1, w - 2)), y + Math.min(h - 1, base + 3), '#c070ff');
       break;
     }
     case 'wave': {
       const wave = [0, 0, 1, 1, 0, 0, -1, -1];
-      for (const row of [Math.floor(h / 3), Math.floor((2 * h) / 3)]) {
-        for (let u = 0; u < w; u++) p.px(x + u, y + clamp(row + wave[(u + row) & 7], 0, h - 1), g[2]);
-      }
-      p.px(x + at(0, w), y + at(8, h), '#d8c8a0');
+      const row = Math.round(h * 0.62);
+      for (let u = 0; u < w; u++) p.px(x + u, y + clamp(row + wave[(u + at(0, 8)) & 7], 0, h - 1), mix(g[2], look.light, 0.25));
+      p.px(x + at(8, w), y + Math.max(0, row - 3), '#d8c8a0');
       break;
     }
     case 'parquet': {
-      for (let v = 0; v < h; v++) for (let u = 0; u < w; u++) {
-        if (bayer(x + u, y + v) < 0.5) p.px(x + u, y + v, ((u >> 1) + v) & 1 ? g[1] : g[2]);
-      }
+      // floor boards: two seams across, joints staggered, brass inlay at the corners
+      const s1 = Math.round(h * 0.4);
+      const s2 = Math.round(h * 0.72);
+      hline(s1, 0, w - 1, seam);
+      hline(s2, 0, w - 1, seam);
+      vline(Math.floor(w * 0.35), s1 + 1, s2 - 1, seam);
+      vline(Math.floor(w * 0.7), s2 + 1, h - 1, seam);
       for (const [u, v] of [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]]) p.px(x + u, y + v, '#9a7430');
       break;
     }
@@ -812,3 +860,47 @@ export function paintPip(col: string, downed: boolean): PixelPainter {
 
 /** Grey sigil palette of a kind not found yet (legend). */
 export const UNFOUND: SigilPal = { h: '#4e4660', m: '#3a3248', d: '#241c30', k: INK };
+
+/**
+ * A cartographer's compass rose (25x25 art) in the floor's bezel metal, the
+ * north point lit with the floor's lantern light. Decoration for the free
+ * space under the legend.
+ */
+export function paintCompass(look: MapLook): PixelPainter {
+  const S = 25;
+  const c = 12;
+  const p = new PixelPainter(S, S);
+  const [lo, mid, hi] = look.metal;
+  /** a spike from the centre toward (dx, dy), `len` long, `half` wide at the base; lit / shaded halves */
+  const spike = (dx: number, dy: number, len: number, half: number, lit: string, dark: string) => {
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const rx = x - c;
+      const ry = y - c;
+      const along = rx * dx + ry * dy;
+      const across = -rx * dy + ry * dx;
+      if (along < 0 || along > len) continue;
+      const w = half * (1 - along / len);
+      if (Math.abs(across) > w + 0.35) continue;
+      // light from the top-left: the half facing it is lit
+      const k = across * (dy - dx);
+      const side = k > 0 || (k === 0 && across >= 0) ? lit : dark;
+      p.px(x, y, side);
+    }
+  };
+  const s2 = Math.SQRT1_2;
+  for (const [dx, dy] of [[s2, s2], [-s2, s2], [s2, -s2], [-s2, -s2]]) spike(dx, dy, 7, 1.6, mid, lo);
+  spike(0, 1, 11, 2.6, mid, lo);
+  spike(1, 0, 11, 2.6, mid, lo);
+  spike(-1, 0, 11, 2.6, hi, mid);
+  spike(0, -1, 11, 2.6, mix(look.light, '#ffffff', 0.35), look.light);
+  p.outline(INK);
+  // dotted outer ring (round the spikes, not over them)
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const d = Math.hypot(x - c, y - c);
+    if (Math.abs(d - 11.5) < 0.5 && ((x + y) & 1) === 0 && !p.isSet(x, y)) p.px(x, y, mix(mid, lo, 0.35));
+  }
+  // hub
+  p.rect(c - 1, c - 1, 3, 3, INK);
+  p.px(c, c, mix(look.thread, '#ffffff', 0.5));
+  return p;
+}

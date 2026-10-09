@@ -104,9 +104,15 @@ describe('buildMapView', () => {
         const boss = map.nodes[map.bossId];
         boss.discovered = true;
         expect(buildMapView(src).nodes.find((n) => n.id === boss.id)!.bossDone).toBe(false);
+        // no way down until the boss falls
+        expect(v.states).not.toContain('exit');
+        expect(v.legend.some((l) => l.key === 'exit')).toBe(false);
         boss.cleared = true;
-        expect(buildMapView(src).nodes.find((n) => n.id === boss.id)!.bossDone).toBe(true);
-        expect(buildMapView(src).legend.some((l) => l.key === 'boss')).toBe(true);
+        const done = buildMapView(src);
+        expect(done.nodes.find((n) => n.id === boss.id)!.bossDone).toBe(true);
+        expect(done.legend.some((l) => l.key === 'boss')).toBe(true);
+        // the defeated boss's trapdoor is the floor's exit: the legend explains its glyph
+        expect(done.states.includes('exit') || done.legend.some((l) => l.key === 'exit')).toBe(true);
       } else {
         // no boss on x-1 / x-2: no boss row in the legend
         expect(v.legend.some((l) => l.key === 'boss')).toBe(false);
@@ -232,12 +238,12 @@ describe('mapSignature', () => {
 });
 
 describe('layout', () => {
-  it('fits every span 1..13 into the 200x138 art board with a 9..20 cell', () => {
+  it('fits every span 1..13 into the 200x138 art board with a 9..24 cell', () => {
     for (let sw = 1; sw <= MAP_W; sw++) for (let sh = 1; sh <= MAP_H; sh++) {
       const b = { x0: 0, y0: 0, x1: sw, y1: sh };
       const L = boardLayout(b, 200, 138, { x: 6, y: 6 });
       expect(L.cell).toBeGreaterThanOrEqual(9);
-      expect(L.cell).toBeLessThanOrEqual(20);
+      expect(L.cell).toBeLessThanOrEqual(24);
       expect(sw * L.cell).toBeLessThanOrEqual(200);
       expect(sh * L.cell).toBeLessThanOrEqual(138);
       expect(L.ox).toBeGreaterThanOrEqual(6);

@@ -173,7 +173,9 @@ export function buildMapView(src: MapSource): MapView {
     total: map.nodes.filter((n) => n.kind !== 'secret').length,
     cleared: map.nodes.filter((n) => n.cleared && n.visited).length,
   };
-  const hasExit = nodes.some((n) => n.exit);
+  const lastFloor = isLastFloor(map.floor.index);
+  // the way down: the stage passage (x-1 / x-2) or a defeated boss's trapdoor (not on the last floor)
+  const hasExit = nodes.some((n) => n.exit || (n.bossDone && !lastFloor));
   const hasUncleared = nodes.some((n) => n.state === 'uncleared');
   const states: LegendState[] = ['current', 'visited', hasUncleared ? 'uncleared' : hasExit ? 'exit' : 'seen', 'seen'];
   if (states[2] === 'seen') states.length = 3;
@@ -206,7 +208,7 @@ export function buildMapView(src: MapSource): MapView {
     stage: src.run.stage,
     staged: src.run.staged,
     seed: src.run.seed,
-    lastFloor: isLastFloor(map.floor.index),
+    lastFloor,
   };
 }
 
@@ -249,6 +251,9 @@ export function mapPanelRect(uiW: number): { x: number; y: number; w: number; h:
   return { x: Math.round(uiW / 2 - MAP_PANEL.w / 2), y: MAP_PANEL.top, w: MAP_PANEL.w, h: MAP_PANEL.h };
 }
 
+/** Largest map cell on the overlay board (art px): small floors fill more of it. */
+export const BOARD_MAX_CELL = 24;
+
 export interface BoardLayout {
   /** art px per map cell */
   cell: number;
@@ -273,12 +278,12 @@ export function sigilFor(min: number): 7 | 5 {
 
 /**
  * Fit the known bounds into an `areaW` x `areaH` art-px area (offset by
- * `opts.x/y`): integer cell 9..20, gap ~28 % of it, centred, whole art px.
+ * `opts.x/y`): integer cell 9..24, gap ~28 % of it (3..6), centred, whole art px.
  */
 export function boardLayout(b: Bounds, areaW: number, areaH: number, opts: { x?: number; y?: number; minCell?: number; maxCell?: number } = {}): BoardLayout {
   const spanW = Math.max(1, b.x1 - b.x0);
   const spanH = Math.max(1, b.y1 - b.y0);
-  const cell = Math.max(opts.minCell ?? 9, Math.min(opts.maxCell ?? 20, Math.floor(Math.min(areaW / spanW, areaH / spanH))));
+  const cell = Math.max(opts.minCell ?? 9, Math.min(opts.maxCell ?? BOARD_MAX_CELL, Math.floor(Math.min(areaW / spanW, areaH / spanH))));
   const gap = Math.max(3, Math.min(6, Math.round(cell * 0.28)));
   const ox = Math.floor((opts.x ?? 0) + (areaW - spanW * cell) / 2) - b.x0 * cell;
   const oy = Math.floor((opts.y ?? 0) + (areaH - spanH * cell) / 2) - b.y0 * cell;

@@ -26,7 +26,7 @@ import { lookFor, type MapLook } from './map-look';
 import { MAP_PANEL, boardLayout, buildMapView, h32, keeperCell, legendLayout, mapPanelRect, mapSignature, type BoardLayout, type LegendState, type MapView } from './map-view';
 import {
   BOARD_IN_H, BOARD_IN_W, FLAME3, FLAME5, FLAME7, FLAME_PAL, HATCH5, INK, UNFOUND, cellCentre, glyphPal, paintBoardStatic,
-  paintEmblemMedallion, paintFlame, paintPip, paintRoomPlate, paintRooms, paintSigil, paintStageBead, paintVignette, plateColor,
+  paintCompass, paintEmblemMedallion, paintFlame, paintPip, paintRoomPlate, paintRooms, paintSigil, paintStageBead, paintVignette, plateColor,
   plateRect, sigilKey, sigilPal, stampMask, threadPixels, type BeadState, type SigilKey,
 } from './map-art';
 import { artCanvas, blitGlow, glowCanvas, lowQuality, mapSource } from './minimap';
@@ -498,6 +498,11 @@ export class MapOverlay implements Scene {
       const lx = row.key === 'party' ? rx + Math.max(18, v.party.length * 6 + 4) : rx + 18;
       r.uiText(row.label, lx, ry, { size: 10, font: 'small', color: row.found ? C.text : C.textMute, alpha: a });
     });
+    // a compass rose in the free space under a short legend
+    const rowsEnd = ly + 76 + Math.max(0, lay.perCol - 1) * 15 + 12;
+    const cv = artCanvas(`compass|${look.id}`, () => paintCompass(look));
+    const cy = ly + LEGEND_H - 8 - cv.height * PX;
+    if (rowsEnd + 6 <= cy) blitArt(r, cv, sx + Math.round((SIDE_W - cv.width * PX) / 2), cy, a * 0.8);
   }
 }
 
@@ -509,7 +514,7 @@ function paintSwatch(look: MapLook, s: LegendState): PixelPainter {
     stampMask(p, FLAME3, 4, 2, FLAME_PAL, INK);
   } else if (s === 'exit') {
     paintRoomPlate(p, 0, 0, 10, 8, { state: 'visited', special: look.thread, look, lod: 'mini' });
-    p.stamp(3, 1, HATCH5, sigilPal(look.thread) as unknown as Record<string, string>);
+    stampMask(p, HATCH5, 3, 1, sigilPal(look.thread) as unknown as Record<string, string>, INK);
   } else if (s === 'uncleared') {
     paintRoomPlate(p, 0, 0, 10, 8, { state: 'uncleared', special: null, look, lod: 'board', cx: 4, cy: 3 });
   } else if (s === 'visited') {

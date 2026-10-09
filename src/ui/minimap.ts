@@ -16,7 +16,7 @@ import { blitArt } from './hud-gear';
 import { lookFor, type MapLook } from './map-look';
 import { buildMapView, keeperCell, knownBounds, mapSignature, miniCamTarget, nodeKnown, type MapSource, type MapView, type ViewNode } from './map-view';
 import {
-  FLAME3, FLAME5, MINI_LAYOUT, MINI_PLATE, MINI_SIZE, paintFlame, paintMapPlate, paintMiniBackground, paintPip, paintRooms,
+  FLAME5, MINI_LAYOUT, MINI_PLATE, MINI_SIZE, paintFlame, paintMapPlate, paintMiniBackground, paintPip, paintRooms,
   paintVignette, plateRect, sigilKey, threadPixels, type GlowSpot, type PlateRect,
 } from './map-art';
 import type { PixelPainter } from '../engine/painter';
@@ -328,10 +328,8 @@ export class MinimapView {
       const cell = plateRect({ gx: kc.cx, gy: kc.cy, cw: 1, ch: 1 }, MINI_LAYOUT);
       const { ox, oy } = this.origin(x, y);
       blitArt(r, fl, ox + (cell.x + Math.floor((cell.w - fl.width) / 2)) * PX, oy + (cell.y + Math.floor((cell.h - fl.height) / 2)) * PX, alpha);
-    } else {
-      const fl = artCanvas('fl3', () => paintFlame(FLAME3));
-      blitArt(r, fl, cp.ux + pw - PX - Math.floor(fl.width / 2) * PX, cp.uy - 3 * PX, alpha);
     }
+    // a special room keeps its sigil readable: at 7 px a flame badge would cover it, so the hot ring and the glow mark it
     this.paintPips(r, w, x, y, t, alpha);
   }
 
