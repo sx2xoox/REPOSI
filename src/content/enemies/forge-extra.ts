@@ -40,7 +40,8 @@ export const PATCH_MIN_HP = 20;
 /** hammer throw: wind-up (first / champion's second), reach band, flight phases, lane width */
 export const THROW_WIND = 0.55;
 export const THROW_WIND_AGAIN = 0.42;
-export const THROW_RANGE = 150;
+/** it only throws at a keeper this close: the reach (keeper + 28, capped) then always carries past them */
+export const THROW_RANGE = 104;
 export const THROW_REACH_MIN = 64;
 export const THROW_REACH_MAX = 112;
 export const THROW_OUT = 0.7;
@@ -114,7 +115,7 @@ const TORSO_HURT = [
   '.PPAAAAAAaa..',
 ];
 
-type TinkerMode = 'walk' | 'wind' | 'strike' | 'cock' | 'throw' | 'wait' | 'hurt';
+type TinkerMode = 'idle' | 'walk' | 'wind' | 'strike' | 'cock' | 'throw' | 'wait' | 'hurt';
 
 /** Hammer drawn from the hand (hx, hy) along (dx, dy): a 5 px handle, then the iron head across it. */
 function paintHammer(p: PixelPainter, hx: number, hy: number, dx: number, dy: number, hot: boolean, len = 5): void {
@@ -142,7 +143,8 @@ function paintHammer(p: PixelPainter, hx: number, hy: number, dx: number, dy: nu
 
 function paintTinker(p: PixelPainter, k: number, mode: TinkerMode): void {
   const walk = mode === 'walk';
-  const bob = walk ? [0, -1, 0, -1][k] : mode === 'wait' ? (k ? -1 : 0) : mode === 'strike' ? 1 : 0;
+  // idle: a slow breath (head and torso dip a pixel), hammer resting at its side
+  const bob = walk ? [0, -1, 0, -1][k] : mode === 'idle' ? k : mode === 'wait' ? (k ? -1 : 0) : mode === 'strike' ? 1 : 0;
   // lean: head/torso shift (back when cocking or hurt, forward when striking / throwing)
   const lean = mode === 'cock' || mode === 'hurt' ? -1 : mode === 'strike' || mode === 'throw' ? 1 : 0;
   const ox = 6 + lean;
@@ -189,9 +191,9 @@ function paintTinker(p: PixelPainter, k: number, mode: TinkerMode): void {
   // --- front arm + hammer
   const sx = ox + 11;
   const sy = oy + 9;
-  if (walk) {
+  if (walk || mode === 'idle') {
     // held upright at its side, swaying with the stride
-    const sw = [0, 1, 0, -1][k];
+    const sw = walk ? [0, 1, 0, -1][k] : 0;
     p.line(sx, sy, sx + 2, sy + 2, TK.R);
     p.px(sx + 3, sy + 3, TK.T);
     paintHammer(p, sx + 3, sy + 3, 0.2 * sw, -1, false, 4);
@@ -240,6 +242,7 @@ function paintTinker(p: PixelPainter, k: number, mode: TinkerMode): void {
 }
 const TW = 24;
 const TH = 19;
+frames('tinker', 'idle', 2, TW, TH, (p, i) => paintTinker(p, i, 'idle'), { anchor: 'bottom', fps: 2.5 });
 frames('tinker', 'walk', 4, TW, TH, (p, i) => paintTinker(p, i, 'walk'), { anchor: 'bottom', fps: 9 });
 frames('tinker', 'wind', 2, TW, TH, (p, i) => paintTinker(p, i, 'wind'), { anchor: 'bottom', fps: 12 });
 frames('tinker', 'strike', 1, TW, TH, (p) => paintTinker(p, 0, 'strike'), { anchor: 'bottom' });
@@ -268,25 +271,30 @@ function paintThrown(p: PixelPainter, hot: boolean): void {
 defineDrawnSprite('tinker_hammer', 11, 9, (p) => paintThrown(p, false), { outline: '#0c0810', origin: [8, 4] });
 defineDrawnSprite('tinker_hammer_hot', 11, 9, (p) => paintThrown(p, true), { outline: '#0c0810', origin: [8, 4] });
 
+// Copper, not grey iron: most of the forge's crew is dark steel (sentinel, welder, hound,
+// golem), and a grey plate vanished on them at game scale. Hot = glowing orange; cooled =
+// bright copper with pale rivets; cracked = darker, split down the middle.
+export const PATCH_RAMP = {
+  hot: { dark: '#a8300a', mid: '#ff7a1a', hi: '#ffd27a', rivet: '#ffffff' },
+  cool: { dark: '#6a2a12', mid: '#c4682c', hi: '#f4ac5c', rivet: '#fff0b8' },
+  cracked: { dark: '#4e1e0c', mid: '#9a4a22', hi: '#d68a4a', rivet: '#e8c890' },
+};
 function paintPatch(p: PixelPainter, state: 'hot' | 'cool' | 'cracked'): void {
-  const c = state === 'hot' ? ['#7a200c', '#e0601a', '#ffb040'] : ['#34303e', '#6e6878', '#b4aec4'];
-  p.rect(0, 0, 7, 5, c[1]);
-  p.rect(0, 0, 7, 1, c[2]);
-  p.rect(0, 0, 1, 5, c[2]);
-  p.rect(6, 1, 1, 4, c[0]);
-  p.rect(1, 4, 6, 1, c[0]);
-  const rv = state === 'hot' ? '#fff6c0' : '#f0c060';
-  for (const [x, y] of [[1, 1], [5, 1], [1, 3], [5, 3]]) p.px(x, y, rv);
+  const c = PATCH_RAMP[state];
+  p.rect(0, 0, 7, 5, c.mid);
+  p.rect(0, 0, 6, 1, c.hi);
+  p.rect(0, 1, 1, 3, c.hi);
+  p.rect(6, 1, 1, 4, c.dark);
+  p.rect(1, 4, 6, 1, c.dark);
+  for (const [x, y] of [[1, 1], [5, 1], [1, 3], [5, 3]]) p.px(x, y, c.rivet);
   if (state === 'cracked') {
-    p.px(3, 0, '#140c18');
-    p.px(3, 1, '#140c18');
-    p.px(4, 2, '#140c18');
-    p.px(3, 3, '#140c18');
+    for (const [x, y] of [[3, 0], [3, 1], [4, 2], [3, 3], [3, 4]]) p.px(x, y, '#1a0804');
+    p.px(4, 1, c.hi);
   }
 }
 defineDrawnSprite('tinker_patch_hot', 7, 5, (p) => paintPatch(p, 'hot'), { outline: '#1a0804' });
-defineDrawnSprite('tinker_patch', 7, 5, (p) => paintPatch(p, 'cool'), { outline: '#0c0810' });
-defineDrawnSprite('tinker_patch_cracked', 7, 5, (p) => paintPatch(p, 'cracked'), { outline: '#0c0810' });
+defineDrawnSprite('tinker_patch', 7, 5, (p) => paintPatch(p, 'cool'), { outline: '#1a0804' });
+defineDrawnSprite('tinker_patch_cracked', 7, 5, (p) => paintPatch(p, 'cracked'), { outline: '#1a0804' });
 // the "this one is next" marker over the ally the tinker is heading for
 defineDrawnSprite('tinker_mark', 7, 6, (p) => {
   p.poly([0, 0, 7, 0, 3.5, 5], '#ffb040');
@@ -364,7 +372,9 @@ export class TinkerPatch extends Entity {
     return a.r * 1.3 * a.scale;
   }
 
-  override update(w: World, dt: number): void {
+  override update(w: World, rawDt: number): void {
+    // an enemy effect: its clock stops with the enemies' (time-stop / slow items)
+    const dt = rawDt * w.enemyTimeScale;
     this.age += dt;
     const a = this.ally;
     this.x = a.x;
@@ -422,6 +432,14 @@ export class TinkerPatch extends Entity {
     // the last second it blinks before it drops off
     if (PATCH_LIFE - this.age < 1 && Math.floor(this.age * 10) % 2 === 0) return;
     r.sprite(name, bx, by, { flash: this.hitT > 0 ? 0.8 : 0, flipX: a.facing < 0 });
+    // a metal glint sweeps across the plate now and then (draw-only, from its own clock)
+    const g = (this.age + (this.id % 7) * 0.21) % 1.6;
+    if (this.age > 0.6 && g < 0.24) {
+      const gx = Math.round(bx - 3 + (g / 0.24) * 6);
+      const gy = Math.round(by);
+      r.rect(gx, gy - 2, 1, 2, '#ffffff', 0.9);
+      r.rect(gx - 1, gy, 1, 2, '#ffffff', 0.9);
+    }
   }
 
   override light(w: World): void {
@@ -453,15 +471,18 @@ export class TinkerHammer extends Entity {
   /** keeper id -> leg (0 out, 1 back) it was last hit on */
   struck = new Map<number, number>();
   warning: GroundWarning | null = null;
+  /** enemy-time clock of the return-lane warning */
+  warnT = 0;
   whooshT = 0;
 
-  constructor(owner: Enemy, angle: number, reach: number) {
+  /** (sx, sy): where it leaves from — the start of its warned lane (default: the thrower) */
+  constructor(owner: Enemy, angle: number, reach: number, sx = owner.x, sy = owner.y) {
     super();
     this.owner = owner;
     this.angle = angle;
     this.reach = reach;
-    this.sx = this.x = owner.x;
-    this.sy = this.y = owner.y;
+    this.sx = this.x = sx;
+    this.sy = this.y = sy;
     this.z = 9;
     this.r = HAMMER_R;
     this.layer = 1;
@@ -475,7 +496,14 @@ export class TinkerHammer extends Entity {
     return this.state === 'back' ? 1 : 0;
   }
 
-  override update(w: World, dt: number): void {
+  /** it whirls at head height: drawn over a keeper (or ally) it overlaps */
+  override get sortY(): number {
+    return this.y + 4;
+  }
+
+  override update(w: World, rawDt: number): void {
+    // an enemy missile: it freezes / slows with the enemies' time like their bullets do
+    const dt = rawDt * w.enemyTimeScale;
     this.age += dt;
     this.t += dt;
     const o = this.owner;
@@ -501,6 +529,7 @@ export class TinkerHammer extends Entity {
           this.t = 0;
           this.speed = 40;
         }
+        this.syncWarning(dt);
         break;
       case 'back': {
         this.speed = Math.min(RETURN_MAX, this.speed + RETURN_ACCEL * dt);
@@ -520,6 +549,13 @@ export class TinkerHammer extends Entity {
         }
         this.x += (dx / d) * st;
         this.y += (dy / d) * st;
+        // knocked about while it waited, its thrower may now stand behind a rock: the
+        // hammer never flies through one — it clangs off it and drops
+        if (w.room.boxBlocked(this.x, this.y, 2, true, false)) {
+          this.drop(w);
+          return;
+        }
+        this.syncWarning(dt);
         break;
       }
       case 'drop':
@@ -550,6 +586,22 @@ export class TinkerHammer extends Entity {
         w.sfx('hit_metal', { vol: 0.4, pitch: 0.9, x: p.x });
       }
     }
+  }
+
+  /**
+   * The return-lane warning shows the way back as it is now: from the hammer to its
+   * thrower (who may have been shoved since), on enemy time like the hammer itself.
+   */
+  private syncWarning(dt: number): void {
+    const g = this.warning;
+    if (!g || g.dead) return;
+    this.warnT += dt;
+    g.age = Math.min(g.age, this.warnT);
+    const o = this.owner;
+    g.x = this.x;
+    g.y = this.y;
+    g.angle = Math.atan2(o.y - this.y, o.x - this.x);
+    g.rw = Math.max(1, Math.hypot(o.x - this.x, o.y - this.y));
   }
 
   /** Clatter to the floor, harmless. */
@@ -679,24 +731,45 @@ function* mend(e: Enemy, w: World, ally: Enemy): Sub {
 function* throwHammer(e: Enemy, w: World, again: boolean): Sub {
   const tg = e.target(w);
   const a = Math.atan2(tg.y - e.y, tg.x - e.x);
-  const reach = Math.min(throwReach(Math.hypot(tg.x - e.x, tg.y - e.y)), rayFree(w.room, e.x, e.y, a, 3, THROW_REACH_MAX, true, 2));
+  const dist = Math.hypot(tg.x - e.x, tg.y - e.y);
+  // (a champion's follow-up throw only if the keeper is still within reach)
+  if (again && dist > THROW_RANGE) return false;
+  const want = throwReach(dist);
+  let reach = Math.min(want, rayFree(w.room, e.x, e.y, a, 3, THROW_REACH_MAX, true, 2));
   if (reach < 28) return false;
   e.halt();
   e.facing = Math.cos(a) >= 0 ? 1 : -1;
   e.setAnim('tinker_cock');
   const wind = again ? THROW_WIND_AGAIN : THROW_WIND;
-  laneWarning(w, e.x, e.y, a, reach + HAMMER_R, LANE_W, wind);
+  const lane = laneWarning(w, e.x, e.y, a, reach + HAMMER_R, LANE_W, wind);
   e.telegraph(wind);
   w.sfx('enemy_charge', { vol: 0.4, pitch: 1.15, x: e.x });
-  yield wind;
+  // The warned lane stays the truth: shoved by the keeper's shots mid wind-up (up to ~11 px),
+  // the lane moves with the tinker, so the hammer always leaves along what was shown. Its
+  // clock is enemy time, so a time stop holds the lane (and the flash) until the release.
+  for (let el = 0; ; ) {
+    yield;
+    el += w.dt * w.enemyTimeScale;
+    if (el >= wind) break;
+    reach = Math.min(want, rayFree(w.room, e.x, e.y, a, 3, THROW_REACH_MAX, true, 2));
+    lane.x = e.x;
+    lane.y = e.y;
+    lane.rw = reach + HAMMER_R;
+    lane.age = Math.min(lane.age, el);
+    e.telegraphT = Math.max(e.telegraphT, wind - el);
+  }
+  lane.dead = true;
+  if (reach < 12) return false;
   e.setAnim('tinker_throw');
   e.mem.hammerOut = 1;
-  const h = w.spawn(new TinkerHammer(e, a, reach));
+  // (from the lane as last shown: a shove in this very frame does not bend it)
+  const h = w.spawn(new TinkerHammer(e, a, reach, lane.x, lane.y));
   w.sfx('whoosh', { vol: 0.5, pitch: 0.85, x: e.x });
   e.squash(0.85, 1.15);
   yield 0.2;
   e.setAnim('tinker_wait');
-  while (!h.done) {
+  // (a hammer removed by anything else — a discarded encounter, a room change — ends the wait too)
+  while (!h.done && !h.dead) {
     e.stop();
     yield;
   }
@@ -734,12 +807,12 @@ defineEnemy({
     e.mem.lastPatch = -PATCH_COOLDOWN;
   },
   *script(e, w) {
+    e.setAnim('tinker_idle');
     yield w.rng.range(0.3, 0.8);
     let side = w.rng.sign();
     let throwNext = false;
     while (true) {
       // keep out of the way: behind the nearest ally, or at throwing distance
-      e.setAnim('tinker_walk');
       const t = w.rng.range(1.0, 1.6);
       for (let el = 0; el < t; el += w.dt) {
         const tg = e.target(w);
@@ -754,9 +827,11 @@ defineEnemy({
           if (gd > 5) e.moveDir(gx - e.x, gy - e.y, Math.min(e.speed, gd * 3));
           else e.stop();
         } else if (d < 72) e.moveAngle(a + Math.PI + side * 0.6, e.speed);
-        else if (d > 124) e.chase(w, e.speed * 0.9);
+        else if (d > THROW_RANGE - 6) e.chase(w, e.speed * 0.9);
         else e.moveAngle(a + (side * Math.PI) / 2, e.speed * 0.6);
         if (e.mem.__bumped && w.rng.chance(0.3)) side = -side;
+        // standing behind its cover it idles instead of treading in place
+        e.setAnim(Math.hypot(e.wantVX, e.wantVY) > 4 ? 'tinker_walk' : 'tinker_idle');
         yield;
       }
       // mend an ally (alternates with throwing)
@@ -767,18 +842,19 @@ defineEnemy({
           continue;
         }
       }
-      throwNext = false;
-      // step out of cover into throwing range (it will not hide and mend forever)
+      // step out of cover into throwing range (it will not hide and mend forever: after a
+      // repair the next turn is a throw, however long it takes to get one in)
       const inRange = () => {
         const tg = e.target(w);
-        return e.distToTarget(w) <= THROW_RANGE - 16 && w.room.lineOfSight(e.x, e.y, tg.x, tg.y);
+        return e.distToTarget(w) <= THROW_RANGE && w.room.lineOfSight(e.x, e.y, tg.x, tg.y);
       };
       e.setAnim('tinker_walk');
-      for (let el = 0; el < 1.6 && !inRange(); el += w.dt) {
+      for (let el = 0; el < 2.2 && !inRange(); el += w.dt) {
         e.chase(w, e.speed);
         yield;
       }
       if (!inRange()) continue;
+      throwNext = false;
       const n = e.champion ? 2 : 1;
       for (let i = 0; i < n; i++) if (!(yield* throwHammer(e, w, i > 0))) break;
       yield 0.35;

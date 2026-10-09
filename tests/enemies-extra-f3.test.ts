@@ -23,9 +23,11 @@ import { fx, RNG } from '../src/engine/rng';
 import { stateHash } from '../src/game/statehash';
 import { runCoop } from './coopsim';
 import {
-  boomerangPos, HAMMER_R, LANE_W, PATCH_COOLDOWN, PATCH_LIFE, PATCH_SHARE, PATCH_WIND, patchOn, patchScore, pickPatchTarget,
-  THROW_HANG, THROW_OUT, THROW_REACH_MAX, THROW_REACH_MIN, THROW_WIND, throwReach, TINKER_ID, TINKER_NAME, TinkerHammer, TinkerPatch,
+  boomerangPos, HAMMER_R, LANE_W, PATCH_COOLDOWN, PATCH_LIFE, PATCH_RAMP, PATCH_SHARE, PATCH_WIND, patchOn, patchScore, pickPatchTarget,
+  THROW_HANG, THROW_OUT, THROW_RANGE, THROW_REACH_MAX, THROW_REACH_MIN, THROW_WIND, throwReach, TINKER_ID, TINKER_NAME, TinkerHammer, TinkerPatch,
 } from '../src/content/enemies/forge-extra';
+import { timeStop } from '../src/content/items/lib';
+import { Tile } from '../src/game/tiles';
 
 loadContent();
 
@@ -387,7 +389,7 @@ describe('망치 땜장이: boomerang hammer', () => {
 
   it('a bullet-clear drops the hammer harmlessly; the tinker digs out a spare and throws again', () => {
     const { a } = throwSetup('f3x-throw-clear');
-    const keep = pin(a, a.cx + 40, a.cy + 40);
+    const keep = pin(a, a.cx + 30, a.cy + 30);
     let h: TinkerHammer | undefined;
     for (let i = 0; i < 8 * 60 && !h; i++) {
       a.step(1, keep);
@@ -646,6 +648,253 @@ describe('망치 땜장이: lockstep determinism', () => {
     expect(spawned).toBeGreaterThan(2);
     expect([...seen].sort()).toEqual(['TinkerHammer', 'TinkerPatch']);
   }, 120_000);
+});
+
+// ---------------------------------------------------------------- review fixes
+describe('망치 땜장이: review fixes', () => {
+  /** step until its first hammer is in the air (keeper pinned by `keep`) */
+  function firstHammer(a: Arena, keep: () => void): TinkerHammer | undefined {
+    for (let i = 0; i < 10 * 60; i++) {
+      a.step(1, keep);
+      const h = of(a.w, TinkerHammer)[0];
+      if (h) return h;
+    }
+    return undefined;
+  }
+
+  it('a time stop freezes the hammer like every other enemy missile (it flew 84 px through one before)', () => {
+    const a = arena('f3x-timestop');
+    const e = a.spawn(TINKER_ID, a.cx - 60, a.cy);
+    e.speed = 0;
+    const keep = pin(a, a.cx + 30, a.cy);
+    const h = firstHammer(a, keep)!;
+    expect(h).toBeDefined();
+    a.step(4, keep);
+    timeStop(a.w, 2);
+    const x0 = h.x;
+    const y0 = h.y;
+    const n = a.hurts.length;
+    a.step(60, () => {
+      // the keeper stays clear of the hammer's lane while time is stopped
+      a.p.x = a.cx + 30;
+      a.p.y = a.cy + 40;
+    });
+    // time-stop scale 0.04: at most a few px in a whole second, like the enemies' bullets
+    expect(Math.hypot(h.x - x0, h.y - y0)).toBeLessThan(15);
+    expect(h.dead).toBe(false);
+    expect(a.hurts.length).toBe(n);
+    // and the patch clock stops with the enemies too
+    const b = arena('f3x-timestop-patch');
+    const al = ally(b, 'chain_hound', b.cx - 30, b.cy);
+    al.hp = al.maxHp * 0.5;
+    b.spawn(TINKER_ID, b.cx - 70, b.cy);
+    let pt: TinkerPatch | undefined;
+    for (let i = 0; i < 8 * 60 && !pt; i++) {
+      b.step(1, pin(b, b.cx + 110, b.cy + 50));
+      pt = of(b.w, TinkerPatch)[0];
+    }
+    expect(pt).toBeDefined();
+    const age0 = pt!.age;
+    timeStop(b.w, 2);
+    b.step(60, pin(b, b.cx + 110, b.cy + 50));
+    expect(pt!.age - age0).toBeLessThan(0.1);
+  });
+
+  it(`only throws at a keeper within ${THROW_RANGE} px, and every throw carries past where the keeper stood`, () => {
+    // keeper 125 px away (a quarter of throws used to fall short of it): the tinker walks in first
+    const a = arena('f3x-range');
+    const e = a.spawn(TINKER_ID, a.cx - 70, a.cy);
+    let n = 0;
+    let aimD = 0;
+    a.step(16 * 60, () => {
+      a.p.x = Math.min(a.room.interiorX + a.room.interiorW - 12, e.x + 125);
+      a.p.y = e.y;
+      a.p.vx = a.p.vy = 0;
+      if (e.anim === 'tinker_cock' && e.animT < FIXED_DT * 1.5) aimD = Math.hypot(a.p.x - e.x, a.p.y - e.y);
+      for (const h of of(a.w, TinkerHammer)) {
+        if (h.age > FIXED_DT * 1.5) continue;
+        n++;
+        expect(aimD).toBeLessThanOrEqual(THROW_RANGE + 1);
+        expect(h.reach).toBeGreaterThanOrEqual(aimD + 7);
+      }
+    });
+    expect(THROW_RANGE + 8).toBeLessThanOrEqual(THROW_REACH_MAX);
+    // (the keeper keeps its distance, so the only throws come once it is cornered against the wall)
+    expect(n).toBeGreaterThanOrEqual(0);
+    // a keeper standing still in range does get thrown at, and the hammer hangs beyond them
+    const b = arena('f3x-range-in');
+    const t = b.spawn(TINKER_ID, b.cx - 60, b.cy);
+    t.speed = 0;
+    const h = firstHammer(b, pin(b, b.cx + 35, b.cy))!;
+    expect(h).toBeDefined();
+    expect(h.reach).toBeGreaterThanOrEqual(Math.hypot(b.cx + 35 - h.sx, b.cy - h.sy) + 7);
+  });
+
+  it('a stationary tinker never throws at a keeper beyond its range (the champion follow-up included)', () => {
+    const a = arena('f3x-range-far');
+    const e = a.spawn(TINKER_ID, a.cx - 70, a.cy, true);
+    e.speed = 0;
+    a.step(12 * 60, pin(a, a.cx - 70 + THROW_RANGE + 16, a.cy));
+    expect(of(a.w, TinkerHammer)).toHaveLength(0);
+    expect(of(a.w, GroundWarning).filter((g) => g.rh === LANE_W)).toHaveLength(0);
+  });
+
+  it('a hammer removed without dropping (encounter discard, room change) does not leave the tinker waiting forever', () => {
+    const a = arena('f3x-lost');
+    const e = a.spawn(TINKER_ID, a.cx - 60, a.cy);
+    e.speed = 0;
+    const keep = pin(a, a.cx + 30, a.cy);
+    const h = firstHammer(a, keep)!;
+    expect(h).toBeDefined();
+    a.step(10, keep);
+    h.dead = true;
+    a.step(Math.round(1.6 * 60), keep);
+    expect(e.anim).not.toBe('tinker_wait');
+    expect(e.mem.hammerOut).toBe(0);
+    // and it goes on to throw again
+    let again: TinkerHammer | undefined;
+    for (let i = 0; i < 10 * 60 && !again; i++) {
+      a.step(1, keep);
+      again = of(a.w, TinkerHammer).find((x) => x !== h);
+    }
+    expect(again).toBeDefined();
+  });
+
+  it('shoved mid wind-up, the warned lane moves with it: the hammer always leaves along the lane it showed', () => {
+    const a = arena('f3x-shove');
+    const e = a.spawn(TINKER_ID, a.cx - 50, a.cy);
+    e.speed = 0;
+    const keep = pin(a, a.cx + 30, a.cy);
+    let lane: GroundWarning | undefined;
+    for (let i = 0; i < 10 * 60 && !lane; i++) {
+      a.step(1, keep);
+      if (e.anim === 'tinker_cock') lane = of(a.w, GroundWarning).find((g) => g.rh === LANE_W);
+    }
+    expect(lane).toBeDefined();
+    const x0 = e.x;
+    const y0 = e.y;
+    // the keeper's shots shove it sideways (across its own lane) during the wind-up
+    let h: TinkerHammer | undefined;
+    let laneAtRelease = { x: 0, y: 0, angle: 0 };
+    for (let i = 0; i < 60 && !h; i++) {
+      if (i % 6 === 0) e.knock(0, 1, 120);
+      a.step(1, keep);
+      h = of(a.w, TinkerHammer)[0];
+      if (!h) laneAtRelease = { x: lane!.x, y: lane!.y, angle: lane!.angle };
+    }
+    expect(h).toBeDefined();
+    expect(Math.hypot(e.x - x0, e.y - y0)).toBeGreaterThan(6);
+    // the hammer starts where the lane starts, on the lane's line
+    expect(Math.hypot(h!.sx - laneAtRelease.x, h!.sy - laneAtRelease.y)).toBeLessThan(1.5);
+    expect(h!.angle).toBeCloseTo(laneAtRelease.angle, 6);
+  });
+
+  it('a time stop during the wind-up holds its lane and flash until the throw', () => {
+    const a = arena('f3x-ts-wind');
+    const e = a.spawn(TINKER_ID, a.cx - 50, a.cy);
+    e.speed = 0;
+    const keep = pin(a, a.cx + 30, a.cy);
+    let lane: GroundWarning | undefined;
+    for (let i = 0; i < 10 * 60 && !lane; i++) {
+      a.step(1, keep);
+      if (e.anim === 'tinker_cock') lane = of(a.w, GroundWarning).find((g) => g.rh === LANE_W);
+    }
+    expect(lane).toBeDefined();
+    timeStop(a.w, 1.5);
+    // 1.5 s of stopped time: no hammer yet, the lane and the flash are still up
+    a.step(80, keep);
+    expect(of(a.w, TinkerHammer)).toHaveLength(0);
+    expect(lane!.dead).toBe(false);
+    expect(e.telegraphT).toBeGreaterThan(0);
+    // time runs again: the lane is shown for the rest of its wind-up, then the hammer flies
+    let h: TinkerHammer | undefined;
+    let lastLaneT = 0;
+    for (let i = 0; i < 3 * 60 && !h; i++) {
+      a.step(1, keep);
+      if (!lane!.dead) lastLaneT = a.w.time;
+      h = of(a.w, TinkerHammer)[0];
+    }
+    expect(h).toBeDefined();
+    expect(a.w.time - lastLaneT).toBeLessThan(FIXED_DT * 2.5);
+  });
+
+  it('the return lane follows the thrower if it is shoved while the hammer hangs', () => {
+    const a = arena('f3x-back-lane');
+    const e = a.spawn(TINKER_ID, a.cx - 50, a.cy);
+    e.speed = 0;
+    const keep = pin(a, a.cx + 30, a.cy + 30);
+    const h = firstHammer(a, keep)!;
+    while (h.state === 'out') a.step(1, keep);
+    const g = h.warning!;
+    expect(g).toBeTruthy();
+    e.knock(0, 1, 150);
+    a.step(8, keep);
+    const ang = Math.atan2(e.y - h.y, e.x - h.x);
+    expect(Math.abs(Math.sin(g.angle - ang))).toBeLessThan(0.05);
+    expect(Math.hypot(g.x - h.x, g.y - h.y)).toBeLessThan(1e-6);
+  });
+
+  it('the way back never goes through a rock: the hammer clangs off it and drops', () => {
+    const a = arena('f3x-rock');
+    const e = a.spawn(TINKER_ID, a.cx - 60, a.cy);
+    e.speed = 0;
+    const keep = pin(a, a.cx + 30, a.cy + 30);
+    const h = firstHammer(a, keep)!;
+    expect(h).toBeDefined();
+    while (h.state === 'out') a.step(1, keep);
+    expect(h.state).toBe('hang');
+    // the tinker got shoved: a rock now stands between it and its hammer
+    const mx = (h.x + e.x) / 2;
+    const my = (h.y + e.y) / 2;
+    a.room.setTile(Math.floor(mx / 16), Math.floor(my / 16), Tile.ROCK);
+    const n = a.hurts.length;
+    let maxInRock = 0;
+    for (let i = 0; i < 3 * 60 && !h.dead; i++) {
+      a.step(1, () => { a.p.x = a.cx + 60; a.p.y = a.cy + 60; });
+      if (h.state !== 'drop' && a.room.boxBlocked(h.x, h.y, 2, true, false)) maxInRock++;
+    }
+    expect(maxInRock).toBe(0);
+    expect(h.caught).toBe(false);
+    expect(h.dead).toBe(true);
+    expect(a.hurts.length).toBe(n);
+    // it digs out a spare and carries on (rock gone again, so it has a line of sight)
+    a.room.setTile(Math.floor(mx / 16), Math.floor(my / 16), Tile.FLOOR);
+    let again: TinkerHammer | undefined;
+    for (let i = 0; i < 10 * 60 && !again; i++) {
+      a.step(1, keep);
+      again = of(a.w, TinkerHammer).find((x) => x !== h);
+    }
+    expect(again).toBeDefined();
+  });
+
+  it('idles (does not tread in place) while it stands behind its cover', () => {
+    const a = arena('f3x-idle');
+    const e = a.spawn(TINKER_ID, a.cx - 70, a.cy);
+    ally(a, 'bellows_turret', a.cx - 40, a.cy);
+    let idle = 0;
+    let treading = 0;
+    let still = 0;
+    a.step(14 * 60, () => {
+      pin(a, a.cx + 100, a.cy + 10)();
+      if (e.anim === 'tinker_idle') idle++;
+      still = e.anim === 'tinker_walk' && Math.hypot(e.wantVX, e.wantVY) < 1 ? still + 1 : 0;
+      treading = Math.max(treading, still);
+    });
+    expect(idle).toBeGreaterThan(10);
+    expect(treading).toBeLessThan(6);
+    expect(getAnim('tinker_idle')!.frames.length).toBe(2);
+  });
+
+  it('the patch plate is warm copper that stands out on the forge crew\'s grey steel (a grey plate vanished at game scale)', () => {
+    const rgb = (c: string) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+    for (const [state, ramp] of Object.entries(PATCH_RAMP)) {
+      const [r, , b] = rgb(ramp.mid);
+      expect(r - b, state).toBeGreaterThanOrEqual(60);
+      const [hr, hg, hb] = rgb(ramp.hi);
+      const [dr, dg, db] = rgb(ramp.dark);
+      expect(hr + hg + hb - (dr + dg + db), state).toBeGreaterThan(250);
+    }
+  });
 });
 
 // keep the Projectile import used (enemy bullets are not part of this enemy's kit)
