@@ -19,8 +19,9 @@ import type { Enemy } from '../../game/enemy';
 import type { Player } from '../../game/player';
 import type { World } from '../../game/world';
 import type { Script } from '../../engine/script';
-import { dust, frames, hurtFrame, landingSpot, lob, rayFree, spinDraw } from './shared';
+import { dust, frames, hurtFrame, landingSpot, lob, rayFree, spinDraw, type FrameOpts } from './shared';
 
+export const ROBBER_ID = 'grave_robber';
 export const ROBBER_NAME = '무덤 도굴꾼';
 /** Seconds a freshly set trap needs to open (harmless meanwhile). */
 export const TRAP_ARM = 0.6;
@@ -58,7 +59,7 @@ const SCARF = ['#3a1018', '#5e1a24', '#86262e', '#a8403a', '#c86048'];
 const SKIN = ['#3e3446', '#625870', '#8e8496', '#bab0be'];
 const IRON = ['#24222c', '#3e3c4a', '#5c5a6a', '#848294', '#b4b2c2', '#e0deea'];
 const WOOD = ['#3e2414', '#6a4024', '#946038'];
-const GOLD = ['#6e4219', '#a66c28', '#d89c42', '#f6d47c', '#fff6cc'];
+export const GOLD = ['#6e4219', '#a66c28', '#d89c42', '#f6d47c', '#fff6cc'];
 const DIRT = ['#2e2018', '#4a3426', '#6a4c34', '#8a6a48'];
 const BONE = ['#7a6a52', '#b8a888', '#e8dcc0', '#fff8e8'];
 const BOOT = '#241a1e';
@@ -66,9 +67,9 @@ const RUST = '#9a5430';
 const ARMED = '#ff3040';
 
 // ------------------------------------------------------------------ robber sprites
-type SpadeHold = 'drag' | 'raise' | 'swing' | 'rest' | 'drop';
+export type SpadeHold = 'drag' | 'raise' | 'swing' | 'rest' | 'drop';
 
-interface RobberPose {
+export interface RobberPose {
   /** torso + head drop (+ = down) */
   bob: number;
   /** leg swing -2..2 */
@@ -106,17 +107,30 @@ function cel(p: PixelPainter, hi: string, lo: string, top = hi): void {
   }
 }
 
-/** The loot sack slung on the back, a stolen gold goblet poking out of its neck. */
+/** Top of the loot sack (its centre row) in figure coordinates. */
+function sackY(s: RobberPose): number {
+  return 9 + s.bob + s.sack;
+}
+
+/**
+ * The stolen gold goblet poking out of the sack's neck: rim, cup, stem. Painted on the
+ * full frame at the figure's offset (`ox`, `oy`): on high steps it rises above the
+ * figure canvas, where it used to be clipped (the goblet blinked out every other step).
+ */
+function paintGoblet(p: PixelPainter, s: RobberPose, ox: number, oy: number): void {
+  const y = sackY(s) + oy;
+  p.px(ox + 3, y - 8, GOLD[3]);
+  p.px(ox + 4, y - 8, GOLD[4]);
+  p.px(ox + 5, y - 8, GOLD[2]);
+  p.px(ox + 3, y - 7, GOLD[2]);
+  p.px(ox + 4, y - 7, GOLD[3]);
+  p.px(ox + 5, y - 7, GOLD[1]);
+  p.px(ox + 4, y - 6, GOLD[1]);
+}
+
+/** The loot sack slung on the back. */
 function paintSack(p: PixelPainter, s: RobberPose): void {
-  const y = 9 + s.bob + s.sack;
-  // goblet: rim, cup, stem
-  p.px(3, y - 8, GOLD[3]);
-  p.px(4, y - 8, GOLD[4]);
-  p.px(5, y - 8, GOLD[2]);
-  p.px(3, y - 7, GOLD[2]);
-  p.px(4, y - 7, GOLD[3]);
-  p.px(5, y - 7, GOLD[1]);
-  p.px(4, y - 6, GOLD[1]);
+  const y = sackY(s);
   const q = new PixelPainter(p.w, p.h);
   q.ellipse(4.5, y + 0.5, 3.9, 3.8, SACK[2]);
   q.poly([3, y - 3, 7, y - 3, 6.5, y - 5, 3.5, y - 5], SACK[2]);
@@ -294,9 +308,16 @@ function paintHoistedTrap(p: PixelPainter, x: number, y: number): void {
   p.px(x + 7, y + 2, RUST);
 }
 
-/** Robber frame, 22x24 (the figure is 20x21 at (1, 3); a raised spade or trap uses the head-room). */
-function paintRobber(big: PixelPainter, s: RobberPose): void {
-  const p = new PixelPainter(20, 21);
+/** Figure canvas inside the 22x24 frame: 21x21 at (1, 3); the head-room above holds a raised spade, a hoisted trap or the goblet. */
+const FIG_W = 21;
+const FIG_H = 21;
+const FIG_X = 1;
+const FIG_Y = 3;
+
+/** Robber frame, 22x24 (the figure at (FIG_X, FIG_Y); a raised spade, a hoisted trap or the goblet use the head-room). */
+export function paintRobber(big: PixelPainter, s: RobberPose): void {
+  paintGoblet(big, s, FIG_X, FIG_Y);
+  const p = new PixelPainter(FIG_W, FIG_H);
   if (s.spade === 'rest') paintSpade(p, 2, 9, 2, 15, false); // stuck in the ground behind it
   paintSack(p, s);
   paintLegs(p, s);
@@ -312,7 +333,7 @@ function paintRobber(big: PixelPainter, s: RobberPose): void {
     hand(p, 18, 17 - s.crouch);
   }
   paintArmAndSpade(p, s);
-  big.blit(p, 1, 3);
+  big.blit(p, FIG_X, FIG_Y);
   const b = s.bob + 3;
   if (s.spade === 'raise') {
     // both hands up, the blade heaped with dirt high over the head (the haft clear of the face)
@@ -343,21 +364,32 @@ function paintRobber(big: PixelPainter, s: RobberPose): void {
 const RW = 22;
 const RH = 24;
 const RO = { anchor: 'bottom' as const };
+export const ROBBER_W = RW;
+export const ROBBER_H = RH;
 const WALK: RobberPose[] = [
   { bob: 0, step: 1, lean: 0, sack: 0, spade: 'drag' },
   { bob: -1, step: 0, lean: 0, sack: 1, spade: 'drag' },
   { bob: 0, step: -1, lean: 0, sack: 0, spade: 'drag' },
   { bob: -1, step: 0, lean: 0, sack: -1, spade: 'drag' },
 ];
-frames('grobber', 'walk', 4, RW, RH, (p, i) => paintRobber(p, WALK[i]), { ...RO, fps: 7 });
-frames('grobber', 'run', 4, RW, RH, (p, i) => paintRobber(p, { ...WALK[i], step: WALK[i].step * 2, lean: 1, sack: WALK[i].sack * 2 }), { ...RO, fps: 12 });
-frames('grobber', 'idle', 2, RW, RH, (p, i) => paintRobber(p, { bob: 0, step: 0, lean: 0, sack: 0, spade: 'drag', eye: i ? 'back' : 'fwd' }), { ...RO, fps: 1.6 });
-frames('grobber', 'plant', 2, RW, RH, (p, i) => paintRobber(p, { bob: 3, step: 1, lean: 1, sack: 1 - i, spade: 'rest', eye: 'hot', crouch: i as 0 | 1 }), { ...RO, fps: 8 });
-frames('grobber', 'wind', 2, RW, RH, (p, i) => paintRobber(p, { bob: i ? -1 : 0, step: -1, lean: -1, sack: 0, spade: 'raise', eye: i ? 'hot' : 'fwd' }), { ...RO, fps: 10 });
-frames('grobber', 'fling', 2, RW, RH, (p, i) => paintRobber(p, { bob: i ? 1 : 2, step: 1, lean: 2, sack: i ? 0 : -1, spade: 'swing', eye: 'hot' }), { ...RO, fps: 8, loop: false });
-frames('grobber', 'toss', 2, RW, RH, (p, i) => paintRobber(p, { bob: i ? 0 : 1, step: -1, lean: -1, sack: i ? 0 : 1, spade: 'rest', eye: i ? 'hot' : 'fwd', carry: 'over' }), { ...RO, fps: 9 });
-frames('grobber', 'throw', 1, RW, RH, (p) => paintRobber(p, { bob: 1, step: 1, lean: 1, sack: -1, spade: 'rest', eye: 'hot', carry: 'throw' }), RO);
-frames('grobber', 'hurt', 1, RW, RH, (p) => paintRobber(p, { bob: 1, step: 0, lean: -1, sack: -1, spade: 'drop', eye: 'shut' }), RO);
+/** Every robber frame's pose, by state (`grobber_<state>_<i>`). */
+export const ROBBER_POSES: Record<string, RobberPose[]> = {
+  walk: WALK,
+  run: WALK.map((w) => ({ ...w, step: w.step * 2, lean: 1, sack: w.sack * 2 })),
+  idle: [0, 1].map((i) => ({ bob: 0, step: 0, lean: 0, sack: 0, spade: 'drag', eye: i ? 'back' : 'fwd' })),
+  plant: [0, 1].map((i) => ({ bob: 3, step: 1, lean: 1, sack: 1 - i, spade: 'rest', eye: 'hot', crouch: i as 0 | 1 })),
+  wind: [0, 1].map((i) => ({ bob: i ? -1 : 0, step: -1, lean: -1, sack: 0, spade: 'raise', eye: i ? 'hot' : 'fwd' })),
+  fling: [0, 1].map((i) => ({ bob: i ? 1 : 2, step: 1, lean: 2, sack: i ? 0 : -1, spade: 'swing', eye: 'hot' })),
+  toss: [0, 1].map((i) => ({ bob: i ? 0 : 1, step: -1, lean: -1, sack: i ? 0 : 1, spade: 'rest', eye: i ? 'hot' : 'fwd', carry: 'over' })),
+  throw: [{ bob: 1, step: 1, lean: 1, sack: -1, spade: 'rest', eye: 'hot', carry: 'throw' }],
+  hurt: [{ bob: 1, step: 0, lean: -1, sack: -1, spade: 'drop', eye: 'shut' }],
+};
+const ROBBER_FPS: Record<string, FrameOpts> = {
+  walk: { fps: 7 }, run: { fps: 12 }, idle: { fps: 1.6 }, plant: { fps: 8 }, wind: { fps: 10 }, fling: { fps: 8, loop: false }, toss: { fps: 9 }, throw: {}, hurt: {},
+};
+for (const [state, poses] of Object.entries(ROBBER_POSES)) {
+  frames('grobber', state, poses.length, RW, RH, (p, i) => paintRobber(p, poses[i]), { ...RO, ...ROBBER_FPS[state] });
+}
 
 // a bone chip dug up with the grave dirt: pale lit core, dark rim; spins in flight like
 // the bone walker's thrown bones (the dirt itself is only particles)
@@ -426,7 +458,7 @@ type TrapState = 'set' | 'armed';
 
 /**
  * An iron jaw trap a robber set. Harmless while it opens (TRAP_ARM), then the first
- * grounded, non-dashing keeper within reach springs it: half a heart and a limp. Keeper
+ * grounded, non-dashing, non-flying keeper within reach springs it: half a heart and a limp. Keeper
  * shots, swings and blasts (it is a hittable neutral actor), bullet-clears, old age and
  * its robber's death all spring it harmlessly. Once sprung it is gone at once; the shut
  * jaws left behind are a purely visual `TrapRemains`.
@@ -484,7 +516,8 @@ export class JawTrap extends Actor {
       return;
     }
     for (const p of w.targets()) {
-      if (!p.alive || p.z > 2 || p.dashing || !this.reaches(p.x, p.y, p.r)) continue;
+      // dashing, airborne or flying keepers pass over the jaws (flight also clears spikes)
+      if (!p.alive || p.z > 2 || p.dashing || p.flying || !this.reaches(p.x, p.y, p.r)) continue;
       this.bite(w, p);
       return;
     }
@@ -594,6 +627,19 @@ export function liveTraps(w: World, owner: Enemy): JawTrap[] {
   return out;
 }
 
+/**
+ * Is a trap within `d` px of (x, y): a live one (any robber's) or one still in the air
+ * (every robber notes where its thrown trap will land)? New traps keep clear of both, so
+ * two robbers never stack theirs on one spot.
+ */
+function trapNear(w: World, x: number, y: number, d: number): boolean {
+  for (const e of w.entities) if (e instanceof JawTrap && !e.dead && Math.hypot(e.x - x, e.y - y) < d) return true;
+  for (const e of w.enemies) {
+    if (e.alive && e.def.id === ROBBER_ID && e.mem.tossEnd > w.time && Math.hypot(e.mem.tossX - x, e.mem.tossY - y) < d) return true;
+  }
+  return false;
+}
+
 /** Live traps a robber may keep (champion: one more). */
 function trapCap(e: Enemy): number {
   return e.champion ? TRAP_MAX + 1 : TRAP_MAX;
@@ -624,7 +670,21 @@ function escapeAngle(e: Enemy, w: World): number {
   return best;
 }
 
-/** Robber footwork: keep 72–130 px, slip away from a keeper who closes in, lurk or sidle in between. */
+/** Can the robber see its keeper? Re-checked a few times a second (kept in `e.mem.los`). */
+function robberSees(e: Enemy, w: World): boolean {
+  if (e.age >= e.mem.losAt) {
+    const tg = e.target(w);
+    e.mem.los = w.room.lineOfSight(e.x, e.y, tg.x, tg.y) ? 1 : 0;
+    e.mem.losAt = e.age + 0.2;
+  }
+  return e.mem.los === 1;
+}
+
+/**
+ * Robber footwork: keep 72–130 px, slip away from a keeper who closes in, lurk or sidle in
+ * between. With cover between them it works its way round (flow field) instead of lurking
+ * behind it forever: it needs a clear line to throw.
+ */
 function robberSpacing(e: Enemy, w: World): number {
   const d = e.distToTarget(w);
   const a = e.angleToTarget(w);
@@ -632,7 +692,7 @@ function robberSpacing(e: Enemy, w: World): number {
   if (d < 72) {
     e.setAnim('grobber_run');
     e.moveAngle(escapeAngle(e, w), e.speed);
-  } else if (d > 130) {
+  } else if (d > 130 || !robberSees(e, w)) {
     e.setAnim('grobber_walk');
     e.chase(w, e.speed * 0.85);
   } else {
@@ -680,7 +740,7 @@ function* plant(e: Enemy, w: World): Script {
     yield;
   }
   const s = trapSpot(e, w);
-  if (!liveTraps(w, e).some((t) => Math.hypot(t.x - s.x, t.y - s.y) < 14)) {
+  if (!trapNear(w, s.x, s.y, 14)) {
     w.spawn(new JawTrap(s.x, s.y, e));
     w.sfx('hit_metal', { vol: 0.25, pitch: 1.5 });
     dust(w, s.x, s.y + 2, [DIRT[3], DIRT[2]], 5, 40);
@@ -688,7 +748,7 @@ function* plant(e: Enemy, w: World): Script {
   yield 0.12;
 }
 
-/** Where a thrown trap lands: a step ahead of the keeper, on free floor clear of its other traps. */
+/** Where a thrown trap lands: a step ahead of the keeper, on free floor clear of every other trap (two robbers never stack theirs). */
 function tossSpot(e: Enemy, w: World): { x: number; y: number } | null {
   const tg = e.target(w) as { x: number; y: number; vx?: number; vy?: number };
   let lx = (tg.vx ?? 0) * 0.3;
@@ -699,10 +759,9 @@ function tossSpot(e: Enemy, w: World): { x: number; y: number } | null {
     ly *= 24 / l;
   }
   const a = Math.atan2(tg.y - e.y, tg.x - e.x);
-  const others = liveTraps(w, e);
   for (const k of [0, 1, -1]) {
     const s = landingSpot(w, tg.x + lx - Math.sin(a) * 18 * k, tg.y + ly + Math.cos(a) * 18 * k, 6);
-    if (!others.some((t) => Math.hypot(t.x - s.x, t.y - s.y) < 16)) return s;
+    if (!trapNear(w, s.x, s.y, 16)) return s;
   }
   return null;
 }
@@ -720,6 +779,10 @@ function* toss(e: Enemy, w: World): Script {
   e.squash(0.85, 1.15);
   if (s) {
     const owner = e;
+    // where it will land, until it has (other robbers keep their traps clear of it)
+    e.mem.tossX = s.x;
+    e.mem.tossY = s.y;
+    e.mem.tossEnd = w.time + TOSS_FLIGHT + 0.05;
     // a shut trap tumbles through the air over a landing ring, lands, then opens
     lob(w, e.x + e.facing * 3, e.y - 18, s.x, s.y, {
       sprite: 'grobber_trap_shut', color: IRON[4], time: TOSS_FLIGHT, height: 34, warn: 9, damage: 0, spin: 5, light: 0, source: ROBBER_NAME,
@@ -777,7 +840,7 @@ function* scurry(e: Enemy, w: World, time: number): Script {
 type RobberAct = 'fling' | 'plant' | 'toss' | null;
 
 defineEnemy({
-  id: 'grave_robber',
+  id: ROBBER_ID,
   name: ROBBER_NAME,
   hp: 28,
   radius: 5,
@@ -798,6 +861,9 @@ defineEnemy({
     e.mem.lurkT = 0;
     e.mem.escA = 0;
     e.mem.escT = 0;
+    e.mem.los = 1;
+    e.mem.losAt = 0;
+    e.mem.tossEnd = 0;
   },
   *script(e, w) {
     yield w.rng.range(0.3, 0.8);
@@ -810,11 +876,13 @@ defineEnemy({
         const d = robberSpacing(e, w);
         trapCd -= w.dt;
         flingCd -= w.dt;
-        if (d < FLING_NEAR && flingCd <= 0) {
+        // charmed, it only skulks: its jaws and chips would still bite the keeper
+        const charmed = e.hasStatus('charm');
+        if (d < FLING_NEAR && flingCd <= 0 && !charmed && robberSees(e, w)) {
           act = 'fling';
           break;
         }
-        if (el >= t && trapCd <= 0 && liveTraps(w, e).length < trapCap(e)) {
+        if (el >= t && trapCd <= 0 && !charmed && liveTraps(w, e).length < trapCap(e)) {
           const tg = e.target(w);
           if (d >= 24 && d < TOSS_MIN) {
             act = 'plant';

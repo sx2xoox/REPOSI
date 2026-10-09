@@ -18,9 +18,12 @@ import { FIXED_DT } from '../src/game/constants';
 import { stateHash } from '../src/game/statehash';
 import type { World } from '../src/game/world';
 import {
-  FLING_COUNT, FLING_NEAR, FLING_RANGE, FLING_WIND, JawTrap, PLANT_TIME, ROBBER_NAME, TOSS_FLIGHT, TOSS_MAX, TOSS_MIN, TOSS_WIND, TRAP_ARM,
-  TRAP_LIFE, TRAP_MAX, TRAP_SLOW, TRAP_TRIGGER, liveTraps,
+  FLING_COUNT, FLING_NEAR, FLING_RANGE, FLING_WIND, GOLD, JawTrap, PLANT_TIME, ROBBER_H, ROBBER_NAME, ROBBER_POSES, ROBBER_W, TOSS_FLIGHT, TOSS_MAX,
+  TOSS_MIN, TOSS_WIND, TRAP_ARM, TRAP_LIFE, TRAP_MAX, TRAP_SLOW, TRAP_TRIGGER, liveTraps, paintRobber,
 } from '../src/content/enemies/crypt-extra';
+import { PixelPainter } from '../src/engine/painter';
+import { HELD, type PlayerInput } from '../src/game/seam';
+import { fx } from '../src/engine/rng';
 
 const ID = 'grave_robber';
 
@@ -106,6 +109,8 @@ interface FakeWorld {
   w: World;
   entities: Entity[];
   player: FakePlayer;
+  /** what `room.lineOfSight` answers (cover between the robber and the keeper when false) */
+  los: boolean;
 }
 
 const IX = 32;
@@ -120,7 +125,7 @@ function fakeWorld(seed: string): FakeWorld {
     boxBlocked: (x: number, y: number, r: number) => !inside(x, y, r),
     isFree: (x: number, y: number, r = 6) => inside(x, y, r),
     nearestFree: (x: number, y: number, r = 6) => ({ x: Math.min(IX + IW - r, Math.max(IX + r, x)), y: Math.min(IY + IH - r, Math.max(IY + r, y)) }),
-    lineOfSight: () => true,
+    lineOfSight: () => fw.los,
     tileAt: (tx: number, ty: number) => (inside(tx * 16 + 8, ty * 16 + 8, 0) ? 0 : 1),
     tileAtPx: (x: number, y: number) => (inside(x, y, 0) ? 0 : 1),
     destroyTile: () => {},
@@ -193,6 +198,7 @@ function fakeWorld(seed: string): FakeWorld {
   fw.w = w as unknown as World;
   fw.entities = entities;
   fw.player = player;
+  fw.los = true;
   return fw;
 }
 
@@ -656,5 +662,172 @@ describe('무덤 도굴꾼 in the real World', () => {
     w.update(FIXED_DT);
     expect(liveTraps(w, e).length).toBe(0);
     expect(w.entities.some((x) => x instanceof JawTrap && !x.dead)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------- review fixes
+/** Packed pixel value of `c` as PixelPainter stores it. */
+function packed(c: string): number {
+  const q = new PixelPainter(1, 1);
+  q.px(0, 0, c);
+  return q.data[0];
+}
+
+describe('무덤 도굴꾼: review fixes', () => {
+  it('the gold goblet shows whole in every frame (it used to be clipped off the high steps)', () => {
+    const gold = new Set(GOLD.map(packed));
+    let frames = 0;
+    for (const [state, poses] of Object.entries(ROBBER_POSES)) {
+      poses.forEach((pose, i) => {
+        const p = new PixelPainter(ROBBER_W, ROBBER_H);
+        paintRobber(p, pose);
+        let n = 0;
+        for (const v of p.data) if (gold.has(v)) n++;
+        // rim 3 + cup 3 + stem 1
+        expect(n, `${state}_${i}`).toBe(7);
+        frames++;
+      });
+    }
+    expect(frames).toBeGreaterThanOrEqual(18);
+    // the trap held while planting keeps its right end (it was cut by the figure canvas)
+    for (const pose of ROBBER_POSES.plant) {
+      const p = new PixelPainter(ROBBER_W, ROBBER_H);
+      paintRobber(p, pose);
+      expect(p.data[22 * ROBBER_W + 21] >>> 24, 'held trap, right end').not.toBe(0);
+    }
+  });
+
+  it('a flying keeper passes over an armed trap (like spikes); on foot it bites', () => {
+    const fw = fakeWorld('trap-flying');
+    const e = fw.w.spawnEnemy(ID, 60, 50)!;
+    e.dormant = 1e9;
+    const t = fw.w.spawn(new JawTrap(150, 100, e));
+    Object.assign(fw.player, { x: 150, y: 100, flying: true });
+    step(fw, TRAP_ARM + 1);
+    expect(t.armed).toBe(true);
+    expect(fw.player.hurts).toBe(0);
+    expect(t.dead).toBe(false);
+    Object.assign(fw.player, { flying: false });
+    step(fw, 0.1);
+    expect(fw.player.hurts).toBe(1);
+    expect(t.dead).toBe(true);
+  });
+
+  it('with cover in between it works its way round instead of lurking, and never flings or throws blind', () => {
+    for (const seed of ['c1', 'c2', 'c3']) {
+      const fw = fakeWorld(`robber-cover-${seed}`);
+      fw.los = false;
+      // a keeper standing 110 px off: the lurk band, out of the plant band
+      const e = fw.w.spawnEnemy(ID, 100, 104)!;
+      e.dormant = 0;
+      Object.assign(fw.player, { x: 210, y: 104 });
+      let closest = Infinity;
+      step(fw, 4, () => { closest = Math.min(closest, Math.hypot(e.x - fw.player.x, e.y - fw.player.y)); });
+      // it closed in (it used to sidle at ~100 px behind the cover for as long as the keeper stood there)
+      expect(closest, seed).toBeLessThan(80);
+      expect(shots(fw).length + lobs(fw).length, seed).toBe(0);
+    }
+    // a keeper right next to it but behind cover: no chips into the rock
+    const fw = fakeWorld('robber-cover-fling');
+    fw.los = false;
+    const e = fw.w.spawnEnemy(ID, 150, 100)!;
+    e.dormant = 0;
+    let fired = 0;
+    step(fw, 4, () => { fired += shots(fw).length; }, () => {
+      const a = Math.atan2(fw.player.y - e.y, fw.player.x - e.x);
+      fw.player.x = e.x + Math.cos(a) * 40;
+      fw.player.y = e.y + Math.sin(a) * 40;
+    });
+    expect(fired).toBe(0);
+    // once the keeper is in sight, the same squeeze gets the fling
+    fw.los = true;
+    step(fw, 3, () => { fired += shots(fw).length; }, () => {
+      const a = Math.atan2(fw.player.y - e.y, fw.player.x - e.x);
+      fw.player.x = e.x + Math.cos(a) * 40;
+      fw.player.y = e.y + Math.sin(a) * 40;
+    });
+    expect(fired).toBeGreaterThan(0);
+  });
+
+  it('a charmed robber only skulks: no traps, throws or chips that would bite the keeper', () => {
+    const fw = fakeWorld('robber-charm');
+    const e = fw.w.spawnEnemy(ID, 120, 70)!;
+    e.dormant = 0;
+    e.applyStatus({ kind: 'charm', duration: 100 }, () => 0);
+    let seen = 0;
+    step(fw, 12, () => { seen += traps(fw).length + shots(fw).length + lobs(fw).length; }, strafe(fw));
+    expect(seen).toBe(0);
+    expect(fw.player.hurts).toBe(0);
+  });
+
+  it('never stacks its trap on another robber’s', () => {
+    for (const seed of ['s1', 's2', 's3']) {
+      const fw = fakeWorld(`robber-stack-${seed}`);
+      // a keeper forever mid-dash (no trap ever bites) standing on robber B's trap
+      Object.assign(fw.player, { x: 220, y: 104, dashing: true });
+      const b = fw.w.spawnEnemy(ID, 280, 50)!;
+      b.dormant = 1e9;
+      const theirs = fw.w.spawn(new JawTrap(220, 104, b));
+      const a = fw.w.spawnEnemy(ID, 100, 104)!;
+      a.dormant = 0;
+      const mine = new Set<JawTrap>();
+      step(fw, 9, () => { for (const t of liveTraps(fw.w, a)) mine.add(t); });
+      expect(mine.size, seed).toBeGreaterThan(0);
+      for (const t of mine) expect(Math.hypot(t.x - theirs.x, t.y - theirs.y), seed).toBeGreaterThanOrEqual(14);
+    }
+  });
+
+  it('robbers throwing at the same keeper never land two traps on one spot (traps in the air count)', () => {
+    let pairs = 0;
+    for (const seed of ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']) {
+      const fw = fakeWorld(`robber-pair-${seed}`);
+      // a keeper standing still (and forever mid-dash, so no trap bites): every throw aims at its feet
+      Object.assign(fw.player, { x: 168, y: 104, dashing: true });
+      for (const [x, y] of [[60, 70], [276, 70], [60, 150], [276, 150]]) fw.w.spawnEnemy(ID, x, y)!.dormant = 0;
+      step(fw, 10, () => {
+        const t = traps(fw);
+        for (let i = 0; i < t.length; i++) {
+          for (let j = i + 1; j < t.length; j++) {
+            pairs++;
+            expect(Math.hypot(t[i].x - t[j].x, t[i].y - t[j].y), seed).toBeGreaterThanOrEqual(14);
+          }
+        }
+      });
+    }
+    expect(pairs).toBeGreaterThan(100);
+  });
+
+  it('two Worlds on the same seed stay bit-identical with robbers fighting, whatever the cosmetic RNG and drawing do', () => {
+    const run = (fxSeed: number, draw: boolean) => {
+      fx.setState(new RNG(fxSeed).getState());
+      const w = realWorld('robber-lockstep');
+      const p = w.player;
+      p.god = true;
+      w.inputSource = (ww: World, _p: unknown, o: PlayerInput) => {
+        const t = ww.time;
+        o.mx = Math.cos(t * 0.7);
+        o.my = Math.sin(t * 1.3) * 0.8;
+        o.ax = o.ay = 0;
+        o.pressed = 0;
+        const e = ww.enemies[0];
+        o.cx = e ? e.x : p.x + 30;
+        o.cy = e ? e.y : p.y;
+        o.held = (Math.floor(t * 0.5) % 2 ? HELD.fire : 0) | HELD.cursorAim;
+      };
+      w.spawnEnemy(ID, p.x + 100, p.y - 30)!.dormant = 0;
+      w.spawnEnemy(ID, p.x - 90, p.y - 20)!.dormant = 0;
+      w.spawnEnemy('bone_walker', p.x + 20, p.y - 60)!.dormant = 0;
+      const hashes: string[] = [];
+      for (let i = 0; i < 900; i++) {
+        w.update(FIXED_DT);
+        if (draw && i % 3 === 0) w.draw(1);
+        hashes.push(String(stateHash(w)));
+      }
+      return hashes;
+    };
+    const a = run(1, false);
+    const b = run(0x9e3779b9, true);
+    const diverge = a.findIndex((h, i) => h !== b[i]);
+    expect(diverge, `first diverging step ${diverge}`).toBe(-1);
   });
 });
