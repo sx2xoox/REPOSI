@@ -14,7 +14,7 @@ import { Spring } from './anim';
 import { glow } from './frame';
 import { blitArt } from './hud-gear';
 import { lookFor, type MapLook } from './map-look';
-import { buildMapView, keeperCell, knownBounds, mapSignature, miniCamTarget, nodeKnown, type MapSource, type MapView, type ViewNode } from './map-view';
+import { buildMapView, keeperCell, knownBounds, mapSignature, mapToken, miniCamTarget, nodeKnown, type MapSource, type MapView, type ViewNode } from './map-view';
 import {
   FLAME5, MINI_LAYOUT, MINI_PLATE, MINI_SIZE, paintFlame, paintMapPlate, paintMiniBackground, paintPip, paintRooms,
   paintVignette, plateRect, sigilKey, threadPixels, type GlowSpot, type PlateRect,
@@ -40,12 +40,20 @@ export function artCanvas(key: string, paint: () => PixelPainter): HTMLCanvasEle
 
 const hexA = (a: number): string => Math.round(Math.max(0, Math.min(1, a)) * 255).toString(16).padStart(2, '0');
 
-/** Soft additive glows (UI-unit spots) painted at art resolution into a `w` x `h` canvas. */
-export function glowCanvas(glows: readonly GlowSpot[], w: number, h: number): HTMLCanvasElement {
-  const cv = document.createElement('canvas');
-  cv.width = Math.max(1, w);
-  cv.height = Math.max(1, h);
+/** Soft additive glows (UI-unit spots) painted at art resolution into a `w` x `h` canvas (`into`: reused). */
+export function glowCanvas(glows: readonly GlowSpot[], w: number, h: number, into?: HTMLCanvasElement): HTMLCanvasElement {
+  const cv = into ?? document.createElement('canvas');
+  const cw = Math.max(1, w);
+  const ch = Math.max(1, h);
   const g = cv.getContext('2d')!;
+  if (cv.width !== cw || cv.height !== ch) {
+    cv.width = cw;
+    cv.height = ch;
+  } else {
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = 'source-over';
+    g.clearRect(0, 0, cw, ch);
+  }
   g.globalCompositeOperation = 'lighter';
   for (const s of glows) {
     const x = s.x / PX;
@@ -59,6 +67,17 @@ export function glowCanvas(glows: readonly GlowSpot[], w: number, h: number): HT
     g.fillRect(x - r, y - r, r * 2, r * 2);
   }
   return cv;
+}
+
+/** A painter's pixels as a canvas (`into`: an existing canvas repainted in place, no new allocation). */
+export function painterCanvas(p: PixelPainter, into?: HTMLCanvasElement): HTMLCanvasElement {
+  if (!into) return p.toCanvas();
+  if (into.width !== p.w || into.height !== p.h) {
+    into.width = p.w;
+    into.height = p.h;
+  }
+  into.getContext('2d')!.putImageData(p.toImageData(), 0, 0);
+  return into;
 }
 
 /** Blit an art canvas additively with smoothing (glow layers). */
@@ -121,14 +140,23 @@ export class MinimapView {
   private nodeId = -1;
   private fromId = -1;
   private sigSeen = 0;
+  /** the floor map the view was built for: a new map (floor or stage) snaps instead of cross-fading */
+  private mapRef: object | null = null;
+  /** canvases of a retired map state, repainted by the next one (no allocation per map change) */
+  private spare: { rooms: HTMLCanvasElement; glow: HTMLCanvasElement } | null = null;
 
   update(w: World, dt: number): void {
+    if (w.map !== this.mapRef) {
+      this.reset();
+      this.mapRef = w.map;
+    }
     const src = mapSource(w);
     const sig = mapSignature(src);
     const theme = w.map.floor.theme;
     if (!this.cur || sig !== this.sigSeen || theme !== this.cur.theme) {
       const fresh = this.state(w, sig);
       if (this.init && this.cur && this.cur !== fresh) {
+        this.retire(this.prev);
         this.prev = this.cur;
         this.fadeT = 0;
       }
@@ -161,7 +189,10 @@ export class MinimapView {
     settle(this.sy);
     this.flash = Math.max(0, this.flash - dt * 1.6);
     this.fadeT = Math.min(FADE, this.fadeT + dt);
-    if (this.fadeT >= FADE) this.prev = null;
+    if (this.fadeT >= FADE && this.prev) {
+      this.retire(this.prev);
+      this.prev = null;
+    }
     this.enterT = Math.min(9, this.enterT + dt);
   }
 
@@ -176,16 +207,28 @@ export class MinimapView {
     const low = lowQuality();
     // low quality bakes the flame into the cache: it moves with the keeper's cell in a big room
     const kc = low ? keeperCell(mapSource(w)) : null;
-    return `${mapSignature(mapSource(w))}|${w.map.floor.theme}|${cam.x},${cam.y}|${low ? `L${kc!.cx},${kc!.cy}` : 'H'}`;
+    return `${mapToken(w.map)}|${mapSignature(mapSource(w))}|${w.map.floor.theme}|${cam.x},${cam.y}|${low ? `L${kc!.cx},${kc!.cy}` : 'H'}`;
   }
 
   /** Snap to the current room (new floor). */
   reset(): void {
+    this.retire(this.prev);
+    this.retire(this.cur);
     this.init = false;
     this.cur = null;
     this.prev = null;
     this.nodeId = -1;
     this.fromId = -1;
+    this.enterT = 9;
+    this.fadeT = FADE;
+  }
+
+  /** A map state leaves the screen: keep its canvases for the next state to repaint. */
+  private retire(s: MiniState | null): void {
+    if (!s || !s.rooms || !s.glow) return;
+    if (!this.spare) this.spare = { rooms: s.rooms, glow: s.glow };
+    s.rooms = null;
+    s.glow = null;
   }
 
   /** Map state for the current signature (canvases are made lazily when drawn). */
@@ -199,8 +242,10 @@ export class MinimapView {
   private canvases(s: MiniState): { rooms: HTMLCanvasElement; glow: HTMLCanvasElement } {
     if (!s.rooms || !s.glow) {
       const out = paintRooms(s.view, s.look, MINI_LAYOUT, 'mini', { w: MINI_SIZE, h: MINI_SIZE });
-      s.rooms = out.painter.toCanvas();
-      s.glow = glowCanvas(out.glows, MINI_SIZE, MINI_SIZE);
+      const sp = this.spare;
+      this.spare = null;
+      s.rooms = painterCanvas(out.painter, sp?.rooms);
+      s.glow = glowCanvas(out.glows, MINI_SIZE, MINI_SIZE, sp?.glow);
     }
     return { rooms: s.rooms, glow: s.glow };
   }
@@ -268,7 +313,8 @@ export class MinimapView {
     const vmax = look.vignette >= 0.7 ? 0.7 : 0.63;
     const vig = artCanvas(`mmvig|${vmax}`, () => paintVignette(look, VIG_W, VIG_H, VIG_W / 2, VIG_H / 2, 11, 40, vmax));
     blitArt(r, vig, Math.round((vcx - (VIG_W * PX) / 2) / PX) * PX, Math.round((vcy - (VIG_H * PX) / 2) / PX) * PX, alpha);
-    if (lowQuality()) this.paintCurrent(r, w, x, y, t, alpha, true);
+    // low quality bakes the glow and flame into the HUD's cache; teammate pips stay live (downed / leaving)
+    if (lowQuality()) this.paintCurrent(r, w, x, y, t, alpha, true, !staticOnly);
     else if (!staticOnly) this.paintCurrent(r, w, x, y, t, alpha, false);
     d.restore();
     blitArt(r, artCanvas('mmplate', () => paintMapPlate()), x, y, alpha);
@@ -294,7 +340,7 @@ export class MinimapView {
   }
 
   /** Current room: glow, flame (badge on a special room), transitions and pips. `baked`: low quality, static. */
-  private paintCurrent(r: Renderer, w: World, x: number, y: number, t: number, alpha: number, baked: boolean): void {
+  private paintCurrent(r: Renderer, w: World, x: number, y: number, t: number, alpha: number, baked: boolean, pips = true): void {
     const cp = this.curPlate(w, x, y);
     const pw = cp.r.w * PX;
     const ph = cp.r.h * PX;
@@ -330,7 +376,7 @@ export class MinimapView {
       blitArt(r, fl, ox + (cell.x + Math.floor((cell.w - fl.width) / 2)) * PX, oy + (cell.y + Math.floor((cell.h - fl.height) / 2)) * PX, alpha);
     }
     // a special room keeps its sigil readable: at 7 px a flame badge would cover it, so the hot ring and the glow mark it
-    this.paintPips(r, w, x, y, t, alpha);
+    if (pips) this.paintPips(r, w, x, y, t, alpha);
   }
 
   private paintStreak(r: Renderer, w: World, x: number, y: number, alpha: number): void {

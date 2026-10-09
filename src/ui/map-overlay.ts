@@ -23,13 +23,13 @@ import { touchUiActive } from './touch-mode';
 import { UiLayer } from './layer-cache';
 import { blitArt } from './hud-gear';
 import { lookFor, type MapLook } from './map-look';
-import { MAP_PANEL, boardLayout, buildMapView, h32, keeperCell, legendLayout, mapPanelRect, mapSignature, type BoardLayout, type LegendState, type MapView } from './map-view';
+import { MAP_PANEL, boardLayout, buildMapView, h32, keeperCell, legendLayout, mapPanelRect, mapSignature, mapToken, type BoardLayout, type LegendState, type MapView } from './map-view';
 import {
   BOARD_IN_H, BOARD_IN_W, FLAME3, FLAME5, FLAME7, FLAME_PAL, HATCH5, INK, UNFOUND, cellCentre, glyphPal, paintBoardStatic,
   paintCompass, paintEmblemMedallion, paintFlame, paintPip, paintRoomPlate, paintRooms, paintSigil, paintStageBead, paintVignette, plateColor,
   plateRect, sigilKey, sigilPal, stampMask, threadPixels, type BeadState, type SigilKey,
 } from './map-art';
-import { artCanvas, blitGlow, glowCanvas, lowQuality, mapSource } from './minimap';
+import { artCanvas, blitGlow, glowCanvas, lowQuality, mapSource, painterCanvas } from './minimap';
 import { PixelPainter } from '../engine/painter';
 
 // ---- layout (UI units, relative to the panel's top-left)
@@ -67,6 +67,13 @@ interface Board {
   lit: { x: number; y: number; r: number; color: string }[];
 }
 
+/**
+ * The last board built by any map overlay: opening the map again with nothing
+ * changed reuses it, and a new map state repaints its art canvases in place
+ * (one overlay is open at a time; a closed overlay never draws again).
+ */
+let lastBoard: Board | null = null;
+
 /** Stage x-y label of a view (or the floor number of a legacy run). */
 function stageLabel(v: MapView, floorName: string): string {
   return v.staged ? `${v.floorIndex}-${v.stage}` : splitFloorName(floorName)[0];
@@ -80,6 +87,8 @@ export class MapOverlay implements Scene {
   private closing = -1;
   private board: Board | null = null;
   private readonly lyText = new UiLayer();
+  /** the board's static layers (bezel, rooms, their glows, vignette, the current room's wide glow) at display resolution */
+  private readonly lyBoard = new UiLayer();
 
   constructor(game: GameScene) {
     this.game = game;
@@ -87,6 +96,12 @@ export class MapOverlay implements Scene {
 
   enter(): void {
     sfx('ui_open', { vol: 0.5 });
+  }
+
+  exit(): void {
+    // the display-resolution layers are big on high-DPI phones: free them now, not at the next GC
+    this.lyText.release();
+    this.lyBoard.release();
   }
 
   update(dt: number): void {
@@ -106,13 +121,18 @@ export class MapOverlay implements Scene {
   private boardFor(): Board {
     const w = this.game.world;
     const src = mapSource(w);
-    const key = `${mapSignature(src)}|${w.map.floor.theme}|${w.run.stage}`;
+    // the map object (a new floor / stage / run never reuses a board), its state, and the party (legend row)
+    const party = w.players.filter((q) => q.slot !== w.local.slot).map((q) => q.slot).join(',');
+    const key = `${mapToken(w.map)}|${mapSignature(src)}|${w.map.floor.theme}|${w.run.stage}|${w.run.seed}|${party}`;
     if (this.board && this.board.key === key) return this.board;
+    if (lastBoard && lastBoard.key === key) return (this.board = lastBoard);
+    const reuse = lastBoard;
     const view = buildMapView(src);
     const look = lookFor(view.themeId);
     const L = boardLayout(view.bounds, BOARD_IN_W - 12, BOARD_IN_H - 12, { x: 6, y: 6 });
     const out = paintRooms(view, look, L, 'board', { w: BOARD_IN_W, h: BOARD_IN_H });
-    const cur = view.nodes.find((n) => n.id === view.curId) ?? view.nodes[0];
+    // the current room is always known in play; fall back to the world's node for an empty view
+    const cur = view.nodes.find((n) => n.id === view.curId) ?? src.node;
     const cr = plateRect(cur, L);
     const ccx = cr.x + cr.w / 2;
     const ccy = cr.y + cr.h / 2;
@@ -128,11 +148,11 @@ export class MapOverlay implements Scene {
         lit.push({ x: (r.x + r.w / 2) * PX, y: (r.y + r.h / 2) * PX, r: Math.max(r.w, r.h) * PX, color: n.state === 'uncleared' ? '#ff4050' : k ? plateColor(k, look) : look.light });
       }
     }
-    this.board = {
+    this.board = lastBoard = {
       key, view, look, L,
-      rooms: out.painter.toCanvas(),
-      glow: glowCanvas(out.glows, BOARD_IN_W, BOARD_IN_H),
-      vignette: vig.toCanvas(),
+      rooms: painterCanvas(out.painter, reuse?.rooms),
+      glow: glowCanvas(out.glows, BOARD_IN_W, BOARD_IN_H, reuse?.glow),
+      vignette: painterCanvas(vig, reuse?.vignette),
       cx: ccx * PX,
       cy: ccy * PX,
       far: (far + L.cell) * PX,
@@ -186,29 +206,46 @@ export class MapOverlay implements Scene {
   private drawBoard(r: Renderer, b: Board, x: number, y: number, k: number, low: boolean): void {
     const d = r.dctx;
     const look = b.look;
-    blitArt(r, artCanvas(`mapboard|${look.id}`, () => paintBoardStatic(look)), x + BOARD_X, y + BOARD_Y, k);
     const ix = x + IN_X;
     const iy = y + IN_Y;
     const t = this.t;
-    d.save();
-    d.beginPath();
-    d.rect(ix, iy, IN_W, IN_H);
-    d.clip();
     // light spreads from the current room (low quality: a short fade)
     const spread = low ? 1 : appear(t, 0.45, 0.08, ease.outCubic);
     const R = spread * b.far;
     const revealing = !low && spread < 1;
     const fadeA = low ? appear(t, 0.2) : 1;
-    if (revealing) {
-      d.save();
-      d.beginPath();
-      d.arc(ix + b.cx, iy + b.cy, Math.max(0.5, R), 0, Math.PI * 2);
-      d.clip();
+    // at rest (and while closing) the static layers are one cached blit; once the panel stands still and the
+    // light is still spreading, the lit board (bezel, rooms, their glows) is a cached layer shown through the
+    // reveal circle with the vignette over it; while the panel slides in everything is drawn live (a cache
+    // would repaint every frame at a new sub-pixel offset)
+    const full = !revealing && fadeA >= 1 && (k >= 1 || this.closing >= 0);
+    const litLayer = !full && k >= 1 && fadeA >= 1;
+    const bw = BOARD_IN_W * PX + 16;
+    const bh = BOARD_IN_H * PX + 16;
+    if (full) {
+      this.lyBoard.draw(r, `${b.key}|${look.id}|full`, 0, 0, x + BOARD_X, y + BOARD_Y, bw, bh, k, () => this.paintBoardBase(r, b, x, y, true));
+    } else {
+      blitArt(r, artCanvas(`mapboard|${look.id}`, () => paintBoardStatic(look)), x + BOARD_X, y + BOARD_Y, k);
     }
-    blitArt(r, b.rooms, ix, iy, k * fadeA);
-    blitGlow(r, b.glow, ix, iy, k * fadeA);
-    if (revealing) d.restore();
-    blitArt(r, b.vignette, ix, iy, k);
+    d.save();
+    d.beginPath();
+    d.rect(ix, iy, IN_W, IN_H);
+    d.clip();
+    if (!full) {
+      if (revealing) {
+        d.save();
+        d.beginPath();
+        d.arc(ix + b.cx, iy + b.cy, Math.max(0.5, R), 0, Math.PI * 2);
+        d.clip();
+      }
+      if (litLayer) this.lyBoard.draw(r, `${b.key}|${look.id}|lit`, 0, 0, x + BOARD_X, y + BOARD_Y, bw, bh, 1, () => this.paintBoardBase(r, b, x, y, false));
+      else {
+        blitArt(r, b.rooms, ix, iy, k * fadeA);
+        blitGlow(r, b.glow, ix, iy, k * fadeA);
+      }
+      if (revealing) d.restore();
+      blitArt(r, b.vignette, ix, iy, k);
+    }
     if (revealing && R > 1) {
       d.globalAlpha = 0.35 * k;
       d.strokeStyle = look.light;
@@ -225,14 +262,41 @@ export class MapOverlay implements Scene {
       }
     }
     if (!low) this.drawAmbient(r, b, ix, iy, k);
-    this.drawCurrent(r, b, ix, iy, k, low);
+    this.drawCurrent(r, b, ix, iy, k, low, full);
     if (!low) this.drawPulses(r, b, ix, iy, k);
     blitArt(r, artCanvas('mapglint', paintGlint), ix + 4, iy + 4, k);
     d.restore();
   }
 
+  /**
+   * The board's static layers, painted once per board state into the display-resolution cache:
+   * bezel, rooms and their glows; `full` (at rest) adds the vignette and the current room's wide glow.
+   */
+  private paintBoardBase(r: Renderer, b: Board, x: number, y: number, full: boolean): void {
+    const d = r.dctx;
+    const ix = x + IN_X;
+    const iy = y + IN_Y;
+    blitArt(r, artCanvas(`mapboard|${b.look.id}`, () => paintBoardStatic(b.look)), x + BOARD_X, y + BOARD_Y, 1);
+    d.save();
+    d.beginPath();
+    d.rect(ix, iy, IN_W, IN_H);
+    d.clip();
+    blitArt(r, b.rooms, ix, iy, 1);
+    blitGlow(r, b.glow, ix, iy, 1);
+    if (full) {
+      blitArt(r, b.vignette, ix, iy, 1);
+      this.wideGlow(r, b, ix, iy, 1);
+    }
+    d.restore();
+  }
+
+  /** The current room's steady wide glow (part of the cached board at rest). */
+  private wideGlow(r: Renderer, b: Board, ix: number, iy: number, k: number): void {
+    glow(r, ix + b.cx, iy + b.cy, 3.2 * b.L.cell * PX, '#ff9a3a', 0.16 * k);
+  }
+
   /** The current room: breathing glow, flame (badge on a special room), sparks, teammate pips. */
-  private drawCurrent(r: Renderer, b: Board, ix: number, iy: number, k: number, low: boolean): void {
+  private drawCurrent(r: Renderer, b: Board, ix: number, iy: number, k: number, low: boolean, baseCached = false): void {
     const t = this.t;
     const v = b.view;
     const L = b.L;
@@ -242,7 +306,7 @@ export class MapOverlay implements Scene {
     const cellU = L.cell * PX;
     const plateU = Math.max(pr.w, pr.h) * PX;
     const breathe = low ? 0 : 0.04 * Math.sin(t * Math.PI * 2 * 2.1);
-    glow(r, ix + b.cx, iy + b.cy, 3.2 * cellU, '#ff9a3a', 0.16 * k);
+    if (!baseCached) this.wideGlow(r, b, ix, iy, k);
     glow(r, ix + b.cx, iy + b.cy, 1.4 * plateU, '#ffb050', (0.3 + breathe) * k);
     if (!low && t < 0.7) {
       const wa = t < 0.4 ? 0.5 - 0.2 * (t / 0.4) : Math.max(0, 0.3 - (t - 0.4) * 1);

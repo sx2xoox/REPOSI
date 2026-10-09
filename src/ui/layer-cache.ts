@@ -24,6 +24,17 @@ export class UiLayer {
     this.key = '';
   }
 
+  /** Free the bitmap now (a closed overlay's big layer) instead of waiting for GC; the next draw repaints. */
+  release(): void {
+    if (this.cv) {
+      this.cv.width = 0;
+      this.cv.height = 0;
+    }
+    this.cv = null;
+    this.g = null;
+    this.key = '';
+  }
+
   /**
    * Draw the UI-space rect (x, y, w, h) — in a UI space translated by (ox, oy)
    * units — from the cache; `paint` (normal UI drawing calls in the same

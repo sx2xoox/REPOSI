@@ -242,6 +242,23 @@ export function mapSignature(src: Pick<MapSource, 'map' | 'node' | 'flags'>): nu
   return h;
 }
 
+const mapIds = new WeakMap<object, number>();
+let nextMapId = 1;
+
+/**
+ * Identity token of a floor map object (UI cache keys): a new floor / stage map,
+ * or another run's map with a colliding signature, never reuses a cached layer.
+ * Read-only: the map itself is not touched.
+ */
+export function mapToken(map: object): number {
+  let id = mapIds.get(map);
+  if (id === undefined) {
+    id = nextMapId++;
+    mapIds.set(map, id);
+  }
+  return id;
+}
+
 // ---------------------------------------------------------------- layout
 /** The map overlay's panel (UI units): centred in the UI space, under an 18-unit top margin. */
 export const MAP_PANEL = { w: 656, h: 396, top: 18 } as const;
