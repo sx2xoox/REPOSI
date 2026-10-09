@@ -10,6 +10,8 @@
 //    Cut the line and it splits: the pilgrim behind the gap raises a standard of its own
 //    and leads the rear half (sooner to chant, zealous). Kill the leader and the next in
 //    line takes over. A pilgrim left too far behind (stuck on a rock) walks on alone.
+//    In a vault raid only the standard bearer strikes the vault; whoever takes up the
+//    standard takes up the raid. Its timers run on enemy time (a time stop holds the chant).
 // Pure helpers (`lineNormals`, `followSpeed`, `orbitGoal`) are unit-tested in
 // tests/enemies-extra-f4.test.ts.
 
@@ -48,6 +50,8 @@ export const ORBIT_R = 80;
 export const LEAD_TURN = 1.9;
 /** the leader only halts to chant with the keeper this close */
 export const CHANT_REACH = 190;
+/** a detour the leader picks around a rock is held this long (s) */
+export const DETOUR_HOLD = 0.4;
 
 // ------------------------------------------------------------------ pure helpers
 /**
@@ -302,6 +306,11 @@ function flame<T extends ShootOpts>(extra: T): ShootOpts & T {
 // ------------------------------------------------------------------ the line
 let buildingLine = false;
 
+/** This step's enemy time: a time stop / slow (w.enemyTimeScale) holds the chant and the march too. */
+function edt(w: World): number {
+  return w.dt * w.enemyTimeScale;
+}
+
 function alive(x: Enemy | null | undefined): x is Enemy {
   return !!x && !x.dead && x.alive;
 }
@@ -374,8 +383,9 @@ function chantTick(e: Enemy, w: World): boolean {
     e.mem.told = 0;
   }
   e.mem.tick = w.time;
-  e.mem.tell -= w.dt;
-  e.mem.fire -= w.dt;
+  const dt = edt(w);
+  e.mem.tell -= dt;
+  e.mem.fire -= dt;
   if (!e.mem.told && e.mem.tell <= 0) {
     e.mem.told = 1;
     e.mem.fire = Math.max(e.mem.fire, 0.3);
@@ -418,18 +428,31 @@ function leadStep(e: Enemy, w: World): void {
     want = Math.atan2(g.y - e.y, g.x - e.x);
   }
   let turn = LEAD_TURN;
+  const dt = edt(w);
+  // a detour around a rock is held for a moment (re-aiming every step at the arc made the
+  // leader dither against a rock corner, half in and half out of the open lane)
+  if (e.mem.detourT > 0) {
+    e.mem.detourT -= dt;
+    if (rayFree(w.room, e.x, e.y, e.mem.detour, e.r, 14) < 8) e.mem.detourT = 0;
+    else {
+      want = e.mem.detour;
+      turn = LEAD_TURN * 3;
+    }
+  }
   // a rock or wall ahead: swing toward open floor
-  if (rayFree(w.room, e.x, e.y, e.mem.heading, e.r, 14) < 12) {
+  if (!(e.mem.detourT > 0) && rayFree(w.room, e.x, e.y, e.mem.heading, e.r, 14) < 12) {
     for (let k = 1; k <= 5; k++) {
       const s = (k % 2 ? 1 : -1) * e.mem.side * Math.ceil(k / 2) * 0.55;
       if (rayFree(w.room, e.x, e.y, e.mem.heading + s, e.r, 14) >= 12) {
         want = e.mem.heading + s;
+        e.mem.detour = want;
+        e.mem.detourT = DETOUR_HOLD;
         break;
       }
     }
     turn = LEAD_TURN * 3;
   }
-  e.mem.heading = rotateToward(e.mem.heading, want, turn * w.dt);
+  e.mem.heading = rotateToward(e.mem.heading, want, turn * dt);
   e.moveAngle(e.mem.heading, e.speed);
   if (e.mem.__bumped) {
     e.mem.bumps = (e.mem.bumps ?? 0) + 1;
@@ -496,16 +519,26 @@ defineEnemy({
     while (true) {
       // a follower whose pilgrim ahead fell, or who fell too far behind, leads on its own
       if (e.mem.prev) {
+        const was = e.mem.prev as Enemy;
         const p = ahead(e);
         if (!p) promote(e, w, true);
         else if (Math.hypot(p.x - e.x, p.y - e.y) > PROC_DETACH) promote(e, w, false);
+        // a besieging line (vault encounters): the new standard bearer takes up the raid; the room drives it
+        if (!e.mem.prev && was.mem.siege) e.mem.siege = was.mem.siege;
+      }
+      if (e.mem.siege) {
+        e.mem.lead = 1;
+        e.mem.chant = 0;
+        e.mem.told = 0;
+        yield;
+        continue;
       }
       if (chantTick(e, w)) {
         yield;
         continue;
       }
       if (e.mem.rest > 0) {
-        e.mem.rest -= w.dt;
+        e.mem.rest -= edt(w);
         e.stop();
         if (e.mem.rest <= 0) e.setAnim('ipilgrim_walk');
         yield;
@@ -527,7 +560,7 @@ defineEnemy({
         e.mem.lead = 1;
         e.setAnim('ipilgrim_walk');
         leadStep(e, w);
-        e.mem.march -= w.dt;
+        e.mem.march -= edt(w);
         if (e.mem.march <= 0) {
           if (e.distToTarget(w) < CHANT_REACH) {
             startChant(e, w);
@@ -549,7 +582,9 @@ defineEnemy({
   draw(e, r, w) {
     const pre = e.mem.lead ? 'ipleader' : 'ipilgrim';
     const hurt = w.time - e.lastHurtAt < 0.24;
-    const frame = hurt ? `${pre}_hurt_0` : animFrame(e.anim.replace('ipilgrim', pre), e.animT);
+    // a vault raider is driven by the room (its script rests): walk, stand, or raise the candle / standard for a blow
+    const anim = e.mem.siege ? (e.telegraphT > 0 ? 'ipilgrim_chant' : Math.hypot(e.vx, e.vy) > 4 ? 'ipilgrim_walk' : 'ipilgrim_idle') : e.anim;
+    const frame = hurt ? `${pre}_hurt_0` : animFrame(anim.replace('ipilgrim', pre), e.animT);
     e.drawDefault(r, frame);
     // while its candle flares, the pilgrim shows where its flames will go: out of both sides of the line
     if (e.mem.told && !e.hidden) {
@@ -558,9 +593,10 @@ defineEnemy({
         const a = e.mem.face + side;
         const c = Math.cos(a);
         const s = Math.sin(a);
-        // just outside the body (an ellipse around its middle: the body is taller than wide)
-        const cx = e.x + c * 12;
-        const cy = e.y - 8 + s * 16;
+        // just outside the body (an ellipse around its middle: the body is taller than wide),
+        // clear of the raised candle
+        const cx = e.x + c * 14;
+        const cy = e.y - 8 + s * 18;
         const bx = cx - c * 3;
         const by = cy - s * 3;
         // a small rose arrowhead pointing out of the line, dark-backed so it reads on ice

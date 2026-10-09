@@ -22,6 +22,7 @@ import { fx, RNG } from '../src/engine/rng';
 import { angleDiff } from '../src/engine/math';
 import { stateHash } from '../src/game/statehash';
 import { runCoop } from './coopsim';
+import { updateSiege } from '../src/content/rooms/encounter-kit';
 import {
   CHANT_REST, CHANT_STAGGER, CHANT_TELL, FLAME_SPEED, PILGRIM_ID, PROC_DETACH, PROC_GAP, PROC_LEN, followSpeed, lineNormals,
   orbitGoal, procession,
@@ -408,6 +409,113 @@ describe('얼음 순례자: the chant', () => {
     const after = watch.casts.filter((c) => c.owner === last).slice(before);
     expect(after.length).toBeGreaterThan(0);
     for (const c of after) expect(c.since).toBeGreaterThanOrEqual(0.3 - 1e-6);
+  });
+});
+
+// ---------------------------------------------------------------- review regressions
+describe('얼음 순례자: time stop, vault raids and rock corners', () => {
+  it('a time stop (enemyTimeScale) holds the chant and the march: no flames while time stands still', () => {
+    const a = arena('f4x-timestop');
+    const keep = pin(a, a.cx + 20, a.cy);
+    const head = a.spawn(a.cx - 70, a.cy - 10);
+    const line = procession(head);
+    // walk until the first candle flares, then stop time for 8 s
+    for (let i = 0; i < 8 * 60 && !line.some((e) => e.mem.told); i++) a.step(1, keep);
+    expect(line.some((e) => e.mem.told)).toBe(true);
+    const seen = new Set(flames(a.w));
+    let during = 0;
+    a.w.enemyTimeScale = 0.04;
+    const x0 = head.x;
+    const y0 = head.y;
+    a.step(8 * 60, () => {
+      keep();
+      for (const f of flames(a.w)) if (!seen.has(f)) { seen.add(f); during++; }
+    });
+    expect(during).toBe(0);
+    expect(Math.hypot(head.x - x0, head.y - y0)).toBeLessThan(4);
+    // time flows again: the chant goes on where it stood (the warning was never cut short)
+    a.w.enemyTimeScale = 1;
+    const watch = watchChants(a.w);
+    let after = 0;
+    a.step(4 * 60, () => {
+      keep();
+      watch.tick();
+      for (const f of flames(a.w)) if (!seen.has(f)) { seen.add(f); after++; }
+    });
+    expect(after).toBeGreaterThan(0);
+  });
+
+  it('a besieging line (vault encounter): when the standard bearer falls, the next one takes up the raid instead of chanting at the keeper', () => {
+    const a = arena('f4x-siege');
+    const { w } = a;
+    const keep = pin(a, a.cx + 100, a.cy + 40);
+    class Vault extends Entity {
+      mem: Record<string, unknown> = { used: false };
+      hits = 0;
+      damageVault(): void { this.hits++; }
+    }
+    const vault = new Vault();
+    vault.x = a.cx;
+    vault.y = a.cy;
+    w.spawn(vault);
+    a.step(1, keep);
+    const head = a.spawn(a.cx - 100, a.cy - 30);
+    const line = procession(head);
+    // what EncounterSummon does to a siege raider; the vault drives every raider each step
+    head.mem.siege = vault.id;
+    head.script.stop();
+    const tick = () => {
+      keep();
+      for (const e of w.enemies) if (e.alive && e.mem.siege === vault.id) updateSiege(e, w, FIXED_DT);
+    };
+    a.step(6 * 60, tick);
+    expect(vault.hits).toBeGreaterThan(0);
+    const hits = vault.hits;
+    w.killEnemy(head);
+    const seen = new Set(flames(w));
+    let cast = 0;
+    a.step(10 * 60, () => {
+      tick();
+      for (const f of flames(w)) if (!seen.has(f)) { seen.add(f); cast++; }
+    });
+    expect(cast).toBe(0);
+    expect(line[1].mem.siege).toBe(vault.id);
+    expect(line[1].mem.lead).toBe(1);
+    expect(vault.hits).toBeGreaterThan(hits);
+    // the rest still walk in its train, close to the vault
+    for (const e of line.slice(2)) expect(Math.hypot(e.x - vault.x, e.y - vault.y)).toBeLessThan(70);
+  });
+
+  it('the leader does not dither against rock corners: in floor-4 rooms it never stands still for long outside its chant', () => {
+    let worst = 0;
+    let rooms = 0;
+    for (const seed of ['sA', 'sB', 'sC', 'sD', 'sE', 'sF', 'sG', 'sH']) {
+      const a = arena(seed);
+      const { w } = a;
+      (w as unknown as { enemyPool: () => Record<string, number> }).enemyPool = () => ({ [PILGRIM_ID]: 1 });
+      a.setMove((t) => [Math.cos(t * 0.7), Math.sin(t * 1.1)]);
+      for (const node of w.map.nodes.filter((n) => n.kind === 'normal')) {
+        w.teleportTo(node);
+        a.step(30);
+        for (const e of [...w.enemies]) w.killEnemy(e);
+        a.step(1);
+        const pos = w.room.randomFreePos(new RNG(`${seed}-${node.id}`), 8, { x: w.player.x, y: w.player.y, dist: 90 });
+        a.spawn(pos.x, pos.y);
+        const last = new Map<number, { x: number; y: number; t: number }>();
+        a.step(25 * 60, () => {
+          for (const e of pilgrims(w)) {
+            const busy = e.mem.chant || e.mem.rest > 0 || e.telegraphT > 0 || !e.mem.lead;
+            const l = last.get(e.id);
+            if (!l || busy || Math.hypot(e.x - l.x, e.y - l.y) > 6) last.set(e.id, { x: e.x, y: e.y, t: w.time });
+            else worst = Math.max(worst, w.time - l.t);
+          }
+        });
+        for (const e of [...w.enemies]) w.killEnemy(e);
+        rooms++;
+      }
+    }
+    expect(rooms).toBeGreaterThan(30);
+    expect(worst).toBeLessThan(2);
   });
 });
 
