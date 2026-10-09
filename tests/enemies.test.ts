@@ -199,6 +199,8 @@ function fakeWorld(seed: string): FakeWorld {
     hurt: () => { fw.hurts++; return true; },
     knock: () => {},
     hasStatus: () => false,
+    // grave_robber's traps slow the keeper
+    applyStatus: () => true,
   };
   const enemies: Enemy[] = [];
   const w = {

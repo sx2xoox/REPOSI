@@ -11,7 +11,9 @@ const BORI: Scenario = {
   maxSteps: 3600, cycle: true, extraEnemies: 2,
 };
 const BAEKGU: Scenario = {
-  name: 'baekgu: floor 2', seed: 'DET-BAEKGU-2', character: 'baekgu', floors: [2], exploreSteps: 1400, bossSteps: 1500, giftsPerFloor: 4,
+  // seed 2 now rolls a room of three kiting 버섯개미 the scripted explorer leaves with 2 kills;
+  // seed 4 plays a full floor (7 kills) — the scenario needs activity, not a particular room
+  name: 'baekgu: floor 2', seed: 'DET-BAEKGU-4', character: 'baekgu', floors: [2], exploreSteps: 1400, bossSteps: 1500, giftsPerFloor: 4,
   maxSteps: 3600, cycle: true, extraEnemies: 2,
 };
 const MORI: Scenario = {
