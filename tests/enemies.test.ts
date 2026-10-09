@@ -23,6 +23,7 @@ const FLOOR_ENEMIES: Record<string, number[]> = {
   urn_mimic: [1, 2],
   bell_ringer: [1],
   bone_archer: [1],
+  grave_robber: [1],
   spore_shroom: [2],
   cave_slime: [2],
   slimeling: [2],
@@ -32,6 +33,7 @@ const FLOOR_ENEMIES: Record<string, number[]> = {
   gas_bloater: [2],
   tongue_toad: [2],
   pill_beetle: [2],
+  fungus_ant: [2],
   fire_imp: [3],
   forge_sentinel: [3],
   bellows_turret: [3],
@@ -43,6 +45,7 @@ const FLOOR_ENEMIES: Record<string, number[]> = {
   anvil_mortar: [3],
   welder_automaton: [3],
   powder_porter: [3],
+  hammer_tinker: [3],
 };
 
 function spriteDefined(name: string): boolean {
