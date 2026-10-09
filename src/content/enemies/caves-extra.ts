@@ -1,13 +1,15 @@
 // Floor 2 — 포자 동굴 (spore caves): one more cave regular.
 //  - 버섯개미 (fungus ant): a rust-red cave ant with a glowing purple mushroom growing from
-//    its back. It scuttles in short stop-and-go bursts and keeps 70–120 px from the keeper.
-//    Every few seconds it rears up (its cap glows) and drums the floor: mycelium runs under
+//    its back. It scuttles in short stop-and-go bursts and keeps 70–120 px from the keeper
+//    (slipping along walls rather than into corners). Every few seconds, when it can see the
+//    keeper, it rears up (its cap glows) and drums the floor: mycelium runs under
 //    the stones and a FAIRY RING of sprouts pops up around the keeper, pair by pair, open
 //    only on the ant's side. Grown sprouts sting on touch (a soft fence you can thread or
 //    dash through), and once the ring has closed every sprout puffs one spore at its middle.
 //    Answers: walk out through the gap (toward the ant), thread the fence early, or stand
-//    off-centre between the spore lines. Killing the ant withers its ring at once, and a
-//    room's ants take turns: one ring at a time.
+//    off-centre between the spore lines; rushing the ant during its wind-up stops the drum.
+//    Killing the ant withers its ring at once, and a room's ants take turns: one ring at a
+//    time. A time stop freezes a ring like any enemy shot.
 // The slot layout (`ringSlots`) and the timing constants are unit-tested in
 // tests/enemies-extra-f2.test.ts.
 
@@ -22,7 +24,7 @@ import type { Renderer } from '../../engine/renderer';
 import type { Enemy } from '../../game/enemy';
 import type { World } from '../../game/world';
 import type { Script } from '../../engine/script';
-import { bullet, dust, frames, gather, hurtFrame, sphere, WARN_RED } from './shared';
+import { bullet, dust, frames, gather, hurtFrame, rayFree, sphere, WARN_RED } from './shared';
 import { EnemyOverlay } from './crypt-toll';
 
 const DIRT = ['#5a4636', '#3e2e24', '#7a604a'];
@@ -49,9 +51,15 @@ export const WITHER = 0.3;
 export const SPORE_SPEED = 66;
 /** Sting reach of one sprout (plus part of the keeper's radius). */
 export const SPROUT_HIT = 4;
-/** The ant drums only when the keeper is this far away. */
-export const CAST_MIN = 46;
+/**
+ * The ant drums only when the keeper is this far away (and in sight). CAST_MIN leaves room
+ * between the ring's gap and the ant itself: walking out through the gap must not walk the
+ * keeper into the ant's body.
+ */
+export const CAST_MIN = 64;
 export const CAST_MAX = 150;
+/** A keeper who rushes the ant during its wind-up and gets this close stops the drum (a dud). */
+export const DRUM_MIN = RING_R + 18;
 const KEEP_NEAR = 70;
 const KEEP_FAR = 120;
 /** A ring needs at least this many sprouts on open floor, or the ant does not bother. */
@@ -105,10 +113,22 @@ function openSlots(w: World, cx: number, cy: number, fromX: number, fromY: numbe
   return ringSlots(cx, cy, fromX, fromY).filter((s) => w.room.isFree(s.x, s.y, 3));
 }
 
+/**
+ * A walkable heading near `a` (probing a short step ahead), turning toward `side` first:
+ * the ant slips along walls and out of corners instead of grinding into them.
+ */
+export function openHeading(e: Enemy, w: World, a: number, side: number): number {
+  for (const k of [0, 0.6, -0.6, 1.2, -1.2, 1.8, -1.8, 2.4, -2.4]) {
+    const b = a + k * side;
+    if (w.room.isFree(e.x + Math.cos(b) * 18, e.y + Math.sin(b) * 18, e.r)) return b;
+  }
+  return a + (side * Math.PI) / 2;
+}
+
 // ================================================================== art: the ant
 type AntMode = 'walk' | 'stand' | 'rear' | 'drum' | 'hurt';
 
-/** Segment centres of one pose (the ant faces right on a 22x16 canvas, feet on row 15). */
+/** Segment centres of one pose (the ant faces right on a 24x16 canvas, feet on row 15). */
 interface AntPose {
   gx: number; gy: number;
   tx: number; ty: number;
@@ -120,26 +140,32 @@ interface AntPose {
 function antPose(k: number, mode: AntMode): AntPose {
   switch (mode) {
     case 'rear':
-      return { gx: 4, gy: 10, tx: 11.5, ty: 8.4, hx: 15.8, hy: 5.4, mx: 10.6, my: 2.2, mrx: 4.3, mry: 2.4 };
+      return { gx: 4, gy: 10, tx: 11.5, ty: 8.4, hx: 16.2, hy: 5.2, mx: 10.6, my: 2.2, mrx: 4.3, mry: 2.4 };
     case 'drum':
-      return { gx: 4, gy: 8.6, tx: 12, ty: 9.4, hx: 16.8, hy: 10, mx: 11.8, my: 3.8, mrx: 4.8, mry: 1.9 };
+      return { gx: 4, gy: 8.6, tx: 12, ty: 9.4, hx: 17.4, hy: 10, mx: 11.8, my: 3.8, mrx: 4.8, mry: 1.9 };
     case 'hurt':
-      return { gx: 4, gy: 9.6, tx: 12, ty: 9.8, hx: 16.4, hy: 9.4, mx: 11.4, my: 3.6, mrx: 4.2, mry: 2.1 };
+      return { gx: 4, gy: 9.6, tx: 12, ty: 9.8, hx: 17, hy: 9.4, mx: 11.4, my: 3.6, mrx: 4.2, mry: 2.1 };
     default: {
       // the gaster sways with the gait
       const sway = mode === 'walk' ? [0, -0.6, 0, -0.6][k] : 0;
-      return { gx: 4, gy: 9 + sway, tx: 12, ty: 9, hx: 16.6, hy: 8, mx: 11.4, my: 2.8, mrx: 4.1, mry: 2.3 };
+      return { gx: 4, gy: 9 + sway, tx: 12, ty: 9, hx: 17.2, hy: 8, mx: 11.4, my: 2.8, mrx: 4.1, mry: 2.3 };
     }
   }
 }
 
-/** Thin two-part insect leg: femur up-and-out to a high knee, tibia down to the foot. */
+/**
+ * Thin two-part insect leg: femur up-and-out to a high knee, tibia down to the foot. The far
+ * legs show only their lower half behind the body (a full dark set reads as a tangled comb).
+ */
 function antLeg(p: PixelPainter, ax: number, ay: number, kx: number, ky: number, fx0: number, fy: number, near: boolean): void {
-  const c = near ? ANT[2] : ANT[0];
-  p.line(ax, ay, kx, ky, c);
-  p.line(kx, ky, fx0, fy, near ? ANT[2] : ANT[0]);
-  if (near) p.px(Math.round(fx0), Math.round(fy), ANT[1]);
-  if (near) p.px(Math.round(kx), Math.round(ky), ANT[3]);
+  if (!near) {
+    p.line(kx, ky + 1, fx0, fy, ANT[1]);
+    return;
+  }
+  p.line(ax, ay, kx, ky, ANT[2]);
+  p.line(kx, ky, fx0, fy, ANT[2]);
+  p.px(Math.round(fx0), Math.round(fy), ANT[1]);
+  p.px(Math.round(kx), Math.round(ky), ANT[3]);
 }
 
 function paintAnt(p: PixelPainter, k: number, mode: AntMode): void {
@@ -175,8 +201,8 @@ function paintAnt(p: PixelPainter, k: number, mode: AntMode): void {
   legs(false);
 
   // ---- gaster: a glossy bulb with two dark seams, pointed tail at the back
-  const grx = 4;
-  const gry = 2.9;
+  const grx = 4.2;
+  const gry = 3.1;
   p.ellipse(o.gx, o.gy, grx, gry, ANT[2]);
   p.px(0, Math.round(o.gy + 0.6), ANT[2]);
   sphere(p, o.gx, o.gy, grx, gry, ANT, false);
@@ -203,24 +229,25 @@ function paintAnt(p: PixelPainter, k: number, mode: AntMode): void {
   p.px(sx0 + 1, sb, STALK[1]);
 
   // ---- thorax: a short hump
-  p.ellipse(o.tx, o.ty, 2.1, 1.7, ANT[2]);
-  sphere(p, o.tx, o.ty, 2.1, 1.7, ANT, false);
+  p.ellipse(o.tx, o.ty, 2.4, 1.9, ANT[2]);
+  sphere(p, o.tx, o.ty, 2.4, 1.9, ANT, false);
   p.pxIn(Math.round(o.tx) - 1, Math.round(o.ty - 1.4), ANT[4]);
 
-  // ---- neck + head
-  p.line(o.tx + 2, o.ty - 0.3, o.hx - 2, o.hy + 0.2, ANT[1]);
-  p.circle(o.hx, o.hy, 2.3, ANT[2]);
-  sphere(p, o.hx, o.hy, 2.3, 2.3, ANT, false);
-  // compound eye: dark, with a glint (white when hurt)
+  // ---- neck (a dark pinch) + a big round head
+  p.line(o.tx + 2, o.ty - 0.3, o.hx - 2.4, o.hy + 0.2, ANT[0]);
+  p.circle(o.hx, o.hy, 2.7, ANT[2]);
+  sphere(p, o.hx, o.hy, 2.7, 2.7, ANT, false);
+  // compound eye: a 2x2 dark gem with a glint (white when hurt)
   const ex = Math.round(o.hx);
   const ey = Math.round(o.hy - 1);
-  p.px(ex, ey, hurt ? '#ffffff' : '#1a0a10');
-  p.px(ex + 1, ey, hurt ? '#ffffff' : '#1a0a10');
-  p.px(ex, ey - 1, hurt ? '#ffffff' : ANT[4]);
-  if (!hurt) p.px(ex, ey, '#3a1820');
-  p.px(ex + 1, ey - 1, '#ffffff');
+  const eye = hurt ? '#ffffff' : '#1a0a10';
+  p.px(ex, ey, eye);
+  p.px(ex + 1, ey, eye);
+  p.px(ex, ey - 1, eye);
+  p.px(ex + 1, ey - 1, eye);
+  if (!hurt) p.px(ex, ey - 1, '#ffffff');
   // mandibles (open while rearing / drumming)
-  const mx0 = Math.round(o.hx + 2.2);
+  const mx0 = Math.round(o.hx + 2.6);
   const my0 = Math.round(o.hy + 1);
   p.px(mx0, my0, ANT[4]);
   p.px(mx0 + 1, my0 + (lit ? 1 : 0), ANT[3]);
@@ -271,11 +298,11 @@ function paintAnt(p: PixelPainter, k: number, mode: AntMode): void {
 }
 
 const AO = { origin: [10, 15] as [number, number] };
-frames('fant', 'idle', 2, 22, 16, (p, i) => paintAnt(p, i, 'stand'), { ...AO, fps: 3 });
-frames('fant', 'run', 4, 22, 16, (p, i) => paintAnt(p, i, 'walk'), { ...AO, fps: 14 });
-frames('fant', 'rear', 2, 22, 16, (p, i) => paintAnt(p, i, 'rear'), { ...AO, fps: 10 });
-frames('fant', 'drum', 2, 22, 16, (p, i) => paintAnt(p, i, 'drum'), { ...AO, fps: 8, loop: false });
-frames('fant', 'hurt', 1, 22, 16, (p) => paintAnt(p, 0, 'hurt'), AO);
+frames('fant', 'idle', 2, 24, 16, (p, i) => paintAnt(p, i, 'stand'), { ...AO, fps: 3 });
+frames('fant', 'run', 4, 24, 16, (p, i) => paintAnt(p, i, 'walk'), { ...AO, fps: 14 });
+frames('fant', 'rear', 2, 24, 16, (p, i) => paintAnt(p, i, 'rear'), { ...AO, fps: 10 });
+frames('fant', 'drum', 2, 24, 16, (p, i) => paintAnt(p, i, 'drum'), { ...AO, fps: 8, loop: false });
+frames('fant', 'hurt', 1, 24, 16, (p) => paintAnt(p, 0, 'hurt'), AO);
 
 // ================================================================== art: the sprouts
 type SproutMode = 'grow' | 'idle' | 'puff' | 'wither';
@@ -394,7 +421,8 @@ export class RingSprout extends Entity {
   }
 
   override update(w: World, dt: number): void {
-    this.age += dt;
+    // a time stop freezes the ring like any enemy shot
+    this.age += dt * w.enemyTimeScale;
     if (this.state === 'grow' && this.age >= SPROUT_GROW) {
       this.state = 'armed';
       this.stateAt = this.age;
@@ -497,12 +525,15 @@ export class SporeRing extends Entity {
   }
 
   override update(w: World, dt: number): void {
-    this.age += dt;
+    // a time stop freezes the ring like any enemy shot (its floor warning waits with it)
+    this.age += dt * w.enemyTimeScale;
     if (!this.ended && !this.owner.alive) this.end();
     if (this.ended) {
       if (this.sprouts.every((s) => !s || s.dead)) this.dead = true;
       return;
     }
+    const wn = this.warning;
+    if (wn && !wn.dead) wn.time = Math.max(wn.time, wn.age + PUFF_AT - this.age);
     // sprouts pop up in pairs, from the gap's ends around to the far side
     for (let i = 0; i < this.slots.length; i++) {
       if (this.sprouts[i] || this.age < Math.floor(i / 2) * SPROUT_STAGGER) continue;
@@ -565,10 +596,12 @@ function ringBusy(w: World): boolean {
   return false;
 }
 
+/** Can the ant drum a ring around its keeper now? (in range, in sight, room for the ring, not charmed) */
 function canRing(e: Enemy, w: World): boolean {
   const d = e.distToTarget(w);
-  if (d < CAST_MIN || d > CAST_MAX || ringBusy(w)) return false;
+  if (d < CAST_MIN || d > CAST_MAX || ringBusy(w) || e.hasStatus('charm')) return false;
   const tg = e.target(w);
+  if (!w.room.lineOfSight(e.x, e.y, tg.x, tg.y)) return false;
   return openSlots(w, tg.x, tg.y, e.x, e.y).length >= MIN_SPROUTS;
 }
 
@@ -583,11 +616,13 @@ function* drumRing(e: Enemy, w: World): Script {
   w.sfx('enemy_charge', { vol: 0.3, pitch: 1.6 });
   gather(w, e.x - e.facing, e.y - 16, [GLOW.hot, GLOW.lime, CAP[3]], 8, 14);
   yield RING_WINDUP;
-  // drum: the ring grows around wherever the keeper stands now, open toward the ant
+  // drum: the ring grows around wherever the keeper stands now, open toward the ant —
+  // unless the keeper rushed it (too close for a gap to walk out of) or ducked out of sight
   e.setAnim('fant_drum', true);
   tg = e.target(w);
   const slots = openSlots(w, tg.x, tg.y, e.x, e.y);
-  if (slots.length >= MIN_SPROUTS) {
+  const clear = e.distToTarget(w) >= DRUM_MIN && w.room.lineOfSight(e.x, e.y, tg.x, tg.y) && !e.hasStatus('charm');
+  if (clear && slots.length >= MIN_SPROUTS) {
     const rx = e.x + e.facing * 8;
     const ry = e.y + 3;
     const ring = w.spawn(new SporeRing(e, tg.x, tg.y, slots, e.champion ? 2 : 1, rx, ry));
@@ -597,7 +632,7 @@ function* drumRing(e: Enemy, w: World): Script {
     dust(w, rx, ry, DIRT, 6, 50);
     w.particles.burst(e.x - e.facing, e.y - 14, { count: 10, speed: [20, 55], life: [0.4, 0.8], colors: [GLOW.pale, GLOW.lime, CAP[3]], size: [1, 2], drag: 2 });
   } else {
-    // no room for a ring after all (the keeper slipped into a corner): a dud puff
+    // no ring after all (the keeper rushed in, ducked behind a rock or into a corner): a dud puff
     e.mem.ringing = 0;
     w.particles.burst(e.x - e.facing, e.y - 14, { count: 5, speed: [10, 30], life: [0.3, 0.6], colors: [CAP[3], CAP[2]], size: [1, 1], drag: 2 });
   }
@@ -605,6 +640,43 @@ function* drumRing(e: Enemy, w: World): Script {
   e.mem.pose = 0;
   e.setAnim('fant_idle');
   yield 0.3;
+}
+
+/**
+ * The scuttle's gait at distance `d` from the keeper: 1 approach, 0 sidle, -1 back off.
+ * A burst picks one at its start (`prev` null) and keeps it: mid-burst it only turns a sidle
+ * into an approach / retreat past a margin, or an approach into a retreat, never back.
+ */
+export function scuttleGait(d: number, prev: number | null): number {
+  if (prev === null) return d > KEEP_FAR ? 1 : d < KEEP_NEAR ? -1 : 0;
+  if (prev < 0) return -1;
+  if (prev > 0) return d < KEEP_NEAR ? -1 : 1;
+  return d < KEEP_NEAR - 14 ? -1 : d > KEEP_FAR + 14 ? 1 : 0;
+}
+
+/**
+ * Where to back off to: of 16 headings, the one whose open run (up to 48 px) ends farthest
+ * from the keeper, slightly favouring the last pick so it does not dither. In the open that
+ * is straight away; against a wall it runs along the wall; in a corner it slips out past the
+ * keeper's side — never into the wall.
+ */
+export function retreatHeading(e: Enemy, w: World): number {
+  const t = e.target(w);
+  const prev: number | undefined = e.mem.retreatA;
+  let best = 0;
+  let bestScore = -Infinity;
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * TAU - Math.PI;
+    const run = rayFree(w.room, e.x, e.y, a, e.r, 48);
+    let score = Math.hypot(e.x + Math.cos(a) * run - t.x, e.y + Math.sin(a) * run - t.y);
+    if (prev !== undefined && Math.cos(a - prev) > 0.9) score += 6;
+    if (score > bestScore) {
+      bestScore = score;
+      best = a;
+    }
+  }
+  e.mem.retreatA = best;
+  return best;
 }
 
 /** Light pass: the cap blazes up during the wind-up. */
@@ -650,11 +722,16 @@ defineEnemy({
       while (true) {
         e.setAnim('fant_run');
         const burst = w.rng.range(0.35, 0.6);
+        // one gait per burst (approach / sidle / back off), so it never dithers on the edge of
+        // its band; a keeper closing in mid-burst still turns it into a retreat
+        let gait = scuttleGait(e.distToTarget(w), null);
         for (let b = 0; b < burst; b += w.dt) {
-          const d = e.distToTarget(w);
-          if (d > KEEP_FAR) e.chase(w, e.speed);
-          else if (d < KEEP_NEAR) e.flee(w, e.speed);
-          else e.moveAngle(e.angleToTarget(w) + (side * Math.PI) / 2, e.speed * 0.8);
+          gait = scuttleGait(e.distToTarget(w), gait);
+          const at = e.angleToTarget(w);
+          if (gait > 0) e.chase(w, e.speed);
+          // back off / sidle along open floor: it slips along walls rather than into corners
+          else if (gait < 0) e.moveAngle(retreatHeading(e, w), e.speed);
+          else e.moveAngle(openHeading(e, w, at + (side * Math.PI) / 2, side), e.speed * 0.8);
           if (e.mem.__bumped) side = -side;
           yield;
         }

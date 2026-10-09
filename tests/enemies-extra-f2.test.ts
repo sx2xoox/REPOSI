@@ -1,7 +1,10 @@
 // 버섯개미 (fungus ant, floor 2, src/content/enemies/caves-extra.ts): definition and art,
 // the fairy-ring slot layout, a 20 s headless run, the telegraphs, the ring's sprouts
 // (harmless while growing, a soft stinging fence once grown), the converging spores,
-// one ring per room, a clean death, a real-World hit and draw purity.
+// one ring per room, a clean death, a real-World hit and draw purity; fair play (it slips
+// out of corners instead of pinning itself, a rush during the wind-up stops the drum, no
+// rings without a line of sight or while charmed, a time stop freezes the ring, stepping
+// into the gap answers every ring, elite damage carries over).
 
 import './headless';
 import { describe, expect, it } from 'vitest';
@@ -19,8 +22,8 @@ import { TAU } from '../src/engine/math';
 import { FIXED_DT } from '../src/game/constants';
 import { stateHash } from '../src/game/statehash';
 import {
-  CAST_MAX, CAST_MIN, FENCE_END, PUFF_AT, PUFF_WARN, RING_GAP, RING_R, RING_SLOTS, RING_WINDUP, RingSprout, SPORE_SPEED,
-  SPROUT_GROW, SPROUT_HIT, SporeRing, VOLLEY_GAP, WITHER, ringSlots,
+  CAST_MAX, CAST_MIN, DRUM_MIN, FENCE_END, PUFF_AT, PUFF_WARN, RING_GAP, RING_R, RING_SLOTS, RING_WINDUP, RingSprout, SPORE_SPEED,
+  SPROUT_GROW, SPROUT_HIT, SporeRing, VOLLEY_GAP, WITHER, ringSlots, scuttleGait,
 } from '../src/content/enemies/caves-extra';
 
 const ID = 'fungus_ant';
@@ -136,6 +139,25 @@ describe('ringSlots: a ring open toward the ant, closing on the far side', () =>
     expect(FENCE_END).toBeGreaterThan(PUFF_AT + VOLLEY_GAP + RING_R / SPORE_SPEED);
     expect(CAST_MIN).toBeGreaterThan(RING_R);
     expect(CAST_MAX).toBeGreaterThan(CAST_MIN);
+    // the gap's way out must not lead straight into the ant's body: a keeper (r 5) walking
+    // clear of the ring's edge (sprout sting reach) still has room before touching the ant (r 5)
+    const keeperR = 5;
+    expect(DRUM_MIN).toBeGreaterThanOrEqual(RING_R + SPROUT_HIT + keeperR * 0.6 + keeperR + Enemies.must(ID).radius);
+    expect(CAST_MIN).toBeGreaterThan(DRUM_MIN);
+  });
+
+  it('the scuttle keeps one gait per burst: no dithering on the edge of its 70–120 px band', () => {
+    // a burst picks its gait at the start ...
+    expect(scuttleGait(130, null)).toBe(1);
+    expect(scuttleGait(95, null)).toBe(0);
+    expect(scuttleGait(65, null)).toBe(-1);
+    // ... a sidle only turns into a retreat / approach past a margin, never back
+    for (const d of [69, 68, 60, 121, 130]) expect(scuttleGait(d, 0), `${d}`).toBe(0);
+    expect(scuttleGait(50, 0)).toBe(-1);
+    expect(scuttleGait(140, 0)).toBe(1);
+    for (const d of [40, 71, 95, 200]) expect(scuttleGait(d, -1), `${d}`).toBe(-1);
+    expect(scuttleGait(100, 1)).toBe(1);
+    expect(scuttleGait(60, 1)).toBe(-1);
   });
 });
 
@@ -348,6 +370,32 @@ describe('버섯개미: headless AI', () => {
     }
   });
 
+  it('slips out of a corner or along a wall instead of grinding into it (regression)', () => {
+    // a keeper planted 30–40 px away pins the ant against the walls: it used to flee straight
+    // into the wall / corner and stay there, never far enough to drum again
+    const cases: [string, number, number, number, number][] = [
+      ['top-left corner', IX + 7, IY + 7, IX + 34, IY + 26],
+      ['top-right corner', IX + IW - 7, IY + 7, IX + IW - 34, IY + 22],
+      ['bottom-right corner', IX + IW - 7, IY + IH - 7, IX + IW - 30, IY + IH - 28],
+      ['right wall', IX + IW - 7, IY + 20, IX + IW - 42, IY + 32],
+      ['bottom wall', IX + 140, IY + IH - 7, IX + 128, IY + IH - 42],
+    ];
+    for (const [name, ax, ay, px, py] of cases) {
+      for (const seed of ['a', 'b']) {
+        const fw = fakeWorld(`fant-corner-${name}-${seed}`);
+        const e = fw.w.spawnEnemy(ID, ax, ay)!;
+        e.dormant = 0;
+        Object.assign(fw.player, { x: px, y: py });
+        // within a couple of seconds it has worked its way back out to drumming range
+        let far = 0;
+        step(fw, 3, () => {
+          far = Math.max(far, Math.hypot(e.x - px, e.y - py));
+        });
+        expect(far, `${name}/${seed}: got only ${far.toFixed(0)} px from the keeper, at (${e.x.toFixed(0)}, ${e.y.toFixed(0)})`).toBeGreaterThanOrEqual(CAST_MIN);
+      }
+    }
+  });
+
   it('keeps its distance: a keeper walking up to it does not catch it in the open', () => {
     const fw = fakeWorld('fant-space');
     const e = fw.w.spawnEnemy(ID, 168, 104)!;
@@ -550,6 +598,73 @@ describe('버섯개미: the fairy ring', () => {
   });
 });
 
+describe('버섯개미: fair play', () => {
+  /** Run until the ant starts rearing; returns false if it never does. */
+  const untilRear = (fw: FakeWorld, e: Enemy, max = 8): boolean => {
+    for (let t = 0; t < max && e.anim !== 'fant_rear'; t += FIXED_DT) step(fw, FIXED_DT);
+    return e.anim === 'fant_rear';
+  };
+
+  it('a keeper who rushes the ant during its wind-up stops the drum: no ring, and it is free to try again', () => {
+    const { fw, e } = setup('rush', 100);
+    expect(untilRear(fw, e)).toBe(true);
+    // charge at it during the wind-up
+    step(fw, RING_WINDUP + 0.1, undefined, () => {
+      const a = Math.atan2(e.y - fw.player.y, e.x - fw.player.x);
+      if (Math.hypot(e.x - fw.player.x, e.y - fw.player.y) > 24) {
+        fw.player.x += Math.cos(a) * 92 * FIXED_DT;
+        fw.player.y += Math.sin(a) * 92 * FIXED_DT;
+      }
+    });
+    expect(Math.hypot(e.x - fw.player.x, e.y - fw.player.y)).toBeLessThan(DRUM_MIN);
+    expect(rings(fw).length).toBe(0);
+    expect(e.mem.ringing).toBe(0);
+    // the keeper backs off to the middle of the room: the next ring comes
+    Object.assign(fw.player, { x: IX + IW / 2, y: IY + IH / 2 });
+    expect(untilRing(fw, 8)).toBeGreaterThan(0);
+  });
+
+  it('does not drum without a line of sight to the keeper (no rings through rock walls)', () => {
+    const { fw } = setup('blind', 100);
+    (fw.w.room as unknown as { lineOfSight: () => boolean }).lineOfSight = () => false;
+    step(fw, 8);
+    expect(rings(fw).length).toBe(0);
+  });
+
+  it('a charmed ant does not drum at the keeper', () => {
+    const { fw, e } = setup('charm', 100);
+    e.applyStatus({ kind: 'charm', duration: 30 }, () => 0);
+    step(fw, 8);
+    expect(rings(fw).length).toBe(0);
+  });
+
+  it('a time stop freezes the ring like any enemy shot: no spores, no stings until time runs again', () => {
+    const { fw } = setup('timestop', 100);
+    expect(untilRing(fw)).toBeGreaterThan(0);
+    const w = fw.w as unknown as { enemyTimeScale: number };
+    const ring = rings(fw)[0];
+    step(fw, 0.2);
+    const age0 = ring.age;
+    w.enemyTimeScale = 0.04;
+    step(fw, 3);
+    // barely aged; nothing puffed; the floor warning waits with it
+    expect(ring.age - age0).toBeLessThan(0.15);
+    expect(fw.w.projectiles.length).toBe(0);
+    expect(ring.ended).toBe(false);
+    const warn = fw.entities.find((x) => x instanceof GroundWarning) as GroundWarning;
+    expect(warn).toBeTruthy();
+    w.enemyTimeScale = 1;
+    // the spores fly when the ring has aged PUFF_AT, and the warning ends with them
+    let puffedAt = -1;
+    step(fw, PUFF_AT, (t) => {
+      if (puffedAt < 0 && fw.w.projectiles.length) puffedAt = t;
+    });
+    expect(puffedAt).toBeGreaterThan(0);
+    expect(Math.abs(ring.age - PUFF_AT) < PUFF_AT).toBe(true);
+    expect(warn.dead).toBe(true);
+  });
+});
+
 // ---------------------------------------------------------------- real world
 describe('버섯개미 in the real World', () => {
   it('a keeper who stands still is stung by the converging spores for one half-heart', () => {
@@ -574,6 +689,60 @@ describe('버섯개미 in the real World', () => {
     expect(hurtAt).toBeGreaterThan(ringAt + PUFF_AT);
     expect(hp0 - (p.red + p.soul)).toBe(1);
     expect(w.run.lastDamageSource).toBe('버섯개미');
+  });
+
+  it('is fair: a keeper who answers each ring by stepping into its gap is never hurt by the ant', () => {
+    for (const seed of ['fair-a', 'fair-b', 'fair-c']) {
+      const { world: w, dummies } = measureDps({ character: 'ria', weapon: 'lantern_bolt', seconds: 0, dist: 60, seed });
+      for (const d of dummies) w.killEnemy(d);
+      w.floor = Floors.all().find((x) => x.index === 2)!;
+      const p = w.player;
+      p.god = false;
+      const ant = w.spawnEnemy(ID, p.x + 100, p.y - 30)!;
+      ant.dormant = 0;
+      ant.hp = 1e6;
+      let ringsSeen = 0;
+      const seen = new Set<SporeRing>();
+      // the answer: when a ring grows around you, step ~30 px into its gap (toward the ant) and wait
+      w.inputSource = (ww, _p, o) => {
+        o.mx = o.my = o.ax = o.ay = o.held = o.pressed = 0;
+        const ring = ww.entities.find((x): x is SporeRing => x instanceof SporeRing && !x.ended);
+        if (!ring) return;
+        if (!seen.has(ring)) {
+          seen.add(ring);
+          ringsSeen++;
+        }
+        if (Math.hypot(ww.player.x - ring.cx, ww.player.y - ring.cy) > 30) return;
+        const a = Math.atan2(ring.owner.y - ring.cy, ring.owner.x - ring.cx);
+        o.mx = Math.cos(a);
+        o.my = Math.sin(a);
+      };
+      for (let i = 0; i < 25 / FIXED_DT; i++) {
+        p.red = Math.max(p.red, 6);
+        w.update(FIXED_DT);
+      }
+      expect(ringsSeen, seed).toBeGreaterThanOrEqual(4);
+      expect(w.run.stats.damageTaken, `${seed}: hurt by ${w.run.lastDamageSource}`).toBe(0);
+    }
+  });
+
+  it('an elite ant (mission rooms) carries its damage scale into the ring, its sprouts and its spores', () => {
+    const { world: w, dummies } = measureDps({ character: 'ria', weapon: 'lantern_bolt', seconds: 0, dist: 60, seed: 'fant-elite' });
+    for (const d of dummies) w.killEnemy(d);
+    w.inputSource = (_w, _p, o) => { o.mx = o.my = o.ax = o.ay = o.held = o.pressed = 0; };
+    w.player.god = true;
+    const ant = w.spawnEnemy(ID, w.player.x + 90, w.player.y)!;
+    ant.dormant = 0;
+    ant.enemyDamageScale = 1.5;
+    let spores = 0;
+    for (let i = 0; i < 60 * 8 && !spores; i++) {
+      w.update(FIXED_DT);
+      spores = w.projectiles.filter((x) => x.team === 'enemy').length;
+    }
+    expect(spores).toBeGreaterThan(0);
+    for (const x of w.entities) {
+      if (x instanceof SporeRing || x instanceof RingSprout || (x instanceof Projectile && x.team === 'enemy')) expect(x.enemyDamageScale).toBe(1.5);
+    }
   });
 
   it('draws without touching the simulation (stateHash unchanged by w.draw)', () => {
