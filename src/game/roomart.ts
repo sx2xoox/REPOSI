@@ -1490,9 +1490,15 @@ function paintDoorOrnament(p: PixelPainter, kind: DoorKind, look: DoorLook): voi
       break;
     }
     case 'hunt': {
-      // a bandit mask with two glinting eyes
-      p.rect(DOX - 3, 3, 7, 2, '#120a12');
-      p.px(DOX - 2, 3, '#ffe27a'); p.px(DOX + 2, 3, '#ffe27a');
+      // the thief's face: tan ears and crown, a black bandit mask with glinting eyes, cream muzzle
+      p.px(DOX - 3, 0, '#94603a'); p.px(DOX + 3, 0, '#94603a');
+      p.rect(DOX - 3, 1, 7, 1, '#c48a52');
+      p.px(DOX - 2, 1, '#e8b878');
+      p.rect(DOX - 4, 2, 9, 2, '#140a10');
+      p.px(DOX - 2, 2, '#ffe27a'); p.px(DOX + 2, 2, '#ffe27a');
+      p.rect(DOX - 2, 4, 5, 1, '#f2e0b8');
+      p.px(DOX, 4, '#140a10');
+      p.rect(DOX - 1, 5, 3, 1, '#c4a27a');
       for (const x of [DOX - 13, DOX + 12]) { p.px(x, 14, '#b6e36e'); p.px(x, 13, '#f0ffd8'); }
       break;
     }

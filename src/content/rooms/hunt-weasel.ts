@@ -1,6 +1,6 @@
 // 등불 족제비 (lantern weasel): the quarry of the 등불 도둑 사냥 mission room (hunt.ts).
-// A masked thief that carries the room's three stolen embers in a brass lantern hung
-// from its tail. It never fights back directly: it flees (scoring 16 directions away
+// A masked thief that carries the room's three stolen embers in a brass lantern held
+// in its jaws. It never fights back directly: it flees (scoring 16 directions away
 // from the hunters), hops out of boxes, scatters caltrops behind it, flares a ring of
 // embers when crowded, and every so often runs for a shadow crack in the wall.
 //
@@ -8,7 +8,7 @@
 // stops at 1 HP, the weasel tumbles (1 s, untouchable) and drops one ember (the
 // mission device's `knockdown`). Standalone (debug spawn, detsim) it is a plain critter.
 //
-// The art is code-drawn (2026-10-07 direction): 22x14 side frames (run / crouch / down /
+// The art is code-drawn (2026-10-07 direction): 24x17 side frames (run / crouch / down /
 // slip) and a 16x20 periscope stand (taunt), 1 px dark outline, light from the top-left.
 
 import { defineEnemy } from '../../game/defs';
@@ -24,6 +24,7 @@ import { bullet, frames } from '../enemies/shared';
 import { EnemyOverlay } from '../enemies/crypt-toll';
 import { Entity } from '../../game/entity';
 import { roomLabel } from './encounter-kit';
+import { pixelTextCanvas } from './floortext';
 
 export const WEASEL_ID = 'lantern_weasel';
 export const HUNT_COLOR = '#b6e36e';
@@ -264,7 +265,7 @@ function update(e: Enemy, w: World, dt: number): void {
 
   // Takes a lying ember back (hunters claim first: the device runs before the weasel each step).
   if (link && m.state !== ST.down && m.state !== ST.hop && m.state !== ST.channel && m.state !== ST.leap && !jumping && link.regrab(w, e)) {
-    callout(w, e.x, e.y - 30, '도로 채 갔다!', '#ffb080');
+    callout(w, e.x, e.y - 30, '도로 채 갔습니다!', '#ffb080');
     w.sfx('whoosh', { vol: 0.5, pitch: 1.2 });
     if (m.state === ST.race) m.state = ST.flee;
   }
@@ -419,24 +420,27 @@ function onHurt(e: Enemy, w: World): void {
 }
 
 // ================================================================== art
-// Long low body with a cream belly, a cream face crossed by a black bandit mask, and a
-// ringed bushy tail that rises from the rump and reaches forward over the back like a
-// fishing rod, the stolen brass lantern dangling from its tip (1 px clear of the back).
-const FUR = { k: '#1a0f1a', d: '#3b2233', m: '#5e3a44', l: '#8a5a52', h: '#b07a62' };
-const CREAM = '#e8d2a8';
-const CREAM_SH = '#b49478';
-const MASK = '#120a12';
+// A long, low marten-like thief in warm tan fur (light enough to stand out on every floor):
+// cream throat and belly, a black bandit mask with a glinting eye, a ringed bushy tail curled
+// up behind it, and the stolen brass lantern swinging from its jaws in front of its chest.
+const FUR = { k: '#2a1612', d: '#5e3624', m: '#94603a', l: '#c48a52', h: '#e8b878' };
+const CREAM = '#f2e0b8';
+const CREAM_SH = '#c4a27a';
+const MASK = '#140a10';
 const GLINT = '#ffe27a';
 const BRASS = { r: '#7a5530', b: '#c39c65', B: '#efd9a4', k: '#4a2e16' };
 const GLASS = '#2a1a24';
 const GLASS_HI = '#6e5868';
 
-/** Lantern glass anchors per frame (unpadded sprite px: where the flame stands). */
+/** Lantern flame anchors per frame (unpadded sprite px: where the flame stands). */
 const LANTERN = new Map<string, [number, number]>();
-const SIDE_ORIGIN: [number, number] = [11, 13];
+/** side frames are SW x SH with the feet on the last row */
+const SW = 24;
+const SH = 17;
+const SIDE_ORIGIN: [number, number] = [12, 16];
 const STAND_ORIGIN: [number, number] = [8, 19];
 
-/** Fill a shape mask with column shading: lit top edge, mid fur, dark underside. */
+/** Fill a shape mask with column shading: lit top edge, mid fur, cream or dark underside. */
 function shadeBody(p: PixelPainter, mask: PixelPainter, belly: (x: number) => boolean, lit: number): void {
   for (let x = 0; x < mask.w; x++) {
     let top = -1;
@@ -470,7 +474,7 @@ function paintTail(p: PixelPainter, pts: number[][]): void {
     for (let s = 0; s <= n; s++) {
       const t = s / n;
       const u = (acc + segs[i] * t) / total;
-      const r = u < 0.12 ? 0.85 : u < 0.7 ? 1.4 : u < 0.9 ? 1.15 : 0.8;
+      const r = u < 0.12 ? 0.9 : u < 0.72 ? 1.5 : u < 0.9 ? 1.2 : 0.85;
       const cx = ax + (bx - ax) * t;
       const cy = ay + (by - ay) * t;
       for (let y = Math.floor(cy - r - 1); y <= Math.ceil(cy + r + 1); y++) for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) {
@@ -485,18 +489,18 @@ function paintTail(p: PixelPainter, pts: number[][]): void {
   for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) {
     if (!mask.isSet(x, y)) continue;
     const u = along[y * p.w + x];
-    const ring = Math.floor(u * total / 2.6) % 2 === 1;
+    const ring = Math.floor((u * total) / 2.8) % 2 === 1;
     const edgeTop = !mask.isSet(x, y - 1) || !mask.isSet(x - 1, y);
     const edgeBot = !mask.isSet(x, y + 1) && !mask.isSet(x + 1, y);
-    let c = ring ? FUR.d : FUR.l;
-    if (u > 0.86) c = CREAM;
-    else if (edgeTop) c = ring ? FUR.m : FUR.h;
+    let c = ring ? '#4a2a1c' : FUR.l;
+    if (u > 0.86) c = edgeBot ? CREAM_SH : CREAM;
+    else if (edgeTop) c = ring ? '#7a4a2c' : FUR.h;
     else if (edgeBot) c = ring ? FUR.k : FUR.m;
     p.px(x, y, c);
   }
 }
 
-/** Brass lantern 5x6: hook row ly-3, cap ly-2, glass ly-1..ly+1 ... flame base at (lx, ly + 1). */
+/** Brass lantern 5x6 with its handle at (lx, top): cap, glass (top+2..top+4), base. Returns the flame spot. */
 function paintLantern(p: PixelPainter, lx: number, top: number): [number, number] {
   p.px(lx, top, BRASS.r);
   p.rect(lx - 1, top + 1, 3, 1, BRASS.b);
@@ -512,22 +516,18 @@ function paintLantern(p: PixelPainter, lx: number, top: number): [number, number
 }
 
 /**
- * Head facing right, eye row at hy: dark crown and ear, cream brow, the black bandit mask with a
- * glinting eye, cream muzzle and a dark nose (6 rows: hy-3 .. hy+2).
+ * Head facing right, eye row at hy: dark ear, tan crown, cream brow, the black bandit mask with
+ * a glinting eye, cream muzzle with a dark nose, and the chin (rows hy-3 .. hy+2, cols hx-2 .. hx+4).
  */
 function paintHead(p: PixelPainter, hx: number, hy: number, eye: 'open' | 'x' | 'squint' = 'open'): void {
-  // ear and crown
-  p.px(hx - 2, hy - 3, FUR.m);
-  p.px(hx - 1, hy - 3, FUR.d);
-  p.rect(hx - 2, hy - 2, 4, 1, FUR.m);
+  p.px(hx - 2, hy - 3, FUR.d);
+  p.px(hx - 1, hy - 3, FUR.m);
+  p.rect(hx - 2, hy - 2, 4, 1, FUR.l);
   p.px(hx - 1, hy - 2, FUR.h);
-  p.px(hx, hy - 2, FUR.l);
-  // cream brow over the mask
+  p.px(hx + 2, hy - 2, FUR.m);
   p.px(hx - 2, hy - 1, FUR.m);
   p.rect(hx - 1, hy - 1, 4, 1, CREAM);
-  // mask band
   p.rect(hx - 2, hy, 6, 1, MASK);
-  // muzzle, nose and chin
   p.px(hx - 2, hy + 1, FUR.m);
   p.rect(hx - 1, hy + 1, 5, 1, CREAM);
   p.px(hx + 4, hy + 1, MASK);
@@ -544,8 +544,8 @@ interface RunPose {
   /** legs [x0, y0, x1, y1]: far front, far hind, near front, near hind */
   legs: number[][];
   tail: number[][];
-  /** lantern centre column and hook row */
-  lx: number; lt: number;
+  /** lantern column (its handle hangs from the mouth, top row = hy + 2) */
+  lx: number;
   eye?: 'open' | 'x' | 'squint';
 }
 
@@ -558,118 +558,116 @@ function paintRun(p: PixelPainter, s: RunPose): [number, number] {
   paintTail(p, s.tail);
   const mask = new PixelPainter(p.w, p.h);
   for (const [cx, cy, rx, ry] of s.body) mask.ellipse(cx, cy, rx, ry, '#ffffff');
-  // neck joins the head
-  mask.ellipse((s.body[s.body.length - 1][0] + s.hx) / 2 + 0.5, s.hy + 0.5, 2, 1.6, '#ffffff');
-  const front = s.body[s.body.length - 1][0];
-  shadeBody(p, mask, (x) => x >= front - 4, s.body[0][0] - 1);
+  // the neck joins the head
+  const chest = s.body[s.body.length - 1];
+  mask.ellipse((chest[0] + s.hx) / 2 + 0.5, s.hy + 1, 2.2, 1.8, '#ffffff');
+  shadeBody(p, mask, (x) => x >= chest[0] - 3, s.body[0][0] - 1);
   for (const l of [nf, nh]) {
     p.line(l[0], l[1], l[2], l[3], FUR.l);
     p.px(l[0], l[1], FUR.m);
     p.px(l[2], l[3], CREAM_SH);
   }
   paintHead(p, s.hx, s.hy, s.eye);
-  // tail tip down to the lantern hook
-  const tip = s.tail[s.tail.length - 1];
-  p.line(Math.round(tip[0]), Math.round(tip[1]) + 1, s.lx, s.lt, BRASS.r);
-  return paintLantern(p, s.lx, s.lt);
+  // the stolen lantern swings from its jaws
+  return paintLantern(p, s.lx, s.hy + 2);
 }
 
 // four bounding-gait frames: gathered, reaching, gathered in the air, landing
-const TAIL_UP = [[4.6, 10.2], [3.2, 8.8], [2.5, 6.8], [2.7, 4.6], [3.8, 2.8], [5.6, 1.5], [8, 1], [10.4, 1.1], [12, 1.9]];
-const tailAt = (dx: number, dy: number, reach = 0) => TAIL_UP.map(([x, y], i) => [x + dx + (i > 5 ? reach : 0), y + dy]);
+const TAIL_UP = [[5, 11.2], [3.4, 10.6], [2.2, 9.4], [1.5, 7.8], [1.4, 6], [1.9, 4.4], [3, 3.3], [4.2, 3]];
+const tailAt = (dx: number, dy: number, curl = 0) => TAIL_UP.map(([x, y], i) => [x + dx + (i > 4 ? curl : 0), y + dy]);
 const RUN: RunPose[] = [
-  { body: [[8, 10.6, 3.6, 1.7], [12, 10.2, 3.8, 1.9]], hx: 17, hy: 9, legs: [[13, 11, 12, 13], [8, 11, 9, 13], [14, 11, 13, 13], [7, 11, 8, 13]], tail: tailAt(0.5, 0), lx: 12, lt: 3 },
-  { body: [[8, 10.8, 4, 1.5], [12.5, 10.6, 4, 1.6]], hx: 18, hy: 9, legs: [[15, 11, 17, 13], [6, 11, 4, 13], [16, 11, 18, 13], [7, 11, 5, 12]], tail: tailAt(0, 0.4, -0.5), lx: 11, lt: 3 },
-  { body: [[8, 10.2, 3.6, 1.7], [12, 9.8, 3.8, 1.9]], hx: 17, hy: 8, legs: [[13, 11, 11, 12], [8, 11, 10, 12], [14, 11, 12, 12], [7, 11, 9, 12]], tail: tailAt(0.5, -0.6, 0.5), lx: 13, lt: 2 },
-  { body: [[8, 10.8, 4, 1.5], [12.5, 10.8, 4, 1.6]], hx: 18, hy: 10, legs: [[15, 11, 16, 13], [6, 11, 5, 13], [16, 11, 17, 13], [7, 11, 6, 13]], tail: tailAt(0, 0.6, 0), lx: 12, lt: 3 },
+  { body: [[7.5, 11.4, 3.9, 2.3], [12, 11, 4.1, 2.6]], hx: 18, hy: 8, legs: [[13, 13, 12, 16], [8, 13, 9, 16], [14, 13, 13, 16], [7, 13, 8, 16]], tail: tailAt(0, 0), lx: 20 },
+  { body: [[7.5, 11.7, 4.2, 2.1], [12.5, 11.5, 4.2, 2.3]], hx: 19, hy: 9, legs: [[15, 13, 17, 16], [6, 13, 4, 16], [16, 13, 18, 15], [7, 13, 5, 15]], tail: tailAt(-0.4, 0.5, -0.4), lx: 21 },
+  { body: [[7.5, 10.8, 3.9, 2.3], [12, 10.4, 4.1, 2.6]], hx: 18, hy: 7, legs: [[13, 12, 11, 14], [8, 12, 10, 14], [14, 12, 12, 14], [7, 12, 9, 14]], tail: tailAt(0.3, -0.6, 0.4), lx: 19 },
+  { body: [[7.5, 11.7, 4.2, 2.1], [12.5, 11.7, 4.2, 2.2]], hx: 19, hy: 9, legs: [[15, 13, 16, 16], [6, 13, 5, 16], [16, 13, 17, 16], [7, 13, 6, 16]], tail: tailAt(-0.2, 0.6), lx: 21 },
 ];
-const CROUCH: RunPose = { body: [[8, 11.4, 4, 1.4], [12.5, 11.6, 4, 1.4]], hx: 18, hy: 10, legs: [[14, 12, 16, 13], [8, 12, 7, 13], [15, 12, 17, 13], [7, 12, 6, 13]],
-  tail: tailAt(-0.5, 0.6, -1.5), lx: 10, lt: 3, eye: 'squint' };
+// coiled to spring (hop wind-up, flare): low body, squinting, the lantern set on the floor
+const CROUCH: RunPose = { body: [[7.5, 12.6, 4.3, 2], [12.5, 12.6, 4.3, 2.1]], hx: 19, hy: 9, legs: [[14, 14, 16, 16], [8, 14, 7, 16], [15, 14, 17, 16], [7, 14, 6, 16]],
+  tail: tailAt(-0.6, 1.4, -0.8), lx: 21, eye: 'squint' };
 
-for (let i = 0; i < 4; i++) {
-  const p0 = new PixelPainter(22, 14);
-  LANTERN.set(`lantern_weasel_run_${i}`, paintRun(p0, RUN[i]));
-}
-frames('lantern_weasel', 'run', 4, 22, 14, (p, i) => { paintRun(p, RUN[i]); }, { fps: 12, origin: SIDE_ORIGIN });
-LANTERN.set('lantern_weasel_crouch_0', paintRun(new PixelPainter(22, 14), CROUCH));
-frames('lantern_weasel', 'crouch', 1, 22, 14, (p) => { paintRun(p, CROUCH); }, { origin: SIDE_ORIGIN });
+for (let i = 0; i < 4; i++) LANTERN.set(`lantern_weasel_run_${i}`, paintRun(new PixelPainter(SW, SH), RUN[i]));
+frames('lantern_weasel', 'run', 4, SW, SH, (p, i) => { paintRun(p, RUN[i]); }, { fps: 12, origin: SIDE_ORIGIN });
+LANTERN.set('lantern_weasel_crouch_0', paintRun(new PixelPainter(SW, SH), CROUCH));
+frames('lantern_weasel', 'crouch', 1, SW, SH, (p) => { paintRun(p, CROUCH); }, { origin: SIDE_ORIGIN });
 
-// knocked over: on its back, belly up, paws in the air, X eyes; the lantern lands upright beside it
+// knocked over: on its back, cream belly up, paws kicking, X eyes; the lantern lands upright beside it
 function paintDown(p: PixelPainter, i: number): [number, number] {
-  paintTail(p, [[9, 12], [6.6, 12.6], [4.4, 12.4], [2.8, 11.6]]);
-  const mask = new PixelPainter(22, 14);
-  mask.ellipse(12.5, 10.8, 5.2, 2.4, '#ffffff');
-  for (let x = 0; x < 22; x++) for (let y = 0; y < 14; y++) {
+  paintTail(p, [[9, 15], [6.6, 15.6], [4.6, 15.3], [3.2, 14.4]]);
+  const mask = new PixelPainter(SW, SH);
+  mask.ellipse(12.5, 13.6, 5.2, 2.4, '#ffffff');
+  for (let x = 0; x < SW; x++) for (let y = 0; y < SH; y++) {
     if (!mask.isSet(x, y)) continue;
-    const k = y - 8;
+    const k = y - 11;
     p.px(x, y, !mask.isSet(x, y - 1) ? CREAM : k <= 1 ? (x < 9 || x > 16 ? CREAM_SH : CREAM) : !mask.isSet(x, y + 1) ? FUR.d : FUR.m);
   }
-  // paws kicking in the air
-  for (const [x, y] of [[9, 7 - i], [11, 6 + i], [14, 6 + i], [16, 7 - i]]) {
-    p.line(x, 9, x, y, FUR.l);
+  for (const [x, y] of [[9, 10 - i], [11, 9 + i], [14, 9 + i], [16, 10 - i]]) {
+    p.line(x, 12, x, y, FUR.l);
     p.px(x, y, CREAM_SH);
   }
-  paintHead(p, 18, 10, 'x');
-  return paintLantern(p, 3, 6);
+  paintHead(p, 18, 13, 'x');
+  return paintLantern(p, 3, 9);
 }
-for (let i = 0; i < 2; i++) LANTERN.set(`lantern_weasel_down_${i}`, paintDown(new PixelPainter(22, 14), i));
-frames('lantern_weasel', 'down', 2, 22, 14, (p, i) => { paintDown(p, i); }, { fps: 6, origin: SIDE_ORIGIN });
+for (let i = 0; i < 2; i++) LANTERN.set(`lantern_weasel_down_${i}`, paintDown(new PixelPainter(SW, SH), i));
+frames('lantern_weasel', 'down', 2, SW, SH, (p, i) => { paintDown(p, i); }, { fps: 6, origin: SIDE_ORIGIN });
 
 // slip: the gathered pose sinking into the crack (clipped at the floor line, smoke at the rim)
 const SLIP_DROP = [3, 6];
+const SLIP_FLOOR = SH - 2;
 for (let i = 0; i < 2; i++) {
-  const a = paintRun(new PixelPainter(22, 14), RUN[0]);
+  const a = paintRun(new PixelPainter(SW, SH), RUN[0]);
   LANTERN.set(`lantern_weasel_slip_${i}`, [a[0], a[1] + SLIP_DROP[i]]);
 }
-frames('lantern_weasel', 'slip', 2, 22, 14, (p, i) => {
-  const src = new PixelPainter(22, 14);
+frames('lantern_weasel', 'slip', 2, SW, SH, (p, i) => {
+  const src = new PixelPainter(SW, SH);
   paintRun(src, RUN[0]);
   const drop = SLIP_DROP[i];
-  for (let y = 0; y < 14; y++) for (let x = 0; x < 22; x++) {
+  for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
     const ty = y + drop;
-    if (ty >= 12 || !src.isSet(x, y)) continue;
-    p.data[ty * 22 + x] = src.data[y * 22 + x];
+    if (ty >= SLIP_FLOOR || !src.isSet(x, y)) continue;
+    p.data[ty * SW + x] = src.data[y * SW + x];
   }
-  for (let x = 3; x < 20; x++) p.px(x, 12, x % 3 ? '#3a1c58' : '#7a4aa8');
-  p.px(5, 11, '#c9a0ff');
-  p.px(16, 11, '#c9a0ff');
+  for (let x = 3; x < 22; x++) p.px(x, SLIP_FLOOR, x % 3 ? '#3a1c58' : '#7a4aa8');
+  p.px(5, SLIP_FLOOR - 1, '#c9a0ff');
+  p.px(17, SLIP_FLOOR - 1, '#c9a0ff');
 }, { fps: 5, origin: SIDE_ORIGIN });
 
-// taunt: up on its hind legs, periscoping, the lantern held aloft on the curled tail
+// taunt: up on its hind legs, periscoping, the lantern held up in its front paws
 function paintStand(p: PixelPainter, i: number): [number, number] {
   const sway = i;
-  paintTail(p, [[7, 17.5], [4.5, 17], [2.6, 15], [2, 12], [2.4, 9], [3.4, 6.5 + sway * 0.5], [4.6, 5 + sway]]);
+  paintTail(p, [[7, 17.5], [4.5, 17.2], [2.5, 15.4], [1.8, 12.6], [2.2, 9.8], [3.2, 7.6 + sway * 0.5], [4.4, 6.4 + sway]]);
   const mask = new PixelPainter(16, 20);
-  mask.ellipse(9, 15.5, 3.4, 3, '#ffffff');
-  mask.ellipse(9.4, 11, 2.6, 4, '#ffffff');
+  mask.ellipse(8.6, 15.5, 3.4, 3, '#ffffff');
+  mask.ellipse(9, 11, 2.6, 4, '#ffffff');
   for (let y = 0; y < 20; y++) for (let x = 0; x < 16; x++) {
     if (!mask.isSet(x, y)) continue;
     const left = !mask.isSet(x - 1, y);
     const right = !mask.isSet(x + 1, y);
-    const front = x >= 10 && y >= 9;
+    const front = x >= 9 && y >= 9;
     p.px(x, y, left ? FUR.h : right ? (front ? CREAM_SH : FUR.d) : front ? CREAM : x < 8 ? FUR.l : FUR.m);
   }
-  // feet and the paws held at the chest
-  p.rect(6, 18, 3, 1, FUR.d);
-  p.rect(10, 18, 3, 1, FUR.d);
-  p.px(12, 18, FUR.k);
-  p.rect(11, 9, 2, 1, FUR.d);
-  p.px(12, 10, FUR.k);
+  // feet
+  p.rect(5, 18, 3, 1, FUR.d);
+  p.rect(9, 18, 3, 1, FUR.d);
+  p.px(11, 18, FUR.k);
   // head (looking right, then up and back)
-  if (i === 0) paintHead(p, 9, 5);
+  if (i === 0) paintHead(p, 8, 5);
   else {
-    p.ellipse(9, 4.6, 2.6, 2.3, FUR.m);
+    p.ellipse(8.6, 4.6, 2.6, 2.3, FUR.l);
     p.rect(10, 3, 2, 2, CREAM);
     p.px(12, 3, MASK);
-    p.px(7, 2, FUR.h);
-    p.rect(8, 2, 3, 1, FUR.h);
-    p.px(6, 1, FUR.l);
-    p.rect(7, 4, 5, 1, MASK);
+    p.px(6, 2, FUR.h);
+    p.rect(7, 2, 3, 1, FUR.h);
+    p.px(5, 1, FUR.d);
+    p.rect(6, 4, 6, 1, MASK);
     p.px(10, 4, GLINT);
     p.rect(8, 5, 3, 2, CREAM);
   }
-  p.line(5, 6 + sway, 4, 7 + sway, BRASS.r);
-  return paintLantern(p, 3, 7 + sway);
+  // the lantern up in both paws
+  const a = paintLantern(p, 12, 9 + sway);
+  p.px(11, 9 + sway, FUR.m);
+  p.px(13, 9 + sway, FUR.m);
+  p.px(11, 10 + sway, FUR.d);
+  return a;
 }
 for (let i = 0; i < 2; i++) LANTERN.set(`lantern_weasel_taunt_${i}`, paintStand(new PixelPainter(16, 20), i));
 frames('lantern_weasel', 'taunt', 2, 16, 20, (p, i) => { paintStand(p, i); }, { fps: 2.5, origin: STAND_ORIGIN });
@@ -754,8 +752,15 @@ function overlay(e: Enemy, r: Renderer, w: World): void {
   const top = e.y - e.z - (frame.includes('taunt') ? 22 : 17);
   // racing back for a dropped ember: '!' and a dotted line to it
   if (m.state === ST.race && m.rx !== undefined) {
-    const n = Math.max(1, Math.floor(Math.hypot(m.rx - e.x, m.ry - e.y) / 5));
-    for (let i = 1; i < n; i++) if ((i + Math.floor(w.time * 10)) % 2) r.rect(e.x + ((m.rx - e.x) * i) / n, e.y - 3 + ((m.ry - e.y + 3) * i) / n, 1, 1, '#ffb080', 0.9);
+    const n = Math.max(1, Math.floor(Math.hypot(m.rx - e.x, m.ry - e.y) / 4));
+    const off = Math.floor(w.time * 12) % 3;
+    for (let i = 1; i < n; i++) {
+      if ((i + off) % 3 === 0) continue;
+      const x = e.x + ((m.rx - e.x) * i) / n;
+      const y = e.y - 3 + ((m.ry - e.y + 3) * i) / n;
+      r.rect(x - 1, y - 1, 2, 2, '#1a0c10', 0.6);
+      r.rect(x, y, 1, 1, '#ffb080', 0.95);
+    }
     r.pixelText('!', e.x, top - 13, '#ffb080', { align: 'center', outline: '#120a12' });
   }
   if (!link) return;
@@ -781,10 +786,14 @@ function overlay(e: Enemy, r: Renderer, w: World): void {
   r.rect(e.x - 8, top, Math.round(16 * k), 2, m.state === ST.down ? '#6a7a50' : HUNT_COLOR);
 }
 
-/** A short Korean callout over the room (the 3x5 world font has no Hangul): purely visual. */
+/**
+ * A short Korean callout over the room (the 3x5 world font has no Hangul): purely visual. It
+ * stays inside the room: clamped between the side walls, and dropped below its subject (drifting
+ * down) when above would put it into the top wall or under the HUD's corner panels.
+ */
 export class HuntCallout extends Entity {
   static override readonly cosmetic = true;
-  constructor(x: number, y: number, readonly text: string, readonly color: string, readonly life = 1.1) {
+  constructor(x: number, y: number, readonly text: string, readonly color: string, readonly dir = -1, readonly life = 1.1) {
     super();
     this.x = x;
     this.y = y;
@@ -793,21 +802,31 @@ export class HuntCallout extends Entity {
   }
   override update(_w: World, dt: number): void {
     this.age += dt;
-    this.y -= dt * (this.age < 0.25 ? 40 : 8);
+    this.y += this.dir * dt * (this.age < 0.25 ? 40 : 8);
     if (this.age >= this.life) this.dead = true;
   }
-  override draw(r: Renderer): void {
+  override draw(r: Renderer, w: World): void {
     const t = this.age / this.life;
     const c = r.ctx;
     const prev = c.globalAlpha;
     c.globalAlpha = t > 0.75 ? Math.max(0, 1 - (t - 0.75) / 0.25) : 1;
-    roomLabel(r, this.text, this.x, this.y, this.color);
+    const room = w.room;
+    const half = typeof document === 'undefined' ? 0 : pixelTextCanvas(this.text, { size: 10, font: 'Galmuri9', color: this.color, outline: '#100c18' }).width / 2;
+    // high in the room the right end stays clear of the HUD's minimap / floor-name corner (16:9)
+    const right = room.interiorX + room.interiorW - (this.y < room.interiorY + 46 ? 18 : 2);
+    const x = Math.max(room.interiorX + half + 2, Math.min(right - half, this.x));
+    roomLabel(r, this.text, x, this.y, this.color);
     c.globalAlpha = prev;
   }
 }
 
-export function callout(w: World, x: number, y: number, text: string, color: string): void {
-  w.spawn(new HuntCallout(x, y, text, color));
+/**
+ * Spawn a callout whose text bottom sits at `y` (above its subject); if that is too close to the
+ * top wall it goes to `below` instead and drifts downward.
+ */
+export function callout(w: World, x: number, y: number, text: string, color: string, below = y + 52): void {
+  const high = y < w.room.interiorY + 20;
+  w.spawn(new HuntCallout(x, high ? below + 12 : y, text, color, high ? 1 : -1));
 }
 
 defineEnemy({

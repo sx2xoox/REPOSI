@@ -61,11 +61,13 @@ defineRoom({ id: 'hunt_yard', shape: '1x1', kinds: ['hunt'], rows: ['p..........
 // ================================================================== cracks
 /** A crack's channel point (where the weasel squeezes in) and the wall it sits in: 0 top, 1 bottom, 2 left, 3 right. */
 export interface CrackSpot { x: number; y: number; face: number }
+// No spot high on the right wall: on a 16:9 screen the HUD's floor name and coin row cover it.
+// The outer top / bottom spots keep clear of the corner pots so a squeezing thief is not hidden.
 const CRACK_SPOTS: CrackSpot[] = [
-  ...[56, 124, 212, 280].map((x) => ({ x, y: 40, face: 0 })),
-  ...[56, 124, 212, 280].map((x) => ({ x, y: 168, face: 1 })),
+  ...[66, 124, 212, 270].map((x) => ({ x, y: 40, face: 0 })),
+  ...[66, 124, 212, 270].map((x) => ({ x, y: 168, face: 1 })),
   { x: 40, y: 60, face: 2 }, { x: 40, y: 148, face: 2 },
-  { x: 296, y: 60, face: 3 }, { x: 296, y: 148, face: 3 },
+  { x: 296, y: 148, face: 3 },
 ];
 
 /** Three crack spots for a hunt room: on open floor, clear of the doors, spread apart (room rng only). */
@@ -81,9 +83,14 @@ export function huntCracks(room: Room, rng: RNG): CrackSpot[] {
   return out;
 }
 
-/** Where a crack is drawn: in the wall base next to its channel point. */
+/** Where a crack's hole sprite is anchored: the floor row at the wall line in front of its channel point. */
 function crackDrawPos(x: number, y: number, face: number): { x: number; y: number } {
-  return face === 0 ? { x, y: y - 3 } : face === 1 ? { x, y: y + 3 } : face === 2 ? { x: x - 3, y } : { x: x + 3, y };
+  return face === 0 ? { x, y: y - 8 } : face === 1 ? { x, y: y + 7 } : face === 2 ? { x: x - 8, y } : { x: x + 7, y };
+}
+
+/** The middle of a crack's hole (its glow and smoke). */
+function crackMouth(x: number, y: number, face: number): { x: number; y: number } {
+  return face === 0 ? { x, y: y - 13 } : face === 1 ? { x, y: y + 10 } : face === 2 ? { x: x - 11, y } : { x: x + 10, y };
 }
 
 // ================================================================== the device
@@ -115,7 +122,7 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
 
   override interactionInfo() {
     if (this.mem.phase > 0) return { name: HUNT_TITLE, icon: 'map_hunt', desc: '', compactHint: '사냥 중' };
-    return { name: `${HUNT_TITLE} · ${LABEL}`, icon: 'map_hunt', desc: '족제비를 쓰러뜨려 떨군 불씨 3개를 되찾으세요. 틈으로 숨어들 때 붙잡거나 세게 치면 틈이 막힙니다. 빠져나가면 실패 · 한 번만 도전할 수 있습니다.' };
+    return { name: `${HUNT_TITLE} · ${LABEL}`, icon: 'map_hunt', desc: '족제비를 쓰러뜨려 떨어뜨린 불씨 3개를 주우세요. 벽 틈으로 숨어들 때 붙잡거나 세게 치면 틈이 막히고, 빠져나가면 실패합니다. 한 번만 도전할 수 있습니다.' };
   }
 
   override interact(w: World): boolean {
@@ -135,7 +142,7 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
     s.progress = 0;
     w.room.setDoorsClosed(true);
     w.sfx('door_close');
-    w.banner(HUNT_TITLE, '쓰러뜨리고 떨군 불씨를 먼저 주우세요', { small: true, color: HUNT_COLOR });
+    w.banner(HUNT_TITLE, '족제비를 쓰러뜨려 떨어뜨린 불씨를 먼저 주우세요', { small: true, color: HUNT_COLOR });
     const e = w.spawnEnemy(WEASEL_ID, this.x, this.y);
     if (e) {
       e.ctxP = null;
@@ -297,7 +304,9 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
         em.dead = true;
         s.progress++;
         w.spawn(new EmberFlight(em.x, em.y, this.x, this.y - 30));
-        callout(w, this.x, this.y - 46, `불씨 ${s.progress}/3`, EMBER);
+        // where it was picked up (over the tree it would cover the tree's own count); the last
+        // one gets the outcome banner instead, which a callout up there would collide with
+        if (s.progress < 3) callout(w, em.x, em.y - 14, `불씨 ${s.progress}/3`, EMBER);
         w.sfx('clock_chime', { vol: 0.55, pitch: 1.2 });
         w.sfx('coin', { vol: 0.4 });
         w.asPlayer(p, () => p.addEmber(CLAIM_EMBER));
@@ -336,7 +345,8 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
     s.escCrack = -1;
     s.chanT = 0;
     s.nextEscape = s.clock + s.interval;
-    callout(w, c.x, c.y + (c.y < w.room.centerY ? 22 : -8), '틈 봉쇄', HUNT_COLOR);
+    // over the crack, or (crack high on the wall) under it, clear of whoever grabbed the thief
+    callout(w, c.x, c.y - 30, '틈 봉쇄', HUNT_COLOR, c.y + 22);
     w.sfx('hit_metal', { vol: 0.6 });
     w.spawn(new RingFx(c.x, c.y, 14, 0.3, HUNT_COLOR, 2));
     // yanked out and flung toward the middle of the room, dazed (still hittable)
@@ -478,20 +488,24 @@ export class HuntDevice extends Prop implements EncounterRoot, HuntLink {
       const text = s.cornered || escaping || !s.weasel ? `${s.progress}/3` : `${s.progress}/3 · ${Math.ceil(left)}s`;
       r.pixelText(text, this.x, this.y - 61, HUNT_COLOR, { align: 'center', outline: '#110c1b' });
     }
-    if (s.used) roomLabel(r, s.phase === 4 ? '완료' : '실패', this.x, this.y - 48, s.phase === 4 ? HUNT_COLOR : '#db8a87');
+    // just over the tree's crook, where the other missions put it (clear of the outcome banner)
+    if (s.used) roomLabel(r, s.phase === 4 ? '완료' : '실패', this.x, this.y - 42, s.phase === 4 ? HUNT_COLOR : '#db8a87');
   }
 
   override light(w: World): void {
     const s = this.mem;
     w.lights.add(this.x, this.y - 22, 24 + s.lightR, EMBER, { intensity: s.used ? 0.35 : 0.55 + 0.1 * s.progress });
     if (s.phase !== 1 || s.used || !s.weasel) return;
-    // the stolen lantern on the thief's tail
+    // the stolen lantern in the thief's jaws
     w.lights.add(s.wx, s.wy - 8, 20 + 8 * s.held, EMBER, { intensity: 0.45 });
   }
 }
 
 // ================================================================== props
-/** A shadow crack at the wall base (persistent: the boards stay after the hunt). */
+/** Hole sprite per wall face: top, bottom, left, right. */
+const HOLE_SPRITE = ['hunt_hole', 'hunt_hole_low', 'hunt_hole_left', 'hunt_hole_right'];
+
+/** A burrow hole in the wall base (persistent: the boards stay after the hunt). */
 export class HuntCrack extends Prop {
   constructor(x: number, y: number, readonly face: number, readonly index: number, readonly rootId: number) {
     super(x, y, 0);
@@ -509,25 +523,23 @@ export class HuntCrack extends Prop {
     const target = root.mem.escCrack === this.index && root.mem.escState > 0 && !root.mem.used;
     // wisps of shadow seeping out (cosmetic)
     if (fx.chance(dt * (target ? 9 : 1.6))) {
-      const p = crackDrawPos(this.x, this.y, this.face);
-      w.particles.spawn({ x: p.x + fx.range(-5, 5), y: p.y + fx.range(-2, 2), vx: fx.range(-4, 4), vy: -fx.range(4, 12), life: fx.range(0.6, 1.2), colors: target ? ['#c9a0ff', ESCAPE_COLOR] : ['#5a3a7a', '#2a1a3a'], size: fx.range(1, 2), sizeEnd: 2.5, fade: true });
+      const p = crackMouth(this.x, this.y, this.face);
+      w.particles.spawn({ x: p.x + fx.range(-4, 4), y: p.y + fx.range(-2, 2), vx: fx.range(-4, 4), vy: -fx.range(4, 12), life: fx.range(0.6, 1.2), colors: target ? ['#c9a0ff', ESCAPE_COLOR] : ['#5a3a7a', '#2a1a3a'], size: fx.range(1, 2), sizeEnd: 2.5, fade: true });
     }
   }
 
   override draw(r: Renderer, w: World): void {
     const root = this.root(w);
     const sealed = !!root && (root.mem.sealed & (1 << this.index)) !== 0;
-    const side = this.face >= 2;
     const p = crackDrawPos(this.x, this.y, this.face);
-    const name = (side ? 'hunt_crack_side' : 'hunt_crack') + (sealed ? '_sealed' : '');
-    r.sprite(name, p.x, p.y, { flipY: this.face === 1, flipX: this.face === 3 });
+    r.sprite(HOLE_SPRITE[this.face] + (sealed ? '_sealed' : ''), p.x, p.y);
   }
 
   override light(w: World): void {
     const root = this.root(w);
     if (!root || root.mem.sealed & (1 << this.index)) return;
     const target = root.mem.escCrack === this.index && root.mem.escState > 0 && !root.mem.used;
-    const p = crackDrawPos(this.x, this.y, this.face);
+    const p = crackMouth(this.x, this.y, this.face);
     w.lights.add(p.x, p.y, target ? 34 : 16, ESCAPE_COLOR, { intensity: target ? 0.6 : 0.25 });
   }
 }
@@ -660,6 +672,7 @@ export class HuntCaltrop extends Entity {
   override draw(r: Renderer, w: World): void {
     const left = CALTROP_LIFE - this.age;
     if (left < 0.6 && Math.floor(w.time * 14) % 2) return;
+    r.shadow(this.x, this.y + 3, 4, 1.5, 0.35);
     r.sprite(this.armed ? 'hunt_caltrop_1' : 'hunt_caltrop_0', this.x, this.y);
   }
 }
@@ -807,15 +820,16 @@ defineDrawnSprite('device_hunt', 42, 44, (p) => {
   // moss tufts in the joints (the room's lime-moss mark)
   for (const [x, y] of [[11, 34], [12, 33], [26, 34], [27, 33], [17, 30], [23, 22]]) p.px(x, y, '#5c8a30');
   for (const [x, y] of [[12, 34], [26, 33], [17, 29]]) p.px(x, y, '#b6e36e');
-  // tipped oil can: body, rim, spout, a drip
-  p.poly([28, 36, 36, 34, 38, 39, 30, 41], '#4e5e46');
-  p.line(28, 36, 36, 34, '#8a9a70');
-  p.line(29, 37, 35, 35.5, '#6a7a58');
-  p.line(30, 41, 38, 39, '#2a3426');
-  p.rect(36, 34, 2, 4, '#3a4834');
-  p.px(36, 34, '#a8b88a');
-  p.rect(38, 36, 2, 2, BRASS[2]);
-  p.px(39, 36, BRASS[3]);
+  // the tipped brass oil can the thief knocked over: body, bands, cap, spout, a drip
+  p.poly([28, 36, 36, 34, 38, 39, 30, 41], BRASS[1]);
+  p.line(28, 36, 36, 34, BRASS[3]);
+  p.line(29, 37, 35, 35.5, BRASS[2]);
+  p.line(30, 41, 38, 39, BRASS[0]);
+  p.line(31, 36, 32, 40, BRASS[0]);
+  p.rect(36, 34, 2, 4, IRON[2]);
+  p.px(36, 34, IRON[4]);
+  p.rect(38, 36, 2, 2, IRON[3]);
+  p.px(39, 36, IRON[4]);
   p.px(40, 39, '#2a2026');
   p.px(39, 40, '#2a2026');
 }, { outline: '#0c0810', origin: [21, 42] });
@@ -838,49 +852,94 @@ defineDrawnSprite('hunt_ember', 7, 9, (p) => {
   p.px(3, 7, '#ffffff');
 }, { outline: '#3a1206', origin: [3, 8] });
 
-// shadow crack in the floor at the wall base (top wall; the others are drawn flipped / turned):
-// a dark gap under the wall with a violet-lit lip, splits running into the floor
-function paintCrack(p: PixelPainter, w: number, h: number, sealed: boolean, side: boolean): void {
-  const L = side ? h : w;
-  const put = (a: number, b: number, c: string) => (side ? p.px(b, a, c) : p.px(a, b, c));
-  const mid = (L - 1) / 2;
-  for (let a = 1; a < L - 1; a++) {
-    const k = 1 - Math.abs(a - mid) / (mid + 0.5);
-    const depth = Math.max(1, Math.round(k * 4.4 + (a % 3 === 1 ? 0.6 : 0)));
-    for (let b = 0; b < depth; b++) put(a, b, b < depth - 1 ? (b === 0 ? '#06030a' : VIOLET[0]) : VIOLET[2]);
-    if (depth >= 3) put(a, depth - 2, VIOLET[1]);
+// A burrow hole gnawed into the wall base (u: across the mouth, v: depth into the wall, v = 0
+// is the floor row in front of it): a chipped stone rim lit from the top-left, a black tunnel
+// with the violet glow of the way out deep inside, rubble and a shadow spilling onto the floor.
+// Sealed: two nailed planks across the mouth.
+type Put = (u: number, v: number, c: string) => void;
+function paintHole(put: Put, L: number, D: number, sealed: boolean, glow = 1): void {
+  const cu = (L - 1) / 2;
+  const ru = L / 2 - 2.5;
+  const rv = D - 2.2;
+  const sq = (a: number) => a * a;
+  const inner = (u: number, v: number) => sq((u - cu) / ru) + sq((v - 0.3) / rv);
+  const outer = (u: number, v: number) => sq((u - cu) / (ru + 1.6)) + sq((v - 0.3) / (rv + 1.5));
+  for (let u = 0; u < L; u++) for (let v = 1; v < D; v++) {
+    const e = inner(u, v);
+    if (e <= 1) {
+      // the tunnel: black, with a small violet glow from the way out deep inside
+      const g = sq((u - cu) / ru) + sq((v - rv * 0.45) / (rv * 0.7));
+      put(u, v, g < 0.05 * glow ? VIOLET[2] : g < 0.16 * glow ? VIOLET[1] : g < 0.34 * glow ? VIOLET[0] : '#07040b');
+    } else if (outer(u, v) <= 1) {
+      // broken rim: lit on the upper-left half, chipped every few px
+      const lit = u < cu;
+      const chip = (u * 3 + v * 5) % 7 === 0;
+      const near = inner(u, v) < 1.45;
+      put(u, v, chip ? '#241e2c' : lit ? (near ? '#a49cb0' : '#77708a') : near ? '#3a3446' : '#5a546c');
+    }
   }
-  // splits into the floor
-  for (const [a0, b0, a1, b1] of [[2, 1, 0, 4], [L - 3, 1, L - 1, 5], [Math.round(mid) - 1, 4, Math.round(mid) - 2, 7], [Math.round(mid) + 2, 4, Math.round(mid) + 4, 6]]) {
-    const n = Math.max(Math.abs(a1 - a0), Math.abs(b1 - b0));
-    for (let i = 0; i <= n; i++) put(Math.round(a0 + ((a1 - a0) * i) / n), Math.round(b0 + ((b1 - b0) * i) / n), i === n ? VIOLET[1] : VIOLET[0]);
+  // cracks running up and out of the masonry from the rim
+  for (const du of [-1, 1]) {
+    let u = Math.round(cu + du * (ru + 1.2));
+    let v = Math.round(rv * 0.6);
+    for (let k = 0; k < 3 && v < D; k++) {
+      u += du;
+      v += k === 1 ? 0 : 1;
+      if (outer(u, v) > 1) put(u, v, '#120a18');
+    }
   }
-  if (!sealed) {
-    put(Math.round(mid), 1, VIOLET[3]);
-    put(Math.round(mid) - 3, 1, VIOLET[2]);
-    return;
-  }
-  // a nailed plank over it with a chalk X
-  for (let a = 1; a < L - 1; a++) for (let b = 1; b < 6; b++) put(a, b, b === 1 ? '#d0a070' : b === 5 ? '#5a3a20' : (a + b * 3) % 7 === 0 ? '#6a4428' : '#8a5e34');
-  put(2, 3, '#e0e0e8');
-  put(L - 3, 3, '#e0e0e8');
-  const c = Math.round(mid);
-  for (const [a, b] of [[c - 2, 2], [c - 1, 3], [c, 4], [c, 2], [c - 2, 4]]) put(a, b, '#f4f0e4');
+  // floor row: the shadow it casts, a scrape of violet dust and chips of rubble
+  for (let u = Math.ceil(cu - ru - 0.5); u <= Math.floor(cu + ru + 0.5); u++) put(u, 0, Math.abs(u - cu) < 1 ? '#3a1c58' : '#140a1c');
+  put(Math.round(cu - ru - 2), 0, '#a49cb0');
+  put(Math.round(cu - ru - 1), 0, '#5a546c');
+  put(Math.round(cu + ru + 2), 0, '#77708a');
+  if (!sealed) return;
+  // two boards nailed across the mouth
+  const span = [Math.round(cu - ru - 1.5), Math.round(cu + ru + 1.5)];
+  const bands = D >= 9 ? [[2, 3, 4], [6, 7]] : [[1, 2], [4, 5]];
+  for (const rows of bands) rows.forEach((v, i) => {
+    for (let u = span[0]; u <= span[1]; u++) {
+      const edge = i === rows.length - 1 ? '#4a2e18' : i === 0 ? '#d09a5c' : '#8a5e34';
+      put(u, v, (u + v * 3) % 6 === 0 && i > 0 ? '#6a4428' : edge);
+    }
+    if (i === 0 || rows.length === 2) {
+      put(span[0] + 1, v, '#e8e4f0');
+      put(span[1] - 1, v, '#e8e4f0');
+    }
+  });
 }
-defineDrawnSprite('hunt_crack', 16, 10, (p) => paintCrack(p, 16, 10, false, false), { outline: '#0c0810', origin: [8, 4] });
-defineDrawnSprite('hunt_crack_sealed', 16, 10, (p) => paintCrack(p, 16, 10, true, false), { outline: '#0c0810', origin: [8, 4] });
-defineDrawnSprite('hunt_crack_side', 10, 16, (p) => paintCrack(p, 10, 16, false, true), { outline: '#0c0810', origin: [4, 8] });
-defineDrawnSprite('hunt_crack_side_sealed', 10, 16, (p) => paintCrack(p, 10, 16, true, true), { outline: '#0c0810', origin: [4, 8] });
+/** Hole sprites: top wall (an arch in the wall face), bottom wall and side walls (notches seen from above). */
+const HOLE_L = 16;
+const HOLE_D = { face: 12, low: 8, side: 8 };
+for (const sealed of [false, true]) {
+  const tag = sealed ? '_sealed' : '';
+  const { face: F, low: B, side: S } = HOLE_D;
+  defineDrawnSprite('hunt_hole' + tag, HOLE_L, F, (p) => paintHole((u, v, c) => p.px(u, F - 1 - v, c), HOLE_L, F, sealed), { origin: [HOLE_L / 2, F - 1] });
+  // the shallow notches seen from above show more of the glow, or they would read as a smudge
+  defineDrawnSprite('hunt_hole_low' + tag, HOLE_L, B, (p) => paintHole((u, v, c) => p.px(u, v, c), HOLE_L, B, sealed, 1.9), { origin: [HOLE_L / 2, 0] });
+  defineDrawnSprite('hunt_hole_left' + tag, S, HOLE_L, (p) => paintHole((u, v, c) => p.px(S - 1 - v, u, c), HOLE_L, S, sealed, 1.9), { origin: [S - 1, HOLE_L / 2] });
+  defineDrawnSprite('hunt_hole_right' + tag, S, HOLE_L, (p) => paintHole((u, v, c) => p.px(v, u, c), HOLE_L, S, sealed, 1.9), { origin: [0, HOLE_L / 2] });
+}
 
-// caltrop: settling (dim) and armed (iron star, hot tips, a glint)
-defineDrawnSprite('hunt_caltrop_0', 5, 5, (p) => {
-  p.px(2, 1, '#4a4a58'); p.px(1, 2, '#4a4a58'); p.px(3, 2, '#4a4a58'); p.px(2, 3, '#4a4a58'); p.px(2, 2, '#6a6a7a');
-}, { outline: '#0c0810', origin: [2, 2] });
-defineDrawnSprite('hunt_caltrop_1', 5, 5, (p) => {
-  p.line(2, 0, 2, 4, '#8a8a9a'); p.line(0, 2, 4, 2, '#8a8a9a');
-  p.px(2, 0, '#ffb040'); p.px(0, 2, '#ffb040'); p.px(4, 2, '#ffb040'); p.px(2, 4, '#ffb040');
-  p.px(2, 2, '#ffffff'); p.px(1, 1, '#5a5a6a'); p.px(3, 3, '#5a5a6a');
-}, { outline: '#0c0810', origin: [2, 2] });
+// 마름쇠: an iron jack seen from above, four spikes in an X round a hub. Settling: dull iron,
+// lying still. Armed: steel spikes lit from the top-left and a red-hot hub, so it reads as a
+// hazard, not as a sparkle or a pickup (no white or gold on it).
+function paintCaltrop(p: PixelPainter, armed: boolean): void {
+  // settling: the same jack in flat grey (visible on dark floors, so its landing spot is seen)
+  const tips = armed ? ['#d8d8e4', '#a4a4b4', '#8a8a9a', '#5e5e6e'] : ['#8a8a98', '#74747f', '#686874', '#55555f'];
+  const arms: [number, number, number, number][] = [[0, 0, 1, 1], [6, 0, 5, 1], [0, 6, 1, 5], [6, 6, 5, 5]];
+  arms.forEach(([tx, ty, ax, ay], i) => {
+    p.px(tx, ty, tips[i]);
+    p.px(ax, ay, armed ? '#6e6e80' : '#5a5a66');
+  });
+  p.rect(2, 2, 3, 3, armed ? '#4a4a5a' : '#44444f');
+  p.px(2, 2, armed ? '#b8b8c8' : '#74747f');
+  p.px(4, 4, armed ? '#2a2a34' : '#34343e');
+  p.px(3, 3, armed ? '#ff4a2a' : '#5a3a3a');
+  if (armed) { p.px(3, 2, '#c02a1a'); p.px(2, 3, '#8a3a30'); }
+}
+defineDrawnSprite('hunt_caltrop_0', 7, 7, (p) => paintCaltrop(p, false), { outline: '#0c0810', origin: [3, 3] });
+defineDrawnSprite('hunt_caltrop_1', 7, 7, (p) => paintCaltrop(p, true), { outline: '#0c0810', origin: [3, 3] });
 
 defineDrawnSprite('hunt_lantern_dropped', 9, 6, (p) => {
   // lying on its side: cap left, base right
@@ -893,35 +952,58 @@ defineDrawnSprite('hunt_lantern_dropped', 9, 6, (p) => {
   p.px(4, 2, '#9a8a98'); p.px(5, 3, '#9a8a98');
 }, { outline: '#0c0810', origin: [4, 5] });
 
-// wall equipment: a coiled net, a snare loop and a wanted poster (mask + three flames)
+// wall equipment: a hunter's peg rail with a weighted net, a snare loop, and a wanted poster of
+// the masked thief over three flames (no backing board, like the other missions' racks)
 defineDrawnSprite('equipment_hunt', 38, 27, (p) => {
-  p.rect(1, 1, 36, 25, '#242131');
-  p.rect(2, 2, 34, 2, '#827680');
-  p.rect(3, 24, 32, 2, '#13121d');
-  for (const x of [3, 34]) { p.line(x, 4, x, 23, '#574b5b'); p.px(x, 3, '#baaa95'); }
-  // coiled net on a peg
-  p.px(9, 5, '#baaa95');
-  p.ellipse(9, 14, 5, 7, '#6a5a44');
-  for (let y = 9; y < 21; y += 2) p.line(5, y, 13, y + 1, '#a08a64');
-  for (let x = 6; x < 13; x += 3) p.line(x, 8, x - 1, 20, '#8a7452');
-  p.line(9, 5, 9, 8, '#a08a64');
-  // snare loop
-  p.line(18, 5, 18, 10, '#c0a878');
-  p.ring(18, 14, 4, 1, '#c0a878');
-  p.px(18, 18, '#7a6a50');
-  // wanted poster
-  p.rect(23, 5, 11, 15, '#d8c8a0');
-  p.rect(23, 5, 11, 1, '#f0e4c4');
-  p.rect(24, 19, 10, 1, '#9a8a68');
-  p.ellipse(28, 10, 3.5, 2.5, '#3a2a30');
-  p.rect(25, 9, 7, 2, INK);
-  p.px(26, 9, '#ffe27a');
-  p.px(30, 9, '#ffe27a');
-  for (const x of [25, 28, 31]) { p.px(x, 16, EMBER); p.px(x, 15, '#ff9a3a'); }
-  p.px(28, 4, '#8a8a9a');
+  // the rail on two iron brackets
+  for (const x of [3, 33]) { p.rect(x, 2, 2, 5, IRON[2]); p.px(x, 2, IRON[4]); p.px(x + 1, 6, IRON[1]); }
+  p.rect(1, 3, 36, 3, '#8a5e34');
+  p.line(1, 3, 36, 3, '#c89458');
+  p.line(1, 5, 36, 5, '#4a2e18');
+  for (const x of [7, 18]) { p.rect(x, 6, 2, 1, IRON[3]); p.px(x, 6, IRON[4]); }
+  // the net: rope mesh widening from its peg, gathered over a row of lead weights
+  for (let y = 7; y <= 20; y++) {
+    const half = 1.5 + (y - 7) * 0.42;
+    for (let x = Math.round(8 - half); x <= Math.round(8 + half); x++) {
+      const edge = x === Math.round(8 - half) || x === Math.round(8 + half);
+      if (edge || (x + y) % 3 === 0 || (x - y + 30) % 3 === 0) p.px(x, y, edge ? '#8a7452' : x < 8 ? '#d8c090' : '#b09868');
+    }
+  }
+  p.line(3, 21, 13, 21, '#6a5638');
+  for (const x of [3, 6, 9, 12]) { p.px(x, 22, IRON[3]); p.px(x, 21, IRON[4]); }
+  // the snare: a cord from its peg into a loop with a brass toggle
+  p.line(18, 7, 18, 11, '#c0a878');
+  p.ring(18, 15.5, 3.6, 1, '#c0a878');
+  p.px(16, 13, '#e8d4a0');
+  p.px(17, 12, '#e8d4a0');
+  p.rect(17, 11, 3, 2, BRASS[2]);
+  p.px(17, 11, BRASS[3]);
+  // the wanted poster, pinned to the rail: lettering, the masked face, three flames
+  p.rect(23, 6, 12, 17, '#d8c8a0');
+  p.line(23, 6, 34, 6, '#f2e6c8');
+  p.line(34, 7, 34, 22, '#a8946c');
+  p.line(23, 22, 33, 22, '#a8946c');
+  p.px(34, 22, '#00000000');
+  p.px(33, 21, '#bca880');
+  p.px(28, 5, '#d04040');
+  p.px(28, 6, '#801820');
+  for (const x of [25, 27, 30, 32]) p.px(x, 8, '#5a4a3a');
+  p.ellipse(28.5, 12.5, 3.6, 2.6, '#c48a52');
+  p.px(25, 9, '#94603a'); p.px(32, 9, '#94603a');
+  p.px(26, 10, '#e8b878'); p.px(27, 10, '#e8b878');
+  p.px(25, 11, INK); p.px(32, 11, INK);
+  p.rect(25, 12, 8, 1, INK);
+  p.px(27, 12, '#ffe27a');
+  p.px(30, 12, '#ffe27a');
+  p.rect(27, 13, 4, 2, '#f2e0b8');
+  p.rect(28, 13, 2, 1, INK);
+  p.px(26, 14, '#94603a'); p.px(31, 14, '#94603a');
+  for (const x of [25, 28, 31]) { p.px(x + 1, 19, EMBER); p.px(x + 1, 18, '#ff9a3a'); p.px(x, 19, '#ff9a3a'); }
+  p.line(25, 21, 32, 21, '#8a7a60');
 }, { outline: '#100c18', origin: [19, 27] });
 
-definePixelSprite('map_hunt', { p: HUNT_COLOR }, ['p.p.p', '.....', '.ppp.', 'ppppp', '.p.p.'], { outline: '#0c0810' });
+// a paw print: four toes in an arc over the pad
+definePixelSprite('map_hunt', { p: HUNT_COLOR }, ['.p.p.', 'p...p', '.ppp.', 'ppppp', '.ppp.'], { outline: '#0c0810' });
 
 // ================================================================== floor dressing
 function pawPair(p: PixelPainter, x: number, y: number, a: number): void {
