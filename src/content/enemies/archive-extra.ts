@@ -7,7 +7,9 @@
 //    and leaves the spider dazed — so the keeper's answer is to flank the medic and shoot it.
 //    Its own attack is a NEEDLE ON A THREAD: a telegraphed lane, the needle flies out, sticks
 //    (the taut thread blinks while a second lane shows the way back), then the spider reels it
-//    in eye-first along the same line — dodge it twice, out and back.
+//    in eye-first along exactly that line — dodge it twice, out and back (champions: three lanes).
+//    It heads for whichever ally needs sewing, routes round book piles tile by tile, and when it
+//    has had nothing to do for a while it leaves its cover to get a throw in.
 // Pure helpers (`coverSpot`, `pickMendTarget`) are unit-tested in tests/enemies-extra-f6.test.ts.
 
 import { defineEnemy } from '../../game/defs';
@@ -19,6 +21,8 @@ import { fx } from '../../engine/rng';
 import { clamp } from '../../engine/math';
 import type { Enemy } from '../../game/enemy';
 import type { World } from '../../game/world';
+import type { Room } from '../../game/room';
+import { TILE } from '../../game/constants';
 import type { Renderer } from '../../engine/renderer';
 import type { Projectile, ProjBehavior } from '../../game/projectile';
 import type { Script } from '../../engine/script';
@@ -27,12 +31,14 @@ import { AOUT, CYAN, GOLD, INKB, PAPER, pages, toward } from './archive-shared';
 
 // ================================================================== tuning
 /** The needle on a thread: wind-up, reach (px), flight / reel speeds, time stuck before the reel. */
-export const NEEDLE = { windup: 0.5, reach: 128, speed: 190, stuck: 0.42, reel: 230, width: 8, catchR: 9, spread: 0.3 } as const;
+export const NEEDLE = { windup: 0.5, reach: 128, speed: 190, stuck: 0.42, reel: 230, width: 8, catchR: 9, spread: 0.36 } as const;
 /**
  * Mending: allies within `range` below `below` of their max HP, not mended in the last
  * `again` s; `stitches` stitches `gap` s apart, each restoring `stitch` of the ally's max HP.
  */
 export const MEND = { range: 150, reach: 64, below: 0.8, again: 5, thread: 0.3, stitches: 3, gap: 0.42, stitch: 0.08, cooldown: 3.2, daze: 0.8 } as const;
+/** Seconds without a throw or a mend after which the spider leaves its cover to get a throw in. */
+export const RESTLESS = 3.5;
 const ID = 'binding_spider';
 
 // ================================================================== art
@@ -266,17 +272,17 @@ export interface MendCandidate {
 
 /**
  * The ally a spider at (x, y) should sew at time `now`: the most torn-up one (lowest HP
- * fraction, below `MEND.below`) within `MEND.range`, never another spider, never one mended
- * in the last `MEND.again` s. Index into `list`, or -1. Ties keep the earlier entry.
+ * fraction, below `MEND.below`) within `range` (default `MEND.range`), never another spider,
+ * never one mended in the last `MEND.again` s. Index into `list`, or -1. Ties keep the earlier entry.
  */
-export function pickMendTarget(list: MendCandidate[], x: number, y: number, now: number): number {
+export function pickMendTarget(list: MendCandidate[], x: number, y: number, now: number, range: number = MEND.range): number {
   let best = -1;
   let bestK: number = MEND.below;
   for (let i = 0; i < list.length; i++) {
     const o = list[i];
     if (!o.ok || o.id === ID || o.maxHp <= 0) continue;
     if (now - o.mendedAt < MEND.again) continue;
-    if (Math.hypot(o.x - x, o.y - y) > MEND.range) continue;
+    if (Math.hypot(o.x - x, o.y - y) > range) continue;
     const k = o.hp / o.maxHp;
     if (k < bestK) {
       bestK = k;
@@ -296,7 +302,13 @@ function mendable(e: Enemy, o: Enemy): boolean {
   return o !== e && o.alive && !o.dead && !o.hidden && o.vulnerable && !o.isBoss && o.dormant <= 0 && o.def.id !== ID;
 }
 
-function findMendTarget(e: Enemy, w: World): Enemy | null {
+/** The binding thread holds while the ally is mendable, within the thread's range and in sight. */
+function threadHolds(e: Enemy, w: World, ally: Enemy): boolean {
+  return mendable(e, ally) && !e.hasStatus('charm') && Math.hypot(ally.x - e.x, ally.y - e.y) <= MEND.range && w.room.lineOfSight(e.x, e.y, ally.x, ally.y);
+}
+
+/** The most torn-up mendable ally within `range` (any line of sight), or null. */
+function tornAlly(e: Enemy, w: World, range: number): Enemy | null {
   const cands: Enemy[] = [];
   const list: MendCandidate[] = [];
   for (const o of w.enemies) {
@@ -304,14 +316,24 @@ function findMendTarget(e: Enemy, w: World): Enemy | null {
     cands.push(o);
     list.push({ id: o.def.id, hp: o.hp, maxHp: o.maxHp, x: o.x, y: o.y, ok: mendable(e, o), mendedAt: (o.mem.__mendedAt as number) ?? -99 });
   }
-  const i = pickMendTarget(list, e.x, e.y, w.time);
-  if (i < 0) return null;
-  const o = cands[i];
-  return w.room.lineOfSight(e.x, e.y, o.x, o.y) ? o : null;
+  const i = pickMendTarget(list, e.x, e.y, w.time, range);
+  return i < 0 ? null : cands[i];
 }
 
-/** The ally to hide behind: the nearest sizeable non-spider monster (small fliers only if nothing else). */
+function findMendTarget(e: Enemy, w: World): Enemy | null {
+  const o = tornAlly(e, w, MEND.range);
+  return o && w.room.lineOfSight(e.x, e.y, o.x, o.y) ? o : null;
+}
+
+/**
+ * The ally to hide behind: a torn-up ally it can sew (anywhere in the room, so it heads over to
+ * it), else the nearest sizeable non-spider monster (small fliers only if nothing else).
+ */
 function coverAlly(e: Enemy, w: World): Enemy | null {
+  if (!e.hasStatus('charm')) {
+    const torn = tornAlly(e, w, Infinity);
+    if (torn) return torn;
+  }
   let best: Enemy | null = null;
   let bestD = Infinity;
   for (const o of w.enemies) {
@@ -325,12 +347,104 @@ function coverAlly(e: Enemy, w: World): Enemy | null {
   return best;
 }
 
+/**
+ * `(gx, gy)` if the spider fits there, else the first free point stepping back toward
+ * `(fx0, fy0)` (so a cover spot behind a book pile or a flee spot in a corner never asks the
+ * spider to walk into a rock forever).
+ */
+export function openSpot(room: { boxBlocked(x: number, y: number, r: number, flying: boolean, phasing: boolean): boolean }, gx: number, gy: number, fx0: number, fy0: number, r: number): { x: number; y: number } {
+  const d = Math.hypot(gx - fx0, gy - fy0);
+  const n = Math.max(1, Math.ceil(d / 4));
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const x = gx + (fx0 - gx) * t;
+    const y = gy + (fy0 - gy) * t;
+    if (!room.boxBlocked(x, y, r + 1, false, false)) return { x, y };
+  }
+  return { x: fx0, y: fy0 };
+}
+
+/** Is the straight walk from (x, y) to (gx, gy) clear for a ground body of half-size `r`? */
+export function clearWalk(room: Room, x: number, y: number, gx: number, gy: number, r: number): boolean {
+  const n = Math.ceil(Math.hypot(gx - x, gy - y) / 4);
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    if (room.boxBlocked(x + (gx - x) * t, y + (gy - y) * t, r, false, false)) return false;
+  }
+  return true;
+}
+
+const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+
+/**
+ * Tile-centre waypoints for a ground walker from (x, y) to (gx, gy) (4-way BFS over
+ * walkable tiles). The last point is the goal itself, or, when the goal is cut off
+ * (an island past a pit, a sealed nook), the centre of the reachable tile nearest to it
+ * (possibly the walker's own tile). Empty when the walker is already in the goal's tile.
+ */
+export function walkRoute(room: Room, x: number, y: number, gx: number, gy: number): { x: number; y: number }[] {
+  const W = room.w;
+  const H = room.h;
+  const sx = Math.floor(x / TILE);
+  const sy = Math.floor(y / TILE);
+  const gtx = Math.floor(gx / TILE);
+  const gty = Math.floor(gy / TILE);
+  if (!room.inside(sx, sy) || (sx === gtx && sy === gty)) return [];
+  const prev = new Int32Array(W * H).fill(-1);
+  const q = new Int32Array(W * H);
+  let head = 0;
+  let tail = 0;
+  const s0 = sy * W + sx;
+  prev[s0] = s0;
+  q[tail++] = s0;
+  let best = s0;
+  let bestD = Math.hypot((sx + 0.5) * TILE - gx, (sy + 0.5) * TILE - gy);
+  let found = false;
+  while (head < tail) {
+    const c = q[head++];
+    const cx = c % W;
+    const cy = (c - cx) / W;
+    if (cx === gtx && cy === gty) {
+      best = c;
+      found = true;
+      break;
+    }
+    const d = Math.hypot((cx + 0.5) * TILE - gx, (cy + 0.5) * TILE - gy);
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
+    for (const [dx, dy] of N4) {
+      const nx = cx + dx;
+      const ny = cy + dy;
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+      const i = ny * W + nx;
+      if (prev[i] !== -1 || room.blocks(nx, ny, false, false)) continue;
+      prev[i] = c;
+      q[tail++] = i;
+    }
+  }
+  const out: { x: number; y: number }[] = [];
+  for (let c = best; c !== s0; c = prev[c]) {
+    const cx = c % W;
+    out.push({ x: (cx + 0.5) * TILE, y: ((c - cx) / W + 0.5) * TILE });
+  }
+  out.reverse();
+  if (found) out[out.length - 1] = { x: gx, y: gy };
+  // cut off, and already on the nearest reachable tile: stay on it
+  else if (!out.length) out.push({ x: (sx + 0.5) * TILE, y: (sy + 0.5) * TILE });
+  return out;
+}
+
 /** Where to skitter next: behind an ally, or (alone) keeping 80–110 px from the keeper. */
 function skitterGoal(e: Enemy, w: World): { x: number; y: number } {
   const tg = e.target(w);
   const room = w.room;
   let g: { x: number; y: number };
-  const ally = coverAlly(e, w);
+  let from = { x: e.x, y: e.y };
+  // nothing to do from behind its cover for a while: it comes out to get a throw in
+  const restless = w.time - ((e.mem.actAt as number) ?? 0) > RESTLESS;
+  const ally = restless ? null : coverAlly(e, w);
   const d = Math.hypot(e.x - tg.x, e.y - tg.y);
   if (d < 44) {
     // too close: scuttle straight away
@@ -338,15 +452,15 @@ function skitterGoal(e: Enemy, w: World): { x: number; y: number } {
     g = { x: e.x + Math.cos(a) * 60, y: e.y + Math.sin(a) * 60 };
   } else if (ally) {
     g = coverSpot(ally.x, ally.y, tg.x, tg.y, 24 + ally.r);
+    from = { x: ally.x, y: ally.y };
   } else {
     const a = Math.atan2(e.y - tg.y, e.x - tg.x) + (e.mem.side as number) * 0.55;
     const r = clamp(d, 80, 110);
     g = { x: tg.x + Math.cos(a) * r, y: tg.y + Math.sin(a) * r };
   }
-  return {
-    x: clamp(g.x, room.interiorX + 10, room.interiorX + room.interiorW - 10),
-    y: clamp(g.y, room.interiorY + 10, room.interiorY + room.interiorH - 10),
-  };
+  const gx = clamp(g.x, room.interiorX + 10, room.interiorX + room.interiorW - 10);
+  const gy = clamp(g.y, room.interiorY + 10, room.interiorY + room.interiorH - 10);
+  return openSpot(room, gx, gy, from.x, from.y, e.r);
 }
 
 // ================================================================== the needle
@@ -355,8 +469,11 @@ function stick(p: Projectile, w: World, owner: Enemy): void {
   p.mem.t = 0;
   p.speed = 0;
   p.syncVel();
-  // the way back is marked for the whole time the needle sits
+  // the way back is marked for the whole time the needle sits, and the reel follows exactly
+  // that line (even if the spider is knocked about meanwhile)
   const h = handPos(owner);
+  p.mem.hx = h.x;
+  p.mem.hy = h.y;
   const back = Math.atan2(h.y - p.y, h.x - p.x);
   laneWarning(w, p.x, p.y, back, Math.hypot(h.x - p.x, h.y - p.y), NEEDLE.width, NEEDLE.stuck);
   w.particles.burst(p.x, p.y - p.z, { count: 5, speed: [20, 60], life: [0.12, 0.25], colors: ['#ffffff', BUL.page.color, BUL.page.rim], size: [1, 1] });
@@ -365,8 +482,8 @@ function stick(p: Projectile, w: World, owner: Enemy): void {
 
 /**
  * Behavior of the needle on a thread: it flies `len` px (or until a rock / wall), sticks for
- * `NEEDLE.stuck` s, then is reeled back eye-first to the spider and caught. A needle whose
- * spider died falls slack and vanishes.
+ * `NEEDLE.stuck` s, then is reeled back eye-first along the warned return lane (to where the
+ * spider's legs were when it stuck) and caught. A needle whose spider died falls slack and vanishes.
  */
 function needleThread(owner: Enemy, len: number): ProjBehavior {
   return {
@@ -390,15 +507,17 @@ function needleThread(owner: Enemy, len: number): ProjBehavior {
         }
       }
       if ((p.mem.st ?? 0) === 2) {
-        const h = handPos(owner);
-        const d = Math.hypot(h.x - p.x, h.y - p.y);
+        const hx = p.mem.hx ?? p.x;
+        const hy = p.mem.hy ?? p.y;
+        const d = Math.hypot(hx - p.x, hy - p.y);
         if (d < NEEDLE.catchR) {
           // caught: back in the spider's legs
           p.dead = true;
+          const h = handPos(owner);
           w.particles.burst(h.x, h.y - 2, { count: 3, speed: [10, 30], life: [0.1, 0.2], colors: [BUL.page.core, CYAN.mid], size: [1, 1] });
           return;
         }
-        p.angle = Math.atan2(h.y - p.y, h.x - p.x);
+        p.angle = Math.atan2(hy - p.y, hx - p.x);
         p.speed = NEEDLE.reel;
         p.syncVel();
       }
@@ -479,11 +598,18 @@ function* skitter(e: Enemy, w: World, time: number): Script {
   while (el < time) {
     const goal = skitterGoal(e, w);
     const burst = w.rng.range(0.26, 0.42);
+    // round book piles and shelves tile by tile instead of pressing into a corner (and stop
+    // at the nearest reachable spot when the goal is across a pit)
+    const route = clearWalk(w.room, e.x, e.y, goal.x, goal.y, e.r) ? [goal] : walkRoute(w.room, e.x, e.y, goal.x, goal.y);
+    if (!route.length) route.push(goal);
+    let k = 0;
     for (let t = 0; t < burst && el < time; t += w.dt, el += w.dt) {
-      const d = Math.hypot(goal.x - e.x, goal.y - e.y);
-      if (d > 4) {
+      while (k < route.length - 1 && Math.hypot(route[k].x - e.x, route[k].y - e.y) < 3) k++;
+      const s = route[k];
+      const d = Math.hypot(s.x - e.x, s.y - e.y) + (route.length - 1 - k) * TILE;
+      if (Math.hypot(s.x - e.x, s.y - e.y) > 4 || k < route.length - 1) {
         e.setAnim('bspider_walk');
-        e.moveDir(goal.x - e.x, goal.y - e.y, Math.min(e.speed, d * 5));
+        e.moveDir(s.x - e.x, s.y - e.y, Math.min(e.speed, d * 5));
       } else {
         e.setAnim('bspider_idle');
         e.stop();
@@ -505,9 +631,13 @@ function* throwNeedles(e: Enemy, w: World): Script {
   const a0 = e.angleToTarget(w);
   e.facing = Math.cos(a0) >= 0 ? 1 : -1;
   e.setAnim('bspider_aim');
-  const angles = e.champion ? [a0 - NEEDLE.spread, a0 + NEEDLE.spread] : [a0];
-  const lens = angles.map((a) => Math.max(24, Math.min(NEEDLE.reach, rayFree(w.room, e.x, e.y, a, 3, NEEDLE.reach + 8, true))));
-  for (let i = 0; i < angles.length; i++) laneWarning(w, e.x, e.y, angles[i], lens[i] + 6, NEEDLE.width, NEEDLE.windup);
+  // a champion keeps the aimed needle and adds one either side
+  const angles = e.champion ? [a0, a0 - NEEDLE.spread, a0 + NEEDLE.spread] : [a0];
+  // the needles leave from where the lanes were drawn, even if a hit shoves the spider meanwhile
+  const ox = e.x;
+  const oy = e.y;
+  const lens = angles.map((a) => Math.max(24, Math.min(NEEDLE.reach, rayFree(w.room, ox, oy, a, 3, NEEDLE.reach + 8, true))));
+  for (let i = 0; i < angles.length; i++) laneWarning(w, ox, oy, angles[i], lens[i] + 6, NEEDLE.width, NEEDLE.windup);
   e.telegraph(NEEDLE.windup);
   gather(w, e.x + e.facing * 4, e.y - 16, [BUL.page.core, BUL.page.color], 6, 10);
   w.sfx('enemy_charge', { vol: 0.35, pitch: 1.6, x: e.x });
@@ -518,7 +648,7 @@ function* throwNeedles(e: Enemy, w: World): Script {
   for (let i = 0; i < angles.length; i++) {
     const a = angles[i];
     shots.push(e.shoot(w, a, {
-      x: e.x + Math.cos(a) * 6, y: e.y + Math.sin(a) * 4, z: 6, speed: NEEDLE.speed, radius: 3, range: 4000, life: 8,
+      x: ox + Math.cos(a) * 6, y: oy + Math.sin(a) * 6, z: 6, speed: NEEDLE.speed, radius: 3, range: 4000, life: 8,
       color: BUL.page.color, style: 'none', light: 14, knockback: 90,
       behaviors: [needleThread(e, lens[i])],
     }));
@@ -529,6 +659,7 @@ function* throwNeedles(e: Enemy, w: World): Script {
     e.stop();
     yield;
   }
+  e.mem.actAt = w.time;
   e.setAnim('bspider_idle');
   yield 0.35;
 }
@@ -539,12 +670,14 @@ function* mend(e: Enemy, w: World, ally: Enemy): Script {
     if (!mendable(e, ally)) return;
     const d = Math.hypot(ally.x - e.x, ally.y - e.y);
     if (d < MEND.reach) break;
+    // a pit, shelving or another monster in the way: sew from here (if the thread reaches)
+    if ((el > 0 && e.mem.__bumped) || w.room.boxBlocked(e.x + ((ally.x - e.x) / d) * 4, e.y + ((ally.y - e.y) / d) * 4, e.r, false, false)) break;
     e.setAnim('bspider_walk');
     e.moveDir(ally.x - e.x, ally.y - e.y, e.speed);
     yield;
   }
   e.halt();
-  if (!mendable(e, ally) || Math.hypot(ally.x - e.x, ally.y - e.y) > MEND.range) return;
+  if (!threadHolds(e, w, ally)) return;
   e.facing = ally.x >= e.x ? 1 : -1;
   e.setAnim('bspider_sew');
   e.mem.mend = ally;
@@ -555,22 +688,25 @@ function* mend(e: Enemy, w: World, ally: Enemy): Script {
   ally.mem.__mendedAt = w.time;
   w.sfx('quill_write', { vol: 0.35, pitch: 1.3, x: e.x });
   // the thread shoots across to the ally
-  for (let el = 0; el < MEND.thread && !e.mem.snap && mendable(e, ally); el += w.dt) {
+  for (let el = 0; el < MEND.thread && !e.mem.snap && threadHolds(e, w, ally); el += w.dt) {
     e.mem.sewK = el / MEND.thread;
     e.stop();
     yield;
   }
   e.mem.sewK = 1;
+  let done = 0;
   for (let s = 0; s < MEND.stitches; s++) {
-    for (let el = 0; el < MEND.gap && !e.mem.snap && mendable(e, ally); el += w.dt) {
+    for (let el = 0; el < MEND.gap && !e.mem.snap && threadHolds(e, w, ally); el += w.dt) {
       e.stop();
       yield;
     }
-    if (e.mem.snap || !mendable(e, ally)) break;
+    // (an ally that wandered off, out of sight or out of reach, slips the thread)
+    if (e.mem.snap || !threadHolds(e, w, ally)) break;
     const heal = Math.max(1, ally.maxHp * MEND.stitch);
     ally.hp = Math.min(ally.maxHp, ally.hp + heal);
     ally.mem.__mendedAt = w.time;
     e.mem.stitched = ((e.mem.stitched as number) ?? 0) + 1;
+    done++;
     w.spawn(new StitchMark(ally));
     w.particles.burst(ally.x, ally.y - ally.z - ally.r, { count: 5, speed: [15, 40], life: [0.25, 0.45], colors: [CYAN.hot, CYAN.mid, GOLD], size: [1, 1], additive: true, light: 4 });
     w.sfx('quill_write', { vol: 0.3, pitch: 1.6 + s * 0.15, x: ally.x });
@@ -583,6 +719,7 @@ function* mend(e: Enemy, w: World, ally: Enemy): Script {
   e.mem.mend = null;
   e.mem.mendId = 0;
   e.mem.mendCd = w.time + MEND.cooldown;
+  e.mem.actAt = w.time;
   if (snapped) {
     // the thread snaps: the spider reels back, dazed
     w.particles.burst(mx, my, { count: 8, speed: [30, 80], life: [0.2, 0.4], colors: [CYAN.hot, CYAN.mid, CYAN.low], size: [1, 1] });
@@ -596,6 +733,9 @@ function* mend(e: Enemy, w: World, ally: Enemy): Script {
       yield;
     }
     e.mem.dazed = 0;
+  } else if (done < MEND.stitches) {
+    // the thread slipped (the ally wandered off or out of sight): it just goes slack
+    w.particles.burst(mx, my, { count: 4, speed: [10, 30], life: [0.2, 0.35], colors: [CYAN.mid, CYAN.low], size: [1, 1] });
   }
   e.setAnim('bspider_idle');
   yield 0.2;
@@ -623,6 +763,7 @@ defineEnemy({
     e.mem.side = w.rng.sign();
     e.mem.mendCd = 0;
     e.mem.stitched = 0;
+    e.mem.actAt = w.time;
   },
   *script(e, w) {
     yield w.rng.range(0.4, 0.9);
@@ -651,7 +792,9 @@ defineEnemy({
   draw(e, r, w) {
     // the binding thread to the ally it is sewing, stitches running along it
     const ally = e.mem.mend as Enemy | null;
-    if (e.mem.sewing && ally && ally.alive) {
+    // (a fleeing spider, or one dragged out of reach, has let the thread go slack: the script
+    // ends the mend on its next step)
+    if (e.mem.sewing && ally && ally.alive && !e.hasStatus('fear') && Math.hypot(ally.x - e.x, ally.y - e.y) <= MEND.range) {
       const hx = e.x + e.facing * SEW.dx;
       const hy = e.y - e.z + SEW.dy;
       const tx = ally.x;

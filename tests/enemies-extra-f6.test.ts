@@ -1,8 +1,10 @@
 // Floor 6 (수몰된 서고) extra regular enemy: 제본 거미 (binding_spider), the floor's support.
 // Definition / sprites / spawn pool, the pure helpers, a 20 s headless run in the real World,
-// the needle on a thread (telegraphed out, stuck with a return lane, reeled back, hurts both
-// ways at base strength, sticks short of rocks), mending (three stitches, capped, never itself
-// or another spider, snapped by a hit -> dazed), clean death, draw purity and lockstep.
+// the needle on a thread (telegraphed out, stuck with a return lane, reeled back exactly along
+// it even when shoved, hurts both ways at base strength, sticks short of rocks, champion fan),
+// mending (three stitches, capped, never itself or another spider, snapped by a hit -> dazed,
+// slips when the ally leaves reach), movement (routes round rock pockets / pits, seeks torn
+// allies, leaves far cover to throw), clean death, draw purity and lockstep.
 
 import './headless';
 import { fakeDisplay } from './headless';
@@ -21,7 +23,7 @@ import { stateHash } from '../src/game/statehash';
 import { Tile } from '../src/game/tiles';
 import { getAnim, hasAnim, hasSprite } from '../src/engine/sprites';
 import { RNG, fx } from '../src/engine/rng';
-import { coverSpot, handPos, MEND, NEEDLE, pickMendTarget, type MendCandidate } from '../src/content/enemies/archive-extra';
+import { clearWalk, coverSpot, handPos, MEND, NEEDLE, openSpot, pickMendTarget, RESTLESS, walkRoute, type MendCandidate } from '../src/content/enemies/archive-extra';
 
 loadContent();
 
@@ -179,6 +181,49 @@ describe('제본 거미 helpers', () => {
     expect(pickMendTarget([c({ x: MEND.range + 5, hp: 10 })], 0, 0, 10)).toBe(-1);
     expect(pickMendTarget([c({ hp: 10, mendedAt: 9 })], 0, 0, 10)).toBe(-1);
     expect(pickMendTarget([c({ hp: 10, mendedAt: 10 - MEND.again - 0.1 })], 0, 0, 10)).toBe(0);
+  });
+
+  it('openSpot never asks the spider to stand inside a rock; walkRoute goes round a wall, or to the nearest reachable spot', () => {
+    const w = world(6, 'xf6-route');
+    const room = w.room;
+    const tx = Math.floor(room.centerX / TILE);
+    const ty = Math.floor(room.centerY / TILE);
+    room.setTile(tx, ty, Tile.ROCK);
+    const gx = (tx + 0.5) * TILE;
+    const gy = (ty + 0.5) * TILE;
+    const s = openSpot(room, gx, gy, gx + 48, gy, 6);
+    expect(room.boxBlocked(s.x, s.y, 6, false, false)).toBe(false);
+    expect(s.x).toBeGreaterThan(gx);
+    expect(Math.abs(s.y - gy)).toBeLessThan(1e-6);
+    // a free goal is kept as is
+    expect(openSpot(room, gx + 40, gy, gx + 80, gy, 6)).toEqual({ x: gx + 40, y: gy });
+    // a wall of rock between (left) start and (right) goal: no straight walk, but a route
+    for (let y = ty - 2; y <= ty + 2; y++) room.setTile(tx, y, Tile.ROCK);
+    const a = { x: gx - 40, y: gy };
+    const b = { x: gx + 40, y: gy };
+    expect(clearWalk(room, a.x, a.y, b.x, b.y, 6)).toBe(false);
+    const route = walkRoute(room, a.x, a.y, b.x, b.y);
+    expect(route.length).toBeGreaterThan(4);
+    let prev = { x: (Math.floor(a.x / TILE) + 0.5) * TILE, y: (Math.floor(a.y / TILE) + 0.5) * TILE };
+    for (const n of route) {
+      expect(room.blocks(Math.floor(n.x / TILE), Math.floor(n.y / TILE), false, false)).toBe(false);
+      // one tile at a time
+      expect(Math.abs(Math.floor(n.x / TILE) - Math.floor(prev.x / TILE)) + Math.abs(Math.floor(n.y / TILE) - Math.floor(prev.y / TILE))).toBe(1);
+      prev = n;
+    }
+    expect(route[route.length - 1]).toEqual(b);
+    // a goal sealed off by rock: the route ends at the reachable tile nearest to it
+    for (let y = ty - 1; y <= ty + 1; y++) for (let x = tx + 2; x <= tx + 4; x++) if (x !== tx + 3 || y !== ty) room.setTile(x, y, Tile.ROCK);
+    const sealed = { x: (tx + 3.5) * TILE, y: (ty + 0.5) * TILE };
+    const r2 = walkRoute(room, a.x, a.y, sealed.x, sealed.y);
+    const end = r2[r2.length - 1];
+    expect(room.blocks(Math.floor(end.x / TILE), Math.floor(end.y / TILE), false, false)).toBe(false);
+    expect(Math.hypot(end.x - sealed.x, end.y - sealed.y)).toBeLessThanOrEqual(2 * TILE + 1);
+    // ... and when the walker already stands on that nearest tile, it stays there (never walks into the rock)
+    const shore = { x: (tx + 5.5) * TILE, y: (ty + 0.5) * TILE };
+    expect(walkRoute(room, shore.x + 3, shore.y - 2, sealed.x, sealed.y)).toEqual([shore]);
+    // already in the goal's tile: nothing to route
+    expect(walkRoute(room, a.x, a.y, a.x + 2, a.y + 1)).toEqual([]);
   });
 });
 
@@ -359,7 +404,7 @@ describe('needle on a thread', () => {
     expect(e.alive).toBe(true);
   });
 
-  it('a champion throws two needles, one either side of the keeper', () => {
+  it('a champion throws three needles: the aimed one plus one either side (standing still is never safe)', () => {
     const w = world(6, 'xf6-champ');
     w.player.god = true;
     const e = spawn(w, ID, 100, 0);
@@ -367,12 +412,65 @@ describe('needle on a thread', () => {
     e.championColor = '#ff4040';
     const first = untilThrow(w);
     const all = needles(w);
-    expect(all).toHaveLength(2);
+    expect(all).toHaveLength(3);
     const aim = Math.atan2(w.player.y - e.y, w.player.x - e.x);
     const rel = all.map((n) => Math.atan2(Math.sin(n.angle - aim), Math.cos(n.angle - aim))).sort((a, b) => a - b);
     expect(rel[0]).toBeLessThan(-0.15);
-    expect(rel[1]).toBeGreaterThan(0.15);
+    expect(Math.abs(rel[1])).toBeLessThan(0.05);
+    expect(rel[2]).toBeGreaterThan(0.15);
+    for (const n of all) expect(n.damage).toBe(1);
     expect(first.damage).toBe(1);
+  });
+
+  it('the needle leaves along the warned lane even if a hit shoves the spider during the wind-up', () => {
+    const w = world(6, 'xf6-shove');
+    w.player.god = true;
+    const e = spawn(w, ID, 100, 0);
+    for (let i = 0; i < secs(8) && e.telegraphT <= 0; i++) w.update(FIXED_DT);
+    expect(e.telegraphT).toBeGreaterThan(0);
+    const lane = warnings(w).filter((g) => g.rw > 0).pop()!;
+    expect(lane).toBeDefined();
+    e.knock(0, 1, 250);
+    let n: Projectile | undefined;
+    for (let i = 0; i < secs(2) && !n; i++) {
+      w.update(FIXED_DT);
+      n = needles(w)[0];
+    }
+    expect(n).toBeDefined();
+    expect(Math.abs(e.y - lane.y)).toBeGreaterThan(8);
+    const perp = Math.abs(-Math.sin(lane.angle) * (n!.x - lane.x) + Math.cos(lane.angle) * (n!.y - lane.y));
+    expect(perp).toBeLessThan(1.5);
+  });
+
+  it('the reel follows the warned return lane exactly, even if the spider is knocked aside meanwhile', () => {
+    const w = world(6, 'xf6-reel-lane');
+    const p = w.player;
+    p.god = true;
+    const e = spawn(w, ID, 100, 0);
+    const n = untilThrow(w);
+    p.y -= 40;
+    for (let i = 0; i < secs(2) && (n.mem.st ?? 0) !== 1; i++) w.update(FIXED_DT);
+    expect(n.mem.st).toBe(1);
+    const back = warnings(w).filter((g) => g.rw > 0).pop()!;
+    expect(back).toBeDefined();
+    let knocked = false;
+    let dev = 0;
+    let reeled = 0;
+    for (let i = 0; i < secs(3) && !n.dead; i++) {
+      w.update(FIXED_DT);
+      if ((n.mem.st ?? 0) !== 2) continue;
+      if (!knocked) {
+        e.knock(0, 1, 250);
+        knocked = true;
+      }
+      reeled++;
+      dev = Math.max(dev, Math.abs(-Math.sin(back.angle) * (n.x - back.x) + Math.cos(back.angle) * (n.y - back.y)));
+      // never past the end of the warned lane
+      expect((n.x - back.x) * Math.cos(back.angle) + (n.y - back.y) * Math.sin(back.angle)).toBeLessThanOrEqual(back.rw + 1);
+    }
+    expect(reeled).toBeGreaterThan(5);
+    expect(dev).toBeLessThan(0.5);
+    expect(n.dead).toBe(true);
   });
 
   it('when the spider dies its needles go slack and vanish', () => {
@@ -458,6 +556,26 @@ describe('mending', () => {
     expect(g.hp).toBeGreaterThan(start);
   });
 
+  it('an ally that leaves the thread\'s reach slips it: no more stitches, no daze, and the thread is never drawn across the room', () => {
+    const { w, e, g } = scene('xf6-slip', 0.4);
+    for (let i = 0; i < secs(5) && !(e.mem.sewing && e.mem.sewK >= 1); i++) w.update(FIXED_DT);
+    expect(e.mem.sewing).toBe(1);
+    const room = w.room;
+    g.x = room.interiorX + 20;
+    g.y = room.interiorY + 20;
+    e.x = room.interiorX + room.interiorW - 20;
+    e.y = room.interiorY + room.interiorH - 20;
+    const h0 = g.hp;
+    let maxLen = 0;
+    steps(w, secs(2), () => {
+      if (e.mem.sewing) maxLen = Math.max(maxLen, Math.hypot(g.x - e.x, g.y - e.y));
+      expect(e.mem.dazed ?? 0).toBe(0);
+    });
+    expect(g.hp).toBeLessThanOrEqual(h0);
+    expect(maxLen).toBeLessThanOrEqual(MEND.range + 5);
+    expect(e.mem.sewing).toBe(0);
+  });
+
   it('never mends another binding spider, and leaves healthy allies alone', () => {
     const w = world(6, 'xf6-self');
     w.player.god = true;
@@ -486,6 +604,109 @@ describe('mending', () => {
     expect(e.dead).toBe(true);
     expect(g.hp).toBeLessThanOrEqual(after);
     expect(needles(w)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------- moving around book piles
+describe('제본 거미 movement', () => {
+  it('walks out of a rock pocket around to its cover spot instead of pressing into the corner', () => {
+    const w = world(6, 'xf6-pocket');
+    const p = w.player;
+    p.god = true;
+    const room = w.room;
+    const cx = Math.floor(p.x / TILE);
+    const cy = Math.floor(p.y / TILE);
+    // a stationary ally to hide behind, to the keeper's right
+    const ty = w.spawnEnemy('ghost_typewriter', (cx + 4.5) * TILE, (cy + 0.5) * TILE)!;
+    // the spider sits in a pocket that is closed toward its cover spot (up and to the right)
+    const sx = cx + 2;
+    const sy = cy + 3;
+    for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [1, 0]]) room.setTile(sx + dx, sy + dy, Tile.ROCK);
+    for (const [dx, dy] of [[0, 0], [0, 1], [-1, 0], [-1, 1], [1, 1], [2, 1], [2, 0], [2, -1]]) expect(room.tileAt(sx + dx, sy + dy), `${dx},${dy}`).toBe(Tile.FLOOR);
+    const e = w.spawnEnemy(ID, (sx + 0.5) * TILE, (sy + 0.5) * TILE)!;
+    const goal = { x: ty.x + 24 + ty.r, y: ty.y };
+    let best = Infinity;
+    let pressing = 0;
+    let lx = e.x;
+    let ly = e.y;
+    steps(w, secs(8), () => {
+      best = Math.min(best, Math.hypot(e.x - goal.x, e.y - goal.y));
+      if (Math.hypot(e.wantVX, e.wantVY) > 1 && Math.hypot(e.x - lx, e.y - ly) < 0.05) pressing += FIXED_DT;
+      lx = e.x;
+      ly = e.y;
+    });
+    expect(best).toBeLessThan(16);
+    expect(pressing).toBeLessThan(0.5);
+  });
+
+  it('heads over to a torn ally beyond the thread\'s reach (past nearer healthy cover) and sews it', () => {
+    const w = world(6, 'xf6-farmend');
+    const p = w.player;
+    p.god = true;
+    const room = w.room;
+    // a stationary ally (typewriter) torn up at one end of the room, the spider at the other
+    const t = w.spawnEnemy('ghost_typewriter', room.interiorX + 24, room.centerY)!;
+    t.hp = t.maxHp * 0.4;
+    const e = w.spawnEnemy(ID, room.interiorX + room.interiorW - 24, room.centerY + 20)!;
+    // healthy cover right next to the spider (it would rather hide there if nobody needed sewing)
+    w.spawnEnemy('ghost_typewriter', room.interiorX + room.interiorW - 50, room.centerY);
+    p.x = room.centerX;
+    p.y = room.interiorY + room.interiorH - 20;
+    expect(Math.hypot(t.x - e.x, t.y - e.y)).toBeGreaterThan(MEND.range + 20);
+    let healed = false;
+    steps(w, secs(9), () => {
+      if (t.hp > t.maxHp * 0.4 + 1) healed = true;
+    });
+    expect(healed).toBe(true);
+  });
+
+  it('a torn ally on an island past a pit: it walks to the shore, sews across, and never pushes into the pit', () => {
+    const w = world(6, 'xf6-moat');
+    const p = w.player;
+    p.god = true;
+    const room = w.room;
+    // a pit ring (radius 4 tiles) around an island at the left of the room; the cover spot
+    // behind the torn ally lies on the island, out of the spider's reach
+    const tx = Math.floor(room.interiorX / TILE) + 4;
+    const ty = Math.floor(room.centerY / TILE);
+    for (let y = ty - 4; y <= ty + 4; y++) for (let x = tx - 4; x <= tx + 4; x++) if (Math.max(Math.abs(x - tx), Math.abs(y - ty)) === 4 && room.tileAt(x, y) === Tile.FLOOR) room.setTile(x, y, Tile.PIT);
+    const t = w.spawnEnemy('ghost_typewriter', (tx + 0.5) * TILE, (ty + 0.5) * TILE)!;
+    t.hp = t.maxHp * 0.4;
+    const e = w.spawnEnemy(ID, room.interiorX + room.interiorW - 20, room.centerY - 8)!;
+    p.x = room.interiorX + room.interiorW - 60;
+    p.y = room.interiorY + room.interiorH - 14;
+    expect(Math.hypot(t.x - e.x, t.y - e.y)).toBeGreaterThan(MEND.range);
+    let pressing = 0;
+    let healed = false;
+    let lx = e.x;
+    let ly = e.y;
+    steps(w, secs(10), () => {
+      if (Math.hypot(e.wantVX, e.wantVY) > 1 && Math.hypot(e.x - lx, e.y - ly) < 0.05) pressing += FIXED_DT;
+      lx = e.x;
+      ly = e.y;
+      if (t.hp > t.maxHp * 0.4 + 1) healed = true;
+      expect(Math.max(Math.abs(Math.floor(e.x / TILE) - tx), Math.abs(Math.floor(e.y / TILE) - ty))).toBeGreaterThan(4);
+    });
+    expect(healed).toBe(true);
+    expect(pressing).toBeLessThan(0.5);
+  });
+
+  it('does not sit behind far-off cover forever: with nothing to sew it comes out to throw', () => {
+    const w = world(6, 'xf6-restless');
+    const p = w.player;
+    p.god = true;
+    const room = w.room;
+    // healthy, stationary cover far from the keeper
+    w.spawnEnemy('ghost_typewriter', room.interiorX + room.interiorW - 40, room.interiorY + 24);
+    p.x = room.interiorX + 30;
+    p.y = room.interiorY + room.interiorH - 24;
+    const e = w.spawnEnemy(ID, room.interiorX + room.interiorW - 20, room.interiorY + 20)!;
+    expect(Math.hypot(e.x - p.x, e.y - p.y)).toBeGreaterThan(NEEDLE.reach + 40);
+    let first = -1;
+    steps(w, secs(RESTLESS + 7), (i) => {
+      if (first < 0 && needles(w).length) first = i * FIXED_DT;
+    });
+    expect(first).toBeGreaterThan(0);
   });
 });
 
