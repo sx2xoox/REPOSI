@@ -18,11 +18,13 @@ import { FIXED_DT } from '../src/game/constants';
 import { stateHash } from '../src/game/statehash';
 import { getAnim, hasAnim, hasSprite } from '../src/engine/sprites';
 import { RNG, fx } from '../src/engine/rng';
+import { HELD } from '../src/game/seam';
 import { TAU } from '../src/engine/math';
 import type { World } from '../src/game/world';
 import {
-  arcCovered, CompassWreck, FENCE_FADE, FENCE_HOLD, hingeHeight, KEEP_OFF, LEG, pickStep, SCRIBE_DRAW, SCRIBE_R, SCRIBE_R_CHAMP,
-  SCRIBE_TELE, ScribeLine, scribeRadius, ScribeWarning, STEP_SPAN, stepGoal, type StepPick,
+  arcCovered, CompassWreck, FENCE_FADE, FENCE_HOLD, hingeHeight, KEEP_OFF, LEG, pickStep, RISE, SCRIBE_DRAW, SCRIBE_R, SCRIBE_R_CHAMP,
+  SCRIBE_MIN_R, SCRIBE_REACH, SCRIBE_TELE, ScribeLine, scribeRadius, scribeSize, ScribeWarning, STEP_SPAN, STEP_VMAX, stepGoal, stepTime,
+  type StepPick,
 } from '../src/content/enemies/clock-extra';
 
 const FLOOR = 7;
@@ -200,6 +202,15 @@ describe('걸음쇠: helpers', () => {
       expect(ny).toBeLessThanOrEqual(174);
       expect(room.isFree((px + nx) / 2, (py + ny) / 2, 7)).toBe(true);
     }
+  });
+
+  it('scribeSize: the circle passes through the keeper when it fits, else the largest that fits; none out of reach', () => {
+    expect(scribeSize(SCRIBE_R, 34)).toBe(34);
+    expect(scribeSize(SCRIBE_R, 10)).toBe(SCRIBE_MIN_R);
+    expect(scribeSize(SCRIBE_R, 55)).toBe(SCRIBE_R);
+    expect(scribeSize(SCRIBE_R, SCRIBE_R + SCRIBE_REACH + 1)).toBe(0);
+    expect(scribeSize(SCRIBE_MIN_R - 1, 20)).toBe(0);
+    expect(scribeSize(33, 36)).toBe(33);
   });
 
   it('stepGoal: straight in when the graver is ready, otherwise keeps its distance on its own side', () => {
@@ -406,7 +417,10 @@ describe('걸음쇠: headless AI', () => {
       const t0 = (fw.w as unknown as { time: number }).time;
       expect(warn.time).toBeCloseTo(champion ? 0.5 : SCRIBE_TELE, 6);
       expect(warn.time).toBeGreaterThanOrEqual(0.3);
-      expect(warn.radius).toBe(champion ? SCRIBE_R_CHAMP : SCRIBE_R);
+      // through the keeper when it fits, never past its largest circle
+      const d = Math.hypot(fw.player.x - warn.x, fw.player.y - warn.y);
+      expect(warn.radius).toBe(scribeSize(champion ? SCRIBE_R_CHAMP : SCRIBE_R, d));
+      expect(warn.radius).toBeLessThanOrEqual(champion ? SCRIBE_R_CHAMP : SCRIBE_R);
       expect(e.telegraphT).toBeGreaterThan(0.3);
       expect(e.anim).toBe('ckcomp_wind');
       // centred on the planted needle
@@ -459,6 +473,30 @@ describe('걸음쇠: headless AI', () => {
     // thrown back outward or inward, along the radius
     const k = fw.player.knocks[0];
     expect(Math.abs(k.x * Math.cos(a) + k.y * Math.sin(a))).toBeGreaterThan(0.95);
+  });
+
+  it('a keeper on the band who reacts like a person (0.35 s) steps in or out unhurt; one who stands still is burnt', () => {
+    for (const move of [12, -12, 0]) {
+      const fw = fakeWorld(`f7x-react-${move}`);
+      fw.player.x = 168;
+      fw.player.y = 104;
+      fw.w.spawnEnemy(ID, 140, 104);
+      const warn = untilWarning(fw);
+      // put the keeper on the band, a little round from the far side
+      const a = warn.a0 + Math.PI + 0.3;
+      fw.player.x = warn.x + Math.cos(a) * warn.radius;
+      fw.player.y = warn.y + Math.sin(a) * warn.radius;
+      const t0 = (fw.w as unknown as { time: number }).time;
+      let moved = 0;
+      step(fw, warn.time + SCRIBE_DRAW + 0.2, (t) => {
+        if (t - t0 < 0.35 || Math.abs(moved) >= Math.abs(move)) return;
+        const s = Math.sign(move) * Math.min(Math.abs(move) - Math.abs(moved), KEEPER_SPEED / 60);
+        moved += s;
+        fw.player.x += Math.cos(a) * s;
+        fw.player.y += Math.sin(a) * s;
+      });
+      expect(fw.player.hurts, `move ${move}`).toBe(move === 0 ? 1 : 0);
+    }
   });
 
   it('a keeper who stepped inside is penned in safely; the fence holds, burns a crossing, then goes out', () => {
@@ -598,11 +636,12 @@ describe('걸음쇠: headless AI', () => {
       // the feet came with it
       expect(Math.hypot(e.x - (e.mem.ax + e.mem.bx) / 2, e.y - (e.mem.ay + e.mem.by) / 2)).toBeLessThan(0.01);
       if (phase === 'cut') expect(lines(fw).every((l) => !l.burning || l.complete)).toBe(true);
-      expect(e.harmful || e.anim === 'ckcomp_scribe' || e.anim === 'ckcomp_rest').toBe(true);
+      // dangerous again unless it is in its next figure (wind-up, cut, rest) or a keeper stands on it
+      expect(e.harmful || ['ckcomp_wind', 'ckcomp_scribe', 'ckcomp_rest'].includes(e.anim) || e.mem.rearm === 1).toBe(true);
     }
   });
 
-  it('every telegraph it shows lasts ≥ 0.3 s, and it is never harmful while it cuts or rests', () => {
+  it('every telegraph it shows lasts ≥ 0.3 s, and it is never harmful while it winds up, cuts or rests', () => {
     const fw = fakeWorld('f7x-tele');
     const e = fw.w.spawnEnemy(ID, 100, 80)!;
     const seen = new Set<Entity>();
@@ -613,7 +652,7 @@ describe('걸음쇠: headless AI', () => {
           expect(g.time).toBeGreaterThanOrEqual(0.3);
         }
       }
-      if (e.anim === 'ckcomp_scribe' || e.anim === 'ckcomp_rest') expect(e.harmful).toBe(false);
+      if (e.anim === 'ckcomp_wind' || e.anim === 'ckcomp_scribe' || e.anim === 'ckcomp_rest') expect(e.harmful).toBe(false);
     }, true);
     expect(seen.size).toBeGreaterThanOrEqual(2);
   });
@@ -693,3 +732,332 @@ describe('걸음쇠 on the real World', () => {
     expect(done!.mask.some((v) => v === 1)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------- review fixes
+describe('걸음쇠: review fixes', () => {
+  const W = (fw: FakeWorld) => fw.w as unknown as { time: number; enemyTimeScale: number };
+
+  it('its body is placed by its script, so it keeps to enemy time: a time stop holds its step, its cut and its fence', () => {
+    // mid-step
+    const fw = fakeWorld('f7r-ts-step');
+    fw.player.x = 280;
+    fw.player.y = 104;
+    const e = fw.w.spawnEnemy(ID, 70, 104)!;
+    for (let i = 0; i < 600 && !(e.mem.swing >= 0 && e.mem.lift > 4 && e.anim === 'ckcomp_step'); i++) step(fw, 1 / 60);
+    expect(e.mem.swing).toBeGreaterThanOrEqual(0);
+    const x0 = e.x;
+    const y0 = e.y;
+    W(fw).enemyTimeScale = 0.04;
+    step(fw, 1);
+    expect(Math.hypot(e.x - x0, e.y - y0)).toBeLessThan(4);
+    W(fw).enemyTimeScale = 1;
+    step(fw, 1);
+    expect(Math.hypot(e.x - x0, e.y - y0)).toBeGreaterThan(8);
+    // mid-cut: the graver all but stops, the half line keeps burning (it is still being cut)
+    const f2 = fakeWorld('f7r-ts-cut');
+    f2.player.x = 168;
+    f2.player.y = 104;
+    f2.w.spawnEnemy(ID, 140, 104);
+    untilWarning(f2);
+    let line: ScribeLine | undefined;
+    for (let i = 0; i < 200 && !(line && line.progress > 0.3); i++) {
+      step(f2, 1 / 60);
+      line = lines(f2)[0];
+    }
+    const p0 = line!.progress;
+    W(f2).enemyTimeScale = 0.04;
+    step(f2, 1.5);
+    expect(line!.progress - p0).toBeLessThan(0.1);
+    expect(line!.burning).toBe(true);
+    W(f2).enemyTimeScale = 1;
+    step(f2, SCRIBE_DRAW);
+    expect(line!.complete).toBe(true);
+    // the finished fence is held by the time stop too
+    W(f2).enemyTimeScale = 0.04;
+    step(f2, FENCE_HOLD + 1);
+    expect(line!.burning).toBe(true);
+    W(f2).enemyTimeScale = 1;
+    step(f2, FENCE_HOLD + FENCE_FADE + 0.2);
+    expect(line!.dead).toBe(true);
+  });
+
+  it('its band warning keeps time with it: up through a time stop until the cut, gone with its compass', () => {
+    const fw = fakeWorld('f7r-warn');
+    fw.player.x = 168;
+    fw.player.y = 104;
+    const e = fw.w.spawnEnemy(ID, 140, 104)!;
+    const warn = untilWarning(fw);
+    W(fw).enemyTimeScale = 0.04;
+    step(fw, 2);
+    // still winding up: the warning is up and no line has been cut
+    expect(warn.dead).toBe(false);
+    expect(lines(fw).every((l) => l.progress === 0)).toBe(true);
+    W(fw).enemyTimeScale = 1;
+    let gapFrames = 0;
+    let cutSeen = false;
+    step(fw, 1, () => {
+      const cut = lines(fw).some((l) => l.progress > 0);
+      if (cut) cutSeen = true;
+      else if (!cutSeen && warn.dead) gapFrames++;
+    });
+    expect(cutSeen).toBe(true);
+    // the warning stays up until the frame the graver starts
+    expect(gapFrames).toBeLessThanOrEqual(1);
+    // killed while winding up: its warning goes at once
+    const f2 = fakeWorld('f7r-warn-kill');
+    f2.player.x = 168;
+    f2.player.y = 104;
+    const e2 = f2.w.spawnEnemy(ID, 140, 104)!;
+    const w2 = untilWarning(f2);
+    e2.takeHit(f2.w, { damage: 999, kind: 'projectile', dirX: 1, dirY: 0 });
+    step(f2, 2 / 60);
+    expect(e2.dead).toBe(true);
+    expect(w2.dead).toBe(true);
+    expect(e.alive).toBe(true);
+  });
+
+  it('a slow status slows its steps like any other walker', () => {
+    const swingFrames = (slow: boolean): number => {
+      const fw = fakeWorld(`f7r-slow-${slow}`);
+      fw.player.x = 280;
+      fw.player.y = 104;
+      const e = fw.w.spawnEnemy(ID, 70, 104)!;
+      if (slow) e.applyStatus({ kind: 'slow', duration: 30, power: 0.5 }, () => 0);
+      let n = 0;
+      let steps = 0;
+      step(fw, 6, () => {
+        if (e.mem.swing >= 0 && e.anim === 'ckcomp_step') n++;
+      });
+      steps = e.mem.steps;
+      return n / Math.max(1, steps);
+    };
+    expect(swingFrames(true)).toBeGreaterThan(swingFrames(false) * 1.7);
+  });
+
+  it('the fence burns only where it is drawn (never over a pit or a rock beside it)', () => {
+    const fw = fakeWorld('f7r-mask');
+    const e = fw.w.spawnEnemy(ID, 100, 60)!;
+    // a pit tile right of the circle's centre, where the ring passes
+    const cx = 168;
+    const cy = 104;
+    const R = 40;
+    const pit = { x: cx + R - 8, y: cy - 8, w: 16, h: 16 };
+    const room = {
+      boxBlocked: (x: number, y: number, r: number) => x + r > pit.x && x - r < pit.x + pit.w && y + r > pit.y && y - r < pit.y + pit.h,
+    };
+    const line = new ScribeLine(e, cx, cy, R, Math.PI, 1, FENCE_HOLD, room as never);
+    line.progress = 1;
+    expect(line.mask.some((v) => v === 0)).toBe(true);
+    // over the pit (angle 0): not drawn, does not burn; a quarter turn away it does
+    expect(line.touches(cx + R, cy, 5)).toBe(false);
+    expect(line.touches(cx, cy + R, 5)).toBe(true);
+    expect(line.touches(cx - R, cy, 5)).toBe(true);
+    // right at the drawn end beside the pit it still burns
+    const edge = Math.asin(9 / R);
+    expect(line.touches(cx + Math.cos(edge + 0.06) * R, cy + Math.sin(edge + 0.06) * R, 5)).toBe(true);
+  });
+
+  it('a heavy (blue) champion keeps its doubled mass after it lets go of its brace', () => {
+    const fw = fakeWorld('f7r-mass');
+    fw.player.x = 280;
+    fw.player.y = 104;
+    const e = fw.w.spawnEnemy(ID, 70, 104)!;
+    e.champion = true;
+    e.mass *= 2;
+    let braced = false;
+    step(fw, 4, () => {
+      if (e.mem.ctl) {
+        braced = true;
+        expect(e.mass).toBe(Infinity);
+      } else expect(e.mass).toBe(6);
+    });
+    expect(braced).toBe(true);
+  });
+
+  it('after a figure it never turns harmful on top of a keeper (it waits until they part)', () => {
+    const fw = fakeWorld('f7r-rearm');
+    fw.player.x = 168;
+    fw.player.y = 104;
+    const e = fw.w.spawnEnemy(ID, 140, 104)!;
+    untilWarning(fw);
+    for (let i = 0; i < 300 && e.anim !== 'ckcomp_rest'; i++) step(fw, 1 / 60);
+    expect(e.anim).toBe('ckcomp_rest');
+    // the keeper hugs the resting compass (point-blank) through the fold
+    let folded = false;
+    step(fw, 2.2, () => {
+      fw.player.x = e.x + 3;
+      fw.player.y = e.y;
+      // a walking step after the fold
+      if (e.anim === 'ckcomp_step' && e.mem.swing === 0) folded = true;
+      expect(e.harmful).toBe(false);
+    });
+    expect(folded).toBe(true);
+    // they part: it is dangerous again
+    fw.player.x = e.x + 60;
+    fw.player.y = e.y;
+    step(fw, 2 / 60);
+    expect(e.harmful).toBe(true);
+  });
+
+  it('legs left open by an interrupted cut close up as it walks on, and it never outruns the keeper', () => {
+    for (const champion of [false, true]) {
+      const fw = fakeWorld(`f7r-open-${champion}`);
+      fw.player.x = 168;
+      fw.player.y = 104;
+      const e = fw.w.spawnEnemy(ID, 140, 104)!;
+      e.champion = champion;
+      untilWarning(fw);
+      for (let i = 0; i < 200 && !lines(fw).some((l) => l.progress > 0.5); i++) step(fw, 1 / 60);
+      e.applyStatus({ kind: 'fear', duration: 0.3 }, () => 0);
+      step(fw, 0.4);
+      // the keeper backs off so it walks (not scribes) for a while
+      fw.player.x = 290;
+      fw.player.y = 50;
+      let px = e.x;
+      let py = e.y;
+      let vmax = 0;
+      step(fw, 3, () => {
+        const v = Math.hypot(e.x - px, e.y - py) * 60;
+        if (e.harmful && e.mem.ctl) vmax = Math.max(vmax, v);
+        px = e.x;
+        py = e.y;
+      });
+      expect(vmax, `champion ${champion}`).toBeLessThan(KEEPER_SPEED);
+      expect(Math.hypot(e.mem.bx - e.mem.ax, e.mem.by - e.mem.ay)).toBeCloseTo(STEP_SPAN, 1);
+    }
+  });
+
+  it('stepTime: a normal step keeps its pace, a wide-open swing takes longer so the body stays under STEP_VMAX', () => {
+    expect(stepTime(0.5, STEP_SPAN, Math.PI)).toBe(0.5);
+    expect(stepTime(0.46, STEP_SPAN, Math.PI)).toBe(0.46);
+    expect(STEP_VMAX).toBeLessThan(KEEPER_SPEED);
+    for (const span0 of [STEP_SPAN, SCRIBE_R, SCRIBE_R_CHAMP, 8]) {
+      for (const phi of [Math.PI, -Math.PI * 0.6, Math.PI * 0.4]) {
+        const T = stepTime(0.46, span0, phi);
+        // peak body speed: ½·√(ṡ² + s²·φ̇²) at the widest span
+        const s = Math.max(span0, STEP_SPAN);
+        const v = (0.5 * Math.hypot(STEP_SPAN - span0, s * phi)) / T;
+        expect(v).toBeLessThanOrEqual(STEP_VMAX + 1e-9);
+      }
+    }
+  });
+
+  it('a bullet-clear mid-cut stops the cut: it does not trace on with no line', () => {
+    const fw = fakeWorld('f7r-clear');
+    fw.player.x = 168;
+    fw.player.y = 104;
+    const e = fw.w.spawnEnemy(ID, 140, 104)!;
+    untilWarning(fw);
+    let line: ScribeLine | undefined;
+    for (let i = 0; i < 200 && !(line && line.progress > 0.4); i++) {
+      step(fw, 1 / 60);
+      line = lines(fw)[0];
+    }
+    line!.onCleared(fw.w);
+    step(fw, 1 / 60);
+    const p0 = line!.progress;
+    step(fw, 0.2);
+    expect(line!.progress).toBe(p0);
+    expect(e.anim).not.toBe('ckcomp_scribe');
+    expect(e.mem.nextScribe).toBeGreaterThan(W(fw).time);
+  });
+});
+
+describe('걸음쇠 on the real World: hit where it is drawn', () => {
+  it('shots aimed at its jewel eye from the side hit it (the head is drawn over its body)', () => {
+    // eye: 3–6 px above the bottom of the head, which hangs 3 px under the drawn hinge
+    const eyeLift = hingeHeight(STEP_SPAN) * RISE - 3 + 4.5;
+    expect(eyeLift).toBeLessThan(16);
+    const r = measureDps({ character: 'ria', weapon: 'lantern_bolt', seconds: 0, seed: 'f7r-eye' });
+    const w = r.world;
+    for (const d of r.dummies) w.killEnemy(d);
+    const p = w.player;
+    const X = p.x;
+    const Y = p.y;
+    const c = w.spawnEnemy(ID, X + 80, Y)!;
+    c.script.stop();
+    c.dormant = 0;
+    c.hp = c.maxHp = 1e6;
+    w.inputSource = (_ww, _pp, o) => {
+      o.mx = o.my = o.ax = o.ay = 0;
+      o.cx = c.x;
+      o.cy = c.y - eyeLift;
+      o.held = HELD.fire | HELD.cursorAim;
+      o.pressed = 0;
+    };
+    for (let i = 0; i < 120; i++) {
+      p.x = X;
+      p.y = Y;
+      w.update(FIXED_DT);
+    }
+    expect(c.hp).toBeLessThan(c.maxHp);
+  });
+});
+
+describe('걸음쇠 in real floor-7 rooms', () => {
+  it('in every normal room of a floor, next to three of the floor enemies: feet over the room, never outruns the keeper while it can touch, never stuck', () => {
+    const r = measureDps({ character: 'ria', weapon: 'lantern_bolt', seconds: 0, seed: 'f7r-rooms' });
+    const w = r.world;
+    w.startFloor(FLOOR);
+    let rooms = 0;
+    let scribes = 0;
+    for (const node of w.map.nodes.filter((n) => n.kind === 'normal')) {
+      w.teleportTo(node);
+      for (let i = 0; i < 60; i++) w.update(FIXED_DT);
+      for (const e of [...w.enemies]) w.killEnemy(e);
+      w.update(FIXED_DT);
+      const room = w.room;
+      const p = w.player;
+      p.god = true;
+      rooms++;
+      const at = () => room.randomFreePos(w.rng, 12, { x: p.x, y: p.y, dist: 60 });
+      const s0 = at();
+      const c = w.spawnEnemy(ID, s0.x, s0.y)!;
+      for (const id of ['cuckoo_clock', 'porcelain_doll', 'rolling_gear']) {
+        const s = at();
+        w.spawnEnemy(id, s.x, s.y);
+      }
+      // the keeper drifts about the middle of the room (never out of a door)
+      w.inputSource = (ww, pp, o) => {
+        const moving = ww.time % 3 >= 1;
+        o.mx = moving ? Math.cos(ww.time * 0.9) : 0;
+        o.my = moving ? Math.sin(ww.time * 1.3) : 0;
+        o.ax = o.ay = 0;
+        o.cx = c.x;
+        o.cy = c.y;
+        o.held = HELD.cursorAim;
+        o.pressed = 0;
+      };
+      const inside = (x: number, y: number) => x >= room.interiorX && x <= room.interiorX + room.interiorW && y >= room.interiorY && y <= room.interiorY + room.interiorH;
+      let px = c.x;
+      let py = c.y;
+      let mark = { x: c.x, y: c.y, t: w.time, n: 0 };
+      for (let i = 0; i < 10 * 60; i++) {
+        w.update(FIXED_DT);
+        expect(w.room).toBe(room);
+        p.x = clampTo(p.x, room.interiorX + 28, room.interiorX + room.interiorW - 28);
+        p.y = clampTo(p.y, room.interiorY + 28, room.interiorY + room.interiorH - 28);
+        const m = c.mem;
+        expect(inside(c.x, c.y) && inside(m.ax, m.ay) && inside(m.bx, m.by), `room ${node.id} step ${i}`).toBe(true);
+        if (c.harmful && m.ctl) expect(Math.hypot(c.x - px, c.y - py) / FIXED_DT, `room ${node.id} step ${i}`).toBeLessThan(KEEPER_SPEED);
+        px = c.x;
+        py = c.y;
+        if (w.time - mark.t >= 4) {
+          // something happened in every 4 s: it moved or took steps / cut a circle
+          const n = m.steps + m.scribes;
+          expect(Math.hypot(c.x - mark.x, c.y - mark.y) > 3 || n > mark.n, `room ${node.id} stuck`).toBe(true);
+          mark = { x: c.x, y: c.y, t: w.time, n };
+        }
+      }
+      scribes += c.mem.scribes;
+      for (const e of [...w.enemies]) w.killEnemy(e);
+      for (let i = 0; i < 20; i++) w.update(FIXED_DT);
+    }
+    expect(rooms).toBeGreaterThanOrEqual(5);
+    expect(scribes).toBeGreaterThan(0);
+  });
+});
+
+function clampTo(v: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, v));
+}

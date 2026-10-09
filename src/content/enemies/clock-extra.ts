@@ -6,8 +6,10 @@
 //    needle. The line it cuts stays on the floor as a burning fence for a few seconds:
 //    touching it burns and throws the keeper back to their own side. Step inside before
 //    the graver comes round and you are penned in with a compass resting on its needle
-//    (harmless until it folds up); stay outside and that ground is closed to you. Killing
-//    it snuffs the line at once.
+//    (it has no contact damage from wind-up to fold, and never turns harmful again on top
+//    of a keeper); stay outside and that ground is closed to you. Killing it snuffs the
+//    line at once. Its body is placed by its script, so its own clock follows enemy time
+//    and slows (`tick`).
 //    It is the floor's only lasting zoning — every other floor-7 attack is gone a moment
 //    after it lands (shots, lanes, steam, swings, rings) — and its only walker that steps
 //    instead of sliding.
@@ -33,10 +35,14 @@ import { AMBER, BRASS, COUT, PLUM, PORC, sparks, springPop, VERD } from './clock
 export const LEG = 24;
 /** Distance between the feet while it walks. */
 export const STEP_SPAN = 26;
-/** Radius of the circle it scribes (champion: SCRIBE_R_CHAMP); shrunk near walls. */
+/**
+ * Largest circle it scribes (champion: SCRIBE_R_CHAMP); shrunk near walls. Within that it
+ * sizes the circle to pass through its keeper (`scribeSize`), so the band always asks them
+ * to choose a side: step in (penned in with it) or out (that ground closed).
+ */
 export const SCRIBE_R = 40;
 export const SCRIBE_R_CHAMP = 46;
-/** It never scribes a circle smaller than this (too close to a wall: walk on). */
+/** It never scribes a circle smaller than this (a keeper closer than this is simply penned in; too close to a wall: walk on). */
 export const SCRIBE_MIN_R = 28;
 /** It scribes when its needle is within the circle's radius + this of its keeper (a fence cut
  *  just in front of a keeper still closes ground to them). */
@@ -54,6 +60,14 @@ export const FENCE_HALF = 2;
 export const KEEP_OFF = 56;
 /** The legs hinge on two lugs this far either side of the head's centre (drawing only). */
 const LUG = 3;
+/**
+ * On-screen rise of the hinge per px of real hinge height (drawing only). The 3/4 view
+ * shortens the legs so the head sits over the body it is hit on: shots aimed at the head
+ * or the jewel eye land (the hit circle is the body, on the floor between the feet).
+ */
+export const RISE = 0.66;
+/** Its body never moves faster than this while it steps (px/s; the keeper runs 92). */
+export const STEP_VMAX = 89;
 
 /** Height of the hinge above the floor for feet `span` px apart (legs of length LEG). */
 export function hingeHeight(span: number): number {
@@ -72,6 +86,16 @@ export interface InteriorQuery extends BlockQuery {
 export function scribeRadius(room: InteriorQuery, cx: number, cy: number, R: number): number {
   const edge = Math.min(cx - room.interiorX, room.interiorX + room.interiorW - cx, cy - room.interiorY, room.interiorY + room.interiorH - cy) - 3;
   return Math.max(0, Math.min(R, edge));
+}
+
+/**
+ * The circle it cuts round its needle for a keeper `d` px away, when at most `fit` fits in
+ * the room: through the keeper, never smaller than SCRIBE_MIN_R (0 = none: no room, or
+ * the keeper is out of reach).
+ */
+export function scribeSize(fit: number, d: number): number {
+  if (fit < SCRIBE_MIN_R || d > fit + SCRIBE_REACH) return 0;
+  return clamp(d, SCRIBE_MIN_R, fit);
 }
 
 /**
@@ -97,12 +121,18 @@ const SWINGS = [Math.PI, Math.PI * 0.8, Math.PI * 0.6, Math.PI * 0.4];
 
 /**
  * The next step toward (gx, gy): which foot to plant and how far to swing the other round
- * it. The new body position (the feet's midpoint) must be free floor, the swung foot must
- * land on the floor inside the room, and the body must not cross a wall on the way (it
- * steps over rocks and pits). Keeps to alternate feet (`prefer`) unless the other is
- * clearly better. Null when boxed in.
+ * it. The swung foot always lands a normal step (STEP_SPAN) from the planted one, so legs
+ * left wide open by an interrupted figure close up again as it walks on. The new body
+ * position (the feet's midpoint) must be free floor, the swung foot must stay over the room
+ * and land on its floor, and the body must not cross a wall on the way (the foot steps over
+ * rocks and pits). Keeps to alternate feet (`prefer`) unless the other is clearly better,
+ * and keeps clear of spots `crowded` reports (another enemy's body) when it can. Null when
+ * boxed in.
  */
-export function pickStep(room: InteriorQuery, ax: number, ay: number, bx: number, by: number, prefer: 0 | 1, gx: number, gy: number, r: number): StepPick | null {
+export function pickStep(
+  room: InteriorQuery, ax: number, ay: number, bx: number, by: number, prefer: 0 | 1, gx: number, gy: number, r: number,
+  crowded?: (x: number, y: number) => boolean,
+): StepPick | null {
   let best: StepPick | null = null;
   let bestScore = Infinity;
   for (const pivot of [prefer, (1 - prefer) as 0 | 1]) {
@@ -111,13 +141,13 @@ export function pickStep(room: InteriorQuery, ax: number, ay: number, bx: number
     const sx = pivot === 0 ? bx : ax;
     const sy = pivot === 0 ? by : ay;
     const a0 = Math.atan2(sy - py, sx - px);
-    const span = Math.max(8, Math.hypot(sx - px, sy - py));
+    const span0 = Math.max(8, Math.hypot(sx - px, sy - py));
     for (const mag of SWINGS) {
       for (const sgn of [1, -1]) {
         const phi = mag * sgn;
         const a1 = a0 + phi;
-        const fx1 = px + Math.cos(a1) * span;
-        const fy1 = py + Math.sin(a1) * span;
+        const fx1 = px + Math.cos(a1) * STEP_SPAN;
+        const fy1 = py + Math.sin(a1) * STEP_SPAN;
         const mx = (px + fx1) / 2;
         const my = (py + fy1) / 2;
         if (fx1 < room.interiorX + 2 || fx1 > room.interiorX + room.interiorW - 2) continue;
@@ -127,13 +157,23 @@ export function pickStep(room: InteriorQuery, ax: number, ay: number, bx: number
         let clear = true;
         for (const k of [0.25, 0.5, 0.75]) {
           const am = a0 + phi * k;
-          if (room.boxBlocked(px + (Math.cos(am) * span) / 2, py + (Math.sin(am) * span) / 2, r * 0.7, true, false)) {
+          const sm = span0 + (STEP_SPAN - span0) * k;
+          const ux = Math.cos(am);
+          const uy = Math.sin(am);
+          // the lifted foot passes over the room, never over its walls
+          const fx = px + ux * sm;
+          const fy = py + uy * sm;
+          if (fx < room.interiorX + 1 || fx > room.interiorX + room.interiorW - 1 || fy < room.interiorY + 1 || fy > room.interiorY + room.interiorH - 1) {
+            clear = false;
+            break;
+          }
+          if (room.boxBlocked(px + (ux * sm) / 2, py + (uy * sm) / 2, r * 0.7, true, false)) {
             clear = false;
             break;
           }
         }
         if (!clear) continue;
-        const score = Math.hypot(mx - gx, my - gy) + (pivot === prefer ? 0 : 8) + (mag < Math.PI ? 0.5 : 0);
+        const score = Math.hypot(mx - gx, my - gy) + (pivot === prefer ? 0 : 8) + (mag < Math.PI ? 0.5 : 0) + (crowded?.(mx, my) ? 40 : 0);
         if (score < bestScore - 1e-9) {
           bestScore = score;
           best = { pivot, phi };
@@ -153,6 +193,17 @@ export function stepGoal(x: number, y: number, tx: number, ty: number, ready: bo
   const d = Math.hypot(x - tx, y - ty);
   if (d < 1e-6) return { x: tx + KEEP_OFF, y: ty };
   return { x: tx + ((x - tx) / d) * KEEP_OFF, y: ty + ((y - ty) / d) * KEEP_OFF };
+}
+
+/**
+ * Seconds a step takes: its own pace (`base`), or longer when the swing is wide (legs left
+ * open) so the body never outruns STEP_VMAX. The body rides on the swung foot's midpoint:
+ * |v| = ½·√(ṡ² + s²·φ̇²) with the span s going from `span0` to STEP_SPAN while the foot turns by `phi`.
+ */
+export function stepTime(base: number, span0: number, phi: number): number {
+  const ds = STEP_SPAN - span0;
+  const smax = Math.max(span0, STEP_SPAN);
+  return Math.max(base, (0.5 * Math.sqrt(ds * ds + smax * smax * phi * phi)) / STEP_VMAX);
 }
 
 // ================================================================== drawing helpers
@@ -244,9 +295,10 @@ function drawLeg(r: Renderer, x0: number, y0: number, x1: number, y1: number, ne
 // ================================================================== the burning line
 /**
  * The line a compass cuts: drawn round as its owner's graver runs (`progress`, set by the
- * owner's script), then it holds as a fence for `hold` seconds. Any part already cut burns
- * a keeper touching it (base 1) and throws them back to their own side. It goes out when
- * its compass dies, and bullet-clears blow it out.
+ * owner's script), then it holds as a fence for `hold` seconds (of enemy time: a time stop
+ * holds it too). Any part already cut burns a keeper touching it (base 1) and throws them
+ * back to their own side; only where it is drawn (never over rocks, pits or walls). It goes
+ * out when its compass dies or stops cutting it, and bullet-clears blow it out.
  */
 export class ScribeLine extends Entity {
   owner: Enemy;
@@ -258,6 +310,9 @@ export class ScribeLine extends Entity {
   held = 0;
   /** time since it began to go out (-1 = burning) */
   fade = -1;
+  /** seconds the half-cut line has not grown (its compass frozen, stunned ...) */
+  stall = 0;
+  private lastProgress = 0;
   source: string;
   /** per sample of the circle: 1 where the floor takes the line (not over rocks / pits / walls) */
   mask: Uint8Array;
@@ -300,7 +355,7 @@ export class ScribeLine extends Entity {
     this.snuff();
   }
 
-  /** Is the keeper at (px, py) of radius `pr` touching the part already cut? */
+  /** Is the keeper at (px, py) of radius `pr` touching the part already cut (and drawn)? */
   touches(px: number, py: number, pr: number): boolean {
     if (!this.burning) return false;
     const dx = px - this.x;
@@ -308,7 +363,21 @@ export class ScribeLine extends Entity {
     const d = Math.hypot(dx, dy);
     const reach = FENCE_HALF + pr * 0.5;
     if (Math.abs(d - this.R) > reach) return false;
-    return arcCovered(this.a0, this.dir, this.progress, Math.atan2(dy, dx), reach / this.R);
+    const ang = Math.atan2(dy, dx);
+    const slack = reach / this.R;
+    if (!arcCovered(this.a0, this.dir, this.progress, ang, slack)) return false;
+    return this.drawnNear(ang, slack);
+  }
+
+  /** Does the floor carry the line anywhere within `slack` radians of `ang`? */
+  drawnNear(ang: number, slack: number): boolean {
+    const N = this.mask.length;
+    let rel = angleDiff(this.a0, ang) * this.dir;
+    if (rel < 0) rel += TAU;
+    const i0 = Math.round((rel / TAU) * N);
+    const k = Math.ceil((slack / TAU) * N);
+    for (let j = -k; j <= k; j++) if (this.mask[(((i0 + j) % N) + N) % N]) return true;
+    return false;
   }
 
   override update(w: World, dt: number): void {
@@ -324,14 +393,17 @@ export class ScribeLine extends Entity {
       return;
     }
     if (this.complete) {
-      this.held += dt;
+      this.held += dt * w.enemyTimeScale;
       if (this.held >= this.hold) {
         this.snuff();
         w.sfx('clock_tick', { vol: 0.25, pitch: 0.7, x: this.x });
         return;
       }
-    } else if (this.age > 8) {
-      // never left half-cut (e.g. its compass was frozen solid mid-line)
+    } else if (this.progress !== this.lastProgress) {
+      this.lastProgress = this.progress;
+      this.stall = 0;
+    } else if (this.progress > 0 && (this.stall += dt) > 1) {
+      // never left half-cut: its compass was frozen solid or stunned mid-line
       this.snuff();
       return;
     }
@@ -395,16 +467,27 @@ export class ScribeLine extends Entity {
 
 /**
  * The band a compass is about to cut: a red ring that fills round from the graver's
- * starting point in the direction it will run, with that starting point marked.
+ * starting point in the direction it will run, with that starting point marked. Its
+ * compass drives it (`age` = wind-up so far, so a slowed or time-stopped compass keeps
+ * it up until the cut), and it goes the moment the compass stops winding up (the cut
+ * starts, it dies, it is carried off its feet).
  */
 export class ScribeWarning extends GroundWarning {
+  owner: Enemy;
   a0: number;
   dir: number;
+  /** cleared by its compass when the wind-up ends */
+  live = true;
 
-  constructor(x: number, y: number, radius: number, time: number, a0: number, dir: number) {
+  constructor(owner: Enemy, x: number, y: number, radius: number, time: number, a0: number, dir: number) {
     super(x, y, radius, time, undefined, WARN_RED);
+    this.owner = owner;
     this.a0 = a0;
     this.dir = dir;
+  }
+
+  override update(_w: World, _dt: number): void {
+    if (!this.live || !this.owner.alive || displaced(this.owner)) this.dead = true;
   }
 
   override draw(r: Renderer): void {
@@ -603,12 +686,23 @@ function syncFeet(e: Enemy): void {
 }
 
 /**
+ * One frame of the compass's own clock. Its body is placed by its script, not moved by
+ * velocity, so its moves follow enemy time (time stop, slowed time) and slows here.
+ */
+function tick(e: Enemy, w: World): number {
+  return w.dt * w.enemyTimeScale * e.speedMult();
+}
+
+/**
  * Braced on a point (stepping or cutting): its script places the body between its feet,
- * knocks and shoves don't move it (others are pushed off it instead).
+ * knocks and shoves don't move it (others are pushed off it instead). Its own mass (a
+ * heavy champion's too) comes back when it lets go.
  */
 function brace(e: Enemy, on: boolean): void {
-  e.mem.ctl = on ? 1 : 0;
-  e.mass = on ? Infinity : e.def.mass ?? 1;
+  const m = e.mem;
+  if (on && !m.ctl) m.mass = e.mass;
+  m.ctl = on ? 1 : 0;
+  e.mass = on ? Infinity : m.mass ?? e.def.mass ?? 1;
 }
 
 /** Was the body carried off its feet while braced (fear, a knock while frozen solid ...)? */
@@ -617,30 +711,46 @@ function displaced(e: Enemy): boolean {
   return Math.abs(e.x - (m.ax + m.bx) / 2) > 3 || Math.abs(e.y - (m.ay + m.by) / 2) > 3;
 }
 
+/** Turn harmful again (after a figure), but never on top of a keeper: it waits until they part. */
+function rearm(e: Enemy, w: World): void {
+  e.mem.rearm = 1;
+  e.harmful = false;
+  tryRearm(e, w);
+}
+
+function tryRearm(e: Enemy, w: World): void {
+  if (!e.mem.rearm) return;
+  for (const p of w.targets()) if (p.alive && Math.hypot(p.x - e.x, p.y - e.y) < e.r + p.r + 4) return;
+  e.mem.rearm = 0;
+  e.harmful = true;
+}
+
 /** Give up the move in hand: the feet follow the body and it stands normally again. */
-function standDown(e: Enemy): void {
+function standDown(e: Enemy, w: World): void {
   const m = e.mem;
   syncFeet(e);
   brace(e, false);
   m.lift = 0;
   m.swing = -1;
   e.flying = !!e.def.flying;
-  e.harmful = true;
+  rearm(e, w);
 }
 
 /** The circle it could scribe right now round its needle (0 = none). */
 function scribeReady(e: Enemy, w: World): number {
   const m = e.mem;
   if (w.time < m.nextScribe || e.hasStatus('charm')) return 0;
-  const R = scribeRadius(w.room, m.ax, m.ay, e.champion ? SCRIBE_R_CHAMP : SCRIBE_R);
-  if (R < SCRIBE_MIN_R) return 0;
   const tg = e.target(w);
-  if (Math.hypot(tg.x - m.ax, tg.y - m.ay) > R + SCRIBE_REACH) return 0;
-  if (!w.room.lineOfSight(m.ax, m.ay, tg.x, tg.y)) return 0;
+  const fit = scribeRadius(w.room, m.ax, m.ay, e.champion ? SCRIBE_R_CHAMP : SCRIBE_R);
+  const R = scribeSize(fit, Math.hypot(tg.x - m.ax, tg.y - m.ay));
+  if (R <= 0 || !w.room.lineOfSight(m.ax, m.ay, tg.x, tg.y)) return 0;
   return R;
 }
 
-/** One step: plant a foot, swing the other round it (lifted), set it down. */
+/**
+ * One step: plant a foot, swing the other round it (lifted), set it down a normal step
+ * away (legs left open by an interrupted figure close up on the way).
+ */
 function* stepOnce(e: Enemy, w: World): Script {
   const m = e.mem;
   const tg = e.target(w);
@@ -649,7 +759,12 @@ function* stepOnce(e: Enemy, w: World): Script {
     const d = w.flow.dirAt(e.x, e.y);
     if (d) goal = { x: e.x + d.x * 80, y: e.y + d.y * 80 };
   }
-  const pick = pickStep(w.room, m.ax, m.ay, m.bx, m.by, m.piv, goal.x, goal.y, e.r);
+  // keep off other bodies (two braced compasses would shove each other off their feet)
+  const crowded = (x: number, y: number): boolean => {
+    for (const o of w.enemies) if (o !== e && o.alive && o.solid && !o.hidden && o.z <= 4 && Math.hypot(o.x - x, o.y - y) < o.r + e.r) return true;
+    return false;
+  };
+  const pick = pickStep(w.room, m.ax, m.ay, m.bx, m.by, m.piv, goal.x, goal.y, e.r, crowded);
   if (!pick) {
     // boxed in: shuffle along on its points instead
     e.setAnim('ckcomp_step');
@@ -665,24 +780,27 @@ function* stepOnce(e: Enemy, w: World): Script {
   const sx = piv === 0 ? m.bx : m.ax;
   const sy = piv === 0 ? m.by : m.ay;
   const a0 = Math.atan2(sy - py, sx - px);
-  const span = Math.hypot(sx - px, sy - py);
-  // a steady clockwork swing: the body never outpaces the keeper (span·π/2 / T < 92 px/s)
-  const T = e.champion ? 0.46 : 0.5;
+  const span0 = Math.hypot(sx - px, sy - py);
+  // a steady clockwork swing: the body never outpaces the keeper (span·φ/2 / T < 92 px/s)
+  const T = stepTime(e.champion ? 0.46 : 0.5, span0, pick.phi);
   brace(e, true);
   m.swing = swing;
   e.setAnim('ckcomp_step', true);
-  for (let el = 0; el < 0.1; el += w.dt) {
-    if (displaced(e)) return standDown(e);
-    m.lift = 3 * Math.min(1, (el + w.dt) / 0.1);
+  for (let el = 0; el < 0.1; ) {
+    if (displaced(e)) return standDown(e, w);
+    el += tick(e, w);
+    m.lift = 3 * Math.min(1, el / 0.1);
     e.halt();
     yield;
   }
   e.flying = true;
-  for (let el = 0; el < T; el += w.dt) {
-    if (displaced(e)) return standDown(e);
-    const t = Math.min(1, (el + w.dt) / T);
+  for (let el = 0; el < T; ) {
+    if (displaced(e)) return standDown(e, w);
+    el += tick(e, w);
+    const t = Math.min(1, el / T);
     const a = a0 + pick.phi * t;
-    setFoot(e, swing, px + Math.cos(a) * span, py + Math.sin(a) * span);
+    const sp = span0 + (STEP_SPAN - span0) * t;
+    setFoot(e, swing, px + Math.cos(a) * sp, py + Math.sin(a) * sp);
     m.lift = 3 + Math.sin(t * Math.PI) * 5;
     e.halt();
     yield;
@@ -717,26 +835,34 @@ function* scribe(e: Enemy, w: World, R: number): Script {
   const b0 = Math.atan2(m.by - cy, m.bx - cx);
   const s0 = Math.hypot(m.bx - cx, m.by - cy);
   const turn = angleDiff(b0, a0);
-  /** carried off mid-figure: stand down, the half-cut line goes out, try again soon */
+  /** carried off mid-figure (or its line blown out): stand down, the half-cut line goes out, try again soon */
   const abort = (line?: ScribeLine): void => {
-    standDown(e);
+    warn.live = false;
+    standDown(e, w);
     if (line && !line.complete) line.snuff();
     m.nextScribe = w.time + 1.5;
   };
   brace(e, true);
   e.halt();
+  // its body swings round the needle with the graver: no contact damage for the whole figure
+  m.rearm = 0;
+  e.harmful = false;
   e.facing = tg.x >= e.x ? 1 : -1;
   e.setAnim('ckcomp_wind', true);
   e.telegraph(tele);
-  w.spawn(new ScribeWarning(cx, cy, R, tele, a0, dir));
+  const warn = w.spawn(new ScribeWarning(e, cx, cy, R, tele, a0, dir));
   w.sfx('clock_ratchet', { vol: 0.45, pitch: 0.75, x: e.x });
   w.sfx('clock_spring', { vol: 0.3, pitch: 1.3, x: e.x });
   // swing the graver leg round and open wide while the band shows
   e.flying = true;
   m.swing = 1;
-  for (let el = 0; el < tele; el += w.dt) {
+  for (let el = 0; el < tele; ) {
     if (displaced(e)) return abort();
-    const t = Math.min(1, (el + w.dt) / tele);
+    el += tick(e, w);
+    warn.age = Math.min(el, tele);
+    // the flashing keeps time with it (a slowed compass flashes until it cuts)
+    e.telegraphT = Math.max(e.telegraphT, tele - el);
+    const t = Math.min(1, el / tele);
     const k = t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
     const a = b0 + turn * k;
     const s = s0 + (R - s0) * k;
@@ -746,23 +872,25 @@ function* scribe(e: Enemy, w: World, R: number): Script {
     if (fx.chance(0.35)) w.particles.spawn({ x: m.bx + fx.range(-1, 1), y: m.by - m.lift, vy: -fx.range(6, 14), life: 0.25, colors: [AMBER.hot, AMBER.mid], size: 1, additive: true });
     yield;
   }
+  warn.live = false;
   m.lift = 0;
   m.swing = -1;
   // cut!
-  e.harmful = false;
   e.setAnim('ckcomp_scribe', true);
   const line = w.spawn(new ScribeLine(e, cx, cy, R, a0, dir, champ ? 2.8 : FENCE_HOLD, w.room));
   w.sfx('whoosh', { vol: 0.4, pitch: 1.4, x: e.x });
   w.sfx('clock_ratchet', { vol: 0.4, pitch: 1.5, x: e.x });
   let scratch = 0;
-  for (let el = 0; el < drawT; el += w.dt) {
-    if (displaced(e)) return abort(line);
-    const k = Math.min(1, (el + w.dt) / drawT);
+  for (let el = 0; el < drawT; ) {
+    if (displaced(e) || line.fade >= 0) return abort(line);
+    const dt = tick(e, w);
+    el += dt;
+    const k = Math.min(1, el / drawT);
     line.progress = k;
     const a = a0 + dir * TAU * k;
     setFoot(e, 1, cx + Math.cos(a) * R, cy + Math.sin(a) * R);
     e.halt();
-    scratch -= w.dt;
+    scratch -= dt;
     if (scratch <= 0) {
       scratch = 0.07;
       w.sfx('clock_tick', { vol: 0.16, pitch: fx.range(2.2, 2.6), x: m.bx });
@@ -792,9 +920,10 @@ function* scribe(e: Enemy, w: World, R: number): Script {
   }
   if (!w.room.isFree(cx + (Math.cos(fold) * STEP_SPAN) / 2, cy + (Math.sin(fold) * STEP_SPAN) / 2, e.r)) fold = b0;
   const foldTurn = angleDiff(a0, fold);
-  for (let el = 0; el < 0.3; el += w.dt) {
+  for (let el = 0; el < 0.3; ) {
     if (displaced(e)) return abort();
-    const k = Math.min(1, (el + w.dt) / 0.3);
+    el += tick(e, w);
+    const k = Math.min(1, el / 0.3);
     const a = a0 + foldTurn * k;
     const s = R + (STEP_SPAN - R) * k;
     setFoot(e, 1, cx + Math.cos(a) * s, cy + Math.sin(a) * s);
@@ -802,7 +931,7 @@ function* scribe(e: Enemy, w: World, R: number): Script {
     yield;
   }
   e.flying = !!e.def.flying;
-  e.harmful = true;
+  rearm(e, w);
   brace(e, false);
   m.piv = 0;
   m.nextScribe = w.time + (champ ? 2.2 : 2.8) + w.rng.range(0, 0.8);
@@ -847,6 +976,7 @@ defineEnemy({
     m.swing = -1;
     m.lift = 0;
     m.ctl = 0;
+    m.rearm = 0;
     m.steps = 0;
     m.scribes = 0;
     m.nextScribe = w.time + 1.2;
@@ -865,7 +995,7 @@ defineEnemy({
       yield* stepOnce(e, w);
     }
   },
-  update(e) {
+  update(e, w) {
     if (e.mem.ctl) {
       // braced on a point: no knockback, the body stays between its feet
       e.kbx = 0;
@@ -873,6 +1003,7 @@ defineEnemy({
       e.x = (e.mem.ax + e.mem.bx) / 2;
       e.y = (e.mem.ay + e.mem.by) / 2;
     } else syncFeet(e);
+    tryRearm(e, w);
   },
   draw(e, r, w) {
     const m = e.mem;
@@ -884,7 +1015,7 @@ defineEnemy({
     const bx = m.bx + ox;
     const by = m.by + oy;
     const span = Math.hypot(bx - ax, by - ay);
-    const h = hingeHeight(span);
+    const h = hingeHeight(span) * RISE;
     const hx = e.x;
     const hy = e.y - e.z - h;
     const liftA = m.swing === 0 ? m.lift : 0;
@@ -904,14 +1035,14 @@ defineEnemy({
     // a glowing bead on the graver point while it cuts
     if (hot && e.anim === 'ckcomp_scribe') r.pixelDisc(bx, by - liftB, 1.5, AMBER.hot, 0.9);
     e.drawDefault(r, hurtFrame(e, w, 'ckcomp_hurt_0'), -h + 3);
-    // the champion crown sits on the head (the default one, at a fixed height, hides behind it)
-    if (e.champion || e.mem.elite) r.sprite('ui_crown', e.x, hy - 18, { sx: 0.65, sy: 0.65 });
+    // the champion crown: drawn again over the head exactly where Enemy.draw put it (one crown, never hidden)
+    if (e.champion || e.mem.elite) r.sprite('ui_crown', e.x, e.y - e.z - e.r * 2 - 7, { sx: 0.65, sy: 0.65 });
   },
   onDeath(e, w) {
     const m = e.mem;
     const span = Math.hypot(m.bx - m.ax, m.by - m.ay);
-    w.spawn(new CompassWreck(e.x, e.y, m.ax, m.ay, m.bx, m.by, hingeHeight(span)));
-    sparks(w, e.x, e.y - hingeHeight(span), 10, 100);
+    w.spawn(new CompassWreck(e.x, e.y, m.ax, m.ay, m.bx, m.by, hingeHeight(span) * RISE));
+    sparks(w, e.x, e.y - hingeHeight(span) * RISE, 10, 100);
     springPop(w, e.x, e.y - 6, 2);
     w.particles.burst(e.x, e.y - 8, { count: 10, speed: [30, 100], life: [0.3, 0.7], colors: [BRASS[4], BRASS[2], AMBER.mid, VERD[1]], size: [1, 2], gravity: 320, vz: [30, 110], shape: 'square', vrot: 9, bounce: 0.3 });
     w.sfx('clock_crack', { vol: 0.4, pitch: 1.2 });
