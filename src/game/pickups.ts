@@ -16,6 +16,7 @@ import { sceneSprite } from '../ui/pixellab-scenery';
 import { PREVIEW_RANGE } from './interact';
 import { STAGES_PER_FLOOR } from './stage-plan';
 import { MATCH_CAP, matchCard, tryLightWithMatch } from './matches';
+import { drawLampStand, drawLampWick, lampStandLight, lampStandStyle } from './lamp-stand';
 
 export type PickupKind =
   | 'coin' | 'coin_string'
@@ -292,19 +293,20 @@ export class Pedestal extends Entity {
   focusT = 0;
 
   override draw(r: Renderer, w: World): void {
-    // stone pedestal
-    r.sprite('pedestal', this.x, this.y + 6);
-    if (!this.item) return;
-    const info = itemInfo(this.item);
-    const bob = Math.sin(this.bobT * 2.4) * 2;
-    const y = this.y - 10 + bob;
-    r.shadow(this.x, this.y - 1, 10 - bob, 3, 0.25);
-    const glowCol = RARITY_COLOR[info.rarity];
-    const f = this.focusT;
-    r.sprite(orbSprite(16, glowCol), this.x, y, { alpha: 0.12 + 0.05 * Math.sin(this.bobT * 4) + f * 0.16, additive: true });
-    // focused (preview card open): a soft rarity ring on the pedestal top
-    if (f > 0.02) r.ring(this.x, this.y + 3, 9 + (1 - f) * 3, glowCol, 1, f * (0.45 + 0.2 * Math.sin(this.bobT * 6)));
-    r.sprite(info.icon, this.x, y, { flash: this.spawnFx > 0 ? this.spawnFx * 2 : f * 0.12 * (1 + Math.sin(this.bobT * 6)) });
+    // 등잔대: the find floats in the light of a lamp stand's oil plate (game/lamp-stand.ts)
+    const info = this.item ? itemInfo(this.item) : null;
+    const glowCol = info ? RARITY_COLOR[info.rarity] : '#ffffff';
+    const f = info ? this.focusT : 0;
+    const stand = { style: lampStandStyle(this.heartPrice), lit: !!info, t: this.bobT, focus: f, focusColor: glowCol, flare: this.spawnFx > 0 ? this.spawnFx * 2 : 0 };
+    drawLampStand(r, w, this.x, this.y, stand);
+    if (info) {
+      const bob = Math.sin(this.bobT * 2.4) * 2;
+      const y = this.y - 10 + bob;
+      r.sprite(orbSprite(16, glowCol), this.x, y, { alpha: 0.12 + 0.05 * Math.sin(this.bobT * 4) + f * 0.16, additive: true });
+      r.sprite(info.icon, this.x, y, { flash: this.spawnFx > 0 ? this.spawnFx * 2 : f * 0.12 * (1 + Math.sin(this.bobT * 6)) });
+    }
+    drawLampWick(r, w, this.x, this.y, stand);
+    if (!info) return;
     if (this.price > 0) {
       const col = w.player.coins >= this.price ? '#ffe680' : '#ff7070';
       r.pixelText(`${this.price}`, this.x, this.y + 9, col, { align: 'center', outline: '#140c1c' });
@@ -319,6 +321,7 @@ export class Pedestal extends Entity {
     if (!this.item) return;
     const info = itemInfo(this.item);
     w.lights.add(this.x, this.y - 10, 40, RARITY_COLOR[info.rarity], { intensity: 0.7 });
+    lampStandLight(w, this.x, this.y, lampStandStyle(this.heartPrice), this.bobT);
   }
 }
 

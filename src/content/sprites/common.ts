@@ -304,15 +304,7 @@ definePixelSprite('map_shrine', { b: '#80a0ff', w: '#e0e8ff' }, ['..w..', '.bwb.
 definePixelSprite('map_curse', { p: '#c050c0' }, ['.ppp.', 'p.p.p', 'ppppp', '.p.p.'], { outline: O });
 
 // ------------------------------------------------------------------ world props
-defineDrawnSprite('pedestal', 16, 12, (p) => {
-  p.rect(1, 0, 14, 3, '#9a92a8');
-  p.rect(3, 3, 10, 6, '#7a7288');
-  p.rect(1, 9, 14, 3, '#6a6278');
-  p.rect(1, 0, 14, 1, '#c8c0d8');
-  p.rect(3, 3, 1, 6, '#9a92a8');
-  p.rect(12, 3, 1, 6, '#5a5268');
-}, { outline: O, origin: [8, 6] });
-
+// (item pedestals are lamp stands: game/lamp-stand.ts)
 function chest(name: string, base: string, band: string, open: boolean): void {
   defineDrawnSprite(name, 18, 17, (p) => {
     const wood = ramp(base, 5), metal = ramp(band, 4);
