@@ -204,7 +204,7 @@ export class OfferingBowl extends Prop {
   }
 
   override light(w: World): void {
-    if (!this.used) w.lights.add(this.x, this.y - 6, 22, this.kind === 'coin' ? '#ffd060' : '#ff8a40', { intensity: 0.5 });
+    if (!this.used) w.lights.add(this.x, this.y - 6, 22, this.kind === 'coin' ? '#ffd060' : '#ff7a50', { intensity: 0.5 });
   }
 }
 

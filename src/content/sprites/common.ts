@@ -8,22 +8,23 @@ const O = '#140c1c'; // outline
 // ------------------------------------------------------------------ life flames (불꽃 / 작은 불꽃: health)
 // Health is the keeper's own lamp fire (the HUD gauge), so its pickups are warm
 // flames, the sibling of the blue flame below: the same build (a pointed tip that
-// sways, a side lick, a white-hot bed low in the body) leaning the other way, lit
-// like the gauge: crimson rim and tip, red-orange body, gold and cream core at the
-// base. Redder than the forge's orange-yellow fire motes and bullets on purpose.
-// Internal kinds stay 'heart' / 'heart_half'.
-export const LIFE_FLAME_PAL = { e: '#9e1c22', r: '#dc3c28', o: '#ff7430', y: '#ffc04a', c: '#fff0c8' };
-const LIFE_OUTLINE = '#260a10';
+// sways, a side lick, a white-hot bed low in the body), mirrored to lean the other
+// way. Red first: a crimson rim and a red body around an orange glow, gold and
+// cream at the base, so it reads as life and stays apart from the orange-yellow
+// fire of the forge (fireplaces, ember motes, fire bullets). Internal kinds stay
+// 'heart' / 'heart_half'.
+export const LIFE_FLAME_PAL = { e: '#9a1626', r: '#ec3a36', o: '#ff8240', y: '#ffd058', c: '#fff8e0' };
+const LIFE_OUTLINE = '#1c0810';
 const LIFE_FLAME: string[][] = [
   [
     '..e.....',
     '..re....',
     '..ere...',
     'e.erre..',
-    'reoooe..',
-    'eooyooe.',
-    'eoocyoe.',
-    'eooccyoe',
+    'rerore..',
+    'eroyore.',
+    'eroccoe.',
+    'erocccoe',
     '.eocccoe',
     '.eoccoe.',
     '..eeee..',
@@ -33,11 +34,11 @@ const LIFE_FLAME: string[][] = [
     '....er..',
     '...ere..',
     '..erre.e',
-    '.eoooeer',
-    '.eoyoooe',
-    'eoocyooe',
-    'eooccyoe',
-    'eoocccoe',
+    '.eroreer',
+    '.eoyorre',
+    'eroccore',
+    'erocccoe',
+    'erocccoe',
     '.eoccoe.',
     '..eeee..',
   ],
@@ -46,20 +47,20 @@ const LIFE_FLAME: string[][] = [
     '.e.er...',
     'er.ere..',
     'ererre..',
-    'eoooooe.',
-    'eooyooe.',
-    'eoocyooe',
-    'eooccyoe',
-    'eoocccoe',
+    'errorre.',
+    'eroyore.',
+    'eroccore',
+    'erocccoe',
+    'erocccoe',
     '.eoccoe.',
     '..eeee..',
   ],
 ];
-// the small one: the same licks and white-hot base, never a plain drop
+// the small one keeps the same licks and white-hot base, never a plain drop
 const LIFE_FLAME_HALF: string[][] = [
-  ['...e..', '..er..', 'e.ere.', 'reooe.', 'eooyoe', 'eoycye', '.eoce.', '..ee..'],
-  ['..e...', '.er...', '.ere.e', 'erooer', 'eooyoe', 'eoycye', '.eoce.', '..ee..'],
-  ['...e..', '...re.', 'e.ere.', 'erooe.', 'eooyoe', 'eoycye', '.eoce.', '..ee..'],
+  ['...e..', '..er..', 'e.ere.', 'reroe.', 'eroyoe', 'eoccoe', '.eooe.', '..ee..'],
+  ['..e...', '.er...', '.ere.e', 'erreer', 'eroyoe', 'eoccoe', '.eooe.', '..ee..'],
+  ['...e..', '...re.', 'e.ere.', 'erroe.', 'eroyoe', 'eoccoe', '.eooe.', '..ee..'],
 ];
 for (const [name, frames] of [['pk_flame', LIFE_FLAME], ['pk_flame_half', LIFE_FLAME_HALF]] as const) {
   frames.forEach((rows, k) => definePixelSprite(`${name}_${k}`, LIFE_FLAME_PAL, rows, { outline: LIFE_OUTLINE }));
@@ -72,20 +73,20 @@ export const LIFE_FLAME_ICON = [
   '..e....',
   '..re...',
   'e.ere..',
-  'reoore.',
-  'eooyooe',
-  'eoocyoe',
-  'eoccyoe',
-  '.eccoe.',
+  'reerre.',
+  'eroyore',
+  'eoccore',
+  'eocccoe',
+  '.eocoe.',
   '..eee..',
 ];
 // (pivot one row below the middle: the pointed tip stays inside a card's top edge like the round coin)
 definePixelSprite('hud_flame', LIFE_FLAME_PAL, LIFE_FLAME_ICON, { outline: LIFE_OUTLINE, origin: [3, 3] });
 // tiny flames written after world float numbers ("-1" + flame, game/effects.ts):
 // life and blue; the pivot is the ink's bottom-left so they sit on the text baseline
-const MINI_FLAME = ['.e...', '.re..', 'eroe.', 'eoyoe', 'eycye', 'eccoe', '.eee.'];
+const MINI_FLAME = ['.e...', '.re..', 'erre.', 'eroye', 'eocce', 'eocoe', '.eee.'];
 definePixelSprite('fx_life_flame', LIFE_FLAME_PAL, MINI_FLAME, { outline: LIFE_OUTLINE, origin: [0, 7] });
-definePixelSprite('fx_blue_flame', { e: '#3050c8', r: '#5a78e8', o: '#7a9af8', y: '#c8d8ff', c: '#e0ecff' }, MINI_FLAME.map((r) => [...r].reverse().join('')), { outline: '#101838', origin: [0, 7] });
+definePixelSprite('fx_blue_flame', { e: '#3050c8', r: '#7a9af8', o: '#a8bcff', y: '#c8d8ff', c: '#e0ecff' }, MINI_FLAME.map((r) => [...r].reverse().join('')), { outline: '#101838', origin: [0, 7] });
 
 // ------------------------------------------------------------------ blue flames (푸른 불꽃: burns before health)
 // a cool flame: white-blue core low in the body, a pointed tip that sways

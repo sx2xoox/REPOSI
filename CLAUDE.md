@@ -28,9 +28,10 @@ Signature mechanics of this game:
   꾸러미 4), health + 푸른 불꽃 (internal `soul`), potions (unidentified, colors shuffled per run),
   active items with room charges (a dropped active keeps its charge). Health is the keeper's lamp
   fire, never hearts (user 2026-10-10): its pickups are 불꽃 / 작은 불꽃 (internal `heart` /
-  `heart_half`, warm flame sprites `pk_flame*` in content/sprites/common.ts, the sibling of
-  `pk_blue_flame*`), health prices / stat icons use `hud_flame`, float texts write the number plus a
-  tiny flame (`floatText(..., LIFE_ICON)`, game/effects.ts). '체력' stays the stat word.
+  `heart_half`, red-first flame sprites `pk_flame*` / `LIFE_FLAME_PAL` in content/sprites/common.ts,
+  the mirrored sibling of `pk_blue_flame*`; keep them red, apart from the orange-yellow forge fire),
+  health prices / stat icons use `hud_flame`, float texts write the number plus a tiny flame
+  (`floatText(..., LIFE_ICON)`, game/effects.ts). '체력' stays the stat word.
 
 ## Tech
 TypeScript (strict) + Vite + Canvas2D. **No external assets**: all art is procedural or

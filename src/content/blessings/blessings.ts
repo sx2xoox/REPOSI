@@ -13,6 +13,7 @@ import type { ArtifactLook } from '../../game/look';
 import { grantPerCopy, isAttack, isPrimary, proc } from '../items/lib';
 import { addMatches } from '../../game/matches';
 import { EMBER_MAX } from '../../game/player';
+import { LIFE_FLAME_PAL } from '../sprites/common';
 
 const O = '#140c1c';
 const GOLD = '#ffd060';
@@ -49,13 +50,15 @@ function bless(b: BlessingSpec): ArtifactDef {
 // ------------------------------------------------------------------ pool
 bless({
   id: 'bless_vigor', name: '생명의 축복', desc: '최대 체력 +1, 체력 1칸 회복', quote: '등불이 심장을 데운다.',
-  // a warm life flame (the blue flame of 푸른 불의 가호, leaning the other way)
-  disk: '#7a2030', glyph: (p) => {
-    p.poly([8, 2, 4.5, 7, 4, 10, 6, 13, 10, 13, 12, 10, 11.5, 7, 9.5, 8], '#ff7a34');
-    p.poly([8, 6, 6, 9, 6.5, 12, 9.5, 12, 10, 9.5], '#ffcf5c');
-    p.px(8, 11, '#fff4d4');
-    p.px(9, 10, '#fff4d4');
-    p.px(7, 4, '#ffb060');
+  // the red life flame of the health pickups (불꽃), the warm sibling of 푸른 불의 가호's
+  // blue flame leaning the other way; red first so it never reads as 불씨의 축복's orange fire
+  disk: '#4a1424', glyph: (p) => {
+    p.poly([8, 2, 4.5, 7, 4, 10, 6, 13, 10, 13, 12, 10, 11.5, 7, 9.5, 8], LIFE_FLAME_PAL.r);
+    p.poly([8, 6, 6, 9, 6.5, 12, 9.5, 12, 10, 9.5], LIFE_FLAME_PAL.o);
+    p.px(8, 11, LIFE_FLAME_PAL.c);
+    p.px(9, 10, LIFE_FLAME_PAL.c);
+    p.px(8, 10, LIFE_FLAME_PAL.y);
+    p.px(7, 4, '#ff8a7a');
   }, look: { aura: '#ff8a9a' },
   stats(m, power) {
     m.addStat('maxHearts', power);

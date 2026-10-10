@@ -16,6 +16,7 @@ import { BLUE_FLAME_ICON, FloatingText, LIFE_ICON } from '../src/game/effects';
 import { LanternShrine, OfferingBowl } from '../src/content/rooms/shrine';
 import { buildCard } from '../src/ui/item-tooltip';
 import { FIXED_DT } from '../src/game/constants';
+import { LIFE_FLAME_PAL } from '../src/content/sprites/common';
 
 loadContent();
 
@@ -57,6 +58,22 @@ describe('health is the lamp flame', () => {
     expect(hasAnim('pk_flame_anim')).toBe(true);
     expect(hasAnim('pk_flame_half_anim')).toBe(true);
     for (const s of ['pk_heart', 'pk_heart_half', 'hud_heart_full', 'st_heart']) expect(hasSprite(s), s).toBe(false);
+  });
+
+  it('the life flame stays red, apart from the orange-yellow forge fire', () => {
+    // hue in degrees of a #rrggbb colour
+    const hue = (c: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16) / 255);
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+      if (d === 0) return 0;
+      const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return (h * 60 + 360) % 360;
+    };
+    // rim and body (most of the silhouette) are red; orange / gold only inside
+    for (const k of ['e', 'r'] as const) {
+      const h = hue(LIFE_FLAME_PAL[k]);
+      expect(h < 10 || h > 345, `${k} ${LIFE_FLAME_PAL[k]} hue ${h.toFixed(0)}`).toBe(true);
+    }
   });
 
   it('every health price shows the flame: 대가의 방 pedestals and the shrine pact', () => {

@@ -45,7 +45,7 @@ await page.evaluate(async () => {
     c.fillStyle = '#8a7f9a'; c.fillText(ch.unlocked ? '기본 해금' : '해금 필요', 40, y + 90);
     const wdef = defs.Weapons.get(ch.weapon);
     if (wdef) { c.fillStyle = '#ffd080'; c.fillText('무기: ' + wdef.name, 40, y + 114); }
-    c.fillText('체력 ' + '♥'.repeat(ch.hearts), 40, y + 138);
+    c.fillText('체력 ' + ch.hearts + '칸', 40, y + 138);
     // portrait
     draw(ch.portrait, 230, y + 120);
     cols.forEach((k, i) => draw(`${ch.spritePrefix}_${k}`, 300 + i * 120 + 40, y + 160));
