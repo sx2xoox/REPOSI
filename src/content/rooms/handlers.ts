@@ -17,18 +17,29 @@ import { coinHeap, darkRing, ritualCircle, roundRug, withDecals } from './decor'
 import { paintKeyHint, whenFontsReady } from './floortext';
 import { touchUiActive } from '../../ui/touch-mode';
 import { save } from '../../engine/save';
+import { input, type Action } from '../../engine/input';
+import { keyName } from '../../ui/keys';
 
 // ------------------------------------------------------------------ start
-const HINTS: { keys: string[]; label: string; dx: number; row: number }[] = [
+// `action`: the key cap is read from the current bindings when the floor is painted (cosmetic only),
+// so a rebound or changed default key never leaves a stale letter on the floor
+const HINTS: { keys: string[]; action?: Action; label: string; dx: number; row: number }[] = [
   { keys: ['W', 'A', 'S', 'D'], label: '이동', dx: -70, row: 0 },
-  { keys: ['Space'], label: '대시', dx: 74, row: 0 },
+  { keys: ['Space'], action: 'dash', label: '대시', dx: 74, row: 0 },
   { keys: ['방향키'], label: '· 마우스  공격', dx: 0, row: 1 },
-  { keys: ['E'], label: '줍기 · 불 붙이기', dx: -70, row: 2 },
-  { keys: ['F'], label: '등불 해방', dx: 70, row: 2 },
-  { keys: ['Q'], label: '액티브', dx: -84, row: 3 },
-  { keys: ['R'], label: '물약', dx: -6, row: 3 },
-  { keys: ['C'], label: '무기 교체', dx: 70, row: 3 },
+  { keys: ['G'], action: 'interact', label: '줍기 · 불 붙이기', dx: -70, row: 2 },
+  { keys: ['F'], action: 'special', label: '등불 해방', dx: 70, row: 2 },
+  { keys: ['Q'], action: 'active', label: '액티브', dx: -84, row: 3 },
+  { keys: ['R'], action: 'consumable', label: '물약', dx: -6, row: 3 },
+  { keys: ['C'], action: 'swap', label: '무기 교체', dx: 70, row: 3 },
 ];
+
+/** Key caps of a floor hint: the action's first keyboard key (falls back to the written default). */
+export function floorHintKeys(h: { keys: string[]; action?: Action }, bindings: Record<Action, string[]>): string[] {
+  if (!h.action) return h.keys;
+  const kb = (bindings[h.action] ?? []).find((c) => !c.startsWith('Mouse') && c !== 'Wheel');
+  return kb ? [keyName(kb)] : h.keys;
+}
 
 // touch screens: the on-screen buttons carry icons, only the sticks need explaining
 const TOUCH_HINTS: typeof HINTS = [
@@ -46,7 +57,7 @@ function paintHints(room: Room): void {
   const bottom = room.interiorY + room.interiorH;
   const rows = [top, top + 20, bottom - 44, bottom - 24];
   const touchHints = save.settings.touchScheme === 'twin' ? TOUCH_HINTS : TOUCH_AUTO_HINTS;
-  for (const h of touchUiActive() ? touchHints : HINTS) paintKeyHint(room, room.centerX + h.dx, rows[h.row], h.keys, h.label);
+  for (const h of touchUiActive() ? touchHints : HINTS) paintKeyHint(room, room.centerX + h.dx, rows[h.row], floorHintKeys(h, input.bindings), h.label);
 }
 
 registerRoomHandler('start', {

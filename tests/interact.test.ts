@@ -6,6 +6,7 @@ import { Pedestal, Pickup } from '../src/game/pickups';
 import { World } from '../src/game/world';
 import { DEFAULT_BINDINGS, GAMEPLAY_ACTIONS, PAD_BUTTONS, type Action } from '../src/engine/input';
 import { CONTROL_ROWS, PAD_NAMES, TOUCH_CONTROL_ROWS } from '../src/ui/keys';
+import { floorHintKeys } from '../src/content/rooms/handlers';
 import { GAME_BUTTONS } from '../src/ui/touch-logic';
 
 loadContent();
@@ -160,6 +161,14 @@ describe('input bindings', () => {
     expect(GAME_BUTTONS).toContain('interact');
     expect(CONTROL_ROWS.some((r) => r.actions.includes('interact'))).toBe(true);
     expect(TOUCH_CONTROL_ROWS.some((r) => r[1].startsWith('줍기'))).toBe(true);
+  });
+
+  it('the first-room floor hints read their key caps from the bindings (pick-up / matches on G)', () => {
+    expect(floorHintKeys({ keys: ['?'], action: 'interact' }, DEFAULT_BINDINGS)).toEqual(['G']);
+    expect(floorHintKeys({ keys: ['?'], action: 'dash' }, DEFAULT_BINDINGS)).toEqual(['Space']);
+    expect(floorHintKeys({ keys: ['?'], action: 'swap' }, DEFAULT_BINDINGS)).toEqual(['C']);
+    expect(floorHintKeys({ keys: ['W', 'A', 'S', 'D'] }, DEFAULT_BINDINGS)).toEqual(['W', 'A', 'S', 'D']);
+    expect(floorHintKeys({ keys: ['G'], action: 'interact' }, { ...DEFAULT_BINDINGS, interact: ['KeyH'] })).toEqual(['H']);
   });
 
   it('Tab-screen actions (tabs, discard) use distinct keys and pad buttons', () => {
