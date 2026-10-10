@@ -129,7 +129,7 @@ Commands:
   (`AffinityDef.families`, the class name is the family labels joined with ' / '). Wherever a weapon is shown its info line
   reads "등급 · 계열 · 속성" (`weaponClassRuns` in ui/logic.ts; the family is green when it is the current keeper's favourite).
 - **Artifact text is glance-readable** (user 2026-10-08: "그냥 대충 보고 알아먹을 정도로만 해… 발동 시간은 알아서 깨닫게").
-  `desc` = one plain sentence ≤ 36 chars (the pickup banner shows only desc); optional `detail` = ONE short sentence (≤ 40) for a
+  `desc` = one plain sentence ≤ 36 chars (a teammate's pickup ribbon shows only desc; the 등불 명판 find tag adds detail); optional `detail` = ONE short sentence (≤ 40) for a
   drawback or a misleading exception only (e.g. 프리즘 조각: '광선 무기로 공격하면 가까운 적에게 프리즘 광선이 분열한다.' +
   '혼자 남은 적에겐 생기지 않는다.'). The UI shows desc + detail together. No timings, intervals, px, caps, stacking or proc-chain
   rules, at most one number (only when the artifact is that number). Keep it true to the code.

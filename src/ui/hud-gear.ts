@@ -261,6 +261,8 @@ export interface LanternState {
   t: number;
   /** white flash 0..1 when the gauge just filled */
   flash: number;
+  /** the glass takes this colour for a moment (a find reaching the keeper's lantern) */
+  tint?: { color: string; amount: number };
 }
 
 /** Glass rect of a lantern drawn at UI (x, y), in UI units. */
@@ -326,6 +328,14 @@ export function drawLantern(r: Renderer, x: number, y: number, s: LanternState, 
   }
   if (!art) glassCage(r, gx, gy, gw, gh, s.ready, alpha);
   if (s.flash > 0) r.uiRect(gx, gy, gw, gh, '#ffffff', alpha * s.flash * 0.7);
+  if (s.tint && s.tint.amount > 0) {
+    // light, not paint: the glass brightens in the colour
+    const d = r.dctx;
+    const op = d.globalCompositeOperation;
+    d.globalCompositeOperation = 'lighter';
+    r.uiRect(gx, gy, gw, gh, s.tint.color, alpha * clamp(s.tint.amount, 0, 1) * 0.5);
+    d.globalCompositeOperation = op;
+  }
   if (s.cooldown > 0) for (let i = 0; i < glassRows; i += 3) r.uiRect(gx, gy + i * PX, gw, PX, '#05030a', alpha * 0.55);
   if (art) blitFrame(r, 'release', s.ready, x, y, alpha);
 }

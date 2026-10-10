@@ -1,5 +1,5 @@
 // Status overlay (Tab): artifacts, floor blessings, and full character abilities.
-// each with its own grid and detail card (name, rarity, tags, description, quote,
+// each with its own grid and detail card (name, rarity, tags, description, signature,
 // copies; blessings: the floor they came from). An artifact can be discarded
 // (X / Del / pad X / the "버리기" button, pressed twice) back onto a pedestal.
 // Also: equipped weapon / active / potion, lantern resonance with tier progress
@@ -388,7 +388,6 @@ export class StatusOverlay implements Scene {
     lines.slice(0, def.detail ? 4 : 2).forEach((l, i) => r.uiText(l, GX + 76, dy + 54 + i * (def.detail ? 11 : 15), { size: def.detail ? 10 : 12, font: def.detail ? 'small' : 'main', color: C.text, alpha: ka }));
     const qy = dy + 57 + Math.min(2, lines.length) * 15;
     if (!def.detail && def.signature) r.uiText(`특징 · ${def.signature}`, GX + 76, qy, { size: 10, font: 'small', color: C.info, alpha: ka });
-    else if (!def.detail && def.quote) r.uiText(`“${def.quote}”`, GX + 76, qy, { size: 10, font: 'small', color: '#a89878', alpha: ka });
     // bottom strip: source / discard
     const by = dy + DETAIL_H - 34;
     r.uiRect(GX + 12, by - 6, dw - 24, 1, C.rimDark, ka);

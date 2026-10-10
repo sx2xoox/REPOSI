@@ -117,8 +117,7 @@ export class Player extends Actor {
   private afterT = 0;
   /** dash pressed slightly before the cooldown ended: performed as soon as possible */
   private dashBuffer = 0;
-  /** Isaac-style "hold the new item over your head" */
-  holdIcon: string | null = null;
+  /** short guard after taking a pedestal item: no fire / release / swap (game/pickup-draw.ts) */
   holdT = 0;
   /** input locked (cutscenes, transitions) */
   frozen = false;
@@ -749,10 +748,6 @@ export class Player extends Actor {
     if (behind) drawBackWeapon(r, this, hover);
     if (!behind) this.drawWeapon(r, w, wdef);
     w.items.draw(r);
-    if (this.holdT > 0 && this.holdIcon) {
-      const t = clamp(1 - this.holdT / 1.0, 0, 1);
-      r.sprite(this.holdIcon, this.x, this.y - 26 - Math.min(1, t * 4) * 4);
-    }
   }
 
   /** Co-op downed keeper: a pale, floating, see-through lantern ghost. */
@@ -785,7 +780,7 @@ export class Player extends Actor {
 
   private drawWeapon(r: Renderer, w: World, wdef = Weapons.get(this.weaponId)): void {
     // `weapon.mem.hideUntil` lets special moves hide the held weapon for a moment
-    if (!wdef || this.holdT > 0 || (this.weapon.mem.hideUntil ?? -1) > w.time) return;
+    if (!wdef || (this.weapon.mem.hideUntil ?? -1) > w.time) return;
     // Apply height once to every custom weapon, including free-drawn chains and bows.
     const ctx = r.ctx;
     ctx.save();

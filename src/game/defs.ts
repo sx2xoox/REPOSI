@@ -162,7 +162,7 @@ export interface ArtifactDef extends ItemHooks {
   desc: string;
   /** Full rules and exclusions shown in inventory / preview / collection. */
   detail?: string;
-  /** flavor quote shown in the pickup banner (Isaac-style), optional */
+  /** flavor quote, shown in the collection (도감) only */
   quote?: string;
   rarity: Rarity;
   /** resonance tags (see SetDef) */

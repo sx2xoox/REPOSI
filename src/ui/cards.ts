@@ -1,5 +1,5 @@
-// Big in-game announcements: the item plaque (a parchment scroll that unrolls
-// between two wooden rollers), small ribbon notices, the boss intro card
+// Big in-game announcements: the find tag (등불 명판: a found item's name and
+// desc light up as it reaches the keeper's lantern), small ribbon notices, the boss intro card
 // (letterbox + keeper vs boss), the floor title card and room-clear feedback,
 // plus the speedrun pieces: fixed-advance clock digits and the boss split card.
 
@@ -10,66 +10,142 @@ import type { Enemy } from '../game/enemy';
 import { clamp, ease, mixColor } from '../engine/math';
 import { animFrame, getSprite, hasAnim } from '../engine/sprites';
 import { C, PX, formatSplit, splitFloorName } from './theme';
-import { divider, fitScale, frame, glow, spriteCentered } from './frame';
+import { divider, drawRuns, fitScale, frame, glow, spriteCentered } from './frame';
+import { weaponClassRuns, type TextRun } from './logic';
+import { RARITY_NAME, Weapons, type CharacterDef } from '../game/defs';
 import { appear, envelope } from './anim';
+import { FIND_LIFE, RIBBON_LIFE } from '../game/pickup-draw';
 import type { SplitNotice } from './speedrun-feed';
 
-// ---------------------------------------------------------------- item plaque
-const BANNER_LIFE = 3.2;
+// ---------------------------------------------------------------- find tag & ribbons
+/** Line height of the small text in a find tag. */
+const FIND_LINE = 11;
+/** Text column of a find tag (after the lantern-window icon frame). */
+const FIND_TEXT_X = 40;
+const FIND_MIN_W = 200;
+const FIND_MAX_W = 380;
+/** Seconds the find tag's text takes to light up, left to right. */
+const FIND_REVEAL = 0.25;
+const FIND_FADE = 0.3;
 
-function roller(r: Renderer, x: number, y: number, h: number, a: number): void {
-  r.uiRect(x - 5, y - 6, 10, h + 12, C.ink, a);
-  r.uiRect(x - 4, y - 5, 8, h + 10, '#6a3e1e', a);
-  r.uiRect(x - 4, y - 5, 3, h + 10, '#a0683a', a);
-  r.uiRect(x + 2, y - 5, 2, h + 10, '#3a200e', a);
-  // brass caps
-  for (const cy of [y - 9, y + h + 5]) {
-    r.uiRect(x - 4, cy, 8, 4, C.ink, a);
-    r.uiRect(x - 3, cy + 1, 6, 2, '#e0a848', a);
-    r.uiRect(x - 3, cy + 1, 2, 1, '#fff0b8', a);
+/** Gap between a weapon's name and its 등급 · 계열 · 속성 line on the tag's first row. */
+const FIND_CLASS_GAP = 8;
+
+interface FindLayout {
+  w: number;
+  h: number;
+  desc: string[];
+  detail: string[];
+  /** a weapon's 등급 · 계열 · 속성 (the family green when it is the keeper's favourite) */
+  cls: TextRun[];
+  textW: number;
+}
+
+/** Size and wrapped lines of a find tag (UI units, on the art grid). */
+function findLayout(r: Renderer, b: Banner, keeper?: CharacterDef | null): FindLayout {
+  const max = FIND_MAX_W - FIND_TEXT_X - 24;
+  const desc = r.wrapText(b.desc, max, 10, false, 'small').slice(0, 3);
+  const detail = b.detail ? r.wrapText(b.detail, max, 10, false, 'small').slice(0, 2) : [];
+  const wdef = b.weapon ? Weapons.get(b.weapon) : undefined;
+  const cls: TextRun[] = wdef ? [{ t: `${RARITY_NAME[wdef.rarity]} · `, c: C.textFaint }, ...weaponClassRuns(wdef, keeper, C.textFaint, C.good)] : [];
+  const clsW = cls.reduce((s, x) => s + r.measureText(x.t, 10, false, 'small'), 0);
+  const head = r.measureText(b.title, 12, true) + (clsW ? FIND_CLASS_GAP + clsW : 0);
+  const textW = Math.max(head, ...desc.map((l) => r.measureText(l, 10, false, 'small')), ...detail.map((l) => r.measureText(l, 10, false, 'small')));
+  const w = Math.ceil(clamp(textW + 64, FIND_MIN_W, FIND_MAX_W) / PX) * PX;
+  const h = Math.ceil((22 + desc.length * FIND_LINE + (detail.length ? 2 + detail.length * FIND_LINE : 0) + 7) / PX) * PX;
+  return { w, h, desc, detail, cls, textW };
+}
+
+/** True once a banner has something on screen (a find waits for its item to land). */
+function bannerShown(b: Banner): boolean {
+  return b.t >= (b.delay ?? 0);
+}
+
+/** Height a banner takes in the stack (0 while it waits). */
+function bannerSlot(r: Renderer, b: Banner): number {
+  if (!bannerShown(b)) return 0;
+  return b.kind === 'find' ? findLayout(r, b).h + 8 : 44;
+}
+
+/** Brass-cornered lantern window holding the found item's icon (24x24 UI units). */
+function lanternWindow(r: Renderer, x: number, y: number, color: string, a: number, lit: number): void {
+  r.uiRect(x, y, 24, 24, C.ink, a);
+  r.uiRect(x + PX, y + PX, 24 - 2 * PX, 24 - 2 * PX, '#1a1420', a);
+  // the glass warms in the item's colour as it lands
+  if (lit > 0) r.uiRect(x + PX, y + PX, 24 - 2 * PX, 24 - 2 * PX, color, a * 0.22 * lit);
+  r.uiRect(x + PX, y + PX, 24 - 2 * PX, PX, '#2a2232', a);
+  // brass corner brackets (3 art pixels each way) with a dark rivet inside
+  const brass = '#c8a060';
+  const dark = '#7a5a30';
+  const arm = 3 * PX;
+  for (const [sx, sy] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) {
+    const cx = sx ? x + 24 - PX : x;
+    const cy = sy ? y + 24 - PX : y;
+    r.uiRect(sx ? cx - arm + PX : cx, cy, arm, PX, brass, a);
+    r.uiRect(cx, sy ? cy - arm + PX : cy, PX, arm, brass, a);
+    r.uiRect(cx + (sx ? -PX : PX), cy + (sy ? -PX : PX), PX, PX, dark, a);
   }
 }
 
-/** Isaac-style item plaque: unrolls, shows name / desc / quote, rolls back up. */
-export function drawPlaque(r: Renderer, b: Banner, y: number): void {
-  const t = b.t;
-  const unroll = ease.outCubic(clamp(t / 0.32, 0, 1));
-  const rollUp = t > 2.65 ? ease.inCubic(clamp((t - 2.65) / 0.35, 0, 1)) : 0;
-  const open = unroll * (1 - rollUp);
-  const fade = t > 2.95 ? clamp(1 - (t - 2.95) / 0.25, 0, 1) : clamp(t / 0.1, 0, 1);
-  if (fade <= 0) return;
-  const lines = r.wrapText(b.desc, 300, 12);
-  const hasQuote = !!b.quote;
-  const h = 36 + lines.length * 15 + (hasQuote ? 17 : 0);
-  const fullW = Math.max(240, Math.min(380, Math.max(r.measureText(b.title, 16, true) + (b.icon ? 56 : 30), ...lines.map((l) => r.measureText(l, 12) + 40), hasQuote ? r.measureText(`“${b.quote}”`, 10, false, 'small') + 40 : 0)));
-  const w = Math.max(12, fullW * open);
-  const x = UI_W / 2 - w / 2;
-  const drop = (1 - ease.outBack(clamp(t / 0.3, 0, 1))) * -10;
-  const yy = y + drop;
-  frame(r, x, yy, w, h, 'parchment', { alpha: fade });
-  // rarity ribbon along the top edge
-  r.uiRect(x + 4, yy + 4, w - 8, 2, b.color, fade * 0.85);
-  const ca = fade * clamp((open - 0.55) / 0.35, 0, 1);
-  if (ca > 0) {
-    const titleW = r.measureText(b.title, 16, true);
-    const iconW = b.icon ? 26 : 0;
-    const tx = UI_W / 2 + iconW / 2;
-    if (b.icon) {
-      const ix = tx - titleW / 2 - 18;
-      spriteCentered(r, b.icon, ix, yy + 22, fitScale(b.icon, 24, 1.5), { alpha: ca });
-    }
-    r.uiText(b.title, tx, yy + 12, { size: 16, bold: true, align: 'center', color: C.parchmentInk, alpha: ca, shadow: '#f4e6c480' });
-    lines.forEach((l, i) => r.uiText(l, UI_W / 2, yy + 34 + i * 15, { size: 12, align: 'center', color: '#5a3a1e', alpha: ca, shadow: false }));
-    if (hasQuote) r.uiText(`“${b.quote}”`, UI_W / 2, yy + 36 + lines.length * 15, { size: 10, font: 'small', align: 'center', color: '#8a6a44', alpha: ca, shadow: false });
+/**
+ * 등불 명판: a dark tag that lights up when a found item reaches the keeper's
+ * lantern — icon in a lantern window, name in the rarity colour, desc (+ detail).
+ */
+export function drawFind(r: Renderer, b: Banner, y: number, keeper?: CharacterDef | null): void {
+  const lt = b.t - (b.delay ?? 0);
+  if (lt < 0) return;
+  const fadeIn = clamp(lt / 0.12, 0, 1);
+  const fadeOut = clamp((FIND_LIFE - lt) / FIND_FADE, 0, 1);
+  const a = Math.min(fadeIn, fadeOut);
+  if (a <= 0) return;
+  const L = findLayout(r, b, keeper);
+  const x = Math.round((UI_W / 2 - L.w / 2) / PX) * PX;
+  const yy = Math.round((y - (1 - ease.outCubic(clamp(lt / 0.2, 0, 1))) * 6) / PX) * PX;
+  const d = r.dctx;
+  // plate: outline, dark plum fill, a rarity rule along the top
+  r.uiRect(x + PX, yy, L.w - 2 * PX, L.h, C.ink, a);
+  r.uiRect(x, yy + PX, L.w, L.h - 2 * PX, C.ink, a);
+  r.uiRect(x + PX, yy + PX, L.w - 2 * PX, L.h - 2 * PX, '#181020', a * 0.92);
+  r.uiRect(x + 2 * PX, yy + PX, L.w - 4 * PX, PX, b.color, a * 0.9);
+  r.uiRect(x + 2 * PX, yy + 2 * PX, L.w - 4 * PX, PX, mixColor(b.color, '#181020', 0.7), a * 0.8);
+  // icon in its lantern window, flaring as it lands
+  const lit = clamp(1 - lt / 0.6, 0, 1);
+  const wx = x + 8;
+  const wy = yy + 8;
+  if (lit > 0) glow(r, wx + 12, wy + 12, 30 + 12 * lit, b.color, 0.35 * lit * a);
+  lanternWindow(r, wx, wy, b.color, a, lit);
+  if (b.icon) {
+    const pop = 1 + (1 - ease.outBack(clamp(lt / 0.25, 0, 1))) * 0.35;
+    spriteCentered(r, b.icon, wx + 12, wy + 12, fitScale(b.icon, 20, 1.5) * pop, { alpha: a, flash: clamp(1 - lt / 0.2, 0, 1) * 0.8 });
   }
-  roller(r, x, yy + 3, h - 6, fade);
-  roller(r, x + w, yy + 3, h - 6, fade);
+  // text lights up left to right, an ember riding the edge
+  const tx = x + FIND_TEXT_X;
+  const k = ease.outCubic(clamp((lt - 0.04) / FIND_REVEAL, 0, 1));
+  const edge = tx + (L.textW + 4) * k;
+  d.save();
+  d.beginPath();
+  d.rect(tx - 2, yy, edge - tx + 2, L.h);
+  d.clip();
+  r.uiText(b.title, tx, yy + 7, { size: 12, bold: true, color: b.color, alpha: a, outline: C.ink });
+  if (L.cls.length) drawRuns(r, L.cls, tx + r.measureText(b.title, 12, true) + FIND_CLASS_GAP, yy + 9, { size: 10, font: 'small', alpha: a });
+  L.desc.forEach((l, i) => r.uiText(l, tx, yy + 23 + i * FIND_LINE, { size: 10, font: 'small', color: C.textDim, alpha: a }));
+  const dy = yy + 25 + L.desc.length * FIND_LINE;
+  L.detail.forEach((l, i) => r.uiText(l, tx, dy + i * FIND_LINE, { size: 10, font: 'small', color: C.textFaint, alpha: a }));
+  d.restore();
+  if (k > 0 && k < 1) {
+    // the wipe's edge: a faint seam with an ember riding it
+    const ex = Math.round(edge / PX) * PX;
+    const ey = Math.round((yy + L.h / 2) / PX) * PX;
+    r.uiRect(ex, yy + 6, PX, L.h - 12, '#ffb040', 0.25 * a * (1 - k));
+    glow(r, ex + 1, ey, 12, '#ffb040', 0.55 * a);
+    r.uiRect(ex, ey - PX, PX, PX * 2, '#ffd080', a);
+  }
 }
 
-/** Smaller dark ribbon notice (potions, resonance tiers, unlocks). */
+/** Smaller dark ribbon notice (potions, resonance tiers, unlocks, a teammate's find). */
 export function drawRibbon(r: Renderer, b: Banner, y: number): void {
   const t = b.t;
-  const a = envelope(t, BANNER_LIFE, 0.2, 0.4);
+  const a = envelope(t, RIBBON_LIFE, 0.2, 0.4);
   if (a <= 0) return;
   const slide = (1 - ease.outCubic(clamp(t / 0.3, 0, 1))) * 24;
   const tw = Math.max(r.measureText(b.title, 12, true), r.measureText(b.desc, 10, false, 'small'));
@@ -89,26 +165,19 @@ export function drawRibbon(r: Renderer, b: Banner, y: number): void {
 
 /** Bottom (UI y) of the banner stack drawn by drawBanners(), or 0 when no banner shows. */
 export function bannersBottom(r: Renderer, w: World): number {
-  if (!w.banners.length) return 0;
   let y = 58;
-  for (const b of w.banners) {
-    if (!b.small && b.icon) y += 36 + r.wrapText(b.desc, 300, 12).length * 15 + (b.quote ? 17 : 0) + 12;
-    else y += 44;
-  }
-  return y - 6;
+  for (const b of w.banners) y += bannerSlot(r, b);
+  return y > 58 ? y - 6 : 0;
 }
 
-/** Draw the world's banner queue: the first non-small one as a plaque, others as ribbons. */
+/** Draw the world's banner queue, top down: find tags and ribbons. */
 export function drawBanners(r: Renderer, w: World): void {
   let y = 58;
   for (const b of w.banners) {
-    if (!b.small && b.icon) {
-      drawPlaque(r, b, y);
-      y += 36 + r.wrapText(b.desc, 300, 12).length * 15 + (b.quote ? 17 : 0) + 12;
-    } else {
-      drawRibbon(r, b, y);
-      y += 44;
-    }
+    if (!bannerShown(b)) continue;
+    if (b.kind === 'find') drawFind(r, b, y, w.local?.character);
+    else drawRibbon(r, b, y);
+    y += bannerSlot(r, b);
   }
 }
 

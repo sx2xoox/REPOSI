@@ -460,7 +460,11 @@ export class Hud {
     const cy = y + (sp.h * PX) / 2 + 2;
     if (ready) glow(r, cx, cy, 30 + 6 * pulse, '#ff9a3a', (0.32 + 0.2 * pulse) * A);
     if (this.releaseFlash > 0) glow(r, cx, cy, 100 * (1.4 - this.releaseFlash * 0.4), '#ffe080', this.releaseFlash * 0.7 * A);
-    drawLantern(r, x, y, { fill: this.emberShown, ready, cooldown: p.releaseCooldown, t: this.t, flash: this.emberFlash }, A);
+    // a find just reached the keeper's lantern: the glass takes its colour, fading out
+    const fg = w.findGlow;
+    const tint = fg ? { color: fg.color, amount: clamp(fg.t / 0.5, 0, 1) } : undefined;
+    if (tint) glow(r, cx, cy, 40 + 16 * tint.amount, tint.color, 0.4 * tint.amount * A);
+    drawLantern(r, x, y, { fill: this.emberShown, ready, cooldown: p.releaseCooldown, t: this.t, flash: this.emberFlash, tint }, A);
     if (ready) {
       // sparks drifting off the cap (time-driven, no RNG)
       for (let i = 0; i < 3; i++) {

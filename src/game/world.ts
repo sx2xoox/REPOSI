@@ -36,6 +36,7 @@ import { StoneLantern, placeStageLantern } from './stone-lantern';
 import { ColdSconce } from './cold-sconce';
 import { Tile } from './tiles';
 import { findFocus } from './interact';
+import { bannerEnd, presentFind } from './pickup-draw';
 import { roomBaseJob } from './roomart';
 import { localRules, readLocalInput, type InputSource, type SimRules } from './seam';
 import { Interpolator } from './interp';
@@ -56,11 +57,18 @@ const MAX_PAN = 0.6;
 export interface Banner {
   title: string;
   desc: string;
-  quote?: string;
   icon: string | null;
   color: string;
   t: number;
   small?: boolean;
+  /** 'find': a pedestal item's tag (등불 명판, ui/cards.ts drawFind); otherwise a ribbon */
+  kind?: 'find';
+  /** seconds before it shows (a find waits for the item to reach the lantern) */
+  delay?: number;
+  /** a find's drawback / exception line (ArtifactDef.detail) */
+  detail?: string;
+  /** a weapon find: its id (the tag adds 등급 · 계열 · 속성) */
+  weapon?: string;
 }
 
 export interface GameOverInfo {
@@ -169,6 +177,8 @@ export class World {
   /** prevents room clear while > 0 (scripted waves) */
   holdClear = 0;
   banners: Banner[] = [];
+  /** HUD only (never read by the simulation, not hashed): the release lantern's glass takes a find's colour for a moment */
+  findGlow: { color: string; t: number } | null = null;
   floorCard: { name: string; subtitle: string; t: number } | null = null;
   bossIntro: { enemy: Enemy; t: number } | null = null;
   gameOver: GameOverInfo | null = null;
@@ -1071,7 +1081,8 @@ export class World {
 
   private updateUiTimers(dt: number): void {
     for (const b of this.banners) b.t += dt;
-    this.banners = this.banners.filter((b) => b.t < 3.2);
+    this.banners = this.banners.filter((b) => b.t < bannerEnd(b));
+    if (this.findGlow && (this.findGlow.t -= dt) <= 0) this.findGlow = null;
     if (this.floorCard) {
       this.floorCard.t += dt;
       if (this.floorCard.t > 3) this.floorCard = null;
@@ -1686,15 +1697,8 @@ export class World {
       }
     }
     if (it.kind !== 'weapon' && it.kind !== 'active') ped.price = 0;
-    p.holdIcon = info.icon;
-    p.holdT = 1.0;
-    p.squash(0.8, 1.25);
-    const rare = info.rarity === 'epic' || info.rarity === 'legendary';
-    playSfx(rare ? 'item_get_rare' : 'item_get');
-    // co-op: a teammate's find is a small banner with their name (UI only)
-    if (this.coop && p !== this.local) this.banner(`${p.name || `P${p.slot + 1}`} · ${info.name}`, info.desc, { icon: info.icon, color: rareColor(info.rarity), small: true });
-    else this.banner(info.name, info.desc, { icon: info.icon, color: rareColor(info.rarity), quote: info.quote });
-    this.spawn(new RingFx(p.x, p.y - 8, 30, 0.4, rareColor(info.rarity), 2));
+    // the keeper's lantern draws the item in; its tag lights up as it lands (game/pickup-draw.ts)
+    presentFind(this, p, info, it, ped.x, ped.y - 10);
   }
 
   /** Put an item on a new pedestal (e.g. swapped out / dropped from a full inventory). */
@@ -1720,9 +1724,9 @@ export class World {
     for (let i = 0; i < n; i++) this.dropRandom(c.x, c.y, 'chest');
   }
 
-  /** Isaac-style item banner. */
-  banner(title: string, desc: string, o: { icon?: string | null; color?: string; quote?: string; small?: boolean } = {}): void {
-    this.banners.push({ title, desc, quote: o.quote, icon: o.icon ?? null, color: o.color ?? '#ffffff', t: 0, small: o.small });
+  /** Banner / ribbon notice queue. */
+  banner(title: string, desc: string, o: { icon?: string | null; color?: string; small?: boolean; kind?: 'find'; delay?: number; detail?: string; weapon?: string } = {}): void {
+    this.banners.push({ title, desc, icon: o.icon ?? null, color: o.color ?? '#ffffff', t: 0, small: o.small, kind: o.kind, delay: o.delay, detail: o.detail, weapon: o.weapon });
     if (this.banners.length > 2) this.banners.shift();
   }
 
@@ -2503,10 +2507,6 @@ function numberSlot(col: string): number {
 function statusColor(hit: HitInfo): string {
   const k = hit.procs?.[0];
   return k === 'burn' ? '#ff9a3a' : k === 'poison' ? '#9aff5a' : k === 'bleed' ? '#ff4a5a' : '#c0c0c0';
-}
-
-function rareColor(r: string): string {
-  return r === 'legendary' ? '#ffb340' : r === 'epic' ? '#c07bff' : r === 'rare' ? '#5fb8ff' : '#ffffff';
 }
 
 function darkenHex(c: string): string {
