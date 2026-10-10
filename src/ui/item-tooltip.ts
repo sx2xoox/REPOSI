@@ -151,6 +151,8 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
       const def = Actives.get(it.id);
       sub.push({ t: ' · 액티브', c: C.textDim });
       if (def) extra.push([{ t: def.timed ? `충전 ${def.charge}초` : `충전 방 ${def.charge}개`, c: C.info }]);
+      // put down earlier: it keeps the charge it had
+      if (def && it.charge !== undefined && it.charge < def.charge) extra.push([{ t: `남은 충전 ${def.timed ? Math.floor(it.charge) : it.charge}/${def.charge}`, c: C.textFaint }]);
       const cur = p.activeId ? Actives.get(p.activeId) : undefined;
       if (cur && cur.id !== it.id) {
         extra[extra.length - 1]?.push({ t: `  ·  ${cur.name}와 교체`, c: C.textFaint });
@@ -248,7 +250,7 @@ export function cardWidth(r: Renderer, c: ItemCard): number {
 function signature(w: World, e: Entity): string {
   const p = w.player;
   let s = `${e.id}|${p.weaponId}|${p.weapon2Id ?? ''}|${p.activeId ?? ''}|${p.potionId ?? ''}|${input.aimMode === 'pad' ? 1 : 0}|${touchUiActive() ? 1 : 0}`;
-  if (e instanceof Pedestal) s += `|${e.item?.kind}:${e.item?.id}|${e.price}|${e.heartPrice}|${e.affordable(w) ? 1 : 0}|${p.coins >= e.price ? 1 : 0}|${e.item ? w.items.powerOf(e.item.id) : 0}`;
+  if (e instanceof Pedestal) s += `|${e.item?.kind}:${e.item?.id}:${e.item?.charge ?? ''}|${e.price}|${e.heartPrice}|${e.affordable(w) ? 1 : 0}|${p.coins >= e.price ? 1 : 0}|${e.item ? w.items.powerOf(e.item.id) : 0}`;
   else if (e instanceof Pickup) s += `|${e.kind}|${e.potionId}|${w.run.identified.has(e.potionId) ? 1 : 0}|${e.price}|${p.coins >= e.price ? 1 : 0}|${e.canCollect(w) ? 1 : 0}`;
   if (e.interactionInfo) {
     const i = e.interactionInfo(w);
