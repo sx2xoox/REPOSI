@@ -379,10 +379,10 @@ export class CharacterSelectScene implements Scene {
     frame(r, x + (1 - k) * 10, y, w, h, 'panel', { alpha: A * 0.95 });
     const tx = x + 14 + (1 - k) * 10;
     r.uiText('능력치', tx, y + 12, { size: 10, font: 'small', color: C.gold, alpha: A });
-    // hearts
+    // life: the lamp's own fire (same flame as the health pickups)
     const hy = y + 34;
     r.uiText('체력', tx + 22, hy - 6, { size: 12, color: C.textDim, alpha: A });
-    r.uiSprite('st_heart', tx + 6, hy, 2, { alpha: A });
+    r.uiSprite('hud_flame', tx + 6, hy, 2, { alpha: A });
     // the same life gauge as in a run (locked keepers: three dark cells)
     const red = open ? c.hearts * 2 : 0;
     const life = { red, maxRed: open ? red : 6, soul: open ? (c.soulHearts ?? 0) * 2 : 0, shields: 0, t: this.t, low: false };

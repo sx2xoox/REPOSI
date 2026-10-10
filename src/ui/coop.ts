@@ -106,7 +106,7 @@ export class CoopHud {
       r.uiRect(x + 33, y + 23, (pw - 42) * f, 3, '#fff0a0', a);
       return;
     }
-    // hearts: one small pip per half heart (red, then soul)
+    // life: one small pip per half 칸 (the lamp's fire, then blue flames)
     const pip = 5;
     const maxPips = Math.floor((pw - 40) / (pip + 1));
     const total = Math.min(maxPips, Math.max(p.maxRed, p.red) + p.soul);
@@ -115,10 +115,11 @@ export class CoopHud {
       const hy = y + 18;
       const isRed = i < p.maxRed;
       const filled = isRed ? i < p.red : i - p.maxRed < p.soul;
-      const c = !filled ? '#3a2430' : isRed ? C.heart : C.soul;
+      const c = !filled ? '#3a2430' : isRed ? C.life : C.soul;
       r.uiRect(hx, hy, pip, 6, C.ink, a);
       r.uiRect(hx + 1, hy + 1, pip - 2, 4, c, a);
-      if (filled && i % 2 === 0) r.uiRect(hx + 1, hy + 1, 1, 1, '#ffffff', a * 0.6);
+      // a bright tip on each whole 칸: gold on the fire, white on blue flames
+      if (filled && i % 2 === 0) r.uiRect(hx + 1, hy + 1, 1, 1, isRed ? C.lifeHi : '#ffffff', a * (isRed ? 0.9 : 0.6));
     }
     // ember
     const ef = clamp(p.ember / EMBER_MAX, 0, 1);

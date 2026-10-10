@@ -28,7 +28,7 @@ import { ItemSystem, Loot } from './items';
 import { RunState } from './run';
 import type { BossSplit } from './speedrun';
 import { roomHandler } from './roomkinds';
-import { DamageNumber, DoorClearGlow, FloatingText, RingFx } from './effects';
+import { DamageNumber, DoorClearGlow, FloatingText, LIFE_HEAL_TEXT, LIFE_ICON, RingFx } from './effects';
 import { Chest, FirePlace, Pedestal, Pickup, Trapdoor, itemInfo, type PedestalItem, type PickupKind } from './pickups';
 import { MATCH_CAP, addMatches } from './matches';
 import { SealLamp } from './seal-lamp';
@@ -1384,7 +1384,7 @@ export class World {
     const p = this.player;
     if (p.stats.lifesteal > 0 && this.rng.chance(p.stats.lifesteal) && p.red < p.maxRed) {
       p.heal(1);
-      this.floatText(p.x, p.y - 18, '+♥', '#ff6070');
+      this.floatText(p.x, p.y - 18, '+', LIFE_HEAL_TEXT, 1, LIFE_ICON);
     }
     // drops
     if (e.champion) this.dropRandom(e.x, e.y, 'champion');
@@ -1730,8 +1730,9 @@ export class World {
     if (this.banners.length > 2) this.banners.shift();
   }
 
-  floatText(x: number, y: number, text: string, color = '#ffffff', scale = 1): void {
-    const f = new FloatingText(x, y, text, color, scale);
+  /** Cosmetic float text; `icon` is a small sprite written after it (LIFE_ICON for health). */
+  floatText(x: number, y: number, text: string, color = '#ffffff', scale = 1, icon: string | null = null): void {
+    const f = new FloatingText(x, y, text, color, scale, 0.7, icon);
     f.layer = 3;
     this.spawn(f);
   }

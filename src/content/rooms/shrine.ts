@@ -129,11 +129,11 @@ export class OfferingBowl extends Prop {
     const affordable = !!p && (coin ? p.coins >= this.cost : !!heartCostKind(p, this.cost));
     const cost = coin ? '동전 16개' : p ? heartCostText(p, this.cost) : '최대 체력 1칸 감소 · 부족하면 푸른 불꽃 1칸 소모';
     return {
-      name: coin ? '등불의 온기' : '등불의 맹약', icon: coin ? 'hud_coin' : 'pk_heart',
+      name: coin ? '등불의 온기' : '등불의 맹약', icon: coin ? 'hud_coin' : 'pk_flame',
       desc: coin ? `${cost}를 바칩니다. 체력을 모두 회복하고 푸른 불꽃 1칸을 얻습니다. 그릇은 한 번만 사용할 수 있습니다.`
         : `${cost}. 무작위 능력치 하나가 이번 도전 동안 증가합니다. 그릇은 한 번만 사용할 수 있습니다.`,
       actionLabel: '봉헌', available: this.previewable() && affordable,
-      price: { icon: coin ? 'hud_coin' : 'pk_heart', text: String(this.cost), ok: affordable },
+      price: { icon: coin ? 'hud_coin' : 'hud_flame', text: String(this.cost), ok: affordable },
     };
   }
 
@@ -196,14 +196,15 @@ export class OfferingBowl extends Prop {
     r.sprite('shrine_bowl', this.x, this.y);
     if (this.used) return;
     const bob = Math.sin(this.age * 3) * 1.5;
-    const icon = this.kind === 'coin' ? 'hud_coin' : 'pk_heart';
-    r.sprite(icon, this.x, this.y - 11 + bob);
+    // the pact bowl holds a flame of the keeper's own fire (what it asks for)
+    if (this.kind === 'coin') r.sprite('hud_coin', this.x, this.y - 11 + bob);
+    else r.anim('pk_flame_anim', this.age, this.x, this.y - 12 + bob);
     const afford = this.kind === 'coin' ? w.player.coins >= this.cost : !!heartCostKind(w.player, 1);
     r.pixelText(`${this.cost}`, this.x, this.y + 5, afford ? '#ffffff' : '#ff7070', { align: 'center', outline: '#140c1c' });
   }
 
   override light(w: World): void {
-    if (!this.used) w.lights.add(this.x, this.y - 6, 22, this.kind === 'coin' ? '#ffd060' : '#ff5060', { intensity: 0.5 });
+    if (!this.used) w.lights.add(this.x, this.y - 6, 22, this.kind === 'coin' ? '#ffd060' : '#ff8a40', { intensity: 0.5 });
   }
 }
 

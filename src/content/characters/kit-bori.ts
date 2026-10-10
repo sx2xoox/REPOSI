@@ -1,10 +1,10 @@
 // 보리's kit — the Saint Bernard rescue dog, built around the little barrel on
 // her collar.
-//   passive 구조통: hearts picked up at full health are stored in the barrel
+//   passive 구조통: health flames (불꽃) picked up at full health are stored in the barrel
 //     (max 3 charges; +½ per cleared room, a little per blocked bullet). When
 //     보리 is hurt the barrel pours a healing puddle at her feet (keepers inside
-//     heal ½♥ every 0.9 s, up to 1♥); the potion key with no potion drinks a
-//     charge (+1♥, +1 shield), and at 1♥ she gulps one automatically. She is
+//     heal ½ 칸 every 0.9 s, up to 1 칸); the potion key with no potion drinks a
+//     charge (+1 칸, +1 shield), and at 1 칸 she gulps one automatically. She is
 //     heavy (knockback resistance).
 //   dash 몸통 밀치기: a short, heavy shove; a shield wall in front blocks bullets
 //     and shoves enemies for ~0.3 s
@@ -24,7 +24,7 @@ import type { Player } from '../../game/player';
 import type { Renderer } from '../../engine/renderer';
 import type { AffinityDef, DashDef, PassiveDef } from '../../game/defs';
 import { Entity } from '../../game/entity';
-import { RingFx } from '../../game/effects';
+import { LIFE_HEAL_TEXT, LIFE_ICON, RingFx } from '../../game/effects';
 import { PRESS } from '../../game/seam';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { fx } from '../../engine/rng';
@@ -40,12 +40,12 @@ export const BORI_MAX_CHARGES = 3;
 /** barrel gained per cleared room and per bullet blocked by the body block */
 export const BORI_ROOM_CHARGE = 0.5;
 export const BORI_BLOCK_CHARGE = 0.1;
-/** puddle: life (s), radius, seconds per ½♥ healed, max ½♥ per puddle */
+/** puddle: life (s), radius, seconds per ½ 칸 healed, max ½ 칸 per puddle */
 export const BORI_PUDDLE_LIFE = 4;
 export const BORI_PUDDLE_RADIUS = 20;
 export const BORI_PUDDLE_HEAL_EVERY = 0.9;
 export const BORI_PUDDLE_HEAL_MAX = 2;
-/** drinking a charge: ½♥ healed, shields granted (cap) */
+/** drinking a charge: ½ 칸 healed, shields granted (cap) */
 export const BORI_DRINK_HEAL = 2;
 export const BORI_SHIELD_CAP = 2;
 /** knockback resistance (Entity.mass; 1 = a normal keeper) */
@@ -159,7 +159,8 @@ export function drink(w: World, auto = false): boolean {
   w.sfx('heal', { vol: 0.5, pitch: 1.1 });
   w.spawn(new RingFx(p.x, p.y - 6, 26, 0.35, '#c8f0ff', 2));
   w.particles.burst(p.x, p.y - 10, { count: 16, speed: [20, 70], life: [0.3, 0.6], colors: ['#ff6070', '#ffd9b0', '#ffffff'], size: [1, 2], vz: [20, 60], gravity: -40 });
-  w.floatText(p.x, p.y - 24, healed > 0 ? (auto ? '꿀꺽! +♥' : '+♥') : '+방패', '#ff8090');
+  if (healed > 0) w.floatText(p.x, p.y - 24, auto ? '꿀꺽! +' : '+', LIFE_HEAL_TEXT, 1, LIFE_ICON);
+  else w.floatText(p.x, p.y - 24, '+방패', '#ff8090');
   proc(w, 'passive:bori');
   return true;
 }
@@ -167,7 +168,7 @@ export function drink(w: World, auto = false): boolean {
 // ------------------------------------------------------------------ puddle
 /**
  * The barrel's spill: a warm puddle that heals keepers standing in it. Gameplay
- * entity (heals); room-bound. `heals` counts the ½♥ it has given away.
+ * entity (heals); room-bound. `heals` counts the ½ 칸 it has given away.
  */
 export class RescuePuddle extends Entity {
   heals = 0;
@@ -206,7 +207,7 @@ export class RescuePuddle extends Entity {
           p.heal(1);
           this.heals++;
           w.sfx('heal', { vol: 0.4, pitch: 1.2 });
-          w.floatText(p.x, p.y - 20, '+½♥', '#ff8090');
+          w.floatText(p.x, p.y - 20, '+0.5', LIFE_HEAL_TEXT, 1, LIFE_ICON);
           w.particles.burst(p.x, p.y - 8, { count: 6, speed: [10, 40], life: [0.3, 0.6], colors: ['#ff6070', '#ffd9b0'], size: [1, 2], vz: [20, 50], gravity: -40 });
           proc(w, 'passive:bori', true);
         }
@@ -254,11 +255,11 @@ export function spill(w: World): RescuePuddle | null {
 // ------------------------------------------------------------------ passive
 export const BORI_PASSIVE: PassiveDef = {
   name: '구조통',
-  desc: '넘치는 회복을 통에 담는다(최대 3). 맞으면 치유 웅덩이를 쏟고, R로 마시면 +♥와 방패.',
+  desc: '넘치는 회복을 통에 담는다(최대 3). 맞으면 치유 웅덩이를 쏟고, R로 마시면 체력과 방패.',
   icon: 'icon_bori_passive',
   look: { aura: '#ffd9b0', step: '#e8b080', hit: '#ffe0b0' },
   stats(m) {
-    // hearts can be picked up at full health (they go into the barrel)
+    // health flames can be picked up at full health (they go into the barrel)
     m.flag('overheal');
   },
   onAcquire(w) {
@@ -292,7 +293,7 @@ export const BORI_PASSIVE: PassiveDef = {
   onUpdate(w) {
     const p = w.player;
     if (!p.alive) return;
-    // R with no potion drinks a charge; at 1♥ she gulps one on her own
+    // R with no potion drinks a charge; at 1 칸 she gulps one on her own
     if (p.input.pressed & PRESS.potion && !p.potionId && !p.frozen && barrel(w) >= 1) drink(w);
     else if (p.red <= 2 && p.soul <= 0 && barrel(w) >= 1 && cooldown(w, 'boriAuto', 2.5)) drink(w, true);
     w.vars.__boriRed = p.red;
@@ -481,7 +482,7 @@ export function releaseRescueHowl(w: World, p: Player): void {
   p.heal(2);
   p.shields = Math.min(BORI_SHIELD_CAP, p.shields + 1);
   addBarrel(w, 1, true);
-  w.floatText(p.x, p.y - 26, '+♥ 방패', '#ff8090');
+  w.floatText(p.x, p.y - 26, '+', LIFE_HEAL_TEXT, 1, LIFE_ICON);
   const falloff = new HitFalloff(BORI_BEACON_FALLOFF);
   const dmg = s.damage * BORI_BEACON_DMG;
   const dur = 2.4;

@@ -53,8 +53,8 @@ export interface ItemCard {
 }
 
 const PICKUP_TEXT: Partial<Record<PickupKind, [string, string]>> = {
-  heart_half: ['체력 반 칸', '체력을 반 칸 회복한다'],
-  heart: ['체력 한 칸', '체력을 한 칸 회복한다'],
+  heart_half: ['작은 불꽃', '체력을 반 칸 회복한다'],
+  heart: ['불꽃', '체력을 한 칸 회복한다'],
   blue_flame: ['푸른 불꽃', '체력보다 먼저 타는 불꽃 한 칸'],
   blue_flame_half: ['작은 푸른 불꽃', '체력보다 먼저 타는 불꽃 반 칸'],
   match: ['성냥', '봉인된 문·상자와 꺼진 등에 불을 붙인다'],
@@ -63,7 +63,7 @@ const PICKUP_TEXT: Partial<Record<PickupKind, [string, string]>> = {
   coin_string: ['동전 꾸러미', '동전 4개'],
 };
 const PICKUP_ICON: Partial<Record<PickupKind, string>> = {
-  heart_half: 'pk_heart_half', heart: 'pk_heart', blue_flame: 'pk_blue_flame', blue_flame_half: 'pk_blue_flame_half',
+  heart_half: 'pk_flame_half', heart: 'pk_flame', blue_flame: 'pk_blue_flame', blue_flame_half: 'pk_blue_flame_half',
   match: 'pk_match', matchbox: 'pk_matchbox', coin: 'pk_coin', coin_string: 'pk_coin_string',
 };
 const RARITY_ORDER: Rarity[] = ['common', 'rare', 'epic', 'legendary'];
@@ -180,7 +180,7 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
       price = { icon: 'hud_coin', text: `${e.price}`, ok: p.coins >= e.price };
       label = '구매';
     } else if (e.heartPrice > 0) {
-      price = { icon: 'hud_heart_full', text: `${e.heartPrice}`, ok };
+      price = { icon: 'hud_flame', text: `${e.heartPrice}`, ok };
       extra.push([{ t: heartCostText(p, e.heartPrice), c: C.bad }]);
       extra.push([{ t: '최대 체력 부족 시 푸른 불꽃으로 지불', c: C.textFaint }]);
       label = '거래';

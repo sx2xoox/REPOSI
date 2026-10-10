@@ -10,6 +10,7 @@ import { Prop } from '../props/prop';
 import type { World } from '../../game/world';
 import type { Renderer } from '../../engine/renderer';
 import { withDecals } from './decor';
+import { BLUE_FLAME_ICON, BLUE_FLAME_TEXT, LIFE_HURT_TEXT, LIFE_ICON } from '../../game/effects';
 
 type MechanismKind = 'relay' | 'workshop' | 'vault';
 const COLORS = { relay: '#8de4dc', workshop: '#f6cf88', vault: '#bf9dea' };
@@ -120,8 +121,8 @@ export class RoomDevice extends Prop {
   endEncounter(w,this,success);
   if(!success&&this.kind==='relay')for(const p of w.coop?w.players:[w.player])if((this.mem.members&(1<<p.slot))&&p.alive&&!p.downed){
    // Mission failure is a fixed cost; neither floor damage nor dodge/shields amplify or erase it.
-   if(p.soul>0)p.soul--;else p.red=Math.max(0,p.red-1);
-   w.run.stats.damageTaken++;w.floatText(p.x,p.y-22,'-0.5♥','#ff8b99');
+   const blue=p.soul>0;if(blue)p.soul--;else p.red=Math.max(0,p.red-1);
+   w.run.stats.damageTaken++;w.floatText(p.x,p.y-22,'-0.5',blue?BLUE_FLAME_TEXT:LIFE_HURT_TEXT,1,blue?BLUE_FLAME_ICON:LIFE_ICON);
    if(!p.alive)w.asPlayer(p,()=>w.playerDied('등불 호위 실패'));
   }
   w.banner(success?'임무 완료':'임무 실패',success?'보상을 확인하세요':'위험이 멎고 출구가 열렸습니다. 이 장치는 다시 가동할 수 없습니다.',{small:true,color:success?COLORS[this.kind]:'#e9988d'});

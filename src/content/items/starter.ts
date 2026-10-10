@@ -7,6 +7,7 @@ import { RingFx } from '../../game/effects';
 import { Projectile } from '../../game/projectile';
 import { amplifyShot, isMelee, proc } from './lib';
 import { effectProc } from '../../game/procs';
+import { LIFE_FLAME_ICON, LIFE_FLAME_PAL } from '../sprites/common';
 
 const O = '#0c0810';
 
@@ -59,18 +60,34 @@ defineArtifact({
   },
 });
 
+// 불씨 화로 (id ember_heart): a small bronze brazier keeping the keeper's own fire
+// (the life flame), i.e. one more 칸 of health; no heart shapes for health
 defineDrawnSprite('icon_ember_heart', 16, 16, (p) => {
-  p.circle(5.5, 6, 3.5, '#e8283c');
-  p.circle(10.5, 6, 3.5, '#e8283c');
-  p.poly([2, 7, 14, 7, 8, 14], '#e8283c');
-  p.shadeSphere(8, 8, 7, 7, ramp('#e8283c', 4));
-  p.ellipse(8, 8, 2, 2.5, '#ffb040');
-  p.px(8, 7, '#fff0a0');
+  const BR = ['#3a1a0c', '#6e3414', '#a85a24', '#d8943e', '#f8d488'];
+  // three short legs under the bowl
+  p.rect(3, 13, 2, 3, BR[1]);
+  p.rect(11, 13, 2, 3, BR[0]);
+  p.rect(7, 14, 2, 2, BR[1]);
+  // the round bronze bowl: the lower half of a ball, lit from the upper left
+  p.ellipse(8, 8, 7, 6.5, BR[2]);
+  p.shadeSphere(7, 7.5, 7.5, 7, BR.slice(0, 4), { dither: false });
+  p.rect(0, 0, 16, 9, null);
+  // the mouth: a bronze lip (bright on the left) around dark glowing coals
+  p.ellipse(8, 9, 7, 1.5, BR[3]);
+  p.line(2, 8, 6, 8, BR[4]);
+  p.px(1, 9, BR[4]);
+  p.ellipse(8, 9.2, 5.6, 1, '#4a1008');
+  for (const [x, c] of [[4, '#c8401c'], [6, '#ff8e34'], [9, '#ff8e34'], [11, '#c8401c']] as const) p.px(x, 9, c);
+  // the keeper's fire rising from it (the life flame)
+  p.stamp(4, 0, LIFE_FLAME_ICON.slice(0, 8), LIFE_FLAME_PAL);
+  p.px(6, 8, LIFE_FLAME_PAL.y);
+  p.px(7, 8, LIFE_FLAME_PAL.o);
+  p.px(5, 8, LIFE_FLAME_PAL.o);
 }, { outline: O });
 
 defineArtifact({
   id: 'ember_heart',
-  name: '불씨 심장',
+  name: '불씨 화로',
   desc: '최대 체력이 늘고, 새 층마다 체력을 반 칸 회복한다.',
   quote: '작은 불씨가 심장을 데운다.',
   signature: '새 층에 도착할 때마다 체력 반 칸을 회복한다',
@@ -86,7 +103,7 @@ defineArtifact({
     const p = w.player;
     if (p.maxRed <= 0 || p.red >= p.maxRed) return;
     p.heal(power);
-    w.particles.burst(p.x, p.y - 8, { count: 12, speed: [20, 60], life: [0.4, 0.7], colors: ['#ffffff', '#ff8a7a', '#ff5060'], size: [1, 2], additive: true });
+    w.particles.burst(p.x, p.y - 8, { count: 12, speed: [20, 60], life: [0.4, 0.7], colors: ['#fff4d4', '#ffcf5c', '#ff8e34'], size: [1, 2], additive: true });
     proc(w, 'ember_heart');
   },
 });

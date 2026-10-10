@@ -22,17 +22,25 @@ export type PickupKind =
   | 'heart_half' | 'heart' | 'blue_flame' | 'blue_flame_half'
   | 'match' | 'matchbox' | 'potion';
 
-/** Still sprite per pickup kind (preview cards, touch buttons; blue flames also animate in the world). */
+/**
+ * Still sprite per pickup kind (preview cards, touch buttons; flames also animate
+ * in the world). Health ('heart' / 'heart_half') is shown as the keeper's warm
+ * lamp flame (불꽃 / 작은 불꽃), the sibling of the blue flame.
+ */
 export const PICKUP_SPRITE: Record<PickupKind, string> = {
   coin: 'pk_coin', coin_string: 'pk_coin_string',
-  heart_half: 'pk_heart_half', heart: 'pk_heart', blue_flame: 'pk_blue_flame', blue_flame_half: 'pk_blue_flame_half',
+  heart_half: 'pk_flame_half', heart: 'pk_flame', blue_flame: 'pk_blue_flame', blue_flame_half: 'pk_blue_flame_half',
   match: 'pk_match', matchbox: 'pk_matchbox', potion: 'pk_potion',
 };
 
 /** World animation per pickup kind (drawn instead of the still sprite). */
 const PICKUP_ANIM: Partial<Record<PickupKind, string>> = {
+  heart: 'pk_flame_anim', heart_half: 'pk_flame_half_anim',
   blue_flame: 'pk_blue_flame_anim', blue_flame_half: 'pk_blue_flame_half_anim',
 };
+
+/** world price text of a health price (대가의 방 pedestals): the life flame's orange */
+export const LIFE_PRICE_COLOR = '#ff8a40';
 
 const GOLDEN_ANGLE = 2.399963229728653;
 
@@ -174,6 +182,7 @@ export class Pickup extends Entity {
 
   override light(w: World): void {
     if (this.kind === 'blue_flame' || this.kind === 'blue_flame_half') w.lights.add(this.x, this.y, 22, '#8ab0ff', { intensity: 0.6 });
+    else if (this.kind === 'heart' || this.kind === 'heart_half') w.lights.add(this.x, this.y - 2, this.kind === 'heart' ? 22 : 17, '#ff9a50', { intensity: 0.55 });
     else if (this.kind === 'coin' || this.kind === 'coin_string') w.lights.add(this.x, this.y, 14, '#ffd060', { intensity: 0.4 });
     else if (this.kind === 'match' || this.kind === 'matchbox') w.lights.add(this.x, this.y - 3, 10, '#ffb060', { intensity: 0.35 });
   }
@@ -240,7 +249,7 @@ export class Pedestal extends Entity {
   group = 0;
   /** blocks pickup until the player steps away once (after swapping) */
   waitForLeave = false;
-  /** optional: costs hearts instead of coins (대가의 방, 성소) */
+  /** optional: costs max health (칸, shown as flames) instead of coins (대가의 방, 성소) */
   heartPrice = 0;
   bobT = fx.range(0, 6);
   spawnFx = 0.5;
@@ -301,8 +310,8 @@ export class Pedestal extends Entity {
       r.pixelText(`${this.price}`, this.x, this.y + 9, col, { align: 'center', outline: '#140c1c' });
     }
     if (this.heartPrice > 0) {
-      r.pixelText(`${this.heartPrice}`, this.x - 3, this.y + 9, '#ff5060', { align: 'center', outline: '#140c1c' });
-      r.sprite('pk_heart', this.x + 5, this.y + 11);
+      r.pixelText(`${this.heartPrice}`, this.x - 3, this.y + 9, LIFE_PRICE_COLOR, { align: 'center', outline: '#140c1c' });
+      r.sprite('hud_flame', this.x + 5, this.y + 9);
     }
   }
 

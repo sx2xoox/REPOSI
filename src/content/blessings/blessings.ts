@@ -45,17 +45,18 @@ function bless(b: BlessingSpec): ArtifactDef {
   return defineArtifact({ ...rest, icon, rarity: 'rare', tags: [], pools: [], hidden: true, blessing: true });
 }
 
-const heart = (c: string) => (p: PixelPainter) => {
-  p.circle(6, 7, 2.2, c);
-  p.circle(10, 7, 2.2, c);
-  p.poly([3.6, 7.6, 12.4, 7.6, 8, 12.4], c);
-  p.px(6, 6, '#ffffff');
-};
 
 // ------------------------------------------------------------------ pool
 bless({
   id: 'bless_vigor', name: '생명의 축복', desc: '최대 체력 +1, 체력 1칸 회복', quote: '등불이 심장을 데운다.',
-  disk: '#7a2030', glyph: heart('#ff5a6a'), look: { aura: '#ff8a9a' },
+  // a warm life flame (the blue flame of 푸른 불의 가호, leaning the other way)
+  disk: '#7a2030', glyph: (p) => {
+    p.poly([8, 2, 4.5, 7, 4, 10, 6, 13, 10, 13, 12, 10, 11.5, 7, 9.5, 8], '#ff7a34');
+    p.poly([8, 6, 6, 9, 6.5, 12, 9.5, 12, 10, 9.5], '#ffcf5c');
+    p.px(8, 11, '#fff4d4');
+    p.px(9, 10, '#fff4d4');
+    p.px(7, 4, '#ffb060');
+  }, look: { aura: '#ff8a9a' },
   stats(m, power) {
     m.addStat('maxHearts', power);
   },

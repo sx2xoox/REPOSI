@@ -30,7 +30,9 @@ export const C = {
   ember: '#ff9a3a',
   emberHi: '#ffe080',
   emberDeep: '#c04010',
-  heart: '#e8283c',
+  /** health: the lamp's own fire (red-orange body, gold tip), see hud-fire.ts */
+  life: '#e2502a',
+  lifeHi: '#ffcf5c',
   soul: '#7a9af8',
   good: '#8ee07a',
   bad: '#ff6a70',

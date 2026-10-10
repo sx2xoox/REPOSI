@@ -5,29 +5,87 @@ import { ramp } from '../../engine/painter';
 
 const O = '#140c1c'; // outline
 
-// ------------------------------------------------------------------ health
-const HEART = [
-  '.rr.rr.',
-  'rwrrrrr',
-  'rrrrrrr',
-  'rrrrrrr',
-  '.rrrrr.',
-  '..rrr..',
-  '...r...',
+// ------------------------------------------------------------------ life flames (불꽃 / 작은 불꽃: health)
+// Health is the keeper's own lamp fire (the HUD gauge), so its pickups are warm
+// flames, the sibling of the blue flame below: the same build (a pointed tip that
+// sways, a side lick, a white-hot bed low in the body) leaning the other way, lit
+// like the gauge: crimson rim and tip, red-orange body, gold and cream core at the
+// base. Redder than the forge's orange-yellow fire motes and bullets on purpose.
+// Internal kinds stay 'heart' / 'heart_half'.
+export const LIFE_FLAME_PAL = { e: '#9e1c22', r: '#dc3c28', o: '#ff7430', y: '#ffc04a', c: '#fff0c8' };
+const LIFE_OUTLINE = '#260a10';
+const LIFE_FLAME: string[][] = [
+  [
+    '..e.....',
+    '..re....',
+    '..ere...',
+    'e.erre..',
+    'reoooe..',
+    'eooyooe.',
+    'eoocyoe.',
+    'eooccyoe',
+    '.eocccoe',
+    '.eoccoe.',
+    '..eeee..',
+  ],
+  [
+    '.....e..',
+    '....er..',
+    '...ere..',
+    '..erre.e',
+    '.eoooeer',
+    '.eoyoooe',
+    'eoocyooe',
+    'eooccyoe',
+    'eoocccoe',
+    '.eoccoe.',
+    '..eeee..',
+  ],
+  [
+    '....e...',
+    '.e.er...',
+    'er.ere..',
+    'ererre..',
+    'eoooooe.',
+    'eooyooe.',
+    'eoocyooe',
+    'eooccyoe',
+    'eoocccoe',
+    '.eoccoe.',
+    '..eeee..',
+  ],
 ];
-const HEART_HALF = [
-  '.rr.ee.',
-  'rwrreee',
-  'rrrreee',
-  'rrrreee',
-  '.rrree.',
-  '..rre..',
-  '...r...',
+// the small one: the same licks and white-hot base, never a plain drop
+const LIFE_FLAME_HALF: string[][] = [
+  ['...e..', '..er..', 'e.ere.', 'reooe.', 'eooyoe', 'eoycye', '.eoce.', '..ee..'],
+  ['..e...', '.er...', '.ere.e', 'erooer', 'eooyoe', 'eoycye', '.eoce.', '..ee..'],
+  ['...e..', '...re.', 'e.ere.', 'erooe.', 'eooyoe', 'eoycye', '.eoce.', '..ee..'],
 ];
-definePixelSprite('hud_heart_full', { r: '#e8283c', w: '#ffb0b8' }, HEART, { outline: O });
-
-definePixelSprite('pk_heart', { r: '#e8283c', w: '#ffb0b8' }, HEART, { outline: O });
-definePixelSprite('pk_heart_half', { r: '#e8283c', w: '#ffb0b8' }, HEART_HALF.map((row) => row.replace(/e/g, '.')), { outline: O });
+for (const [name, frames] of [['pk_flame', LIFE_FLAME], ['pk_flame_half', LIFE_FLAME_HALF]] as const) {
+  frames.forEach((rows, k) => definePixelSprite(`${name}_${k}`, LIFE_FLAME_PAL, rows, { outline: LIFE_OUTLINE }));
+  definePixelSprite(name, LIFE_FLAME_PAL, frames[0], { outline: LIFE_OUTLINE });
+  defineAnim(`${name}_anim`, [0, 1, 2, 1].map((k) => `${name}_${k}`), 7);
+}
+// price / stat icon (item card, 대가의 방 pedestal, shrine, character select): one still
+// flame; artifact icons about max health stamp the same rows (items/starter.ts)
+export const LIFE_FLAME_ICON = [
+  '..e....',
+  '..re...',
+  'e.ere..',
+  'reoore.',
+  'eooyooe',
+  'eoocyoe',
+  'eoccyoe',
+  '.eccoe.',
+  '..eee..',
+];
+// (pivot one row below the middle: the pointed tip stays inside a card's top edge like the round coin)
+definePixelSprite('hud_flame', LIFE_FLAME_PAL, LIFE_FLAME_ICON, { outline: LIFE_OUTLINE, origin: [3, 3] });
+// tiny flames written after world float numbers ("-1" + flame, game/effects.ts):
+// life and blue; the pivot is the ink's bottom-left so they sit on the text baseline
+const MINI_FLAME = ['.e...', '.re..', 'eroe.', 'eoyoe', 'eycye', 'eccoe', '.eee.'];
+definePixelSprite('fx_life_flame', LIFE_FLAME_PAL, MINI_FLAME, { outline: LIFE_OUTLINE, origin: [0, 7] });
+definePixelSprite('fx_blue_flame', { e: '#3050c8', r: '#5a78e8', o: '#7a9af8', y: '#c8d8ff', c: '#e0ecff' }, MINI_FLAME.map((r) => [...r].reverse().join('')), { outline: '#101838', origin: [0, 7] });
 
 // ------------------------------------------------------------------ blue flames (푸른 불꽃: burns before health)
 // a cool flame: white-blue core low in the body, a pointed tip that sways

@@ -8,6 +8,17 @@ import { animDuration, animFrame, getSprite } from '../engine/sprites';
 import { clamp, ease, TAU } from '../engine/math';
 import { fx } from '../engine/rng';
 
+/**
+ * Health in float texts: no hearts, a tiny flame written after the number
+ * ("-1" + flame). Warm for the lamp's own fire, blue for 푸른 불꽃.
+ */
+export const LIFE_ICON = 'fx_life_flame';
+export const BLUE_FLAME_ICON = 'fx_blue_flame';
+/** float text colors: life lost (warm red-orange), life gained (gold-orange), blue flame lost */
+export const LIFE_HURT_TEXT = '#ff6a3a';
+export const LIFE_HEAL_TEXT = '#ffb24a';
+export const BLUE_FLAME_TEXT = '#a8c8ff';
+
 export class FloatingText extends Entity {
   /** purely visual: separate (negative) ids, not in the state hash */
   static override readonly cosmetic = true;
@@ -15,7 +26,9 @@ export class FloatingText extends Entity {
   color: string;
   life: number;
   scale: number;
-  constructor(x: number, y: number, text: string, color = '#ffffff', scale = 1, life = 0.7) {
+  /** optional small sprite written right after the text (bottom-aligned, e.g. LIFE_ICON) */
+  icon: string | null;
+  constructor(x: number, y: number, text: string, color = '#ffffff', scale = 1, life = 0.7, icon: string | null = null) {
     super();
     this.x = x + fx.range(-3, 3);
     this.y = y;
@@ -23,6 +36,7 @@ export class FloatingText extends Entity {
     this.color = color;
     this.scale = scale;
     this.life = life;
+    this.icon = icon;
     this.vy = -55;
     this.vx = fx.range(-15, 15);
     this.layer = 2;
@@ -41,12 +55,19 @@ export class FloatingText extends Entity {
   override draw(r: Renderer): void {
     const t = this.age / this.life;
     const pop = this.age < 0.08 ? 1 + (1 - this.age / 0.08) * 0.6 : 1;
-    r.pixelText(this.text, this.x, this.y, this.color, {
-      align: 'center',
-      outline: '#140c1c',
-      scale: Math.max(1, Math.round(this.scale * pop)),
-      alpha: t > 0.7 ? 1 - (t - 0.7) / 0.3 : 1,
-    });
+    const s = Math.max(1, Math.round(this.scale * pop));
+    const alpha = t > 0.7 ? 1 - (t - 0.7) / 0.3 : 1;
+    if (!this.icon) {
+      r.pixelText(this.text, this.x, this.y, this.color, { align: 'center', outline: '#140c1c', scale: s, alpha });
+      return;
+    }
+    // text + icon centered together; the icon's ink sits one glyph gap after the
+    // text and shares its baseline (the icon's own origin is its ink bottom-left)
+    const tw = this.text ? (this.text.toUpperCase().length * 4 - 1) * s : -s;
+    const iw = (getSprite(this.icon).w - 2) * s;
+    const left = Math.round(this.x - (tw + s + iw) / 2);
+    if (this.text) r.pixelText(this.text, left, this.y, this.color, { outline: '#140c1c', scale: s, alpha });
+    r.sprite(this.icon, left + tw + s, this.y + 5 * s, { alpha, sx: s, sy: s });
   }
 }
 

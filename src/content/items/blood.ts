@@ -195,20 +195,32 @@ defineArtifact({
 });
 
 // ------------------------------------------------------------------ 심장 실
+// an anatomical heart (blood, not a health container) bound by a pale thread
 defineDrawnSprite('icon_heartstring', 16, 16, (p) => {
-  p.circle(5, 6, 3.6, RED[2]);
-  p.circle(11, 6, 3.6, RED[2]);
-  p.poly([1.5, 7, 14.5, 7, 8, 14.5], RED[2]);
-  p.shadeSphere(8, 8, 7, 7, ramp('#d82838', 4), { dither: false });
-  p.line(2, 9, 13, 5, '#f8e8e0');
-  p.line(3, 11, 12, 8, '#f8e8e0');
-  p.px(7, 3, '#f8e8e0');
-  p.px(6, 2, '#f8e8e0');
-  p.px(8, 2, '#f8e8e0');
-  p.px(4, 4, '#ffd0d8');
-  p.line(11, 15, 15, 9, '#c0c8d8');
-  p.px(15, 9, '#ffffff');
-  p.px(14, 11, '#f8e8e0');
+  // the body: a tilted lump with its apex low on the left, chambers bulging on top
+  p.poly([2, 8, 4, 5, 8, 4.5, 12, 5, 14.5, 8, 14, 11.5, 10.5, 14.5, 6.5, 15.5, 3, 12.5], RED[1]);
+  p.circle(5, 6.5, 2.4, RED[1]);
+  p.shadeSphere(7.5, 8.5, 6.5, 6.5, [RED[0], RED[1], RED[2], RED[3]], { dither: false });
+  p.px(4, 5, RED[4]);
+  p.px(5, 5, RED[3]);
+  p.px(3, 6, RED[3]);
+  // the groove between the chambers
+  p.line(10, 6, 7, 14, RED[0]);
+  p.px(10, 5, RED[0]);
+  // the great vessels: the aortic arch bending right, a smaller trunk beside it
+  p.rect(8, 1, 3, 4, '#c23646');
+  p.rect(10, 0, 4, 2, '#c23646');
+  p.rect(13, 1, 2, 2, '#8a1a2a');
+  p.px(8, 1, '#f07a88');
+  p.px(9, 1, '#f07a88');
+  p.px(10, 0, '#f07a88');
+  p.rect(5, 2, 2, 3, '#962234');
+  p.px(5, 2, '#d04a5a');
+  // the thread wound around it, and its needle
+  p.line(2, 11, 13, 8, '#f0dcd0');
+  p.px(13, 8, '#c8b4ac');
+  p.line(12, 15, 15, 11, '#c0c8d8');
+  p.px(15, 11, '#ffffff');
 }, { outline: O });
 
 defineArtifact({

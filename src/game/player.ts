@@ -12,7 +12,7 @@ import { angleOf, clamp, fromAngle, norm } from '../engine/math';
 import { animFrame, hasAnim, hasSprite } from '../engine/sprites';
 import { Projectile, fanAngles, type ProjectileOpts } from './projectile';
 import { MeleeSwing, type SwingOpts } from './melee';
-import { Afterimage, RingFx } from './effects';
+import { Afterimage, BLUE_FLAME_ICON, BLUE_FLAME_TEXT, LIFE_HURT_TEXT, LIFE_ICON, RingFx } from './effects';
 import { Tile } from './tiles';
 import { spikeState } from './spikes';
 import { RELEASE_COOLDOWN } from './ember';
@@ -679,7 +679,8 @@ export class Player extends Actor {
       w.renderer.screenFlash('#ff2030', 0.24 + 0.08 * heavy);
       w.playerHurtFx?.(halfHearts, origin);
     }
-    w.floatText(this.x, this.y - 22, `-${halfHearts / 2}♥`, fromSoul === halfHearts ? '#a8c8ff' : '#ff7a8a');
+    const blueOnly = fromSoul === halfHearts;
+    w.floatText(this.x, this.y - 22, `-${halfHearts / 2}`, blueOnly ? BLUE_FLAME_TEXT : LIFE_HURT_TEXT, 1, blueOnly ? BLUE_FLAME_ICON : LIFE_ICON);
     this.squash(0.72, 1.3);
     w.sfx('player_hurt', { pitch: heavy ? 0.9 : 1 });
     w.spawn(new RingFx(this.x, this.y - 6, 16 + 6 * heavy, 0.25, '#ff5060', 2));
