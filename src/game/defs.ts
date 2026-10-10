@@ -132,6 +132,11 @@ export interface ItemHooks {
   modifyHit?(w: World, target: Actor, hit: HitInfo, power: number): void;
   /** a player-caused hit was applied to an enemy */
   onHit?(w: World, target: Actor, hit: HitInfo, power: number): void;
+  /**
+   * Every keeper hit applied to an enemy, `noProc` ones included (releases, item blasts):
+   * bookkeeping only (run counters, unlock evidence), never damage, statuses or procs.
+   */
+  onAnyHit?(w: World, target: Actor, hit: HitInfo, power: number): void;
   onKill?(w: World, enemy: Enemy, power: number): void;
   /** the player took damage (after it is applied) */
   onHurt?(w: World, amount: number, power: number): void;

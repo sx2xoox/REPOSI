@@ -11,6 +11,8 @@ import { GlobalHooks, Characters } from '../src/game/defs';
 import { measureDps } from './dpsharness';
 import { save } from '../src/engine/save';
 import { REFUGE_PASSIVES } from '../src/content/characters/refuge-kits';
+import { releaseHit } from '../src/content/characters/releases';
+import { emberSpark } from '../src/content/characters/kit-ria';
 import { LUEN_TRIPLE_KILLS, MIRA_SWIFT_ROOMS, MIRA_SWIFT_SECONDS, ORT_CLEAN_ROOMS, REFUGE_UNLOCK_HINTS, TOVE_EXPLOSION_KILLS, VES_DASH_KILLS } from '../src/content/characters/refuge-unlocks';
 const hook = () => GlobalHooks.must('refuge_keeper_unlocks');
 function setup() {
@@ -31,15 +33,27 @@ describe('refuge release audit',()=>{
  });
  it('토브: explosion kills by the keeper, each enemy once; other kills and other hits do not count',()=>clean(()=>{
   const {world:w}=setup(),h=hook();
-  const boom=(e:any)=>{e.hp=0;h.onHit!(w,e,{damage:10,kind:'explosion',attacker:w.player},1);};
+  const boom=(e:any)=>{e.hp=0;h.onAnyHit!(w,e,{damage:10,kind:'explosion',attacker:w.player},1);};
   const mk=()=>w.spawnEnemy('__dps_dummy',w.room.centerX,w.room.centerY)!;
   const a=mk();boom(a);boom(a);expect(w.vars.rfExplosionKills).toBe(1);
-  const b=mk();b.hp=0;h.onHit!(w,b,{damage:10,kind:'projectile',attacker:w.player},1);expect(w.vars.rfExplosionKills).toBe(1);
-  const c=mk();h.onHit!(w,c,{damage:10,kind:'explosion',attacker:w.player},1);expect(w.vars.rfExplosionKills).toBe(1);
-  const d=mk();d.hp=0;h.onHit!(w,d,{damage:10,kind:'explosion',attacker:null},1);expect(w.vars.rfExplosionKills).toBe(1);
+  const b=mk();b.hp=0;h.onAnyHit!(w,b,{damage:10,kind:'projectile',attacker:w.player},1);expect(w.vars.rfExplosionKills).toBe(1);
+  const c=mk();h.onAnyHit!(w,c,{damage:10,kind:'explosion',attacker:w.player},1);expect(w.vars.rfExplosionKills).toBe(1);
+  const d=mk();d.hp=0;h.onAnyHit!(w,d,{damage:10,kind:'explosion',attacker:null},1);expect(w.vars.rfExplosionKills).toBe(1);
   for(let i=1;i<TOVE_EXPLOSION_KILLS-1;i++)boom(mk());
   expect(save.hasFlag('unlock:tove')).toBe(false);
   boom(mk());expect(save.hasFlag('unlock:tove')).toBe(true);
+ }));
+ it('토브: an explosive release and 리아\'s ember spark (no-proc blasts) count as explosion kills',()=>clean(()=>{
+  const {world:w}=setup();
+  const p=w.player;
+  const mk=(dx:number)=>{const e=w.spawnEnemy('__dps_dummy',p.x+dx,p.y)!;e.hp=1;return e;};
+  const a=mk(30);releaseHit(w,a,50,p.x,p.y);
+  expect(a.alive).toBe(false);expect(w.vars.rfExplosionKills).toBe(1);
+  const b=mk(-40);w.update(FIXED_DT);emberSpark(w,b);
+  expect(b.alive).toBe(false);expect(w.vars.rfExplosionKills).toBe(2);
+  // a plain shot kill still does not count
+  const c=mk(60);w.applyHit(c,{damage:50,kind:'projectile',attacker:p});
+  expect(c.alive).toBe(false);expect(w.vars.rfExplosionKills).toBe(2);
  }));
  it('루엔: three kills inside one second make a knot; the next knot needs three fresh kills',()=>clean(()=>{
   const {world:w}=setup(),h=hook(),e=setup().dummies[0];
@@ -109,7 +123,7 @@ describe('refuge release audit',()=>{
  }));
  it('seeded practice never unlocks, and a fresh run does not inherit partial goals',()=>clean(()=>{
   const {world:w}=setup(),h=hook();w.run.seeded=true;
-  for(let i=0;i<TOVE_EXPLOSION_KILLS+2;i++){const e=w.spawnEnemy('__dps_dummy',w.room.centerX,w.room.centerY)!;e.hp=0;h.onHit!(w,e,{damage:10,kind:'explosion',attacker:w.player},1);}
+  for(let i=0;i<TOVE_EXPLOSION_KILLS+2;i++){const e=w.spawnEnemy('__dps_dummy',w.room.centerX,w.room.centerY)!;e.hp=0;h.onAnyHit!(w,e,{damage:10,kind:'explosion',attacker:w.player},1);}
   expect(save.hasFlag('unlock:tove')).toBe(false);
   const next=setup().world;expect(next.vars.rfExplosionKills).toBeUndefined();
  }));

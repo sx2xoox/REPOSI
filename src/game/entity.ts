@@ -44,7 +44,7 @@ export type DamageKind = 'projectile' | 'melee' | 'explosion' | 'contact' | 'sta
 export interface HitInfo {
   damage: number;
   kind: DamageKind;
-  /** entity that physically hit (projectile, swing, bomb ...) */
+  /** entity that physically hit (projectile, swing, blast ...) */
   source?: Entity | null;
   /** the actor responsible (the player for all player damage) */
   attacker?: Actor | null;

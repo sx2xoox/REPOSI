@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "등불지기 — Isaac/Sephiria-style roguelike dungeon crawler (TypeScript + Canvas)",
+  "description": "등불지기 — 꺼진 도시의 지하로 내려가는 로그라이크 액션 (TypeScript + Canvas)",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

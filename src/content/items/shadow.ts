@@ -159,8 +159,8 @@ defineArtifact({
   },
 });
 
-// ------------------------------------------------------------------ 검은 초
-defineDrawnSprite('icon_black_candle', 16, 16, (p) => {
+// ------------------------------------------------------------------ 그을음 초
+defineDrawnSprite('icon_soot_candle', 16, 16, (p) => {
   p.rect(5, 7, 6, 8, '#2a2030');
   p.shadeVertical(5, 7, 6, 8, ['#141018', '#2a2030', '#3e3448']);
   p.ellipse(8, 7, 3, 1.2, '#4a4058');
@@ -180,15 +180,15 @@ defineDrawnSprite('icon_black_candle', 16, 16, (p) => {
 }, { outline: O });
 
 defineArtifact({
-  id: 'black_candle',
-  name: '검은 초',
+  id: 'soot_candle',
+  name: '그을음 초',
   desc: '공격력 +1.5. 처치하면 가끔 검은 불꽃이 터져 적을 겁준다.',
   detail: '대신 행운이 줄어든다.',
   signature: '처치하면 가끔 검은 불꽃이 터져 적을 겁준다',
   quote: '어둠을 태우는 불도 있다.',
   rarity: 'common',
   tags: ['shadow', 'flame'],
-  icon: 'icon_black_candle',
+  icon: 'icon_soot_candle',
   look: { shot: '#8a5ac8', trail: 'smoke', mote: '#3a2a4a' },
   pools: ['curse', 'shop', 'treasure'],
   stats(m, power) {

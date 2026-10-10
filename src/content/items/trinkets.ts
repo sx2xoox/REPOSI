@@ -1,5 +1,5 @@
-// Untagged trinkets: economy (coins, keys, bombs), defense (shields, soul
-// hearts, invulnerability), bouncing shots, charm, mirror orbitals, cluster bombs.
+// Untagged trinkets: economy (coins, matches), defense (shields, blue flames,
+// invulnerability), bouncing shots, charm, mirror orbitals, blast shrapnel.
 
 import { defineArtifact } from '../../game/defs';
 import type { World } from '../../game/world';
@@ -75,7 +75,7 @@ defineDrawnSprite('icon_alchemist_scale', 16, 16, (p) => {
 defineArtifact({
   id: 'alchemist_scale',
   name: '연금술사의 저울',
-  desc: '20금 모을 때마다 폭탄과 열쇠를 번갈아 얻는다.',
+  desc: '동전 20개를 모을 때마다 성냥이 하나 생긴다.',
   quote: '동전 한 닢의 무게는 생각보다 다양하다.',
   rarity: 'common',
   tags: [],
@@ -149,7 +149,7 @@ defineArtifact({
   },
 });
 
-// ------------------------------------------------------------------ 영혼 밀랍
+// ------------------------------------------------------------------ 푸른 밀랍
 defineDrawnSprite('icon_soul_wax', 16, 16, (p) => {
   p.rect(4, 8, 8, 7, '#d8e4f0');
   p.shadeVertical(4, 8, 8, 7, ['#8a9ab8', '#b8c8e0', '#e8f0ff']);
@@ -160,8 +160,7 @@ defineDrawnSprite('icon_soul_wax', 16, 16, (p) => {
   p.line(8, 5, 8, 7, '#3a3a50');
   p.ellipse(8, 3, 2.6, 3.2, '#7ab8ff');
   p.ellipse(8, 3.8, 1.5, 2, '#d8f0ff');
-  p.px(7, 3, '#1a2a50');
-  p.px(9, 3, '#1a2a50');
+  p.px(8, 4, '#ffffff');
   p.px(8, 0, '#5a90e8');
   p.px(12, 2, '#a8d0ff');
   p.px(3, 4, '#a8d0ff');
@@ -169,9 +168,9 @@ defineDrawnSprite('icon_soul_wax', 16, 16, (p) => {
 
 defineArtifact({
   id: 'soul_wax',
-  name: '영혼 밀랍',
-  desc: '영혼 하트를 하나 얻고, 새 층마다 반 칸씩 더 얻는다.',
-  quote: '영혼을 녹여 굳힌 밀랍.',
+  name: '푸른 밀랍',
+  desc: '푸른 불꽃을 하나 얻고, 새 층마다 반 칸씩 더 얻는다.',
+  quote: '푸른 불을 녹여 굳힌 밀랍.',
   rarity: 'common',
   tags: [],
   icon: 'icon_soul_wax',
@@ -440,14 +439,15 @@ defineDrawnSprite('icon_cluster_powder', 16, 16, (p) => {
 defineArtifact({
   id: 'cluster_powder',
   name: '산탄 화약통',
-  desc: '폭탄 2개를 얻고, 내 폭탄이 터지면 불붙은 파편이 튄다.',
+  desc: '폭발로 적을 쓰러뜨리면 불붙은 파편이 튄다.',
+  detail: '폭발 공격이 없으면 효과가 없다.',
   quote: '하나가 터지면 여럿이 터진다.',
   rarity: 'epic',
   tags: [],
   icon: 'icon_cluster_powder',
   look: { mote: '#ffb040', aura: '#ff7a20' },
   pools: ['treasure', 'shop', 'secret'],
-  // interim (bombs removed): a keeper blast that kills throws burning shards; A3 retunes and rewrites the text
+  // a keeper blast (weapon, artifact, active, release) that kills throws burning shards, at most once a second
   onHit(w, target, hit, power) {
     if (hit.kind !== 'explosion' || hit.noProc || hit.attacker !== w.player || target.alive) return;
     if (w.time - (w.vars.__clusterT ?? -99) < 1) return;

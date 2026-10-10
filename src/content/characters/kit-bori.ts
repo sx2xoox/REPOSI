@@ -254,7 +254,7 @@ export function spill(w: World): RescuePuddle | null {
 // ------------------------------------------------------------------ passive
 export const BORI_PASSIVE: PassiveDef = {
   name: '구조통',
-  desc: '남는 하트를 통에 담는다(최대 3). 맞으면 치유 웅덩이를 쏟고, R로 마시면 +♥와 방패.',
+  desc: '넘치는 회복을 통에 담는다(최대 3). 맞으면 치유 웅덩이를 쏟고, R로 마시면 +♥와 방패.',
   icon: 'icon_bori_passive',
   look: { aura: '#ffd9b0', step: '#e8b080', hit: '#ffe0b0' },
   stats(m) {

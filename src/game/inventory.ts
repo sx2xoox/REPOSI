@@ -1,4 +1,4 @@
-// Collected passive artifacts (no slot limit, Isaac-style). Picking up a
+// Collected passive artifacts (no slot limit). Picking up a
 // duplicate stacks it: the artifact's `power` equals the number of copies.
 // Artifact tags add up to "등불 공명" (resonance) bonuses (see SetDef).
 

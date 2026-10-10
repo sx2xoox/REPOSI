@@ -12,6 +12,7 @@ import { RingFx } from '../../game/effects';
 import type { ArtifactLook } from '../../game/look';
 import { grantPerCopy, isAttack, isPrimary, proc } from '../items/lib';
 import { addMatches } from '../../game/matches';
+import { EMBER_MAX } from '../../game/player';
 
 const O = '#140c1c';
 const GOLD = '#ffd060';
@@ -105,8 +106,15 @@ bless({
 });
 
 bless({
-  id: 'bless_blastproof', name: '화약 내성', desc: '폭발 피해를 받지 않는다. 폭탄 +2', quote: '불꽃이 길을 비켜 간다.',
-  disk: '#4a2a1a', glyph: (p) => { p.circle(7.5, 9, 3.8, '#1a1420'); p.ring(7.5, 9, 3.8, 1, '#ffb040'); p.px(6, 8, '#a8a0b8'); p.line(10, 6, 12, 3, '#c8a060'); p.px(12, 2, '#ffd040'); }, look: { aura: '#ff9a30' },
+  id: 'bless_blastproof', name: '화약 내성', desc: '폭발 피해를 받지 않는다. 성냥 +2', quote: '불꽃이 길을 비켜 간다.',
+  // a small shield standing in front of a blast star
+  disk: '#4a2a1a', glyph: (p) => {
+    p.poly([8, 1.5, 9.5, 5, 13.5, 4, 11, 7.5, 14, 10, 10, 10, 8, 14, 6, 10, 2, 10, 5, 7.5, 2.5, 4, 6.5, 5], '#ff9a30');
+    p.poly([5, 5.5, 11, 5.5, 11, 9, 8, 12.5, 5, 9], '#c8d0e0');
+    p.poly([8, 5.5, 11, 5.5, 11, 9, 8, 12.5], '#9aa4bc');
+    p.line(8, 6, 8, 11, '#ffd060');
+    p.px(6, 6, '#ffffff');
+  }, look: { aura: '#ff9a30' },
   stats(m) {
     m.flag('blastImmune');
   },
@@ -132,7 +140,7 @@ bless({
 });
 
 bless({
-  id: 'bless_hearth', name: '쉼터의 온기', desc: '방 3개마다 체력 반 칸 회복. 최대 체력이 없으면 영혼 하트 2칸까지 회복', quote: '잠시 쉬어 가도 괜찮다.',
+  id: 'bless_hearth', name: '쉼터의 온기', desc: '방 3개마다 체력 반 칸 회복. 최대 체력이 없으면 푸른 불꽃 2칸까지 회복', quote: '잠시 쉬어 가도 괜찮다.',
   disk: '#6a3a1a', glyph: (p) => { p.line(4, 12, 12, 10, '#8a5a30'); p.line(4, 10, 12, 12, '#6a4020'); p.poly([8, 3, 10.5, 8, 8, 10, 5.5, 8], '#ffb040'); p.px(8, 7, '#fff0a0'); }, look: { aura: '#ffc080' },
   onRoomClear(w, power) {
     w.vars.__hearthN = (w.vars.__hearthN ?? 0) + 1;
@@ -158,8 +166,19 @@ bless({
 
 const chestSeen = new WeakMap<object, boolean>();
 bless({
-  id: 'bless_locksmith', name: '상자 감별사', desc: '상자를 열면 열쇠나 폭탄이 하나 더 나온다', quote: '빈 상자는 없다.',
-  disk: '#4a3a20', glyph: (p) => { p.circle(5.5, 8, 2.5, '#e8c870'); p.circle(5.5, 8, 1, null); p.line(8, 8, 13, 8, '#e8c870'); p.line(11, 9, 11, 10, '#e8c870'); p.line(13, 9, 13, 10, '#e8c870'); }, look: { mote: '#e8c870' },
+  id: 'bless_locksmith', name: '상자 감별사', desc: '상자를 열면 성냥이나 동전이 하나 더 나온다', quote: '빈 상자는 없다.',
+  // an open chest with a spark rising out of it
+  disk: '#4a3a20', glyph: (p) => {
+    p.rect(3, 8, 10, 5, '#a8682c');
+    p.rect(3, 8, 10, 1, '#e8c870');
+    p.line(3, 13, 12, 13, '#5a3418');
+    p.rect(7, 9, 2, 2, '#ffe080');
+    p.poly([3, 7, 13, 7, 12, 4.5, 4, 4.5], '#7a4a20');
+    p.line(4, 5, 11, 5, '#c08840');
+    p.px(8, 2, '#fff4c0');
+    p.px(10, 3, '#ffd060');
+    p.px(6, 3, '#ffd060');
+  }, look: { mote: '#e8c870' },
   onUpdate(w) {
     for (const e of w.entities) {
       if (!(e instanceof Chest)) continue;
@@ -193,8 +212,14 @@ bless({
 });
 
 bless({
-  id: 'bless_soul', name: '영혼의 가호', desc: '영혼 하트 +2', quote: '보이지 않는 손이 등을 받친다.',
-  disk: '#1a2a6a', glyph: heart('#8ab0ff'), look: { mote: '#8ab0ff' },
+  id: 'bless_soul', name: '푸른 불의 가호', desc: '푸른 불꽃 +2', quote: '보이지 않는 손이 등을 받친다.',
+  // a blue flame
+  disk: '#1a2a6a', glyph: (p) => {
+    p.poly([8, 2, 11.5, 7, 12, 10, 10, 13, 6, 13, 4, 10, 4.5, 7, 6.5, 8], '#7a9af8');
+    p.poly([8, 6, 10, 9, 9.5, 12, 6.5, 12, 6, 9.5], '#c8d8ff');
+    p.px(8, 11, '#ffffff');
+    p.px(7, 10, '#e0ecff');
+  }, look: { mote: '#8ab0ff' },
   onAcquire(w, power) {
     grantPerCopy(w, 'bless_soul', power, () => w.player.addSoul(4));
   },
@@ -231,13 +256,28 @@ bless({
 });
 
 bless({
-  id: 'bless_powder', name: '화약 주머니', desc: '폭탄 +3. 폭탄을 놓으면 주변 적 탄환이 사라진다', quote: '쾅, 하고 조용해진다.',
-  disk: '#5a3a1a', glyph: (p) => { p.ellipse(8, 9.5, 4.5, 3.8, '#f0c890'); p.ellipse(8, 10, 3.5, 2.8, '#d09858'); p.rect(6, 4, 4, 2, '#fff0c0'); p.px(8, 9, '#ff7a20'); p.px(12, 3, '#ffd040'); p.px(13, 2, '#ffffff'); }, look: { step: '#ffb040' },
+  id: 'bless_match_pouch', name: '성냥 주머니', desc: '성냥 +3. 성냥을 쓰면 등불 게이지가 차오른다', quote: '불을 붙일 때마다 마음도 데워진다.',
+  // a lit match leaning out of a small matchbox
+  disk: '#5a3a1a', glyph: (p) => {
+    p.rect(2, 10, 8, 4, '#a06a3a');
+    p.rect(2, 10, 8, 1, '#c89058');
+    p.rect(3, 11, 5, 2, '#b02a20');
+    p.line(9, 11, 9, 13, '#3a2420');
+    p.line(6, 10, 10, 6, '#f0dcb0');
+    p.line(7, 10, 10, 7, '#c8a070');
+    p.rect(10, 4, 2, 2, '#c03a2a');
+    p.poly([10, 4, 11, 0.5, 13, 2, 13.5, 4.5, 12, 5.5], '#ff9a30');
+    p.px(11, 3, '#fff0a0');
+    p.px(12, 2, '#ffd060');
+  }, look: { step: '#ffb040' },
   onAcquire(w, power) {
-    grantPerCopy(w, 'bless_powder', power, () => { addMatches(w, 3); });
+    grantPerCopy(w, 'bless_match_pouch', power, () => { addMatches(w, 3); });
   },
-  onMatch(w, x, y) {
-    if (w.clearEnemyBullets(x, y, 70) > 0) proc(w, 'bless_powder');
+  onMatch(w, _x, _y, power) {
+    const p = w.player;
+    p.addEmber(EMBER_MAX * 0.35 * power);
+    w.particles.burst(p.x, p.y - 8, { count: 10, speed: [20, 60], life: [0.3, 0.6], colors: ['#ffffff', '#ffd060', '#ff9a30'], size: [1, 2], additive: true });
+    proc(w, 'bless_match_pouch');
   },
 });
 
@@ -251,7 +291,7 @@ bless({
 });
 
 bless({
-  id: 'bless_release_heal', name: '해방의 온기', desc: '해방 시 반 칸 회복 (방마다 한 번). 최대 체력이 없으면 영혼 하트 2칸까지 회복', quote: '불꽃을 놓아줄 때 따뜻해진다.',
+  id: 'bless_release_heal', name: '해방의 온기', desc: '해방 시 반 칸 회복 (방마다 한 번). 최대 체력이 없으면 푸른 불꽃 2칸까지 회복', quote: '불꽃을 놓아줄 때 따뜻해진다.',
   disk: '#6a4a2a', glyph: (p) => { p.rect(6, 5, 4, 7, '#ffd890'); p.rect(5, 4, 6, 1, '#a07040'); p.rect(5, 12, 6, 1, '#a07040'); p.px(8, 8, '#ff8a30'); p.px(8, 7, '#fff0a0'); }, look: { aura: '#ffe0a0' },
   onRelease(w, power) {
     // once per room: several releases a floor would otherwise out-heal every other source

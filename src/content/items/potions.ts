@@ -1,7 +1,7 @@
 // Potions (R). Unidentified until drunk once per run; bottle colors are shuffled
 // per run by RunState, so `color` here is only the "true" liquid color.
 //
-// good:  영혼 / 투지 / 바람 / 네잎 / 황금 / 보급 / 불씨 / 혜안
+// good:  푸른 불 / 투지 / 바람 / 네잎 / 황금 / 보급 / 불씨 / 혜안
 // bad:   납빛 (slow for 45s), 끓어넘친 (explodes at your feet)
 // mixed: 맹물 (nothing happens)
 
@@ -42,8 +42,8 @@ function popPickups(w: World, kinds: PickupKind[]): void {
 
 definePotion({
   id: 'potion_soul',
-  name: '영혼의 물약',
-  desc: '영혼 하트 +1',
+  name: '푸른 불 물약',
+  desc: '푸른 불꽃 +1',
   color: '#8ab0ff',
   nature: 'good',
   use(w) {

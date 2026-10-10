@@ -359,6 +359,7 @@ export class ItemSystem {
   onAttack(angle: number): void { this.each('onAttack', (e) => e.hooks.onAttack?.(this.w, angle, e.power)); }
   modifyHit(target: Actor, hit: HitInfo): void { this.each('modifyHit', (e) => e.hooks.modifyHit?.(this.w, target, hit, e.power)); }
   onHit(target: Actor, hit: HitInfo): void {
+    this.each('onAnyHit', (e) => e.hooks.onAnyHit?.(this.w, target, hit, e.power));
     if (hit.noProc) return;
     this.each('onHit', (e) => e.hooks.onHit?.(this.w, target, hit, e.power));
     this.look.onHit(this.w, target, hit);

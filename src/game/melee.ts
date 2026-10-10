@@ -1,4 +1,4 @@
-// Melee attacks (Sephiria-style swings). A swing is a short-lived arc hitbox
+// Melee attacks: short-lived arc hitboxes. A swing sweeps an arc
 // around its owner that hits each enemy once, breaks pots, and deflects
 // (destroys — or, with `reflect`, sends back) enemy projectiles it touches.
 // Visuals: a pixel "smear" that sweeps across the arc and thins out, plus a

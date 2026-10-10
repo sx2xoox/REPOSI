@@ -32,7 +32,7 @@ export const REFUGE_UNLOCK_HINTS = [
  '한 원정에서 여섯 방을 들어서자마자 몰아쳐 정리하고 3층 보스를 꺾으면, 시간을 멈추는 결계사가 당신의 발자취를 적는다.',
 ];
 export const REFUGE_UNLOCK_REQUIREMENTS = [
- `한 판에서 폭발(폭탄·폭발 유물·폭발 무기)로 적 ${TOVE_EXPLOSION_KILLS}마리 처치`,
+ `한 판에서 폭발(폭발 유물·폭발 무기·해방)로 적 ${TOVE_EXPLOSION_KILLS}마리 처치`,
  `한 판에서 ${LUEN_KNOT_WINDOW}초 안에 적 3마리 연속 처치 ${LUEN_TRIPLE_KILLS}번`,
  `한 판에서 대시 후 ${VES_DASH_WINDOW}초 안에 적 ${VES_DASH_KILLS}마리 처치`,
  `한 판에서 피해 없이 전투방 ${ORT_CLEAN_ROOMS}곳 정리 + 3층 이상 보스방 정리`,
@@ -69,8 +69,9 @@ defineGlobalHooks({
  onDash(w) {
   w.vars.rfDashT = w.time;
  },
- onHit(w, target, hit) {
-  // the explosion that brings an enemy down (each enemy once)
+ onAnyHit(w, target, hit) {
+  // the explosion that brings an enemy down (each enemy once): weapon blasts, artifact
+  // blasts and explosive releases alike (those are noProc hits, so not onHit)
   if (hit.kind !== 'explosion' || target.team !== 'enemy' || target.hp > 0 || hit.attacker !== w.player) return;
   if (!once(w, 'rfBoom:' + target.id)) return;
   w.vars.rfExplosionKills = (w.vars.rfExplosionKills ?? 0) + 1;

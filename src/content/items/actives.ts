@@ -9,7 +9,7 @@
 //   sky_lantern     떨어지는 하늘등    (3)    a burning sky lantern crashes on the cursor
 //   keeper_map      등불지기의 낡은 지도 (4)  reveal the floor map (secret room too)
 //   oath_dagger     맹세의 단검        (1)    pay half a heart: big damage boost for the room
-//   ember_hail      불비 주머니        (4)    fire-bombs rain on enemies
+//   ember_hail      불비 주머니        (4)    fireballs rain on enemies
 //
 // Runtime state lives in w.vars (never in shared defs); a global hook ticks the
 // time stop and keeps the spirit hound alive across rooms.
@@ -656,7 +656,7 @@ defineDrawnSprite('fx_sky_lantern', 9, 12, (p) => {
 defineActive({
   id: 'sky_lantern',
   name: '떨어지는 하늘등',
-  desc: '조준한 곳에 불타는 하늘등을 떨어뜨려 폭발시킨다 (바위도 부순다)',
+  desc: '조준한 곳에 하늘등을 떨어뜨려 폭발시킨다 (바위를 부수고 꺼진 벽등을 밝힌다)',
   quote: '소원을 빌었더니 하늘이 대답했다.',
   rarity: 'rare',
   icon: 'icon_act_sky_lantern',
@@ -742,7 +742,7 @@ defineDrawnSprite('icon_act_oath_dagger', 16, 16, (p) => {
 defineActive({
   id: 'oath_dagger',
   name: '맹세의 단검',
-  desc: '현재 체력 반 칸 소모 (빨간 체력 우선, 최대 체력 유지). 이 방에서 공격력 +3, ×1.3',
+  desc: '현재 체력 반 칸 소모 (체력 우선, 최대 체력 유지). 이 방에서 공격력 +3, ×1.3',
   quote: '피로 쓴 맹세는 지워지지 않는다.',
   rarity: 'rare',
   icon: 'icon_act_oath_dagger',
@@ -758,7 +758,7 @@ defineActive({
       return false;
     }
     w.items.addBuff({
-      key: 'oath_dagger', time: Infinity, until: 'room', label: '피의 맹세', icon: 'icon_act_oath_dagger',
+      key: 'oath_dagger', time: Infinity, until: 'room', label: '붉은 각오', icon: 'icon_act_oath_dagger',
       hooks: {
         stats(m) {
           m.addStat('damage', 3);
@@ -777,50 +777,49 @@ defineActive({
     w.decal(p.x, p.y + 2, '#6a0a14', 5, 0.7);
     w.particles.burst(p.x, p.y - 6, { count: 18, speed: [40, 120], life: [0.3, 0.6], colors: ['#ff5060', '#c01828', '#800010'], size: [1, 2], gravity: 300, vz: [40, 100] });
     w.spawn(new RingFx(p.x, p.y - 6, 30, 0.35, '#ff3040', 2));
-    shout(w, '피의 맹세', '#ff5060');
+    shout(w, '붉은 각오', '#ff5060');
   },
 });
 
-// ====================================================================== 10. 불비 주머니 (bomb rain)
+// ====================================================================== 10. 불비 주머니 (fireball rain)
 defineDrawnSprite('icon_act_ember_hail', 16, 16, (p) => {
   p.ellipse(8, 11.5, 5.5, 3.5, '#b09468');
   p.rect(6, 7, 4, 2, '#b09468');
   p.shadeSphere(8, 10, 6, 5, ramp('#b09468', 4));
   p.rect(6, 7, 4, 1, '#c03030');
-  p.px(10, 6, '#c03030');
-  p.px(11, 5, '#c03030');
   // stitched flame emblem
   p.px(8, 10, '#ffb040');
   p.px(7, 11, '#ff7030');
   p.px(8, 11, '#fff0a0');
   p.px(9, 11, '#ff7030');
   p.px(8, 12, '#ff7030');
-  // fire-bombs falling
-  p.circle(3.5, 4, 1.6, '#4a4060');
-  p.px(3, 3, '#a8a0c0');
-  p.px(4, 2, '#ffb040');
-  p.px(5, 1, '#fff0a0');
-  p.circle(12.5, 3, 1.6, '#4a4060');
-  p.px(12, 2, '#a8a0c0');
-  p.px(13, 1, '#ffb040');
-  p.px(14, 0, '#fff0a0');
-  p.px(2, 7, '#ff7030');
-  p.px(14, 7, '#ff7030');
-  p.px(1, 6, '#ffb040');
+  // three embers raining down above it, short tails trailing up-left
+  const ember = (x: number, y: number) => {
+    p.px(x - 2, y - 2, '#c84a20');
+    p.px(x - 1, y - 1, '#ff7030');
+    p.rect(x, y, 2, 2, '#ff9a30');
+    p.px(x, y, '#fff0a0');
+  };
+  ember(2, 3);
+  ember(8, 1);
+  ember(13, 4);
 }, { outline: O });
 
-defineDrawnSprite('fx_fire_bomb', 7, 8, (p) => {
-  p.circle(3.5, 4.5, 2.8, '#3a3048');
-  p.shadeSphere(3.5, 4.5, 2.8, 2.8, ['#1e1828', '#3a3048', '#6a6080']);
-  p.px(4, 1, '#c8a060');
-  p.px(5, 0, '#ffb040');
+// a falling fireball: hot core low, flame licking up behind it
+defineDrawnSprite('fx_ember_ball', 7, 9, (p) => {
+  p.poly([1, 5, 2, 1, 3.5, 3, 5, 0, 6, 5], '#c84a20');
+  p.poly([2, 5, 3, 2.5, 4, 4, 5, 2, 5.5, 5], '#ff7030');
+  p.circle(3.5, 6, 2.6, '#ff7030');
+  p.circle(3.5, 6.3, 1.8, '#ffb040');
+  p.circle(3.2, 6.6, 1, '#fff0a0');
+  p.px(3, 7, '#ffffff');
 }, { outline: O });
 
 defineActive({
   id: 'ember_hail',
   name: '불비 주머니',
-  desc: '적들의 머리 위로 불씨 폭탄 8개를 쏟아붓는다',
-  quote: '오늘의 일기예보: 맑음, 곳에 따라 폭탄.',
+  desc: '적들의 머리 위로 불덩이 8개를 쏟아붓는다',
+  quote: '오늘의 일기예보: 맑음, 곳에 따라 불덩이.',
   rarity: 'epic',
   icon: 'icon_act_ember_hail',
   pools: ['treasure', 'boss', 'curse'],
@@ -834,7 +833,7 @@ defineActive({
     const dmg = p.stats.damage;
     spots.forEach((s, i) => {
       skyDrop(w, s.x, s.y, 22, {
-        fall: 0.6 + i * 0.13, sprite: 'fx_fire_bomb', color: '#ff7030', drift: fx.range(-20, 20), height: 170, spin: 8,
+        fall: 0.6 + i * 0.13, sprite: 'fx_ember_ball', color: '#ff7030', drift: fx.range(-20, 20), height: 170,
         onLand(ww, x, y) {
           miniBlast(ww, x, y, 24, 15 + dmg * 1.6, '#ff7030', [{ kind: 'burn', duration: 2, power: dmg * 0.3 }]);
           ww.shake(0.2);
@@ -843,7 +842,7 @@ defineActive({
       });
     });
     w.sfx('whoosh', { vol: 0.7, pitch: 0.6 });
-    w.sfx('fuse', { vol: 0.5 });
+    w.sfx('fire', { vol: 0.5 });
     shout(w, '불비!', '#ff9040');
   },
 });

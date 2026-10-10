@@ -182,7 +182,7 @@ describe('getting stronger', () => {
   });
 
   it('common stat artifacts are noticeable (>= +15% of a base stat)', () => {
-    for (const id of ['long_wick', 'quick_feather', 'cracked_hourglass', 'black_candle', 'leech_tooth']) {
+    for (const id of ['long_wick', 'quick_feather', 'cracked_hourglass', 'soot_candle', 'leech_tooth']) {
       const m = new StatMods();
       Artifacts.must(id).stats!(m, 1, undefined as never);
       const s = computeStats(BASE_STATS, m);

@@ -2,7 +2,7 @@
 //  떠도는 등령    (wandering_lamp, epic)  — a lantern spirit drifts toward the
 //                                         cursor; every attack fires from the
 //                                         keeper and from the lamp at the aim
-//  점착 폭탄 쇠뇌 (sticky_crossbow, epic) — bolts stick into foes and blow a
+//  점착 화약 쇠뇌 (sticky_crossbow, epic) — powder bolts stick into foes and blow a
 //                                         moment later; stuck bolts merge
 // (shared helpers in arms-kit.ts)
 
@@ -267,7 +267,7 @@ defineWeapon({
   },
 });
 
-// ================================================================== 점착 폭탄 쇠뇌
+// ================================================================== 점착 화약 쇠뇌
 defineDrawnSprite('w_sticky_crossbow', 17, 13, (p) => {
   // stock
   p.rect(0, 5, 11, 3, '#5a4030');
@@ -279,7 +279,7 @@ defineDrawnSprite('w_sticky_crossbow', 17, 13, (p) => {
     p.px(Math.round(11 - 2.5 * k * k), y, y === 0 || y === 12 ? '#c8d0e4' : '#6a7284');
   }
   p.line(8, 0, 8, 12, '#e8e0d0');
-  // loaded bomb bolt
+  // loaded powder bolt
   p.line(5, 6, 12, 6, '#c8a070');
   p.circle(14, 6.5, 2.4, '#2a2230');
   p.rect(13, 6, 3, 1, '#e04040');
@@ -287,7 +287,7 @@ defineDrawnSprite('w_sticky_crossbow', 17, 13, (p) => {
   p.px(15, 4, '#ffd040');
 }, { outline: O, origin: [3, 6] });
 
-/** The bomb bolt in flight (pivot at the head). */
+/** The powder bolt in flight (pivot at the head). */
 defineDrawnSprite('proj_sticky_bolt', 10, 5, (p) => {
   p.line(0, 2, 6, 2, '#c8a070');
   p.px(0, 1, '#e04040');
@@ -307,7 +307,7 @@ defineDrawnSprite('icon_sticky_crossbow', 16, 16, (p) => {
   }
   p.line(9, 1, 6, 9, '#f0e8d8');
   p.line(9, 15, 6, 9, '#f0e8d8');
-  // the bomb bolt with its lit fuse
+  // the powder bolt with its lit fuse
   p.line(5, 9, 11, 9, '#c8a070');
   p.circle(13, 9, 2.6, '#2a2230');
   p.line(11, 9, 15, 9, '#e04040');
@@ -328,7 +328,7 @@ export function stickyRadius(bolts: number, projSize: number): number {
   return Math.min(40, STICKY_RADIUS + 4 * Math.max(0, bolts - 1)) + Math.max(0, projSize - 3);
 }
 
-/** Bombs stuck in one foe by one keeper: one fuse, one (merged) blast. */
+/** Powder bolts stuck in one foe by one keeper: one fuse, one (merged) blast. */
 export class StickyCharge extends Entity {
   owner: Player;
   target: Actor;
@@ -357,7 +357,7 @@ export class StickyCharge extends Entity {
   override update(w: World, dt: number): void {
     this.age += dt;
     const t = this.target;
-    // ride the foe; if it falls, the bombs drop where it stood
+    // ride the foe; if it falls, the bolts drop where it stood
     if (t.alive && !t.dead) {
       this.x = t.x;
       this.y = t.y;
@@ -395,8 +395,8 @@ export class StickyCharge extends Entity {
     const on = Math.floor(this.age * rate) % 2 === 0;
     for (let i = 0; i < this.angles.length; i++) {
       const a = this.angles[i];
-      // each bomb clings to the side it struck, its shaft pointing back the way it came
-      // spread across the body so a merged cluster reads as several bombs
+      // each bolt clings to the side it struck, its shaft pointing back the way it came
+      // spread across the body so a merged cluster reads as several bolts
       const jit = [0, -4, 4, -2, 2, -5][i] ?? 0;
       const tilt = [0, -0.25, 0.25, -0.12, 0.12, -0.3][i] ?? 0;
       const bx = this.x - Math.cos(a) * tr * 0.7 - Math.sin(a) * jit;
@@ -449,8 +449,8 @@ const stickyFx: ProjBehavior = {
 
 defineWeapon({
   id: 'sticky_crossbow',
-  name: '점착 폭탄 쇠뇌',
-  desc: '폭탄 쇠뇌살이 맞은 적에게 달라붙어 잠시 뒤 터진다. 한 적에게 여러 발이 붙으면 하나로 합쳐져 더 크고 넓게 터진다.',
+  name: '점착 화약 쇠뇌',
+  desc: '화약 쇠뇌살이 맞은 적에게 달라붙어 잠시 뒤 터진다. 한 적에게 여러 발이 붙으면 하나로 합쳐져 더 크고 넓게 터진다.',
   icon: 'icon_sticky_crossbow',
   heldSprite: 'w_sticky_crossbow',
   kind: 'ranged',
@@ -478,7 +478,7 @@ defineWeapon({
   },
   draw(w, p, r, st) {
     drawGun(r, w, p, st, heldSprite('sticky_crossbow'), 6, 2.5);
-    // the loaded bomb's fuse winks while it is ready
+    // the loaded bolt's fuse winks while it is ready
     if (st.cooldown > 0) return;
     const h = visualHandPos(p, p.aim, 6);
     const q = heldLocalPoint(h.x, h.y, p.aim, 12, -2);

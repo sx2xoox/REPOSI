@@ -4,7 +4,7 @@
 //                                                  snaps shut on what is inside
 //  태엽 정지 석궁 (stasis_arbalest, legendary)     — bolts stop and hang in the
 //                                                  air, then all launch at once
-// (떠도는 등령 and 점착 폭탄 쇠뇌 live in star-lamps.ts; shared helpers in arms-kit.ts.)
+// (떠도는 등령 and 점착 화약 쇠뇌 live in star-lamps.ts; shared helpers in arms-kit.ts.)
 
 import { defineWeapon } from '../../game/defs';
 import { multishotShare } from '../../game/stats';

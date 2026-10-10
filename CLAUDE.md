@@ -22,9 +22,11 @@ Signature mechanics of this game:
   `tests/presence.test.ts` enforces this.
 - **등불의 축복 (floor blessings)**: pick 1 of 3 seeded blessings at every floor start
   (`content/blessings`, hidden artifacts with `blessing: true`; `window.__lkAutoBless` auto-picks).
-- Isaac-like floors: start / normal / treasure / shop / boss / secret / challenge / shrine /
-  curse rooms, keys, bombs, coins, hearts (red + soul), potions (unidentified, colors
-  shuffled per run), active items with room charges.
+- Floors: start / normal / treasure / shop / boss / secret / 시련방 / shrine / 대가의 방 rooms,
+  matches (성냥, cap 9: sealed doors from floor 2, sealed chests, stone lanterns, cold wall sconces
+  of secret rooms; always by interact, never during a lockdown for doors / sconces), coins (동전 1 /
+  꾸러미 4), health + 푸른 불꽃 (internal `soul`), potions (unidentified, colors shuffled per run),
+  active items with room charges (a dropped active keeps its charge).
 
 ## Tech
 TypeScript (strict) + Vite + Canvas2D. **No external assets**: all art is procedural or
@@ -69,7 +71,7 @@ Commands:
 - Units: player damage base 10, fire rate 2.6/s, move 92 px/s. Player HP is in half hearts.
   Enemy hits are written at *base strength*: contact & bullets 1, heavy attacks (slams, blasts) 2;
   `Player.hurt` turns that into the floor's damage (`FloorDef.enemyDamage`, `enemyHitDamage()`;
-  pass `raw` only for the keeper's own bombs / status ticks). Enemy HP is defined in floor-1 units
+  pass `raw` only for the keeper's own blasts / status ticks). Enemy HP is defined in floor-1 units
   and multiplied by `FloorDef.hpMult` (bosses: `bossHpMult`). Typical floor-1 HP: fodder 10–20,
   regular 25–45, tough 60–120; bosses 700–1150.
 - **Floors & difficulty** (`content/floors.ts`): floors are 1..N and the deepest defined floor is
@@ -148,6 +150,10 @@ Commands:
   rank (`taintSpeedrun`). `__lk.speedrun(char)` starts an unranked speedrun for screenshots. The title's '랭킹'
   screen shows 닉네임 / 캐릭터 / 시드 / 시간 per floor (dropdown) with each run's per-floor breakdown. Bump
   `SEASON` in `net/leaderboard.ts` when balance changes make old times incomparable.
+- **Matches & lanterns** (user 2026-10-10): no bombs. `src/game/matches.ts` is the only spend path (`spendMatch`,
+  `onMatch` hook). A secret room opens by lighting its 꺼진 벽등 with a match, the keeper's own release within 80 px,
+  or the keeper's own explosion. Enemy blasts never reveal. One stone lantern per stage (rock conversion, own RNG
+  stream). Old ids are migrated through `game/legacy-ids.ts`.
 - **등불 해방** balance: a release is a burst / crowd-control moment worth ~10–15x `stats.damage` on a
   single target (multi-hit releases use `HitFalloff`), ≤ ~20% of a run's damage.
 - Enemy AI = generator `script(e, w)`: `yield 0.5` waits 0.5s, `yield` waits a frame.

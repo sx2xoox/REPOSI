@@ -1,5 +1,5 @@
 // Workshop weapons (w2 batch): 거울 방패, 톱날 사출기, 폭죽 통, 뇌전 말뚝,
-// 떠도는 등령, 점착 폭탄 쇠뇌, 별자리 지팡이, 태엽 정지 석궁.
+// 떠도는 등령, 점착 화약 쇠뇌, 별자리 지팡이, 태엽 정지 석궁.
 // Registry + art, each weapon's signature verb in the real World, the dummy
 // DPS band, draw purity, lockstep determinism and no leaks across rooms.
 
@@ -325,7 +325,7 @@ describe('w2 weapons: signature mechanics', () => {
     expect(Math.hypot(p.weapon.mem.lx - p.x, p.weapon.mem.ly - p.y)).toBeLessThan(12);
   });
 
-  it('점착 폭탄 쇠뇌: bolts stick, blow a moment later, and several on one foe merge into one bigger blast', () => {
+  it('점착 화약 쇠뇌: bolts stick, blow a moment later, and several on one foe merge into one bigger blast', () => {
     const { w, p, dmg } = sim('sticky_crossbow');
     const foe = dummy(w, p.x + 45, p.y - 6);
     const side = dummy(w, p.x + 45, p.y - 6 + 30);
@@ -347,7 +347,7 @@ describe('w2 weapons: signature mechanics', () => {
     expect(lost(side, hpS, dmg)).toBeCloseTo(3 * STICKY_BLAST, 5);
   });
 
-  it('점착 폭탄 쇠뇌: a single bolt only catches what is close', () => {
+  it('점착 화약 쇠뇌: a single bolt only catches what is close', () => {
     const { w, p, dmg } = sim('sticky_crossbow');
     const foe = dummy(w, p.x + 45, p.y - 6);
     const side = dummy(w, p.x + 45, p.y - 6 + 34);

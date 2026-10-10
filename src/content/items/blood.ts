@@ -214,7 +214,7 @@ defineDrawnSprite('icon_heartstring', 16, 16, (p) => {
 defineArtifact({
   id: 'heartstring',
   name: '심장 실',
-  desc: '빨간 체력이 가득 차 있으면 피해가 20% 늘어난다.',
+  desc: '체력이 가득 차 있으면 피해가 20% 늘어난다.',
   quote: '온전할 때, 가장 강하다.',
   rarity: 'rare',
   tags: ['blood'],

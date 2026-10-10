@@ -1,4 +1,4 @@
-// 태엽 (clockwork) artifacts: attack speed, keys & bombs, rhythm, returning
+// 태엽 (clockwork) artifacts: attack speed, matches, rhythm, returning
 // and orbiting shots, a turret familiar and the legendary time stop.
 
 import { defineArtifact } from '../../game/defs';
@@ -71,88 +71,108 @@ defineArtifact({
   },
 });
 
-// ------------------------------------------------------------------ 태엽 열쇠
-defineDrawnSprite('icon_wind_up_key', 16, 16, (p) => {
-  p.ellipse(4, 4.5, 3.5, 3, BRASS[2]);
-  p.ellipse(4, 11.5, 3.5, 3, BRASS[2]);
-  p.ellipse(4, 4.5, 1.5, 1.2, null);
-  p.ellipse(4, 11.5, 1.5, 1.2, null);
-  p.px(2, 3, BRASS[4]);
-  p.px(2, 10, BRASS[4]);
-  p.px(6, 6, BRASS[0]);
-  p.px(6, 13, BRASS[0]);
-  p.rect(6, 6.5, 3, 3, BRASS[1]);
-  p.rect(8, 7, 7, 2, BRASS[2]);
-  p.line(8, 7, 14, 7, BRASS[3]);
-  p.rect(12, 9, 2, 3, BRASS[1]);
-  p.px(14, 10, BRASS[1]);
-  p.px(12, 9, BRASS[3]);
+// ------------------------------------------------------------------ 태엽 성냥갑
+// a brass matchbox with a wind-up key in its side and two heads peeking out
+defineDrawnSprite('icon_wind_up_matchbox', 16, 16, (p) => {
+  p.rect(2, 6, 10, 8, BRASS[1]);
+  p.shadeVertical(2, 6, 10, 8, [BRASS[3], BRASS[2], BRASS[1]]);
+  p.line(2, 6, 11, 6, BRASS[4]);
+  p.line(2, 13, 11, 13, BRASS[0]);
+  // red label with a small flame
+  p.rect(4, 8, 6, 4, '#b02a20');
+  p.px(7, 9, '#ffd060');
+  p.px(6, 10, '#ff9a30');
+  p.px(7, 10, '#fff0a0');
+  p.px(8, 10, '#ff9a30');
+  // striker strip
+  p.line(4, 12, 9, 12, '#3a2420');
+  // two match heads
+  p.line(5, 3, 5, 5, '#e8d0a0');
+  p.line(8, 2, 8, 5, '#e8d0a0');
+  p.px(5, 2, '#c03a2a');
+  p.px(8, 1, '#c03a2a');
+  p.px(8, 0, '#ff8a60');
+  // wind-up key in the side
+  p.rect(12, 9, 2, 2, BRASS[1]);
+  p.ellipse(14.5, 7.5, 1.5, 1.5, BRASS[2]);
+  p.ellipse(14.5, 12.5, 1.5, 1.5, BRASS[2]);
+  p.px(14, 7, BRASS[4]);
+  p.px(14, 12, BRASS[3]);
 }, { outline: O });
 
 defineArtifact({
-  id: 'wind_up_key',
-  name: '태엽 열쇠',
-  desc: '열쇠 +2. 가진 열쇠가 많을수록 공격력이 오른다.',
+  id: 'wind_up_matchbox',
+  name: '태엽 성냥갑',
+  desc: '성냥 +2. 가진 성냥이 많을수록 공격력이 오른다.',
   quote: '감을수록 단단해진다.',
   rarity: 'common',
   tags: ['clockwork'],
-  icon: 'icon_wind_up_key',
+  icon: 'icon_wind_up_matchbox',
   look: { mote: '#c8a060', orbit: '#e8c880' },
   pools: ['treasure', 'shop'],
   stats(m, power, w) {
-    const keys = w?.player?.matches ?? 0;
-    m.addStat('damage', Math.min(3, keys * 0.25) * power);
+    // +1 damage for every 3 matches held: +3 at the purse cap (9)
+    const matches = w?.player?.matches ?? 0;
+    m.addStat('damage', Math.min(3, matches / 3) * power);
   },
   onAcquire(w, power) {
-    grantPerCopy(w, 'wind_up_key', power, () => { addMatches(w, 2); });
+    grantPerCopy(w, 'wind_up_matchbox', power, () => { addMatches(w, 2); });
     w.items.recomputeStats();
   },
   onUpdate(w, _dt, power) {
-    grantPerCopy(w, 'wind_up_key', power, () => { addMatches(w, 2); });
-    watch(w, 'wind_up_key', Math.min(12, w.player.matches));
+    grantPerCopy(w, 'wind_up_matchbox', power, () => { addMatches(w, 2); });
+    watch(w, 'wind_up_matchbox', w.player.matches);
   },
 });
 
-// ------------------------------------------------------------------ 째깍 폭탄 꾸러미
-defineDrawnSprite('icon_tick_bomb', 16, 16, (p) => {
-  p.circle(7.5, 9.5, 6, '#2a2a38');
-  p.shadeSphere(7.5, 9.5, 6, 6, ['#101018', '#22222e', '#3a3a4c', '#5a5a70']);
-  p.circle(7.5, 9.5, 3.4, '#f0e8d0');
-  p.line(7.5, 9.5, 7.5, 7, '#2a2020');
-  p.line(7.5, 9.5, 9.5, 10, '#c02030');
-  p.px(7, 6, '#2a2020');
-  p.px(11, 9, '#2a2020');
-  p.px(7, 13, '#2a2020');
-  p.px(4, 9, '#2a2020');
-  p.rect(9, 3, 3, 2, '#7a7a88');
-  p.line(11, 3, 13, 1, '#c8a060');
-  p.px(14, 0, '#ffe080');
-  p.px(13, 0, '#ff9030');
-  p.px(15, 1, '#ff9030');
-  p.px(4, 6, '#8a8aa0');
+// ------------------------------------------------------------------ 째깍 멈춤쇠
+// a brass pocket watch with its stop lever thrown
+defineDrawnSprite('icon_tick_stopper', 16, 16, (p) => {
+  // brass case and a cream face
+  p.circle(7.5, 9.5, 6, BRASS[1]);
+  p.shadeSphere(7.5, 9.5, 6, 6, [BRASS[0], BRASS[1], BRASS[2], BRASS[3]]);
+  p.circle(7.5, 9.5, 4.6, '#f0e6cc');
+  // hour ticks at 12 / 3 / 6 / 9
+  p.px(7, 5, '#7a6048');
+  p.px(12, 9, '#7a6048');
+  p.px(7, 14, '#7a6048');
+  p.px(3, 9, '#7a6048');
+  // hands stopped at three o'clock
+  p.line(7, 6, 7, 9, '#241818');
+  p.line(8, 9, 11, 9, '#241818');
+  p.px(7, 9, '#c02030');
+  // crown on top, the stop lever thrown out to the right
+  p.rect(6, 1, 3, 2, BRASS[2]);
+  p.line(6, 1, 8, 1, BRASS[4]);
+  p.line(9, 3, 12, 2, BRASS[3]);
+  p.rect(12, 0, 3, 3, '#c02030');
+  p.px(12, 0, '#ff7080');
+  p.px(4, 6, '#ffffff');
 }, { outline: O });
 
 defineArtifact({
-  id: 'tick_bomb',
-  name: '째깍 폭탄 꾸러미',
-  desc: '폭탄 +3. 폭탄을 놓으면 주변 적이 잠시 멈춘다.',
-  quote: '째깍, 째깍, 쾅.',
+  id: 'tick_stopper',
+  name: '째깍 멈춤쇠',
+  desc: '대시하면 가끔 주변 적이 잠시 멈춘다.',
+  quote: '째깍, 하고 세상이 멈춘다.',
   rarity: 'common',
   tags: ['clockwork'],
-  icon: 'icon_tick_bomb',
+  icon: 'icon_tick_stopper',
   look: { aura: '#f0d080', hit: '#f0d080' },
   pools: ['treasure', 'shop'],
-  onAcquire(w, power) {
-    grantPerCopy(w, 'tick_bomb', power, () => { addMatches(w, 3); });
-  },
-  onUpdate(w, _dt, power) {
-    grantPerCopy(w, 'tick_bomb', power, () => { addMatches(w, 3); });
-  },
-  onMatch(w, x, y, power) {
-    const R = 70 + 10 * (power - 1);
-    w.spawn(new RingFx(x, y, R, 0.45, '#f0d080', 2));
+  onDash(w, power) {
+    // ready again 7 s after it last stopped anything (6 s with two copies ... never under 3 s);
+    // a dash with nothing in reach keeps it ready
+    if (w.time < (w.vars.__tickStopT ?? -99)) return;
+    const p = w.player;
+    const R = 64 + 8 * (power - 1);
+    const foes = enemiesNear(w, p.x, p.y, R);
+    if (!foes.length) return;
+    w.vars.__tickStopT = w.time + Math.max(3, 7 - power);
+    w.spawn(new RingFx(p.x, p.y - 6, R, 0.45, '#f0d080', 2));
     w.sfx('ui_select', { vol: 0.5, pitch: 0.8 });
-    for (const e of enemiesNear(w, x, y, R)) inflict(w, e, { kind: 'stun', duration: 1.2 + 0.3 * (power - 1) });
+    for (const e of foes) inflict(w, e, { kind: 'stun', duration: 1.0 + 0.2 * (power - 1) });
+    proc(w, 'tick_stopper');
   },
 });
 

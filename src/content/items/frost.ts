@@ -213,7 +213,7 @@ defineDrawnSprite('icon_hoarfrost_mantle', 16, 16, (p) => {
 defineArtifact({
   id: 'hoarfrost_mantle',
   name: '상고대 망토',
-  desc: '영혼 하트 +1. 피격당하면 주변 적을 얼리고 탄환을 지운다.',
+  desc: '푸른 불꽃 +1. 피격당하면 주변 적을 얼리고 탄환을 지운다.',
   quote: '상처가 닿는 곳마다 서리가 핀다.',
   rarity: 'epic',
   tags: ['frost'],

@@ -5,7 +5,7 @@
 // all held artifacts into ONE ShotLook (shared by every shot until the
 // inventory changes; composed sprites are cached per quantized size) and one
 // PlayerLook (drawn by a floor-layer entity + the item draw pass). Effects stack
-// and combine, like tears evolving in Isaac, while costing ~one extra sprite
+// and combine as layers, while costing ~one extra sprite
 // draw per shot.
 
 import { Entity } from './entity';

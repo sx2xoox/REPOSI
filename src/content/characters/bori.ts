@@ -163,7 +163,7 @@ defineCharacter({
   affinity: BORI_AFFINITY,
   playstyle: ['탱커', '회복', '협동'],
   difficulty: 1,
-  pitch: '맞아도 버티고, 남는 하트는 통에 담는다. 든든하게 가고 싶은 이에게.',
+  pitch: '맞아도 버티고, 넘치는 회복은 통에 담는다. 든든하게 가고 싶은 이에게.',
   // co-op: a rescue dog revives twice as fast and brings the ally back with 2 hearts
   coop: { reviveSpeed: 2, reviveHearts: 2 },
 });

@@ -236,14 +236,14 @@ resonance('blood', '피', '#e83048', 'res_blood', [
   [5, '층마다 한 번, 치명상을 반 칸으로 버틴다', {
     onHurt(w) {
       const p = w.player;
-      if (p.alive || w.vars.__bloodOathFloor === w.run.floor) return;
-      w.vars.__bloodOathFloor = w.run.floor;
+      if (p.alive || w.vars.__lastStandFloor === w.run.floor) return;
+      w.vars.__lastStandFloor = w.run.floor;
       if (p.maxRed > 0) p.red = 1;
       else p.soul = 1;
       p.invuln = Math.max(p.invuln, 1.6);
       w.renderer.screenFlash('#ff2040', 0.5);
       w.sfx('heal', { pitch: 0.6 });
-      shout(w, '피의 맹세!', '#ff5060');
+      shout(w, '아직 꺼지지 않아!', '#ff5060');
       w.spawn(new RingFx(p.x, p.y - 6, 60, 0.5, '#ff3048', 4));
       for (const e of enemiesNear(w, p.x, p.y, 60)) itemHit(w, e, dmg(w) * 2, { knockback: 260, statuses: [{ kind: 'bleed', duration: 4, power: dmg(w) * 0.3 }] });
     },
