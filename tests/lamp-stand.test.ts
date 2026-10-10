@@ -1,5 +1,5 @@
 // 등잔대 item stands (game/lamp-stand.ts): every Pedestal is drawn as a lamp stand. The art
-// keeps the old pedestal's footprint (item hover height, price row, 26 px pick-one pairs) and
+// keeps the old pedestal's footprint (item hover height, price row, 24 / 26 px pick-one pairs) and
 // is presentation only: drawing / lighting it and its cosmetic snuff clock never touch the
 // rng or the state hash.
 import './headless';
@@ -33,13 +33,24 @@ const steps = (w: World, n: number) => { for (let i = 0; i < n; i++) w.update(FI
 const rngState = (w: World) => JSON.stringify([w.rng.snapshot(), w.run.rng.snapshot(), w.run.lootRng.snapshot()]);
 
 describe('lamp stand pedestals', () => {
-  it('keeps the old footprint: a 16 x 14 body that spans y-2..y+13 around the pedestal', () => {
+  it('keeps the old footprint: a 14-row stand from y-1 to y+12, the dish over the old block', () => {
     expect(LAMP_STAND_BODY).toHaveLength(14);
-    for (const row of LAMP_STAND_BODY) expect(row).toHaveLength(16);
+    for (const row of LAMP_STAND_BODY) expect(row).toHaveLength(18);
     const s = getSprite(lampStandSprites('bronze', 'crypt').body);
     // 1 px outline on every side; the pivot is the pedestal's own (x, y)
-    expect([s.w, s.h]).toEqual([18, 16]);
-    expect(s.oy).toBe(2);
+    expect([s.w, s.h]).toEqual([20, 16]);
+    expect([s.ox, s.oy]).toEqual([10, 2]);
+    // the dish spans x-8..x+7 like the old block; only the wick's spout reaches x-9
+    const cols = (y: number) => [...LAMP_STAND_BODY[y]].flatMap((ch, i) => (ch === '.' ? [] : [i - 9]));
+    for (const y of [1, 2]) expect(Math.max(...cols(y))).toBeLessThanOrEqual(7);
+    expect(Math.min(...cols(2))).toBe(-8);
+    expect(Math.min(...cols(1))).toBe(-9);
+    // a lamp stand, not a goblet: a shallow dish (rows 0..3) on a slender pole (collar, ring
+    // and socket included, never wider than 5 px) that is half the stand's height
+    const width = (y: number) => cols(y).length;
+    const slender = LAMP_STAND_BODY.filter((_, y) => width(y) <= 5).length;
+    expect(slender).toBeGreaterThanOrEqual(7);
+    for (const y of [0, 1, 2, 3]) expect(width(y)).toBeGreaterThan(9);
     // two stands of a pick-one pair (26 px apart) never touch
     expect(s.w).toBeLessThan(26);
   });
