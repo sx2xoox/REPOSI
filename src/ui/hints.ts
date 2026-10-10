@@ -12,8 +12,6 @@ import { save } from '../engine/save';
 import { Actives } from '../game/defs';
 import { EMBER_MAX } from '../game/player';
 import { SealLamp } from '../game/seal-lamp';
-import { StoneLantern } from '../game/stone-lantern';
-import { ColdSconce } from '../game/cold-sconce';
 import { clamp, ease } from '../engine/math';
 import { frame, keycap } from './frame';
 import { C } from './theme';
@@ -62,8 +60,9 @@ export const HINTS: HintDef[] = [
     when: (_w, h) => h.roomsVisited >= 5,
   },
   {
-    id: 'match', action: 'interact', text: '성냥 — 꺼진 등에 불을 붙여 보자',
-    when: (w) => w.player.matches >= 1 && w.entities.some((e) => (e instanceof StoneLantern || e instanceof ColdSconce || e instanceof SealLamp) && !e.lit),
+    // only the sealed door is taught: stone lanterns and secret sconces are left for players to notice
+    id: 'match', action: 'interact', text: '성냥 — 봉인된 문에 불을 붙여 보자',
+    when: (w) => w.player.matches >= 1 && w.entities.some((e) => e instanceof SealLamp && !e.lit),
   },
 ];
 

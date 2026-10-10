@@ -93,6 +93,8 @@ describe('cold wall sconces', () => {
     expect(sconce.previewable()).toBe(true);
     const card = sconce.interactionInfo(w);
     expect(card.name).toBe('꺼진 벽등');
+    // silent: no preview card or key prompt, a secret is found by trying a match
+    expect(card.silent).toBe(true);
     expect(card.desc).toBe('벽 너머로 바람이 샌다. 불을 붙이면 길이 드러날 것 같다.');
     expect(card.actionLabel).toBe('불 붙이기');
     // the dark sconce is the only lamp near the hidden door on that wall

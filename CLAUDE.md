@@ -156,7 +156,10 @@ Commands:
   sconce). Enemy blasts never reveal. One stone lantern per stage (rock conversion, own RNG
   stream). Old ids (items and vars keyed by an item id) are migrated through `game/legacy-ids.ts`. Measure the
   match economy with `ECON_AUDIT=1 npx vitest run tests/econ-audit` (per floor: matches held / gained / spent,
-  seals, lanterns, secrets).
+  seals, lanterns, secrets). Every match target is lit with the one interact key (G / pad X or D↓ / the touch
+  pick-up button; user: "성냥도 g로 통합"). Stone lanterns and secret sconces are **silent**
+  (`interactionInfo().silent`: no card, no key prompt, no hint, no NPC tip — "알아서 눈치채고 쓰게끔"); sealed
+  doors and sealed chests keep their card.
 - **등불 해방** balance: a release is a burst / crowd-control moment worth ~10–15x `stats.damage` on a
   single target (multi-hit releases use `HitFalloff`), ≤ ~20% of a run's damage.
 - Enemy AI = generator `script(e, w)`: `yield 0.5` waits 0.5s, `yield` waits a frame.

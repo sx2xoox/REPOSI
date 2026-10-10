@@ -1,3 +1,14 @@
+## 2026-10-10 — Matches replace bombs and keys (main, NOT deployed yet; gh-pages is still 662a82e)
+- User: no bombs, keys → 성냥, the bomb-for-reward rock → 꺼진 석등 lit with a match, secret rooms found without bombs,
+  currency kept as 동전, public text tied to the story. Merged as a5f220a (matches.ts, legacy-ids.ts, stone-lantern.ts,
+  cold-sconce.ts, seal-lamp.ts; econ audit `ECON_AUDIT=1`; SEASON 5).
+- Keys (8772311): the user asked "줍는게 원래 g 아니였나?" then "성냥도 g로 통합하자": interact is G only again
+  (pad X / D↓, touch pick-up button in the old bomb slot); E is only the menus' next-tab / blessing reroll key.
+- Silent lanterns (user: "꺼진 석등이랑 비밀방은 상호작용 키 표시하지 마 그냥 알아서 눈치채고 쓰게끔"): stone lanterns and
+  secret sconces return `silent: true` from interactionInfo — no card, no key prompt; the first-time match hint now only
+  teaches sealed doors; the town NPC line and the sky-lantern desc no longer spell them out. G still lights them; on touch
+  the pick-up button shows a plain hand (otherwise touch players could not light them at all).
+
 ## 2026-10-09 — Map redesign 등불 성좌도 (M overlay + HUD minimap) (deployed 2ec84b6, gh-pages 662a82e)
 - User: "지도를 더 멋있게 만들자 지금은 초기 느낌이 강했어" (story draft and the 8–10 run-length question set aside for now: "우선 일단 냅두고"; the lore maps from that workflow are cached in wf_e728e374-f8e). Chosen by a judge from three directions (parchment chart / floor dioramas / constellation): a night-glass board where visited rooms are lit glass panes joined by light threads, seen rooms are dim embers, uncleared rooms show red eyes, special rooms are coloured sigils, the current room holds a flame in the cell the keeper stands in; per-floor glass / thread / metal / emblem / pane motif (src/ui/map-look.ts, derived looks for floors 8+); header with floor medallion and x-1..x-3 stage beads; record plaque (방문 / 정화 + lantern bar + seed); legend in two columns with '출구' once a boss trapdoor shows; compass filler. HUD minimap: brass plate matching the purse, 5x5 sigils, cross-fade on map change, entry flare, clear ring; size / position unchanged (touch layout untouched).
 - Files: src/ui/map-view.ts (read-only snapshot, layouts, cache key `mapSignature` incl. party / map / seed), map-art.ts (ASCII-mask glyphs, painters), map-look.ts, map-overlay.ts / minimap.ts rewritten, hud.ts `drawLive`, hud-gear `rivet()` export, layer-cache `UiLayer.release()`. UI only (drawn-vs-undrawn state hash test). Tests: tests/map-view.test.ts, tests/map-robust.test.ts. Cost: minimap at rest ~0.15 ms vs 0.06 ms before (headless, no GPU); map screen at rest 4.1 ms (cached board), first 0.2 s of opening ~12 ms per frame.

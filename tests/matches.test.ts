@@ -147,6 +147,7 @@ describe('sealed doors', () => {
     expect(w.focus).toBe(lamp);
     const info = lamp.interactionInfo(w);
     expect(info.actionLabel).toBe('불 붙이기');
+    expect('silent' in info).toBe(false); // the sealed door keeps its card (only lanterns / sconces are silent)
     expect(info.price).toEqual({ icon: 'hud_match', text: '1', ok: true });
     expect(info.available).toBe(true);
     press(w, PRESS.interact);

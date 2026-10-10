@@ -204,6 +204,8 @@ describe('lighting a stone lantern', () => {
     const card = lantern.interactionInfo(w);
     expect(card.name).toBe('꺼진 석등');
     expect(card.actionLabel).toBe('불 붙이기');
+    // silent: no preview card or key prompt (user 2026-10-10: players notice it themselves), G still lights it
+    expect(card.silent).toBe(true);
     expect(card.available).toBe(false);
     expect(card.price?.ok).toBe(false);
     press(w, PRESS.interact);

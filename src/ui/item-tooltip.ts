@@ -112,7 +112,7 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
   const keyOf = () => actionLabel(input.bindings, 'interact', pad);
   if (e.interactionInfo) {
     const info = e.interactionInfo(w);
-    if (info.compactHint) return null;
+    if (info.compactHint || info.silent) return null;
     return { icon:info.icon, name:info.name, color:C.gold, sub:[], desc:info.desc, extra:[],
       action:{ key:touchUiActive() ? '' : keyOf(), label:info.actionLabel ?? '사용', pad, ok:info.available ?? true }, note:'', price:info.price ?? null };
   }
@@ -285,7 +285,8 @@ export class ItemTooltip {
     this.t += dt;
     const prev = this.cur;
     const hidden = !!w.bossIntro || w.transitioning || !!w.descending || !w.player?.alive;
-    const f = hidden || !w.focus?.previewable(w) ? null : w.focus;
+    // silent targets (stone lanterns, secret sconces) never show a card: players find them out
+    const f = hidden || !w.focus?.previewable(w) || w.focus.interactionInfo?.(w).silent ? null : w.focus;
     // Mission devices lose their full card immediately when combat begins.
     if (this.cur && !this.cur.previewable(w)) { this.cur = null; this.a = 0; }
     if (f && f.dead) this.cur = null;

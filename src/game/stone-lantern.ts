@@ -259,8 +259,9 @@ export class StoneLantern extends Entity {
   override interactionInfo(w?: World) {
     const name = '꺼진 석등';
     const desc = '성냥으로 불을 붙이면 무언가 나온다.';
-    if (!w) return { name, desc, icon: 'icon_stone_lantern', actionLabel: '불 붙이기', available: false, price: { icon: 'hud_match', text: '1', ok: false } };
-    return matchCard(w, { name, desc, icon: 'icon_stone_lantern' });
+    // silent: no card or key prompt — players notice the cold lantern and try a match themselves
+    if (!w) return { name, desc, icon: 'icon_stone_lantern', actionLabel: '불 붙이기', available: false, price: { icon: 'hud_match', text: '1', ok: false }, silent: true };
+    return { ...matchCard(w, { name, desc, icon: 'icon_stone_lantern' }), silent: true };
   }
 
   override interact(w: World): boolean {

@@ -184,6 +184,11 @@ export abstract class Entity {
     name: string; desc: string; icon: string; compactHint?: string;
     actionLabel?: string; available?: boolean;
     price?: { icon: string; text: string; ok: boolean };
+    /**
+     * No preview card and no key prompt: the keeper finds out by trying (stone
+     * lanterns, secret-room sconces). The touch button still appears, as a plain hand.
+     */
+    silent?: boolean;
   };
   interact?(_w: World): boolean;
   previewable(_w: World): boolean {

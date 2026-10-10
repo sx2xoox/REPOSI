@@ -656,7 +656,7 @@ defineDrawnSprite('fx_sky_lantern', 9, 12, (p) => {
 defineActive({
   id: 'sky_lantern',
   name: '떨어지는 하늘등',
-  desc: '조준한 곳에 하늘등을 떨어뜨려 폭발시킨다 (바위를 부수고 꺼진 벽등을 밝힌다)',
+  desc: '조준한 곳에 하늘등을 떨어뜨려 폭발시킨다 (바위도 부순다)',
   quote: '소원을 빌었더니 하늘이 대답했다.',
   rarity: 'rare',
   icon: 'icon_act_sky_lantern',

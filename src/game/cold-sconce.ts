@@ -158,8 +158,9 @@ export class ColdSconce extends Entity {
   override interactionInfo(w?: World) {
     const name = '꺼진 벽등';
     const desc = '벽 너머로 바람이 샌다. 불을 붙이면 길이 드러날 것 같다.';
-    if (!w) return { name, desc, icon: 'icon_cold_sconce', actionLabel: '불 붙이기', available: false, price: { icon: 'hud_match', text: '1', ok: false } };
-    return matchCard(w, { name, desc, icon: 'icon_cold_sconce', lockdown: inLockdown(w) });
+    // silent: no card or key prompt — a secret is found by trying a match on the cold sconce
+    if (!w) return { name, desc, icon: 'icon_cold_sconce', actionLabel: '불 붙이기', available: false, price: { icon: 'hud_match', text: '1', ok: false }, silent: true };
+    return { ...matchCard(w, { name, desc, icon: 'icon_cold_sconce', lockdown: inLockdown(w) }), silent: true };
   }
 
   override interact(w: World): boolean {

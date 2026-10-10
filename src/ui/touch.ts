@@ -946,10 +946,14 @@ export class TouchControls {
     }
     if (f?.interact && f.interactionInfo) {
       const info = f.interactionInfo(w);
-      const ok = info.available ?? true;
-      // short verbs fit the button ('불 붙이기', '내려가기'); anything longer reads as '줍기'
-      const label = info.actionLabel && info.actionLabel.length <= 6 ? info.actionLabel : '줍기';
-      this.drawBtn(r, 'interact', A, held.has('interact'), info.icon, ok, ok, 1, '', label);
+      // silent targets (stone lanterns, secret sconces): a plain hand, no verb and no match check
+      if (info.silent) this.drawBtn(r, 'interact', A, held.has('interact'), 'tc_pick', true, false, 1);
+      else {
+        const ok = info.available ?? true;
+        // short verbs fit the button ('불 붙이기', '내려가기'); anything longer reads as '줍기'
+        const label = info.actionLabel && info.actionLabel.length <= 6 ? info.actionLabel : '줍기';
+        this.drawBtn(r, 'interact', A, held.has('interact'), info.icon, ok, ok, 1, '', label);
+      }
     }
     // system
     this.drawBtn(r, 'pause', A, held.has('pause'), 'tc_pause');
