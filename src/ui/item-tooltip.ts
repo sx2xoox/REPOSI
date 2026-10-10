@@ -407,6 +407,8 @@ export class ItemTooltip {
     const ox = (Math.round(r.uiOffsetX + (x + sx) * s) - r.uiOffsetX) / s;
     const oy = (Math.round(r.uiOffsetY + (y + sy) * s) - r.uiOffsetY) / s;
     const A = k * alpha;
+    // float texts over this spot (a refused press: '동전 부족', '성냥이 없다') step out from under the card
+    if (A > 0.25) r.coverWorld(ox - 4, oy - 4, W + 8, H + 8);
     // pointer tail toward the item (live: a few 1-unit rects)
     const d = r.dctx;
     d.globalAlpha = A;

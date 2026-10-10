@@ -7,6 +7,7 @@ import type { Renderer } from '../engine/renderer';
 import { animDuration, animFrame, getSprite } from '../engine/sprites';
 import { clamp, ease, TAU } from '../engine/math';
 import { fx } from '../engine/rng';
+import { dodgeCovers } from '../engine/worldtext';
 
 /**
  * Health in float texts: no hearts, a tiny flame written after the number
@@ -57,18 +58,45 @@ export class FloatingText extends Entity {
     const pop = this.age < 0.08 ? 1 + (1 - this.age / 0.08) * 0.6 : 1;
     const s = Math.max(1, Math.round(this.scale * pop));
     const alpha = t > 0.7 ? 1 - (t - 0.7) / 0.3 : 1;
+    // text + icon centered together; the icon's ink sits one glyph gap after the
+    // text and shares its baseline (the icon's own origin is its ink bottom-left;
+    // a Hangul text stands on the same baseline, see Renderer.pixelText)
+    const tw = this.text ? r.pixelTextWidth(this.text, s) : -s;
+    const iw = this.icon ? (getSprite(this.icon).w - 2) * s : 0;
+    const total = this.icon ? tw + s + iw : tw;
+    const th = Math.max(this.text ? r.pixelTextHeight(this.text, s) : 0, this.icon ? 7 * s : 0);
+    let x = this.x;
+    let y = this.y;
+    // draw-only placement (world canvas px, with the outline): a long text near a wall
+    // stays on screen, and a UI card over this spot (the item / fixture card of the
+    // keeper who pressed) is stepped out from under
+    const vw = r.world.width;
+    const bw = total + 2 * s;
+    let left = Math.round(x - r.viewX) - Math.floor(total / 2) - s;
+    if (bw < vw) {
+      const fit = Math.min(Math.max(left, 1), vw - 1 - bw);
+      x += fit - left;
+      left = fit;
+    }
+    const covers = r.worldCovers();
+    if (covers.length) {
+      const top = Math.round(y - r.viewY) + 5 * s - th - s;
+      const [dx, dy, dir] = dodgeCovers(left, top, bw, th + 3 * s, covers, vw, r.world.height, this.dodge);
+      this.dodge = dir;
+      x += dx;
+      y += dy;
+    } else this.dodge = -1;
     if (!this.icon) {
-      r.pixelText(this.text, this.x, this.y, this.color, { align: 'center', outline: '#140c1c', scale: s, alpha });
+      r.pixelText(this.text, x, y, this.color, { align: 'center', outline: '#140c1c', scale: s, alpha });
       return;
     }
-    // text + icon centered together; the icon's ink sits one glyph gap after the
-    // text and shares its baseline (the icon's own origin is its ink bottom-left)
-    const tw = this.text ? (this.text.toUpperCase().length * 4 - 1) * s : -s;
-    const iw = (getSprite(this.icon).w - 2) * s;
-    const left = Math.round(this.x - (tw + s + iw) / 2);
-    if (this.text) r.pixelText(this.text, left, this.y, this.color, { outline: '#140c1c', scale: s, alpha });
-    r.sprite(this.icon, left + tw + s, this.y + 5 * s, { alpha, sx: s, sy: s });
+    const lx = Math.round(x - total / 2);
+    if (this.text) r.pixelText(this.text, lx, y, this.color, { outline: '#140c1c', scale: s, alpha });
+    r.sprite(this.icon, lx + tw + s, y + 5 * s, { alpha, sx: s, sy: s });
   }
+
+  /** draw only: the side it stepped out of a UI card last frame (-1 none) */
+  private dodge = -1;
 }
 
 /** Seconds a damage number stays after its last hit (then fades). */

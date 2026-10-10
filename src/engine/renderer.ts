@@ -16,6 +16,7 @@ import { getFlash, getSprite, getTintCanvas, animFrame, type Sprite } from './sp
 import { clamp, TAU } from './math';
 import { fx } from './rng';
 import { cssViewportSize, safeInsets, type Insets } from './viewport';
+import { PIXEL_GLYPHS, fontTextBitmap, fontTextStyle, fontTextWidth, pixelFontCovers } from './worldtext';
 
 export const VIEW_H = 216;
 export const UI_H = 432;
@@ -114,49 +115,8 @@ export interface TextOpts {
 }
 
 // ---------------------------------------------------------------- tiny world font
-// 3x5 bitmap glyphs for numbers / short words drawn in world space (damage numbers etc.)
-const GLYPHS: Record<string, string[]> = {
-  '0': ['111', '101', '101', '101', '111'],
-  '1': ['010', '110', '010', '010', '111'],
-  '2': ['111', '001', '111', '100', '111'],
-  '3': ['111', '001', '011', '001', '111'],
-  '4': ['101', '101', '111', '001', '001'],
-  '5': ['111', '100', '111', '001', '111'],
-  '6': ['111', '100', '111', '101', '111'],
-  '7': ['111', '001', '010', '010', '010'],
-  '8': ['111', '101', '111', '101', '111'],
-  '9': ['111', '101', '111', '001', '111'],
-  '+': ['000', '010', '111', '010', '000'],
-  '-': ['000', '000', '111', '000', '000'],
-  '!': ['010', '010', '010', '000', '010'],
-  '.': ['000', '000', '000', '000', '010'],
-  '%': ['101', '001', '010', '100', '101'],
-  'x': ['000', '101', '010', '101', '000'],
-  '/': ['001', '001', '010', '100', '100'],
-  ' ': ['000', '000', '000', '000', '000'],
-  'A': ['010', '101', '111', '101', '101'],
-  'B': ['110', '101', '110', '101', '110'],
-  'C': ['011', '100', '100', '100', '011'],
-  'D': ['110', '101', '101', '101', '110'],
-  'E': ['111', '100', '110', '100', '111'],
-  'F': ['111', '100', '110', '100', '100'],
-  'G': ['011', '100', '101', '101', '011'],
-  'H': ['101', '101', '111', '101', '101'],
-  'I': ['111', '010', '010', '010', '111'],
-  'K': ['101', '101', '110', '101', '101'],
-  'L': ['100', '100', '100', '100', '111'],
-  'M': ['101', '111', '111', '101', '101'],
-  'N': ['110', '101', '101', '101', '101'],
-  'O': ['010', '101', '101', '101', '010'],
-  'P': ['110', '101', '110', '100', '100'],
-  'R': ['110', '101', '110', '101', '101'],
-  'S': ['011', '100', '010', '001', '110'],
-  'T': ['111', '010', '010', '010', '010'],
-  'U': ['101', '101', '101', '101', '111'],
-  'V': ['101', '101', '101', '101', '010'],
-  'W': ['101', '101', '111', '111', '101'],
-  'Y': ['101', '101', '010', '010', '010'],
-};
+// 3x5 bitmap glyphs for numbers / short words drawn in world space (damage numbers
+// etc.) live in ./worldtext with the Galmuri path for texts they cannot draw (Hangul).
 
 // ---------------------------------------------------------------- measure cache
 /**
@@ -252,7 +212,7 @@ function textBitmap(up: string, color: string, outline: string | undefined, s: n
   const glyphs = (ox: number, oy: number, col: string) => {
     c.fillStyle = col;
     for (let i = 0; i < up.length; i++) {
-      const g = GLYPHS[up[i]];
+      const g = PIXEL_GLYPHS[up[i]];
       if (!g) continue;
       for (let r = 0; r < 5; r++) {
         for (let k = 0; k < 3; k++) {
@@ -269,6 +229,7 @@ function textBitmap(up: string, color: string, outline: string | undefined, s: n
 }
 
 const NO_TEXT_OPTS = {};
+const NO_COVERS: readonly number[] = [];
 
 const shadowCache = new Map<number, { canvas: HTMLCanvasElement; cx: number; cy: number }>();
 
@@ -348,6 +309,11 @@ export class Renderer {
    * one (a paused / covered world must not interpolate).
    */
   simStep = 0;
+  /** world frames begun (beginWorld); dates the UI covers below */
+  drawFrame = 0;
+  /** UI rects drawn over the world (world canvas px, flat x, y, w, h) by the UI pass of frame `coversFrame` */
+  private covers: number[] = [];
+  private coversFrame = -1;
 
   constructor(display: HTMLCanvasElement) {
     this.display = display;
@@ -458,6 +424,7 @@ export class Renderer {
 
   // ------------------------------------------------------------ world drawing
   beginWorld(clearColor = '#0b0710'): void {
+    this.drawFrame++;
     const c = this.ctx;
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.globalAlpha = 1;
@@ -671,11 +638,17 @@ export class Renderer {
     c.globalAlpha = 1;
   }
 
-  /** Tiny 3x5 bitmap text in world space (cached bitmaps). Returns width in pixels. */
+  /**
+   * Tiny 3x5 bitmap text in world space (cached bitmaps). Returns width in pixels.
+   * A text the 3x5 font cannot draw (Hangul ...) is drawn in the Galmuri pixel face
+   * instead (engine/worldtext), standing on the same baseline (its ink bottom is the
+   * 3x5 text's bottom row, taller glyphs grow upward), same outline / alpha / align.
+   */
   pixelText(str: string, x: number, y: number, color: string, opts: { align?: 'left' | 'center' | 'right'; outline?: string; scale?: number; alpha?: number } = NO_TEXT_OPTS): number {
     const s = Math.max(1, Math.round(opts.scale ?? 1));
     const alpha = opts.alpha ?? 1;
     if (!str.length) return -s;
+    if (!pixelFontCovers(str)) return this.fontText(str, x, y, color, opts, s, alpha);
     if (alpha <= 0) return (str.toUpperCase().length * 4 - 1) * s;
     const te = textEntry(str, color, opts.outline, s);
     const width = (te.len * 4 - 1) * s;
@@ -686,6 +659,64 @@ export class Renderer {
     const c = this.ctx;
     c.globalAlpha = alpha * this.worldOpacity;
     c.drawImage(te.canvas, sx - s, sy - s);
+    c.globalAlpha = 1;
+    return width;
+  }
+
+  /** Width in pixels `pixelText(str, ..., { scale })` draws (lay out text + icon before drawing). */
+  pixelTextWidth(str: string, scale = 1): number {
+    const s = Math.max(1, Math.round(scale));
+    if (!str.length) return -s;
+    if (pixelFontCovers(str)) return (str.toUpperCase().length * 4 - 1) * s;
+    const st = fontTextStyle(s);
+    return fontTextWidth(str, st) * st.k;
+  }
+
+  /** Ink rows `pixelText(str, x, y, ..., { scale })` draws above its baseline `y + 5 * scale` (outline not counted). */
+  pixelTextHeight(str: string, scale = 1): number {
+    const s = Math.max(1, Math.round(scale));
+    if (!str.length || pixelFontCovers(str)) return 5 * s;
+    const st = fontTextStyle(s);
+    return st.ink * st.k;
+  }
+
+  /**
+   * UI pass: a panel (UI units) drawn over the world this frame, e.g. the item card.
+   * World-anchored popups (FloatingText) drawn in the next frame step out from under it.
+   */
+  coverWorld(x: number, y: number, w: number, h: number): void {
+    if (this.coversFrame !== this.drawFrame) {
+      this.covers.length = 0;
+      this.coversFrame = this.drawFrame;
+    }
+    const k = this.uiScale / this.scale;
+    this.covers.push((this.uiOffsetX - this.offsetX) / this.scale + x * k, (this.uiOffsetY - this.offsetY) / this.scale + y * k, w * k, h * k);
+  }
+
+  /** Panels the latest UI pass drew over the world (world canvas px, flat x, y, w, h); empty when it drew none. */
+  worldCovers(): readonly number[] {
+    return this.coversFrame >= this.drawFrame - 1 ? this.covers : NO_COVERS;
+  }
+
+  /** pixelText's Galmuri path: a cached hard-pixel raster blitted at an integer scale. */
+  private fontText(str: string, x: number, y: number, color: string, opts: { align?: 'left' | 'center' | 'right'; outline?: string }, s: number, alpha: number): number {
+    const st = fontTextStyle(s);
+    const k = st.k;
+    if (alpha <= 0) return fontTextWidth(str, st) * k;
+    // null: no DOM, or the face is still loading (drawn from the next frame it is ready)
+    const b = fontTextBitmap(str, st, color, opts.outline);
+    if (!b) return fontTextWidth(str, st) * k;
+    const width = b.w * k;
+    if (!b.canvas) return width;
+    let sx = Math.round(x - this.viewX);
+    // baseline = the bottom edge of the 3x5 text's last row
+    const base = Math.round(y - this.viewY) + 5 * s;
+    if (opts.align === 'center') sx -= Math.floor(width / 2);
+    else if (opts.align === 'right') sx -= width;
+    const c = this.ctx;
+    c.globalAlpha = alpha * this.worldOpacity;
+    if (k === 1) c.drawImage(b.canvas, sx + b.dx, base + b.dy);
+    else c.drawImage(b.canvas, sx + b.dx * k, base + b.dy * k, b.canvas.width * k, b.canvas.height * k);
     c.globalAlpha = 1;
     return width;
   }
