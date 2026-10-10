@@ -1,11 +1,12 @@
 import { stageRoomPlan, STAGES_PER_FLOOR } from './stage-plan';
-// Isaac-style floor generation on a MAP_W x MAP_H cell grid.
+// Floor generation on a MAP_W x MAP_H cell grid.
 //  1. grow rooms outward from the start cell with a BFS that refuses cells which
 //     would create loops/clumps (neighbour count > 1) -> tree-like layouts with dead ends
 //  2. boss room = farthest dead end, then treasure / shop / other specials on dead ends
-//  3. secret room = empty cell surrounded by many rooms (hidden, bombable doors)
+//  3. secret room = empty cell surrounded by many rooms (hidden doors behind a cold wall sconce)
 //  4. merge some normal cells into big rooms (2x1, 1x2, 2x2)
 //  5. pick a room template for every node
+// A stage (generateStage) also marks one normal room whose rock becomes a stone lantern.
 
 import { RNG } from '../engine/rng';
 import { DIRS, DIR_VEC, MAP_H, MAP_W, OPPOSITE, type Dir, type RoomKind, type RoomShape } from './constants';
@@ -18,7 +19,7 @@ export interface NodeDoor {
   cy: number;
   /** node id on the other side */
   to: number;
-  /** hidden secret door (revealed by bombs) */
+  /** hidden secret door (revealed by lighting its cold wall sconce) */
   secret: boolean;
 }
 
@@ -39,8 +40,10 @@ export interface RoomNode {
   cleared: boolean;
   /** shown on the minimap (adjacent to a visited room, or revealed by an item) */
   discovered: boolean;
-  /** treasure / shop rooms need a key (floor 2+) */
+  /** sealed treasure / shop room (floor 2+): a match burns the seal */
   locked: boolean;
+  /** stage lantern: one rock (or open floor tile) of this room becomes a stone lantern (World.buildRoom) */
+  lantern?: boolean;
   doors: NodeDoor[];
   /** room state saved when the player leaves (see World) */
   saved?: unknown;
@@ -66,6 +69,8 @@ export function generateStage(floor: FloorDef, stage: number, rng: RNG): FloorMa
   const map = generateFloor({ ...floor, roomCount: [size, size + 2], extraRooms: {} }, rng,
     { fixedSpecials: specials, secret: plan.includes('secret'), minNormal: normal });
   map.floor = floor;
+  // the far dead end the boss would hold (a plain room before the boss stage)
+  const bossCell = map.bossId;
   for (const n of map.nodes) {
     if (stage < STAGES_PER_FLOOR && n.kind === 'boss') n.kind = 'normal';
     n.locked = floor.index >= 2 && (n.kind === 'treasure' || n.kind === 'shop');
@@ -79,7 +84,28 @@ export function generateStage(floor: FloorDef, stage: number, rng: RNG): FloorMa
     map.bossId = -1;
   }
   for (const d of map.nodes[map.startId].doors) if (!d.secret) map.nodes[d.to].discovered = true;
+  markStageLantern(map, floor, stage, bossCell);
   return map;
+}
+
+/**
+ * One normal room per stage gets a stone lantern (a rock converted in
+ * World.buildRoom): never the start / exit room nor the stage's far (boss) cell;
+ * on the very first stage a room next to the start when there is one. Drawn
+ * from its own stream (a hash of the node seeds), never from the layout rng.
+ */
+function markStageLantern(map: FloorMap, floor: FloorDef, stage: number, bossCell: number): void {
+  let seed = 0;
+  for (const n of map.nodes) seed = (Math.imul(seed ^ n.seed, 0x9e3779b1) + n.id + 1) >>> 0;
+  const lr = new RNG((seed ^ 0x1a7e57) >>> 0);
+  let cands = map.nodes.filter((n) => n.kind === 'normal' && n.id !== map.startId && n.id !== bossCell);
+  if (floor.index === 1 && stage === 1) {
+    const near = new Set(map.nodes[map.startId].doors.filter((d) => !d.secret).map((d) => d.to));
+    const first = cands.filter((n) => near.has(n.id));
+    if (first.length) cands = first;
+  }
+  if (!cands.length) return;
+  lr.pick(cands).lantern = true;
 }
 
 export function shapeOf(n: RoomNode): RoomShape {
@@ -272,7 +298,7 @@ function tryGenerate(floor: FloorDef, rng: RNG, opts: GenOpts): FloorMap | null 
     }
   }
 
-  // floors 2+ lock treasure rooms & shops behind a key (Isaac rule); floor 1 is open
+  // floors 2+ seal treasure rooms & shops (a match burns the seal); floor 1 is open
   for (const n of nodes) {
     if ((n.kind === 'treasure' || n.kind === 'shop') && floor.index >= 2) n.locked = true;
   }

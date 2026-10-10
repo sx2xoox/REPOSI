@@ -32,6 +32,8 @@ import { DamageNumber, DoorClearGlow, FloatingText, RingFx } from './effects';
 import { Chest, FirePlace, Pedestal, Pickup, Trapdoor, itemInfo, type PedestalItem, type PickupKind } from './pickups';
 import { MATCH_CAP, addMatches } from './matches';
 import { SealLamp } from './seal-lamp';
+import { StoneLantern, placeStageLantern } from './stone-lantern';
+import { ColdSconce } from './cold-sconce';
 import { Tile } from './tiles';
 import { findFocus } from './interact';
 import { roomBaseJob } from './roomart';
@@ -456,6 +458,8 @@ export class World {
       const door = room.addDoor(d.dir, d.cx - node.gx, d.cy - node.gy, d.to, kind, hidden);
       if (!hidden && target.locked) door.state = 'locked';
     }
+    // the stage's stone lantern (a rock of this room, picked on the node's own stream)
+    if (node.lantern) placeStageLantern(room);
     return room;
   }
 
@@ -656,10 +660,15 @@ export class World {
 
   /**
    * Match targets fixed to the room, spawned once on its first visit (after the
-   * template markers, before the enemies) and kept with the room: one SealLamp
-   * per sealed door, in door order.
+   * template markers, before the enemies) and kept with the room: a StoneLantern
+   * per lantern tile (row-major), a ColdSconce per secret door (door order; lit
+   * when the door is already open), a SealLamp per sealed door (door order).
    */
   private spawnRoomFixtures(room: Room): void {
+    for (let ty = 0; ty < room.h; ty++) {
+      for (let tx = 0; tx < room.w; tx++) if (room.tiles[ty * room.w + tx] === Tile.STONE_LANTERN) this.spawn(new StoneLantern(tx, ty));
+    }
+    if (room.node.kind !== 'secret') for (const d of room.doors) if (d.secret) this.spawn(ColdSconce.forDoor(room, d));
     for (const d of room.doors) if (d.state === 'locked') this.spawn(new SealLamp(d));
   }
 
@@ -1415,7 +1424,8 @@ export class World {
 
   /**
    * Explosion: damages everyone in radius (player too, unless immune flag),
-   * breaks rocks & pots, reveals secret doors, pushes things away.
+   * breaks rocks & pots, pushes things away; a keeper's own blast lights the
+   * cold sconces of secret doors nearby (enemy blasts never do).
    */
   explode(x: number, y: number, radius: number, damage: number, o: { source?: Entity | null; byPlayer?: boolean; hurtsPlayer?: boolean; color?: string; noTiles?: boolean } = {}): void {
     const p = this.player;
@@ -1469,14 +1479,27 @@ export class World {
           const cx = (tx + 0.5) * TILE;
           const cy = (ty + 0.5) * TILE;
           if (dist(x, y, cx, cy) > r + 6) continue;
-          this.room.destroyTile(this, tx, ty, 'bomb'); // A2: cause 'blast'
+          this.room.destroyTile(this, tx, ty, 'blast');
         }
       }
-      // secret doors
-      for (const d of this.room.doors) {
-        if (d.state === 'hidden' && dist(x, y, d.x, d.y) < radius + 18) this.revealSecretDoor(d);
-      }
     }
+    if (friendly) this.lightSecretSconces(x, y, radius + 18);
+  }
+
+  /**
+   * Light every cold sconce of a hidden secret door whose doorway is within `r`
+   * of (x, y) (a keeper's release or blast): each passage opens. Returns how many.
+   */
+  lightSecretSconces(x: number, y: number, r: number): number {
+    let n = 0;
+    for (const d of this.room.doors) {
+      if (d.state !== 'hidden' || dist(x, y, d.x, d.y) > r) continue;
+      const s = this.entities.concat(this.pending).find((e): e is ColdSconce => e instanceof ColdSconce && e.door === d && !e.dead);
+      if (s) s.ignite(this);
+      else this.revealSecretDoor(d);
+      n++;
+    }
+    return n;
   }
 
   revealSecretDoor(d: Door): void {
@@ -1511,16 +1534,6 @@ export class World {
       this.sfx('rock_break', { vol: 0.8, x: cx });
       this.particles.burst(cx, cy, { count: 18, speed: [40, 140], life: [0.4, 0.9], colors: pal.rock, size: [1, 3], gravity: 300, vz: [60, 150], shape: 'square', vrot: 8, bounce: 0.3 });
       this.particles.burst(cx, cy, { count: 8, speed: [10, 40], life: [0.5, 1.0], colors: ['#9a9088', '#6a6058'], size: [3, 5], sizeEnd: 7, drag: 3 });
-      if (t === Tile.TINTED) {
-        const r = this.rng.next();
-        if (r < 0.4) { for (let i = 0; i < 3; i++) this.spawn(new Pickup('coin', cx, cy).pop()); }
-        else if (r < 0.65) this.spawn(new Pickup('blue_flame', cx, cy).pop());
-        else if (r < 0.85) { this.spawn(new Pickup('match', cx, cy).pop()); this.spawn(new Pickup('match', cx, cy).pop()); }
-        else this.spawn(new Chest(cx, cy, false));
-        this.sfx('secret_found', { vol: 0.6, x: cx });
-      } else if (t === Tile.SKULL_ROCK && this.rng.chance(0.3)) {
-        this.spawn(new Pickup('blue_flame_half', cx, cy).pop());
-      }
     }
   }
 

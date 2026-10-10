@@ -170,15 +170,16 @@ function botMain(opts) {
     };
   }
   /**
-   * What a match target is (duck-typed: a dist build mangles class names): a sealed
-   * door's lamp sits by a 'locked' door, a cold sconce by a 'hidden' one; any other
+   * What a match target is (duck-typed: a dist build mangles class names): each
+   * fixture names itself (`fixture`: seal / lantern / sconce); older builds: a sealed
+   * door's lamp sits by a 'locked' door, a cold sconce by a 'hidden' one, any other
    * world fixture with a `lit` flag and an interaction is a stone lantern.
    */
   const targetKinds = new WeakMap();
   function matchTargetKind(e) {
     if (typeof e.lit !== 'boolean' || typeof e.interact !== 'function') return null;
     let k = targetKinds.get(e);
-    if (!k) targetKinds.set(e, (k = !e.door ? 'lantern' : e.door.state === 'hidden' ? 'sconce' : 'seal'));
+    if (!k) targetKinds.set(e, (k = e.fixture ?? (!e.door ? 'lantern' : e.door.state === 'hidden' ? 'sconce' : 'seal')));
     return k;
   }
   /** Per stage: matches held at the start, gained, spent; seals / lanterns / sconces seen and lit; secrets by cause. */

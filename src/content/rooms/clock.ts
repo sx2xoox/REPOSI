@@ -56,7 +56,7 @@ room('1x1', 'pendulumrow', 2, [
   '.................',
 ]);
 
-// the workshop: vases, gear stacks and a marked stone
+// the workshop: vases, gear stacks and a stone lantern
 room('1x1', 'workshop', 1, [
   '.................',
   '.p....e........p.',

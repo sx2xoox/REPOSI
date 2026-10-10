@@ -97,7 +97,7 @@ function slam(w: World, p: Player, st: WeaponState): void {
     for (let tx = Math.floor((ix - 18) / TILE); tx <= Math.floor((ix + 18) / TILE); tx++) {
       if (dist(ix, iy, (tx + 0.5) * TILE, (ty + 0.5) * TILE) > 18) continue;
       const pr = tileProps(w.room.tileAt(tx, ty));
-      if (pr.bombable) { w.room.destroyTile(w, tx, ty, 'bomb'); broke = true; }
+      if (pr.blastable) { w.room.destroyTile(w, tx, ty, 'blast'); broke = true; }
       else if (pr.breakable) w.room.destroyTile(w, tx, ty, 'shot');
     }
   }

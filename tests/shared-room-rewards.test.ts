@@ -61,11 +61,11 @@ it('shrine bowls are shared single uses, with the benefit going to the offering 
   w.asPlayer(p, () => coin.update(w, 1 / 60));
   expect(coin.used).toBe(false); expect(p.coins).toBe(100);
   expect(w.asPlayer(p, () => coin.interact(w))).toBe(true);
-  expect(coin.used).toBe(true); expect(p.coins).toBe(85); expect(p.red).toBe(p.maxRed); expect(p.soul).toBe(soul + 2);
+  expect(coin.used).toBe(true); expect(p.coins).toBe(84); expect(p.red).toBe(p.maxRed); expect(p.soul).toBe(soul + 2);
   second.x = coin.x; second.y = coin.y;
   w.asPlayer(second, () => coin.update(w, 2));
   expect(w.asPlayer(second, () => coin.interact(w))).toBe(false);
-  expect(second.coins).toBe(85); expect(second.soul).toBe(otherSoul); expect(coin.shrine.spent).toBe(1);
+  expect(second.coins).toBe(84); expect(second.soul).toBe(otherSoul); expect(coin.shrine.spent).toBe(1);
   const heart = bowls.find(b => b.kind === 'heart')!;
   p.x = heart.x; p.y = heart.y;
   w.asPlayer(p, () => heart.update(w, 1 / 60));

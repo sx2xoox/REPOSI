@@ -19,6 +19,8 @@ import { FIXED_DT, TILE } from '../src/game/constants';
 import { EMBER_MAX, type Player } from '../src/game/player';
 import { Chest, Pedestal, Pickup, Trapdoor } from '../src/game/pickups';
 import { SealLamp } from '../src/game/seal-lamp';
+import { StoneLantern } from '../src/game/stone-lantern';
+import { ColdSconce } from '../src/game/cold-sconce';
 import { HELD, PRESS, fixedRules, type PlayerInput } from '../src/game/seam';
 import { stateHash, stateHashParts } from '../src/game/statehash';
 import { applyBlessing, blessingChoices, blessingDue, markBlessed } from '../src/game/blessings';
@@ -168,16 +170,16 @@ export interface BotState {
   modeT: number;
   dashT: number;
   /** strikes a match at the focused match target (sealed door / chest ...) every few seconds, even mid-fight */
-  bombT: number;
+  matchT: number;
   swapT: number;
   door: Door | null;
   roomSteps: number;
   clearSteps: number;
 }
 
-/** A world fixture lit with a match through interact (A2 adds stone lanterns and cold sconces). */
+/** A world fixture lit with a match through interact (sealed door / chest, stone lantern, cold sconce). */
 function isMatchTarget(e: Entity | null): boolean {
-  return !!e && ((e instanceof SealLamp && !e.lit) || (e instanceof Chest && e.locked && !e.opened));
+  return !!e && (((e instanceof SealLamp || e instanceof StoneLantern || e instanceof ColdSconce) && !e.lit) || (e instanceof Chest && e.locked && !e.opened));
 }
 
 function unit(x: number, y: number): [number, number] {
@@ -188,7 +190,7 @@ function unit(x: number, y: number): [number, number] {
 /** A fresh bot (seeded); drive it with `botInput` once per step. */
 export function newBot(seed: string): BotState {
   return {
-    rng: new RNG(`${seed}:bot`), strafe: 1, strafeT: 0, cursorMode: false, modeT: 0, dashT: 1, bombT: 3, swapT: 2,
+    rng: new RNG(`${seed}:bot`), strafe: 1, strafeT: 0, cursorMode: false, modeT: 0, dashT: 1, matchT: 3, swapT: 2,
     door: null, roomSteps: 0, clearSteps: 0,
   };
 }
@@ -243,10 +245,10 @@ export function botInput(w: World, b: BotState, out: PlayerInput): void {
       b.dashT = r.range(0.8, 3);
     }
     if (p.ember >= EMBER_MAX) out.pressed |= PRESS.release;
-    b.bombT -= FIXED_DT;
-    if (b.bombT <= 0) {
+    b.matchT -= FIXED_DT;
+    if (b.matchT <= 0) {
       if (p.matches > 0 && isMatchTarget(w.focus)) out.pressed |= PRESS.interact;
-      b.bombT = r.range(4, 12);
+      b.matchT = r.range(4, 12);
     }
     if (p.activeId && r.chance(0.01)) out.pressed |= PRESS.active;
     if (p.potionId && r.chance(0.004)) out.pressed |= PRESS.potion;

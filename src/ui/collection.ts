@@ -44,7 +44,7 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 
 const RAR_ORDER: Rarity[] = ['common', 'rare', 'epic', 'legendary'];
 const POOL_NAME: Record<string, string> = {
-  treasure: '보물방', shop: '상점', boss: '보스', secret: '비밀방', challenge: '도전방', curse: '저주방', shrine: '성소',
+  treasure: '보물방', shop: '상점', boss: '보스', secret: '비밀방', challenge: '시련방', curse: '대가의 방', shrine: '성소',
 };
 
 const COLS = 10;

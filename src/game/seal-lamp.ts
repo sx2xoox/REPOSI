@@ -22,6 +22,8 @@ const FRAME: Record<Door['dir'], [number, number]> = { N: [1, 0], S: [-1, 0], E:
 
 export class SealLamp extends Entity {
   override readonly worldLoot = true;
+  /** what kind of match target this is (bots / tools: class names are mangled in builds) */
+  readonly fixture = 'seal';
   readonly door: Door;
   lit = false;
   /** `age` when it was lit (draw only: the cords' burn) */

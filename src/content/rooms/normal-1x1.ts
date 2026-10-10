@@ -1,6 +1,6 @@
 // Normal 1x1 room templates (17x9 interior).
-// Legend: . floor  # rock  X metal block  O pit  ^ spikes  p pot  t tinted rock  s skull rock
-//         e enemy  E tough enemy  f fireplace  c coin  h heart  k key  b bomb
+// Legend: . floor  # rock  X metal block  O pit  ^ spikes  p pot  t stone lantern  s skull rock
+//         e enemy  E tough enemy  f fireplace  c coin  h heart
 // Door entrances (col 8 on the top/bottom row, row 4 on the left/right column) stay floor
 // and are connected; tests/rooms.test.ts checks this by flood fill.
 
@@ -442,7 +442,7 @@ n('fourpits', 2, [
   '.................',
 ], [2, 3, 4, 5]);
 
-n('tintedvault', 2, [
+n('lanternvault', 2, [
   '.................',
   '.e..#.......#..e.',
   '...p#.......#p...',

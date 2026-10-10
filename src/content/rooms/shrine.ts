@@ -1,6 +1,6 @@
 // Shrine room "등불 제단": a great stone lantern with two offering bowls.
-//  - 동전 15개: "등불의 온기" — fully restores red hearts and grants a soul heart.
-//  - 심장 1개: "등불의 맹약" — a permanent blessing (random stat buff, never expires).
+//  - 동전 16개: "등불의 온기" — fully restores health and grants a blue flame (푸른 불꽃).
+//  - 최대 체력 1칸: "등불의 맹약" — a blessing for the rest of the run (random stat buff).
 // Each bowl accepts one offering.
 
 import { registerRoomHandler } from '../../game/roomkinds';
@@ -115,7 +115,7 @@ export class OfferingBowl extends Prop {
   }
 
   get cost(): number {
-    return this.kind === 'coin' ? 15 : 1;
+    return this.kind === 'coin' ? 16 : 1;
   }
 
   override update(w: World, dt: number): void {
@@ -127,10 +127,10 @@ export class OfferingBowl extends Prop {
   override interactionInfo(w?: World) {
     const coin = this.kind === 'coin', p = w?.player;
     const affordable = !!p && (coin ? p.coins >= this.cost : !!heartCostKind(p, this.cost));
-    const cost = coin ? '동전 15개' : p ? heartCostText(p, this.cost) : '최대 빨간 체력 1칸 감소 · 부족하면 영혼 하트 1칸 소모';
+    const cost = coin ? '동전 16개' : p ? heartCostText(p, this.cost) : '최대 체력 1칸 감소 · 부족하면 푸른 불꽃 1칸 소모';
     return {
       name: coin ? '등불의 온기' : '등불의 맹약', icon: coin ? 'hud_coin' : 'pk_heart',
-      desc: coin ? `${cost}를 바칩니다. 빨간 체력을 모두 회복하고 영혼 하트 1칸을 얻습니다. 그릇은 한 번만 사용할 수 있습니다.`
+      desc: coin ? `${cost}를 바칩니다. 체력을 모두 회복하고 푸른 불꽃 1칸을 얻습니다. 그릇은 한 번만 사용할 수 있습니다.`
         : `${cost}. 무작위 능력치 하나가 이번 도전 동안 증가합니다. 그릇은 한 번만 사용할 수 있습니다.`,
       actionLabel: '봉헌', available: this.previewable() && affordable,
       price: { icon: coin ? 'hud_coin' : 'pk_heart', text: String(this.cost), ok: affordable },
@@ -156,7 +156,7 @@ export class OfferingBowl extends Prop {
     p.addSoul(2);
     this.consume(w);
     w.sfx('heal');
-    w.banner('등불의 온기', '체력이 모두 회복되고 영혼 심장을 얻었다.', { color: '#9ac0ff', small: true });
+    w.banner('등불의 온기', '체력이 모두 회복되고 푸른 불꽃을 얻었다.', { color: '#9ac0ff', small: true });
     return true;
   }
 
@@ -164,7 +164,7 @@ export class OfferingBowl extends Prop {
     const costText = heartCostText(w.player, 1);
     if (!payHeartCost(w, 1)) {
       w.sfx('ui_error');
-      w.floatText(this.x, this.y - 16, '바칠 심장이 없다', '#ff8080');
+      w.floatText(this.x, this.y - 16, '바칠 체력이 없다', '#ff8080');
       return false;
     }
     w.sfx('player_hurt', { vol: 0.5, pitch: 0.8 });

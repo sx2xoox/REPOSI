@@ -250,9 +250,9 @@ export const ROOM_LABELS: Record<RoomKind, string> = {
   treasure: '보물방',
   shop: '상점',
   secret: '비밀방',
-  challenge: '도전방',
+  challenge: '시련방',
   shrine: '성소',
-  curse: '저주방',
+  curse: '대가의 방',
   relay: '등불 회랑', workshop: '잿불 대장간', vault: '경보 금고', hunt: '도둑 사냥',
   refinery: '제련방', fusion: '합성방', well: '우물방', elite: '엘리트방',
 };

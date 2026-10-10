@@ -425,6 +425,8 @@ export class Player extends Actor {
     if (this.character.release) this.character.release(w, this);
     else defaultRelease(w, this);
     w.items.onRelease();
+    // the lantern's release wakes the cold sconces of secret doors close by
+    w.lightSecretSconces(this.x, this.y, 80);
   }
 
   /** Switch to the weapon in the second slot (no-op when it is empty). */

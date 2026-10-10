@@ -93,7 +93,7 @@ describe('room templates', () => {
   });
 
   it('only use known characters', () => {
-    const ok = new Set('.#XO^ptseEfchkbIBS@'.split(''));
+    const ok = new Set('.#XO^ptseEfchIBS@'.split(''));
     for (const t of all) for (const row of t.rows) for (const ch of row) expect(ok.has(ch), `${t.id}: '${ch}'`).toBe(true);
   });
 
@@ -157,7 +157,7 @@ describe('room templates', () => {
       const reach = flood(t, entrances(t)[0], true);
       t.rows.forEach((row, y) => {
         for (let x = 0; x < row.length; x++) {
-          if ('chkb'.includes(row[x]) && !reach.has(`${x},${y}`)) problems.push(`${t.id}: pickup '${row[x]}' at ${x},${y} unreachable`);
+          if ('ch'.includes(row[x]) && !reach.has(`${x},${y}`)) problems.push(`${t.id}: pickup '${row[x]}' at ${x},${y} unreachable`);
         }
       });
     }

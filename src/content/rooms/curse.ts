@@ -1,5 +1,5 @@
-// Curse room "저주의 방": stepping in costs half a heart. Inside wait items paid with
-// heart containers (Pedestal.heartPrice) and a couple of chests.
+// Price room "대가의 방" (kind 'curse'): stepping in costs half a heart. Inside wait items
+// paid with maximum health (Pedestal.heartPrice) and a couple of chests.
 
 import { registerRoomHandler } from '../../game/roomkinds';
 import { Entity } from '../../game/entity';
@@ -25,8 +25,8 @@ class CurseToll extends Entity {
     // every keeper who walked in pays (co-op)
     for (const p of w.targets()) {
       if (!p.alive || p.red + p.soul <= 1) continue; // never lethal
-      if (p.hurt(w, 1, '저주의 문', true)) {
-        w.floatText(p.x, p.y - 20, '피의 대가', '#ff6080');
+      if (p.hurt(w, 1, '대가의 문', true)) {
+        w.floatText(p.x, p.y - 20, '대가를 치렀다', '#ff6080');
         w.particles.burst(p.x, p.y - 8, { count: 16, speed: [20, 60], life: [0.5, 1], colors: ['#ff70c0', '#a02070', '#300820'], size: [1, 2], additive: true });
       }
     }
@@ -57,7 +57,7 @@ registerRoomHandler('curse', {
     }
     w.spawn(new Chest(cx - 54, cy + 30, false));
     w.spawn(new Chest(cx + 54, cy + 30, rng.chance(0.5)));
-    w.spawn(new HintLabel(cx, cy - 36, '심장으로 값을 치른다', () => true, '#ff90c0', 70));
+    w.spawn(new HintLabel(cx, cy - 36, '체력으로 값을 치른다', () => true, '#ff90c0', 70));
   },
   spawnEnemies() {
     return false;

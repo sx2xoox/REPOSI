@@ -892,9 +892,12 @@ function paintObstacles(p: PixelPainter, room: Room): void {
       const py = ty * TILE;
       let spr: PixelPainter | null = null;
       switch (t) {
-        case Tile.ROCK: spr = getRockPainter(theme, v % 4, false); break;
-        case Tile.SKULL_ROCK: spr = getRockPainter(theme, 4, false); break;
-        case Tile.TINTED: spr = getRockPainter(theme, v % 4, true); break;
+        case Tile.ROCK: spr = getRockPainter(theme, v % 4); break;
+        case Tile.SKULL_ROCK: spr = getRockPainter(theme, 4); break;
+        case Tile.STONE_LANTERN:
+          // the StoneLantern entity draws the lantern itself: here only its footprint and shadow
+          paintLanternFootprint(p, px, py, pal);
+          continue;
         case Tile.BLOCK: spr = getBlockPainter(theme, art); break;
         case Tile.POT: spr = getPotPainter(theme, art, v % 2); break;
       }
@@ -928,9 +931,17 @@ function paintRubble(p: PixelPainter, px: number, py: number, pal: ThemePalette,
   }
 }
 
+/** A stone lantern's footprint: its dark stone plinth bed and a shadow cast to the bottom right. */
+function paintLanternFootprint(p: PixelPainter, px: number, py: number, pal: ThemePalette): void {
+  shadowEllipse(p, px + 10, py + 14.5, 8, 3.2, 0.45);
+  const rk = pal.rock;
+  p.rect(px + 2, py + 10, 12, 5, rk[0]);
+  p.rect(px + 3, py + 10, 10, 1, rk[1]);
+}
+
 const rockCache = new Map<string, PixelPainter>();
-function getRockPainter(theme: ThemeDef, variant: number, tinted: boolean): PixelPainter {
-  const key = `${theme.id}:${variant}:${tinted}`;
+function getRockPainter(theme: ThemeDef, variant: number): PixelPainter {
+  const key = `${theme.id}:${variant}`;
   let r = rockCache.get(key);
   if (r) return r;
   r = new PixelPainter(TILE, TILE + 2);
@@ -939,7 +950,6 @@ function getRockPainter(theme: ThemeDef, variant: number, tinted: boolean): Pixe
   if (variant === 4) paintSkullRock(r, pal);
   else if (theme.paintRock) theme.paintRock(r, rng, variant);
   else paintDefaultRock(r, pal, rng, variant);
-  if (tinted) paintTintMark(r);
   rockCache.set(key, r);
   return r;
 }
@@ -1006,19 +1016,6 @@ function paintSkullRock(r: PixelPainter, pal: ThemePalette): void {
   r.px(7, 5, lighten(rk[4], 0.3));
   r.innerShadow(rk[0]);
   r.outline(pal.dark);
-}
-
-/** Golden rune on tinted rocks (bombing them reveals a reward). Same on every floor. */
-function paintTintMark(r: PixelPainter): void {
-  const gold = '#ffd84a';
-  const hot = '#fff6c0';
-  const pts: [number, number][] = [[8, 7], [7, 8], [9, 8], [6, 9], [10, 9], [7, 10], [9, 10], [8, 11]];
-  for (const [x, y] of pts) r.pxIn(x, y, gold);
-  r.pxIn(8, 9, hot);
-  r.pxIn(8, 8, '#8a5a10');
-  r.pxIn(8, 10, '#8a5a10');
-  r.pxIn(5, 6, hot);
-  r.pxIn(11, 12, gold);
 }
 
 const blockCache = new Map<string, PixelPainter>();
@@ -1160,29 +1157,82 @@ export function drawSpikes(r: Renderer, room: Room, roomTime: number): void {
   }
 }
 
-function paintHiddenDoorHints(p: PixelPainter, room: Room): void {
+/** The wall face a door sits in. */
+export function doorFace(d: Door): Face {
+  return d.dir === 'N' ? 'top' : d.dir === 'S' ? 'bottom' : d.dir === 'W' ? 'left' : 'right';
+}
+
+/** The seeded stream of a secret door's wall cracks (paint and the sconce's fire share it). */
+function crackRng(room: Room, d: Door): RNG {
+  return new RNG((room.node.seed ^ (d.to * 7919)) >>> 0);
+}
+
+/**
+ * Hairline cracks spreading from a hidden opening (wall-face px, five polylines):
+ * painted on the wall, and traced by fire when the door's cold sconce is lit.
+ */
+export function hiddenDoorCracks(room: Room, d: Door, rng: RNG = crackRng(room, d)): { x: number; y: number }[][] {
   const g = wallGeo(room);
+  const face = doorFace(d);
+  const c = face === 'top' || face === 'bottom' ? d.x : d.y;
+  const out: { x: number; y: number }[][] = [];
+  for (let k = 0; k < 5; k++) {
+    let along = c + rng.range(-7, 7);
+    let t = rng.range(0.1, 0.45);
+    const dir = rng.sign();
+    const pts: { x: number; y: number }[] = [];
+    for (let i = 0; i < 11; i++) {
+      pts.push(facePoint(g, face, along, t));
+      along += dir * rng.range(0.4, 1.4);
+      t += rng.range(0.02, 0.08) * (face === 'top' ? 1 : 1.7);
+      if (t > 0.92) break;
+    }
+    out.push(pts);
+  }
+  return out;
+}
+
+/**
+ * Where the cold wall sconce of a secret door is mounted (world px of its wick):
+ * on a top wall beside the opening at the wall lights' height, above a side
+ * door's frame, beside a bottom door on the wall's lip — clear of the door frame
+ * once the passage opens.
+ */
+export function secretSconceAt(room: { pxW: number; pxH: number }, d: Door): { x: number; y: number } {
+  const g = wallGeo(room);
+  let pt: { x: number; y: number };
+  switch (d.dir) {
+    case 'N': pt = facePoint(g, 'top', d.x - 24, 0.56); break; // MOUNT_T of the wall lights (themes/common)
+    case 'S': pt = { x: d.x + 24, y: d.y + 1 }; break;
+    case 'E': pt = facePoint(g, 'right', d.y - 27, 0.5); break;
+    case 'W': pt = facePoint(g, 'left', d.y - 27, 0.5); break;
+  }
+  return { x: Math.round(pt.x), y: Math.round(pt.y) };
+}
+
+function paintHiddenDoorHints(p: PixelPainter, room: Room): void {
   const art = themeArt(room.theme);
   for (const d of room.doors) {
+    if (!d.secret || room.node.kind === 'secret') continue;
+    // soot licked up the wall above the cold sconce (stays once the passage is open)
+    const s = secretSconceAt(room, d);
+    shadePx(p, s.x, s.y - 2, 0.5);
+    shadePx(p, s.x - 1, s.y - 3, 0.42);
+    shadePx(p, s.x + 1, s.y - 4, 0.36);
+    shadePx(p, s.x, s.y - 5, 0.28);
     if (d.state !== 'hidden') continue;
-    const face: Face = d.dir === 'N' ? 'top' : d.dir === 'S' ? 'bottom' : d.dir === 'W' ? 'left' : 'right';
+    const face = doorFace(d);
     const c = face === 'top' || face === 'bottom' ? d.x : d.y;
-    const rng = new RNG((room.node.seed ^ (d.to * 7919)) >>> 0);
-    // hairline cracks spreading from the hidden opening (a subtle hint to bomb here)
-    for (let k = 0; k < 5; k++) {
-      let along = c + rng.range(-7, 7);
-      let t = rng.range(0.1, 0.45);
-      const dir = rng.sign();
-      for (let i = 0; i < 11; i++) {
-        const pt = facePoint(g, face, along, t);
+    const rng = crackRng(room, d);
+    // hairline cracks spreading from the hidden opening (hint at the cold sconce beside it)
+    for (const pts of hiddenDoorCracks(room, d, rng)) {
+      for (const pt of pts) {
         shadePx(p, pt.x, pt.y, 0.6);
         blendPx(p, pt.x + 1, pt.y + 1, art.face[4], 0.3);
-        along += dir * rng.range(0.4, 1.4);
-        t += rng.range(0.02, 0.08) * (face === 'top' ? 1 : 1.7);
-        if (t > 0.92) break;
       }
     }
     // a little crumbled mortar at the wall base
+    const g = wallGeo(room);
     for (let k = 0; k < 4; k++) {
       const pt = facePoint(g, face, c + rng.range(-8, 8), 0);
       const n = face === 'top' ? [0, 2] : face === 'bottom' ? [0, -2] : face === 'left' ? [2, 0] : [-2, 0];

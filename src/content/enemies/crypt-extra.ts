@@ -5,7 +5,7 @@
 //    and then it scurries off, so chasing it runs into the trap; a keeper standing off
 //    gets one thrown at them (trap hoisted overhead, then a landing ring). A trap opens
 //    over 0.6 s, then bites a grounded keeper who steps in (half a heart and a limp).
-//    Dashing over a trap, shooting it, striking it or bombing it springs it harmlessly,
+//    Dashing over a trap, shooting it, striking it or any blast springs it harmlessly,
 //    and every trap of a robber snaps shut when it dies. Cornered, it raises the spade
 //    and flings a short fan of bone chips, then runs.
 // Area denial + kiting: nothing else on the crypt floor leaves lasting danger on the floor.

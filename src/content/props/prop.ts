@@ -40,10 +40,25 @@ export interface WallSlot {
   index: number;
 }
 
+/** Wall slots this close (px along the face) to a secret door stay empty: its cold sconce is the only lamp there. */
+export const SECRET_DOOR_CLEAR = 44;
+
+/** Is a point along a face within `margin` px of a secret door (the cold sconce beside it)? */
+function nearSecretDoor(room: Room, face: Face, along: number, margin: number): boolean {
+  if (room.node.kind === 'secret') return false;
+  for (const d of room.doors) {
+    if (!d.secret) continue;
+    const f: Face = d.dir === 'N' ? 'top' : d.dir === 'S' ? 'bottom' : d.dir === 'W' ? 'left' : 'right';
+    if (f === face && Math.abs((f === 'top' || f === 'bottom' ? d.x : d.y) - along) < margin) return true;
+  }
+  return false;
+}
+
 /**
  * Deterministic decoration slots on the walls (no RNG, so wall paint and prop
  * entities agree): light sources alternate with ornaments, symmetric, avoiding doors
- * (also hidden secret doors, so nothing ends up in front of a revealed passage).
+ * (also hidden secret doors, so nothing ends up in front of a revealed passage, and
+ * nothing crowds the dark sconce beside one: SECRET_DOOR_CLEAR).
  */
 export function wallSlots(room: Room): WallSlot[] {
   const g = wallGeo(room);
@@ -53,14 +68,14 @@ export function wallSlots(room: Room): WallSlot[] {
   const nTop = Math.max(2, Math.round(iw / 68));
   for (let k = 0; k < nTop; k++) {
     const along = g.X0 + ((k + 0.5) / nTop) * iw;
-    if (nearDoor(room, 'top', along, 27)) continue;
+    if (nearDoor(room, 'top', along, 27) || nearSecretDoor(room, 'top', along, SECRET_DOOR_CLEAR)) continue;
     out.push({ face: 'top', along, kind: Math.min(k, nTop - 1 - k) % 2 === 0 ? 'light' : 'ornament', index: k });
   }
   const nSide = Math.max(2, Math.round(ih / 72));
   for (const face of ['left', 'right'] as Face[]) {
     for (let k = 0; k < nSide; k++) {
       const along = g.Y0 + ((k + 0.5) / nSide) * ih;
-      if (nearDoor(room, face, along, 24)) continue;
+      if (nearDoor(room, face, along, 24) || nearSecretDoor(room, face, along, SECRET_DOOR_CLEAR)) continue;
       out.push({ face, along, kind: k % 2 === 0 ? 'light' : 'ornament', index: k });
     }
   }

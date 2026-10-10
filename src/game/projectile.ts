@@ -246,7 +246,7 @@ export class Projectile extends Entity {
     const props = tileProps(t);
     if (props.blocksShots && !(this.spectral && t !== Tile.WALL && t !== Tile.DOOR)) {
       if (props.breakable && this.team === 'player') w.room.damageTile(w, tx, ty, this.damage);
-      if (this.team === 'player' && (t === Tile.ROCK || t === Tile.TINTED || t === Tile.BLOCK)) {
+      if (this.team === 'player' && (t === Tile.ROCK || t === Tile.STONE_LANTERN || t === Tile.BLOCK)) {
         // sparks off rock
         w.particles.burst(this.x, this.y - this.z, { count: 3, speed: [20, 60], life: [0.1, 0.25], colors: ['#ffffff', '#c8b8a8'] });
       }

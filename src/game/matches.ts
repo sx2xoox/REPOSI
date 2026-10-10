@@ -101,9 +101,10 @@ function refuse(w: World, target: Entity, text: string, sound: 'ui_error' | 'no_
  * Standard lighting flow for a match target, run by the context keeper's
  * interact: alive, standing, in reach; a door / sconce (`lockdownRule`) refuses
  * while the room is locked down (the match is kept); an empty purse refuses.
- * True when a match was struck (the caller then lights the target).
+ * True when a match was struck (the caller then lights the target). `at`: where
+ * the strike's sparks fly (the wick / window), default the target's position.
  */
-export function tryLightWithMatch(w: World, target: Entity, lockdownRule: boolean): boolean {
+export function tryLightWithMatch(w: World, target: Entity, lockdownRule: boolean, at?: { x: number; y: number }): boolean {
   const p = w.player;
   if (!p || !p.alive || p.downed || dist(target.x, target.y, p.x, p.y) >= PREVIEW_RANGE) return false;
   if (lockdownRule && inLockdown(w)) {
@@ -114,5 +115,5 @@ export function tryLightWithMatch(w: World, target: Entity, lockdownRule: boolea
     refuse(w, target, '성냥이 없다', 'no_money');
     return false;
   }
-  return spendMatch(w, target.x, target.y);
+  return spendMatch(w, at?.x ?? target.x, at?.y ?? target.y);
 }

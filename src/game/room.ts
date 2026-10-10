@@ -245,7 +245,7 @@ export class Room {
     return door;
   }
 
-  /** Reveal a secret door (bombed). */
+  /** Reveal a secret door (its cold sconce was lit, or it was walked out of). */
   revealDoor(d: Door): void {
     if (!d.secret || d.state !== 'hidden') return;
     d.state = 'open';
@@ -283,11 +283,11 @@ export class Room {
     if (this.tileHp[i] <= 0) this.destroyTile(w, tx, ty, 'shot');
   }
 
-  /** Destroy an obstacle tile (rocks by bombs, pots by anything). */
-  destroyTile(w: World, tx: number, ty: number, cause: 'bomb' | 'shot' | 'other'): void {
+  /** Destroy an obstacle tile (rocks by explosions, pots by anything). */
+  destroyTile(w: World, tx: number, ty: number, cause: 'blast' | 'shot' | 'other'): void {
     const t = this.tileAt(tx, ty);
     const p = tileProps(t);
-    if (cause === 'bomb' ? !p.bombable : !p.breakable) return;
+    if (cause === 'blast' ? !p.blastable : !p.breakable) return;
     const cx = (tx + 0.5) * TILE;
     const cy = (ty + 0.5) * TILE;
     this.setTile(tx, ty, Tile.RUBBLE);

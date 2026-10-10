@@ -1,8 +1,8 @@
 // Helpers for the expanded arsenal (wands, launchers, staves, blades ...):
 // shot timing for recoil animations, held-gun drawing, player-owned blasts,
 // segment hit tests, lightning zaps, lobbed-shell flight and ground fire.
-// Everything here only hits enemies (never the player) and never breaks tiles,
-// so bombs stay the tool for rocks and secret doors.
+// Everything here only hits enemies (never the player), never breaks tiles and
+// never lights a secret door's cold sconce (matches, releases and World.explode do).
 
 import type { World } from '../../game/world';
 import type { Player } from '../../game/player';
