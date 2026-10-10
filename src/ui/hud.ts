@@ -393,7 +393,8 @@ export class Hud {
     const split = sr ? this.activeSplit() : null;
     const srLate = !!(w.floorCard || w.bossIntro);
     if (sr && !srLate) this.drawSpeedrunLayer(r, w, sr, split);
-    this.tooltip.draw(r, w, A);
+    const mb = minimapBlockRect(UI_W, sa);
+    this.tooltip.draw(r, w, A, { x: mb.x - 4, y: mb.y, w: mb.w + 8, h: sa.t + this.purseY() + PURSE_H + 4 - mb.y });
     drawBanners(r, w);
     if (this.clearT >= 0) drawRoomClear(r, this.clearT, w.banners.length === 0 && !w.floorCard && !split);
     if (w.floorCard) drawFloorCard(r, w.floorCard);
@@ -521,12 +522,15 @@ export class Hud {
     const items: [string, ChangeTracker, number][] = [['hud_coin', this.coins, p.coins], ['hud_match', this.matches, p.matches]];
     const y = this.purseY();
     const cy = y + PURSE_H / 2;
-    const cellW = 34;
-    const pw = items.length * cellW + 8;
+    // each cell fits its count (a fat purse of 100+ coins must not run into the matches)
+    const cellW = items.map(([, , n]) => Math.max(34, Math.ceil((18 + r.measureText(String(n), 10, false, 'small') + 8) / PX) * PX));
+    const pw = cellW.reduce((a, b) => a + b, 0) + 8;
     const px = this.W - 8 - pw;
     blitArt(r, plateCanvas(pw / PX, PURSE_H / PX), px, y, A);
+    let cx = px + 10;
     items.forEach(([icon, tr, n], i) => {
-      const ix = px + 10 + i * cellW;
+      const ix = cx;
+      cx += cellW[i];
       const sc = popScale(tr.pop, 0.45);
       r.uiSprite(icon, ix, cy, 1.5, { alpha: A });
       const full = icon === 'hud_match' && n >= MATCH_CAP;
@@ -535,7 +539,8 @@ export class Hud {
       d.save();
       d.translate(ix + 8, cy);
       d.scale(sc, sc);
-      r.uiText(String(n).padStart(2, '0'), 0, -6, { size: 10, font: 'small', color: col, alpha: A, outline: C.ink });
+      // plain counts (a purse of matches never passes one digit)
+      r.uiText(String(n), 0, -6, { size: 10, font: 'small', color: col, alpha: A, outline: C.ink });
       d.restore();
       if (tr.age < 1.1 && tr.delta !== 0) {
         const a = clamp(1 - tr.age / 1.1, 0, 1) * A;

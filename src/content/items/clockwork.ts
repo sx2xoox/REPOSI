@@ -104,7 +104,7 @@ defineArtifact({
   id: 'wind_up_matchbox',
   name: '태엽 성냥갑',
   desc: '성냥 +2. 가진 성냥이 많을수록 공격력이 오른다.',
-  quote: '감을수록 단단해진다.',
+  quote: '태엽을 감을 때마다 성냥 한 개비가 고개를 내민다.',
   rarity: 'common',
   tags: ['clockwork'],
   icon: 'icon_wind_up_matchbox',

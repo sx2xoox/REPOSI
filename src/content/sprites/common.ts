@@ -61,23 +61,24 @@ const BLUE_FLAME: string[][] = [
     '..eeee..',
   ],
   [
-    '....e...',
-    '...ebe..',
-    '...ebe..',
-    '..ebbbe.',
-    '..ebcbe.',
+    '...e....',
+    '...be.e.',
+    '..ebe.be',
+    '..ebbebe',
+    '.ebbbbbe',
     '.ebbcbbe',
-    '.ebccbbe',
+    'ebbccbbe',
     'ebcccbbe',
     'ebcccbbe',
     '.ebccbe.',
     '..eeee..',
   ],
 ];
+// the small one keeps the same licks: a bent tip and a side tongue, never a plain drop
 const BLUE_FLAME_HALF: string[][] = [
-  ['...e..', '..ebe.', '..ebbe', '.ebcbe', 'ebccbe', 'ebccbe', '.ebbe.', '..ee..'],
-  ['..e...', '.ebe..', 'ebbe..', 'ebcbe.', 'ebccbe', 'ebccbe', '.ebbe.', '..ee..'],
-  ['..e...', '..be..', '.ebbe.', '.ebcbe', 'ebccbe', 'ebccbe', '.ebbe.', '..ee..'],
+  ['..e...', '..be..', '.ebe.e', '.ebbeb', 'ebcbbe', 'ebccbe', '.ebbe.', '..ee..'],
+  ['...e..', '...be.', 'e.ebe.', 'beebbe', 'ebcbbe', 'ebccbe', '.ebbe.', '..ee..'],
+  ['..e...', '.eb...', '.ebe.e', '.ebbbe', 'ebcbbe', 'ebccbe', '.ebbe.', '..ee..'],
 ];
 for (const [name, frames] of [['pk_blue_flame', BLUE_FLAME], ['pk_blue_flame_half', BLUE_FLAME_HALF]] as const) {
   frames.forEach((rows, k) => definePixelSprite(`${name}_${k}`, BLUE, rows, { outline: '#101838' }));
@@ -106,20 +107,20 @@ definePixelSprite('hud_coin', BRASS, [
   '.bbmmmd.',
   '..mmdd..',
 ], { outline: O });
-// 동전 꾸러미: four coins threaded on a red cord, knotted at the end
-const STRUNG_COIN = ['.lbm.', 'lbbbd', 'bbkbd', 'bbbmd', '.mdd.'];
+// 동전 꾸러미: two full coins threaded on a red cord (both holes show); the cord
+// comes out of the back coin's hole in a knot with a short tail
+const STRUNG_COIN = ['.llbb.', 'lgbbbm', 'lbkkbm', 'bbkkmm', 'bbbmmd', '.bmdd.'];
 defineDrawnSprite('pk_coin_string', 12, 8, (p) => {
-  const pal = { ...BRASS, k: '#3a1808' };
-  // back to front: each coin's shaded right rim parts it from the one behind
-  for (const [x, y] of [[6, 2], [4, 1], [2, 2], [0, 1]]) p.stamp(x, y, STRUNG_COIN, pal);
-  // the cord leaves the last coin's hole: a knot and two tails
-  p.px(9, 4, '#c03030');
-  p.rect(10, 3, 2, 2, '#e04040');
-  p.px(10, 3, '#ff8080');
-  p.px(10, 5, '#c03030');
-  p.px(10, 6, '#8a1c1c');
-  p.px(11, 6, '#c03030');
-  p.px(11, 7, '#8a1c1c');
+  const pal = { ...BRASS, k: '#2a1006' };
+  p.stamp(4, 0, STRUNG_COIN, pal);
+  p.stamp(0, 2, STRUNG_COIN, pal);
+  // the cord comes out of the back coin's hole to the knot
+  p.px(8, 3, '#c03030');
+  p.px(9, 3, '#e04040');
+  p.rect(10, 2, 2, 2, '#e04040');
+  p.px(10, 2, '#ff8080');
+  p.px(10, 4, '#c03030');
+  p.px(11, 5, '#8a1c1c');
 }, { outline: O });
 
 // ------------------------------------------------------------------ matches (성냥)
@@ -137,10 +138,10 @@ definePixelSprite('pk_match', MATCH, [
   '.ws.',
   '.ss.',
 ], { outline: O });
-// 성냥갑: a small brown box, red label with a flame mark, dark striker strip, two heads peeking out
+// 성냥갑: a small brown box, red label with a flame mark, dark striker strip, three heads peeking out
 definePixelSprite('pk_matchbox', { ...MATCH, b: '#a06a3a', t: '#c89058', k: '#6a4020', L: '#b02a20', y: '#ffd060', x: '#3a2420', g: '#6a5040' }, [
-  '..hr.hr...',
-  '..ws.ws...',
+  '.hr.hr.hr.',
+  '.ws.ws.ws.',
   'tttttttttt',
   'bLLLyLLLLk',
   'bLLyyyLLLk',

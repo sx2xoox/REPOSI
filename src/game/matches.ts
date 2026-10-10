@@ -88,9 +88,17 @@ export function matchCard(w: World, o: { name: string; desc: string; lockdown?: 
 
 /** Refusal float texts, each at most once a second per target (cosmetic only: never sim state). */
 const refusedAt = new WeakMap<object, { text: string; t: number }>();
+/** Last press refused for want of a match, per target (cosmetic: the card's price blinks red). */
+const emptyAt = new WeakMap<object, number>();
+
+/** When a press on this target was last refused because the purse had no match (undefined: never). */
+export function matchDeniedAt(target: object): number | undefined {
+  return emptyAt.get(target);
+}
 
 function refuse(w: World, target: Entity, text: string, sound: 'ui_error' | 'no_money'): void {
   w.sfx(sound);
+  if (sound === 'no_money') emptyAt.set(target, w.time);
   const last = refusedAt.get(target);
   if (last && last.text === text && w.time - last.t < 1 && w.time >= last.t) return;
   refusedAt.set(target, { text, t: w.time });

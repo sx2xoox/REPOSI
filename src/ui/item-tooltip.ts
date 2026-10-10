@@ -9,6 +9,7 @@ import type { Renderer } from '../engine/renderer';
 import { UI_H, UI_W } from '../engine/renderer';
 import type { World } from '../game/world';
 import { heartCostText } from '../game/heart-cost';
+import { matchDeniedAt } from '../game/matches';
 import type { Entity } from '../game/entity';
 import { input } from '../engine/input';
 import { clamp, ease } from '../engine/math';
@@ -308,7 +309,11 @@ export class ItemTooltip {
     return this.visible && !!this.cur?.interactionInfo?.(w).compactHint;
   }
 
-  draw(r: Renderer, w: World, alpha = 1): void {
+  /**
+   * `avoid`: a HUD rect (UI units) the card must not cover, e.g. the minimap and
+   * purse block: a fixture high on the right wall would otherwise hide the purse.
+   */
+  draw(r: Renderer, w: World, alpha = 1, avoid?: { x: number; y: number; w: number; h: number }): void {
     const e = this.cur;
     if (!e || this.a <= 0.01 || alpha <= 0.01) return;
     const compact=e.interactionInfo?.(w).compactHint;
@@ -369,6 +374,15 @@ export class ItemTooltip {
         y = ab.y + 8;
       }
     }
+    // keep clear of the minimap / purse block: a card beside its item drops below the
+    // block, a card above its item slides left of it
+    if (avoid) {
+      const cx = clamp(x, minX, maxX);
+      if (cx < avoid.x + avoid.w && cx + W > avoid.x && y < avoid.y + avoid.h && y + H > avoid.y) {
+        if (side === 'left' || side === 'right') y = Math.min(maxY, avoid.y + avoid.h + 4);
+        else if (side === 'up') x = Math.max(minX, avoid.x - 6 - W);
+      }
+    }
     // glide between placements (relative to the anchor, so camera motion never lags)
     if (this.fresh) {
       this.lastDraw = typeof performance !== 'undefined' ? performance.now() : 0;
@@ -409,8 +423,8 @@ export class ItemTooltip {
     this.pr = r;
     this.ly.draw(r, `${this.sig}|${W}x${H}`, ox, oy, 0, 0, W, H, A, this.paint);
     this.pr = null;
-    // a refused press (can't pay): the price blinks red for a moment
-    const deny = e instanceof Pedestal ? e.mem.denyT : undefined;
+    // a refused press (can't pay, no match to strike): the price blinks red for a moment
+    const deny = e instanceof Pedestal ? e.mem.denyT : matchDeniedAt(e);
     if (deny !== undefined && w.time - deny < 0.5 && c.price) {
       const bl = 0.5 + 0.5 * Math.sin(this.t * 40);
       r.uiRect(ox + W - 64, oy + PAD - 2, 58, 16, C.bad, 0.3 * bl * A);

@@ -27,11 +27,13 @@ const CRACK_FIRE_T = 0.4;
 /** a keeper this close (px, to the door) makes dust drift into the cracks */
 const DRAUGHT_R = 60;
 
-// 7 x 10 sooty iron sconce: a cup with a dead black wick and a rim of pale ash on a
-// short arm, a wall plate with two rivets and one glint of old gilt on the arm's end
+// 7 x 11 sooty iron sconce: a stub of pale, soot-streaked wax with a dead black wick
+// in an iron cup on a short arm, a wall plate with two rivets and one glint of old
+// gilt on the arm's end (the pale stub is what tells it apart from the lit torches)
 const SCONCE = [
   '...w...',
-  '..awa..',
+  '..cwc..',
+  '..cCc..',
   '.IsssI.',
   '..iIi..',
   '.iIIIg.',
@@ -41,12 +43,13 @@ const SCONCE = [
   '..pPp..',
   '..ppp..',
 ];
-definePixelSprite('cold_sconce', { w: '#0a0608', a: '#8a8088', s: '#1c1820', i: '#3a3440', I: '#6a6474', g: '#d8a848', p: '#2a2630', P: '#5a5464' }, SCONCE, { outline: '#0c0810', origin: [3, 0] });
-// lit: the ash burnt off the rim and the wick glowing
-definePixelSprite('cold_sconce_lit', { w: '#ffd070', a: '#c89060', s: '#5a3a28', i: '#3a3440', I: '#8a8494', g: '#ffd860', p: '#2a2630', P: '#6a6474' }, SCONCE, { outline: '#0c0810', origin: [3, 0] });
-definePixelSprite('icon_cold_sconce', { w: '#0a0608', s: '#1c1820', i: '#4a4450', I: '#6e6878', g: '#d8a848', p: '#34303a', c: '#0c0810' }, [
+definePixelSprite('cold_sconce', { w: '#0a0608', c: '#c8bcaa', C: '#7a7064', s: '#1c1820', i: '#3a3440', I: '#6a6474', g: '#d8a848', p: '#2a2630', P: '#5a5464' }, SCONCE, { outline: '#0c0810', origin: [3, 0] });
+// lit: warm wax, the wick glowing
+definePixelSprite('cold_sconce_lit', { w: '#ffd070', c: '#f0e0c0', C: '#c8a070', s: '#5a3a28', i: '#3a3440', I: '#8a8494', g: '#ffd860', p: '#2a2630', P: '#6a6474' }, SCONCE, { outline: '#0c0810', origin: [3, 0] });
+definePixelSprite('icon_cold_sconce', { w: '#0a0608', c: '#c8bcaa', C: '#7a7064', s: '#1c1820', i: '#4a4450', I: '#6e6878', g: '#d8a848', p: '#34303a' }, [
   '....w....',
-  '...sws...',
+  '...cwc...',
+  '...cCc...',
   '..iIsss..',
   '...iii...',
   '.iIIIIig.',
@@ -182,12 +185,17 @@ export class ColdSconce extends Entity {
     this.litAt = show ? this.age : this.age - 10;
   }
 
+  /** draw only: the dead wick's last ember flickers on now and then */
+  private emberShowing(): boolean {
+    return Math.floor(this.age * 1.2 + this.id * 0.7) % 4 === 0 && Math.floor(this.age * 6) % 3 !== 0;
+  }
+
   override draw(r: Renderer): void {
     const { x, y } = this.wick;
     if (!this.lit) {
       r.sprite('cold_sconce', x, y);
       // a last ember still glows in the dead wick now and then
-      if (Math.floor(this.age * 1.2 + this.id * 0.7) % 4 === 0 && Math.floor(this.age * 6) % 3 !== 0) r.rect(Math.round(x), Math.round(y), 1, 1, '#ff8a40', 0.9);
+      if (this.emberShowing()) r.rect(Math.round(x), Math.round(y), 1, 1, '#ff8a40', 0.9);
       return;
     }
     r.sprite('cold_sconce_lit', x, y);
@@ -195,7 +203,11 @@ export class ColdSconce extends Entity {
   }
 
   override light(w: World): void {
-    if (!this.lit) return;
+    if (!this.lit) {
+      // the last ember in the dead wick: just enough glow to catch the eye in a dark corner
+      if (this.emberShowing()) w.lights.add(this.wick.x, this.wick.y + 2, 14, '#ff8a40', { intensity: 0.45 });
+      return;
+    }
     const fl = 1 + Math.sin(this.age * 12 + this.id) * 0.04;
     w.lights.add(this.wick.x, this.wick.y - 4, 60 * fl, '#ffa850', { intensity: 0.8 });
     const since = this.age - this.litAt;

@@ -123,6 +123,15 @@ export class HintSystem {
       }
     } else if (this.queue.length && this.cooldown <= 0 && !w.bossIntro && !w.floorCard) {
       const def = this.queue.shift()!;
+      // queued a while ago: still true now? (a lamp lit or a potion drunk in the meantime
+      // leaves the hint unseen, to come back the next time it applies)
+      let still = false;
+      try {
+        still = def.when(w, st);
+      } catch {
+        still = false;
+      }
+      if (!still) return;
       this.cur = { def, t: 0 };
       save.setFlag(`hint:${def.id}`);
       sfx('ui_open', { vol: 0.35, pitch: 1.3 });

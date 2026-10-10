@@ -13,10 +13,11 @@ import { RunState } from '../src/game/run';
 import { Characters } from '../src/game/defs';
 import { Chest, Pickup } from '../src/game/pickups';
 import { SealLamp } from '../src/game/seal-lamp';
-import { MATCH_CAP, addMatches, spendMatch } from '../src/game/matches';
+import { MATCH_CAP, addMatches, matchDeniedAt, spendMatch } from '../src/game/matches';
 import { LEGACY_ITEM_IDS, LEGACY_VARS, migrateCheckpoint, migratePurse, normalizeItemId } from '../src/game/legacy-ids';
 import { captureCheckpoint, restoreCheckpoint, type Checkpoint } from '../src/game/checkpoint';
-import { migrateProgress, type Progress } from '../src/engine/save';
+import { migrateProgress, save, type Progress } from '../src/engine/save';
+import { HintSystem } from '../src/ui/hints';
 import { PRESS } from '../src/game/seam';
 import { stateHash } from '../src/game/statehash';
 import type { RoomNode } from '../src/game/dungeon';
@@ -178,6 +179,8 @@ describe('sealed doors', () => {
       expect(p.matches).toBe(1);
       expect(lamp.door.state).toBe('locked');
       expect(float.mock.calls.some((c) => c[2] === '전투가 끝나면 붙일 수 있다')).toBe(true);
+      // a lockdown is not a missing match: the price does not blink
+      expect(matchDeniedAt(lamp)).toBeUndefined();
       other.state = 'open';
     }
     p.matches = 0;
@@ -189,6 +192,31 @@ describe('sealed doors', () => {
     expect(lamp.door.state).toBe('locked');
     // the refusal floats once a second, not once a press
     expect(float.mock.calls.filter((c) => c[2] === '성냥이 없다')).toHaveLength(1);
+    // and the card's price blinks on every refused press (the float can hide behind the card)
+    expect(matchDeniedAt(lamp)).toBe(w.time);
+  });
+
+  it('a queued match hint that stopped applying is dropped unseen, and comes back when it applies again', () => {
+    const w = world('ria', 'SEALS-HINT');
+    const { lamp } = sealedDoor(w);
+    const flags = save.progress.flags;
+    save.progress.flags = flags.filter((f) => f !== 'hint:match');
+    try {
+      const fixtures = w.entities.filter((e) => 'fixture' in e && 'lit' in e) as unknown as { lit: boolean }[];
+      const run = (h: HintSystem) => { for (let i = 0; i < 240; i++) { w.floorCard = null; h.update(w, DT); } };
+      w.floorCard = null;
+      w.player.matches = 1;
+      const h = new HintSystem();
+      h.update(w, DT); // queued; the start cooldown holds it back
+      for (const f of fixtures) f.lit = true; // lit in the meantime
+      run(h);
+      expect(HintSystem.seen('match')).toBe(false);
+      lamp.lit = false;
+      run(h);
+      expect(HintSystem.seen('match')).toBe(true);
+    } finally {
+      save.progress.flags = flags;
+    }
   });
 
   it('co-op: two keepers striking the same lamp on the same step pay one match', () => {
