@@ -1673,7 +1673,9 @@ export class World {
         if (old) {
           ped.item = { kind: 'active', id: old, charge: oldCharge };
           ped.waitForLeave = true;
+          // the keeper's own item put down is free to take back (coins and health alike)
           ped.price = 0;
+          ped.heartPrice = 0;
         }
         break;
       }
@@ -1686,6 +1688,7 @@ export class World {
           ped.item = { kind: 'weapon', id: old, temper: oldTemper };
           ped.waitForLeave = true;
           ped.price = 0;
+          ped.heartPrice = 0;
         }
         break;
       }
