@@ -3,6 +3,7 @@
 // so it stays pixel-sharp when the world canvas is scaled up.
 
 import type { Room } from '../../game/room';
+import { fontFaceReady, LruCache } from '../../engine/worldtext';
 
 export interface PixelTextOpts {
   /** css px size; Galmuri11 is crisp at 12, Galmuri9 at 10 */
@@ -16,7 +17,11 @@ export interface PixelTextOpts {
   shadow?: string;
 }
 
-const cache = new Map<string, HTMLCanvasElement>();
+/**
+ * Rasterized labels, least recently used dropped first: a few hundred is far more than
+ * a room shows, and counters ('랠리 37') can no longer grow it without bound.
+ */
+const cache = new LruCache<HTMLCanvasElement>(256);
 
 function hex(c: string): [number, number, number] {
   const n = parseInt(c.slice(1, 7), 16);
@@ -31,6 +36,8 @@ export function pixelTextCanvas(text: string, o: PixelTextOpts = {}): HTMLCanvas
   const hit = cache.get(key);
   if (hit) return hit;
   const fontStr = `${o.bold ? 'bold ' : ''}${size}px '${font}', monospace`;
+  // while Galmuri is still loading the fallback face draws this frame only (never cached)
+  const ready = fontFaceReady(fontStr);
   const probe = document.createElement('canvas').getContext('2d')!;
   probe.font = fontStr;
   const w = Math.ceil(probe.measureText(text).width) + 4;
@@ -73,7 +80,7 @@ export function pixelTextCanvas(text: string, o: PixelTextOpts = {}): HTMLCanvas
   for (let i = 0; i < w * h; i++) if (mask[i]) put(i, fc);
   ctx.clearRect(0, 0, w, h);
   ctx.putImageData(out, 0, 0);
-  cache.set(key, cv);
+  if (ready) cache.set(key, cv);
   return cv;
 }
 

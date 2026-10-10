@@ -124,6 +124,60 @@ export function fontTextKey(text: string, css: string, color: string, outline: s
   return `${css}\u0001${color}\u0001${outline ?? ''}\u0001${text}`;
 }
 
+// ---------------------------------------------------------------- placement (draw only)
+/**
+ * Left edge (view px) for a popup box `w` wide whose anchor sits at view x `anchor`:
+ * a box cut by the view edge is nudged back inside, but only while its anchor is on
+ * screen; a popup whose source is off screen stays off screen (it must not slide in
+ * and ride the view edge as if something there had spoken).
+ */
+export function nudgeIntoView(left: number, w: number, anchor: number, viewW: number): number {
+  if (w >= viewW || anchor < 0 || anchor >= viewW) return left;
+  return Math.min(Math.max(left, 1), viewW - 1 - w);
+}
+
+/** A popup's box (world px, outline included): center x, width, top, bottom (exclusive). */
+export interface TextBox {
+  cx: number;
+  w: number;
+  top: number;
+  bottom: number;
+}
+
+/**
+ * How far (px, <= 0) to raise box `b` so it overlaps none of `others`, each time
+ * sitting it `gap` px above the box it ran into (popups that spawn together — a hit,
+ * the barrel spilling and the auto gulp — read as a short stack instead of one blot).
+ * Never more than `maxRise`.
+ */
+export function stackRise(b: TextBox, others: readonly TextBox[], gap = 1, maxRise = 48): number {
+  let dy = 0;
+  for (let pass = 0; pass <= others.length; pass++) {
+    let moved = false;
+    for (const o of others) {
+      if (Math.abs(o.cx - b.cx) * 2 >= o.w + b.w) continue;
+      if (b.bottom + dy + gap <= o.top || b.top + dy >= o.bottom + gap) continue;
+      dy = o.top - gap - b.bottom;
+      moved = true;
+    }
+    if (!moved || dy < -maxRise) break;
+  }
+  return Math.max(dy, -maxRise);
+}
+
+/**
+ * Extra seconds a Hangul popup rests at the top of its hop: '동전 부족' needs none,
+ * a sentence ('전투가 끝나면 붙일 수 있다') gets a moment to be read (at most 0.5 s).
+ */
+export function readingHold(text: string): number {
+  let n = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c >= 0xac00 && c <= 0xd7a3) n++;
+  }
+  return Math.min(0.5, Math.max(0, (n - 5) * 0.06));
+}
+
 // ---------------------------------------------------------------- stepping out of UI panels
 /** dodge directions: up, down, left, right */
 export type DodgeDir = 0 | 1 | 2 | 3;
@@ -258,7 +312,14 @@ function hasDom(): boolean {
 /**
  * True once the face can be drawn (loaded, or settled as missing: then the fallback
  * draws). The first miss asks the browser to load it; until then nothing is cached.
+ * Also used by other world-text caches (content/rooms/floortext) for the same rule.
+ * True without a DOM / FontFaceSet.
  */
+export function fontFaceReady(font: string): boolean {
+  if (!hasDom()) return true;
+  return fontUsable(font);
+}
+
 function fontUsable(font: string): boolean {
   if (fontState.get(font)) return true;
   const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
@@ -433,7 +494,11 @@ export function fontTextBitmap(text: string, st: FontTextStyle, color: string, o
  */
 export function fontTextWidth(text: string, st: FontTextStyle): number {
   const m = maskFor(text, st);
-  if (m) return m.w;
+  return m ? m.w : fontTextWidthEstimate(text, st);
+}
+
+/** fontTextWidth without touching a canvas (syllables a full em, the rest half): pure, for layout outside draw. */
+export function fontTextWidthEstimate(text: string, st: FontTextStyle): number {
   let w = 0;
   for (let i = 0; i < text.length; i++) w += text.charCodeAt(i) >= 0x1100 ? st.size : st.size / 2;
   return Math.max(0, Math.round(w) - 2);

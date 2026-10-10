@@ -1737,6 +1737,8 @@ export class World {
   floatText(x: number, y: number, text: string, color = '#ffffff', scale = 1, icon: string | null = null): void {
     const f = new FloatingText(x, y, text, color, scale, 0.7, icon);
     f.layer = 3;
+    // cosmetic: a Hangul text stacks above the texts popping at the same spot (its y only)
+    f.settle([this.entities, this.pending]);
     this.spawn(f);
   }
 

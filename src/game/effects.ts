@@ -7,7 +7,7 @@ import type { Renderer } from '../engine/renderer';
 import { animDuration, animFrame, getSprite } from '../engine/sprites';
 import { clamp, ease, TAU } from '../engine/math';
 import { fx } from '../engine/rng';
-import { dodgeCovers } from '../engine/worldtext';
+import { dodgeCovers, fontTextStyle, fontTextWidthEstimate, nudgeIntoView, pixelFontCovers, readingHold, stackRise, type TextBox } from '../engine/worldtext';
 
 /**
  * Health in float texts: no hearts, a tiny flame written after the number
@@ -36,7 +36,8 @@ export class FloatingText extends Entity {
     this.text = text;
     this.color = color;
     this.scale = scale;
-    this.life = life;
+    this.hold = readingHold(text);
+    this.life = life + this.hold;
     this.icon = icon;
     this.vy = -55;
     this.vx = fx.range(-15, 15);
@@ -44,13 +45,65 @@ export class FloatingText extends Entity {
     this.tileCollide = false;
   }
 
-  override update(_w: World, dt: number): void {
+  override update(w: World, dt: number): void {
+    if (!this.placed) this.settle([w.entities]);
     this.age += dt;
     this.x += this.vx * dt;
-    this.y += this.vy * dt;
-    this.vy += 120 * dt;
+    if (this.hold > 0 && this.vy >= 0) this.hold -= dt; // a long Hangul text rests at the top of its hop
+    else {
+      this.y += this.vy * dt;
+      this.vy += 120 * dt;
+    }
     this.vx *= Math.exp(-dt * 4);
     if (this.age >= this.life) this.dead = true;
+  }
+
+  /**
+   * Cosmetic placement, once (World.floatText calls it at spawn with the live and the
+   * queued entities; otherwise the first update does): a Hangul text that pops where
+   * another fresh text already is (a hit's '-1', the barrel's '구조통이 쏟아진다' and the
+   * auto '꿀꺽! +' come in the same frame) stacks above it instead of printing over it.
+   * Texts that are all 3x5 (damage-like numbers, '+1' coins) and repeats of the same
+   * text keep overlapping as before. Moves only this text's y; no DOM, no RNG.
+   */
+  settle(lists: readonly (readonly Entity[])[]): void {
+    if (this.placed) return;
+    this.placed = true;
+    const hangul = !pixelFontCovers(this.text);
+    let others: TextBox[] | null = null;
+    for (const list of lists) {
+      for (const e of list) {
+        if (e === this || !(e instanceof FloatingText) || e.dead || !e.placed || e.age > 0.3) continue;
+        if (!hangul && pixelFontCovers(e.text)) continue;
+        if (e.text === this.text && e.icon === this.icon) continue;
+        (others ??= []).push(e.box());
+      }
+    }
+    if (others) this.y += stackRise(this.box(), others, 2);
+  }
+
+  /** world box at the base scale (outline included; the icon's width estimated) */
+  private box(): TextBox {
+    const s = Math.max(1, Math.round(this.scale));
+    const base = this.y + 5 * s;
+    let w: number;
+    let top: number;
+    let o: number;
+    if (pixelFontCovers(this.text)) {
+      w = this.text ? (this.text.toUpperCase().length * 4 - 1) * s : 0;
+      top = this.y;
+      o = s;
+    } else {
+      const st = fontTextStyle(s);
+      w = fontTextWidthEstimate(this.text, st) * st.k;
+      top = base - st.ink * st.k;
+      o = st.k;
+    }
+    if (this.icon) {
+      w += 7 * s;
+      top = Math.min(top, base - 7 * s);
+    }
+    return { cx: this.x, w: w + 2 * o, top: top - o, bottom: base + o };
   }
 
   override draw(r: Renderer): void {
@@ -72,12 +125,15 @@ export class FloatingText extends Entity {
     // keeper who pressed) is stepped out from under
     const vw = r.world.width;
     const bw = total + 2 * s;
-    let left = Math.round(x - r.viewX) - Math.floor(total / 2) - s;
-    if (bw < vw) {
-      const fit = Math.min(Math.max(left, 1), vw - 1 - bw);
-      x += fit - left;
-      left = fit;
-    }
+    const anchor = Math.round(x - r.viewX);
+    let left = anchor - Math.floor(total / 2) - s;
+    const fit = nudgeIntoView(left, bw, anchor, vw);
+    x += fit - left;
+    left = fit;
+    // same for the top / bottom edge (a refusal at a north door of a scrolled room)
+    const baseY = Math.round(y - r.viewY) + 5 * s;
+    const top0 = baseY - th - s;
+    y += nudgeIntoView(top0, th + 2 * s, baseY, r.world.height) - top0;
     const covers = r.worldCovers();
     if (covers.length) {
       const top = Math.round(y - r.viewY) + 5 * s - th - s;
@@ -97,6 +153,10 @@ export class FloatingText extends Entity {
 
   /** draw only: the side it stepped out of a UI card last frame (-1 none) */
   private dodge = -1;
+  /** seconds left to rest at the top of the hop (readingHold: long Hangul texts only) */
+  private hold: number;
+  /** stacked against the texts popping at the same spot (at spawn via World.floatText, else the first update) */
+  private placed = false;
 }
 
 /** Seconds a damage number stays after its last hit (then fades). */
