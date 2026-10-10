@@ -16,7 +16,7 @@ import { sceneSprite } from '../ui/pixellab-scenery';
 import { PREVIEW_RANGE } from './interact';
 import { STAGES_PER_FLOOR } from './stage-plan';
 import { MATCH_CAP, matchCard, tryLightWithMatch } from './matches';
-import { drawLampStand, drawLampWick, lampStandLight, lampStandStyle } from './lamp-stand';
+import { drawLampStand, drawLampWick, lampStandEmberLight, lampStandLight, lampStandStyle } from './lamp-stand';
 
 export type PickupKind =
   | 'coin' | 'coin_string'
@@ -254,6 +254,11 @@ export class Pedestal extends Entity {
   heartPrice = 0;
   bobT = fx.range(0, 6);
   spawnFx = 0.5;
+  /**
+   * cosmetic: seconds since the lamp stand's wick was snuffed (its find taken; 0 while a find
+   * rests on it). Drives the smoke wisp only: never hashed, never read by the simulation.
+   */
+  snuffT = 0;
 
   constructor(x: number, y: number, item: PedestalItem | null) {
     super();
@@ -263,11 +268,13 @@ export class Pedestal extends Entity {
     this.r = 7;
     this.persistent = true;
     this.solid = false;
+    if (!item) this.snuffT = 99;
   }
 
   override update(w: World, dt: number): void {
     this.age += dt;
     this.bobT += dt;
+    this.snuffT = this.item ? 0 : this.snuffT + dt;
     if (this.spawnFx > 0) this.spawnFx -= dt;
     if (w.focus === this) this.focusT = Math.min(1, this.focusT + dt * 6);
     else if (this.focusT > 0) this.focusT = Math.max(0, this.focusT - dt * 4);
@@ -297,7 +304,7 @@ export class Pedestal extends Entity {
     const info = this.item ? itemInfo(this.item) : null;
     const glowCol = info ? RARITY_COLOR[info.rarity] : '#ffffff';
     const f = info ? this.focusT : 0;
-    const stand = { style: lampStandStyle(this.heartPrice), lit: !!info, t: this.bobT, focus: f, focusColor: glowCol, flare: this.spawnFx > 0 ? this.spawnFx * 2 : 0 };
+    const stand = { style: lampStandStyle(this.heartPrice), lit: !!info, t: this.bobT, outT: this.snuffT, focus: f, focusColor: glowCol, flare: this.spawnFx > 0 ? this.spawnFx * 2 : 0 };
     drawLampStand(r, w, this.x, this.y, stand);
     if (info) {
       const bob = Math.sin(this.bobT * 2.4) * 2;
@@ -318,10 +325,14 @@ export class Pedestal extends Entity {
   }
 
   override light(w: World): void {
-    if (!this.item) return;
-    const info = itemInfo(this.item);
-    w.lights.add(this.x, this.y - 10, 40, RARITY_COLOR[info.rarity], { intensity: 0.7 });
-    lampStandLight(w, this.x, this.y, lampStandStyle(this.heartPrice), this.bobT);
+    const style = lampStandStyle(this.heartPrice);
+    if (!this.item) {
+      lampStandEmberLight(w, this.x, this.y, style, this.bobT, this.snuffT);
+      return;
+    }
+    const col = RARITY_COLOR[itemInfo(this.item).rarity];
+    w.lights.add(this.x, this.y - 10, 40, col, { intensity: 0.7 });
+    lampStandLight(w, this.x, this.y, style, this.bobT, this.focusT, col);
   }
 }
 

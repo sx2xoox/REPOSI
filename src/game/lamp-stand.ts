@@ -1,13 +1,14 @@
 // 등잔대 (lamp stand): what every item pedestal is drawn as (treasure finds, shop wares,
-// 대가의 방 offers, boss rewards, a discarded artifact). A short metal stand: a wide shallow
-// oil plate on a thin pole with a knob and a round foot. The find floats in the plate's
-// light and a small wick burns on the plate's left lip (light from the top left); once
-// its find is taken the stand goes dark, only an ember left on the wick.
+// 대가의 방 offers, boss rewards, secret / 시련방 rewards, a discarded artifact). A short metal
+// stand in two tiers: a wide shallow oil plate, a thin pole with a drip saucer (불똥받이)
+// halfway down, and a flat drip dish (받침) for a foot. The find floats in the plate's lit oil
+// and a small wick burns on the plate's left lip (light from the top left); once its find is
+// taken the wick is snuffed (a thin smoke wisp) and only an ember stays on it.
 // One family, two looks: bronze (default; soot iron on the forge floor, verdigris in the
-// brass clock tower) and a dark iron stand whose oil and wick burn crimson where the
+// brass clock tower) and a warm pewter stand whose oil and wick burn crimson where the
 // price is the keeper's own life flame (health prices, 대가의 방).
-// Presentation only: drawn from Pedestal.draw / light(), timed by the pedestal's
-// cosmetic clock; nothing here reaches the simulation.
+// Presentation only: drawn from Pedestal.draw / light(), timed by the pedestal's cosmetic
+// clocks (bobT, snuffT); nothing here reaches the simulation.
 
 import type { Renderer } from '../engine/renderer';
 import type { World } from './world';
@@ -15,10 +16,10 @@ import { definePixelSprite, hasSprite } from '../engine/sprites';
 
 const O = '#140c1c';
 
-// 16 x 14. Row 0 is the plate's back rim (one px above the pedestal's y), row 13 the
-// foot. a..f = the metal ramp (dark -> specular), o / p / q = the oil (rim -> centre),
+// 16 x 14. Row 0 is the plate's back rim (one px above the pedestal's y), row 13 the dish's
+// front lip. a..f = the metal ramp (dark -> specular), o / p / q = the oil (rim -> centre),
 // k = the wick.
-const BODY = [
+export const LAMP_STAND_BODY = [
   '.k.bcdffeedcb...',
   '.bcdaoppppoadcb.',
   'bcdaopqqqqpoaccb',
@@ -26,14 +27,15 @@ const BODY = [
   '..aabbbbbbbbaa..',
   '.......dc.......',
   '.......dc.......',
-  '......cfdb......',
+  '....bdffddcb....', // drip saucer: lit top
+  '.....abbbba.....', //              dark underside
   '.......dc.......',
   '.......dc.......',
-  '......bdcb......',
-  '....bcdfedcb....',
-  '..bcddddcccbba..',
-  '..aabbbbbbbbaa..',
+  '..bcdeedcdcccb..', // drip dish: back rim
+  '.bdbaaadcaaabcb.', //            the well the pole stands in
+  '..bcdeffdddccb..', //            front lip
 ];
+const BODY = LAMP_STAND_BODY;
 /** the oil well only: the lit oil, laid over the dark oil with a flickering alpha */
 const OIL = BODY.map((r) => r.replace(/[^opq]/g, '.'));
 /** rows 0..4 of BODY are the oil plate */
@@ -61,6 +63,8 @@ const ORIGIN: [number, number] = [8, 1];
 /** where the wick sits, relative to the pedestal's (x, y) */
 const WICK_X = -7;
 const WICK_Y = -1;
+/** seconds the snuffed wick smokes before it settles to an ember */
+export const SNUFF_SECONDS = 1;
 
 export type LampStandStyle = 'bronze' | 'blood';
 
@@ -78,14 +82,17 @@ interface Look {
 
 const LOOKS: Record<LampStandStyle, Look> = {
   bronze: {
-    metal: ['#3c1e1a', '#6e3a22', '#a0602c', '#cf9440', '#f2c766', '#fff4c8'],
+    // an old lamp bronze: browner and less yellow in the highlights than gold, so a plain
+    // stand never reads as a trophy and a legendary find's gold rim still stands out
+    metal: ['#3a1c1a', '#683622', '#9a5a2e', '#c68842', '#e8b660', '#fde8b4'],
     oil: ['#3a200e', '#5a3414', '#7a4c1c'],
     glow: ['#6a3a14', '#c08636', '#ffe6a2'],
     flame: ['#e0601a', '#ffb040', '#fff6c8'],
     light: '#ffc070',
   },
   blood: {
-    metal: ['#241a26', '#423446', '#665470', '#927e9a', '#c0aec4', '#ece0f0'],
+    // warm pewter, a step lighter than the 대가의 방 floor so pole and dish keep their shape
+    metal: ['#2c1c24', '#56404a', '#86686e', '#b29498', '#dcc2c0', '#fbeee8'],
     oil: ['#2a0a14', '#40101e', '#56162a'],
     glow: ['#6a1428', '#c62a4c', '#ff8098'],
     flame: ['#a01040', '#ff4070', '#ffd0e0'],
@@ -95,8 +102,9 @@ const LOOKS: Record<LampStandStyle, Look> = {
 
 /** Floors whose stone or brass would swallow a bronze stand: the stand's own metal there. */
 const THEME_METAL: Record<string, string[]> = {
-  // the forge glows orange: a soot-dark iron stand keeps its silhouette there
-  forge: ['#1c1418', '#342830', '#54444c', '#806a70', '#b09a9a', '#e0d0c8'],
+  // the forge glows orange: a soot-dark iron stand keeps its silhouette there (mid-tones a
+  // step above the forge's scorched floor plates)
+  forge: ['#221a1e', '#3e3238', '#5e4e56', '#8a767a', '#b8a4a2', '#e8d8d0'],
   // the clock tower is brass: a verdigris stand like its stone lanterns
   clock: ['#0e2420', '#1a4a40', '#2a7a66', '#48b094', '#8ae0c4', '#d0fff0'],
 };
@@ -121,7 +129,7 @@ interface SpriteSet {
 const sets = new Map<string, SpriteSet>();
 
 /** sprite names of one style on one floor theme (defined on first use) */
-function spriteSet(style: LampStandStyle, theme: string): SpriteSet {
+export function lampStandSprites(style: LampStandStyle, theme: string): SpriteSet {
   const metal = style === 'bronze' ? THEME_METAL[theme] : undefined;
   const key = metal ? `${style}@${theme}` : style;
   let set = sets.get(key);
@@ -167,6 +175,8 @@ export interface LampStandDraw {
   lit: boolean;
   /** cosmetic clock (s) for the flicker */
   t: number;
+  /** cosmetic: seconds since the wick was snuffed (its find taken); large = long out */
+  outT: number;
   /** 0..1 focus highlight and its colour (the find's rarity) */
   focus: number;
   focusColor: string;
@@ -176,34 +186,65 @@ export interface LampStandDraw {
 
 /** Draw the stand under a pedestal at (x, y) (the find floats at y - 10 above it). */
 export function drawLampStand(r: Renderer, w: World, x: number, y: number, o: LampStandDraw): void {
-  const s = spriteSet(o.style, w.room.theme.id);
+  const s = lampStandSprites(o.style, w.room.theme.id);
   r.shadow(x, y + 12, 15, 4, 0.32);
   r.sprite(s.body, x, y);
   if (o.lit) {
     const t = o.t;
     const flick = 0.72 + 0.12 * Math.sin(t * 7.3) + 0.08 * Math.sin(t * 17.9 + 1.3);
-    r.sprite(s.oil, x, y, { alpha: Math.min(1, flick + o.flare), flash: o.flare * 0.5 });
+    // in focus the oil burns full and bright (focus reads through brightness, not only the rim)
+    const lift = Math.max(o.flare, o.focus);
+    r.sprite(s.oil, x, y, { alpha: Math.min(1, flick + lift), flash: Math.max(o.flare * 0.5, o.focus * 0.3) });
+    if (o.focus > 0.02) r.sprite(s.oil, x, y, { additive: true, alpha: o.focus * (0.4 + 0.1 * Math.sin(t * 6)) });
   }
   if (o.focus > 0.02) r.sprite(rimSprite(o.focusColor), x, y, { alpha: o.focus * (0.85 + 0.15 * Math.sin(o.t * 6)) });
 }
 
 /** The wick on the plate's left lip, drawn over the floating find (it stands in front of it). */
 export function drawLampWick(r: Renderer, w: World, x: number, y: number, o: LampStandDraw): void {
-  const s = spriteSet(o.style, w.room.theme.id);
+  const L = LOOKS[o.style];
+  const wx = x + WICK_X;
+  const wy = y + WICK_Y;
   if (o.lit) {
-    r.sprite(s.flame[Math.floor(o.t * 9) & 3], x + WICK_X, y + WICK_Y - 1);
-  } else {
-    // a dying ember on the wick
-    r.rect(x + WICK_X, y + WICK_Y, 1, 1, LOOKS[o.style].flame[1], 0.35 + 0.25 * Math.sin(o.t * 2.1));
+    const s = lampStandSprites(o.style, w.room.theme.id);
+    r.sprite(s.flame[Math.floor(o.t * 9) & 3], wx, wy - 1);
+    return;
+  }
+  const u = o.outT;
+  // the ember left on the wick: a hot tip over the charred wick, breathing slowly
+  const hot = u < 0.4 ? 1 - u / 0.4 : 0;
+  const breathe = 0.82 + 0.18 * Math.sin(o.t * 2.1);
+  r.rect(wx, wy - 1, 1, 1, L.flame[1], Math.min(1, breathe + hot));
+  r.rect(wx, wy, 1, 1, L.flame[0], Math.min(1, 0.85 + hot));
+  if (u >= SNUFF_SECONDS) return;
+  // snuffed: the wick tip flashes white-hot for a blink, then a thin wisp of smoke curls up
+  if (u < 0.2) r.rect(wx, wy - 1, 1, 1, L.flame[2], 1 - u / 0.2);
+  const a = Math.min(1, u * 10) * (1 - u / SNUFF_SECONDS);
+  for (let j = 0; j < 5; j++) {
+    const h = 2 + j * 2 + u * 7;
+    const sway = Math.round(Math.sin(u * 5 + j * 1.2) * (0.3 + j * 0.4));
+    r.rect(wx + sway, Math.round(wy - h), 1, 1, j < 2 ? '#e6dee8' : '#aca4b4', a * (0.9 - j * 0.15));
   }
 }
 
-/** The stand's own light: the wick (only while a find rests on it). */
-export function lampStandLight(w: World, x: number, y: number, style: LampStandStyle, t: number): void {
+/** The stand's own light: the wick and the lit oil while a find rests on it (focus brightens the plate). */
+export function lampStandLight(w: World, x: number, y: number, style: LampStandStyle, t: number, focus = 0, focusColor = '#ffffff'): void {
   const L = LOOKS[style];
   const fl = 1 + Math.sin(t * 11) * 0.06 + Math.sin(t * 23) * 0.04;
   w.lights.add(x + WICK_X, y + WICK_Y - 3, 26 * fl, L.light, { intensity: 0.55 });
   w.lights.glow(x + WICK_X, y + WICK_Y - 3, 5, L.light, 0.22 * fl);
   // the lit oil blooms softly under the find
   w.lights.glow(x, y + 1, 8, L.glow[2], 0.12 * fl);
+  if (focus > 0.02) w.lights.glow(x, y + 1, 11, focusColor, 0.26 * focus);
+}
+
+/** An emptied stand: the snuffed wick's last light, then only the ember's tiny glow. */
+export function lampStandEmberLight(w: World, x: number, y: number, style: LampStandStyle, t: number, outT: number): void {
+  const L = LOOKS[style];
+  // the wick's light dies down over the smoke's life (so the wisp stays readable), then the
+  // ember keeps a faint warm spot of its own
+  const fade = outT < SNUFF_SECONDS ? 1 - outT / SNUFF_SECONDS : 0;
+  const breathe = 1 + 0.08 * Math.sin(t * 2.1);
+  w.lights.add(x + WICK_X, y + WICK_Y - 2 - 2 * fade, (10 + 16 * fade) * breathe, L.light, { intensity: 0.4 + 0.15 * fade });
+  w.lights.glow(x + WICK_X, y + WICK_Y - 1, 3, L.flame[1], (0.3 + 0.2 * fade) * breathe);
 }
