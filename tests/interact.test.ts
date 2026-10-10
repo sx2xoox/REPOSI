@@ -159,7 +159,7 @@ describe('input bindings', () => {
     expect(PAD_NAMES.interact).toBeTruthy();
     expect(GAME_BUTTONS).toContain('interact');
     expect(CONTROL_ROWS.some((r) => r.actions.includes('interact'))).toBe(true);
-    expect(TOUCH_CONTROL_ROWS.some((r) => r[1] === '줍기')).toBe(true);
+    expect(TOUCH_CONTROL_ROWS.some((r) => r[1].startsWith('줍기'))).toBe(true);
   });
 
   it('Tab-screen actions (tabs, discard) use distinct keys and pad buttons', () => {

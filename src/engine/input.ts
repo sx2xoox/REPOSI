@@ -44,8 +44,8 @@ export const DEFAULT_BINDINGS: Record<Action, string[]> = {
   special: ['KeyF', 'Mouse1'],
   /** switch between the two weapon slots ("Wheel" = any mouse-wheel step over the game) */
   swap: ['KeyC', 'Wheel'],
-  /** take the item the keeper stands at (read its card first), buy, light a match */
-  interact: ['KeyE', 'KeyG'],
+  /** take the item the keeper stands at (read its card first), buy, light a match — one key for every interaction */
+  interact: ['KeyG'],
   inventory: ['Tab', 'KeyI'],
   map: ['KeyM'],
   pause: ['Escape', 'KeyP'],
