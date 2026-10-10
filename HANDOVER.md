@@ -1,4 +1,4 @@
-## 2026-10-10 — Matches replace bombs and keys (main, NOT deployed yet; gh-pages is still 662a82e)
+## 2026-10-10 — Matches replace bombs and keys, one G key, silent lanterns (deployed 26c6aaf, gh-pages 32b7622)
 - User: no bombs, keys → 성냥, the bomb-for-reward rock → 꺼진 석등 lit with a match, secret rooms found without bombs,
   currency kept as 동전, public text tied to the story. Merged as a5f220a (matches.ts, legacy-ids.ts, stone-lantern.ts,
   cold-sconce.ts, seal-lamp.ts; econ audit `ECON_AUDIT=1`; SEASON 5).
