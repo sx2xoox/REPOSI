@@ -152,8 +152,7 @@ defineCharacter({
   color: '#8fb0ff',
   hearts: 4,
   weapon: 'sentinel_blade',
-  bombs: 1,
-  keys: 1,
+  matches: 2,
   baseStats: {
     moveSpeed: 86,
     damage: 11,

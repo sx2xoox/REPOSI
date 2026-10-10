@@ -311,10 +311,10 @@ registerRoomHandler('shop', {
         ped.price = priceOf(item);
         w.spawn(ped);
       } else {
-        const pool: [PickupKind, number][] = [['heart', 3], ['bomb', 5], ['key', 5], ['soul_heart', 5], ['potion', 4]];
+        const pool: [PickupKind, number][] = [['heart', 4], ['match', 4], ['match', 4], ['blue_flame', 7], ['potion', 5]];
         const potions = Object.keys(w.run.potionColors);
         let [kind, price] = rng.pick(pool);
-        if (kind === 'potion' && !potions.length) [kind, price] = ['heart', 3];
+        if (kind === 'potion' && !potions.length) [kind, price] = ['heart', 4];
         const pk = new Pickup(kind, x, cy);
         pk.price = price;
         if (kind === 'potion') pk.potionId = rng.pick(potions);

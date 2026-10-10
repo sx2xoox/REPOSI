@@ -17,7 +17,7 @@ import type { InvComputed } from '../src/game/inventory';
 loadContent();
 
 const HANGUL = /[가-힣]/;
-const HOOKS = ['stats', 'onAcquire', 'onRemove', 'onUpdate', 'onShoot', 'onAttack', 'modifyHit', 'onHit', 'onKill', 'onHurt', 'onDash', 'onRoomEnter', 'onRoomClear', 'onFloorStart', 'onBomb', 'onPickup', 'onRelease', 'onDeflect', 'draw'] as const;
+const HOOKS = ['stats', 'onAcquire', 'onRemove', 'onUpdate', 'onShoot', 'onAttack', 'modifyHit', 'onHit', 'onKill', 'onHurt', 'onDash', 'onRoomEnter', 'onRoomClear', 'onFloorStart', 'onMatch', 'onPickup', 'onRelease', 'onDeflect', 'draw'] as const;
 /** stat-only artifacts whose stat change is itself plainly visible on screen */
 const VISIBLE_STATS = new Set(['star_chart', 'jade_marble', 'paper_fan', 'void_body']);
 

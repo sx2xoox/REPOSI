@@ -152,7 +152,7 @@ defineCharacter({
   hearts: 2,
   soulHearts: 2,
   weapon: 'void_gaze',
-  bombs: 0,
+  matches: 0,
   baseStats: {
     moveSpeed: 90,
     range: 200,

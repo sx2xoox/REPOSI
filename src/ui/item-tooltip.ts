@@ -52,20 +52,18 @@ export interface ItemCard {
 }
 
 const PICKUP_TEXT: Partial<Record<PickupKind, [string, string]>> = {
-  heart_half: ['빨간 반 하트', '체력을 반 칸 회복한다'],
-  heart: ['빨간 하트', '체력을 한 칸 회복한다'],
-  soul_heart: ['영혼 하트', '푸른 보호막 하트 한 칸'],
-  soul_half: ['영혼 반 하트', '푸른 보호막 하트 반 칸'],
-  bomb: ['폭탄', '폭탄 1개'],
-  bomb2: ['폭탄 묶음', '폭탄 2개'],
-  key: ['열쇠', '잠긴 문과 상자를 연다'],
-  coin: ['동전', '1코인'],
-  nickel: ['은화', '5코인'],
-  dime: ['금화', '10코인'],
+  heart_half: ['체력 반 칸', '체력을 반 칸 회복한다'],
+  heart: ['체력 한 칸', '체력을 한 칸 회복한다'],
+  blue_flame: ['푸른 불꽃', '체력보다 먼저 타는 불꽃 한 칸'],
+  blue_flame_half: ['작은 푸른 불꽃', '체력보다 먼저 타는 불꽃 반 칸'],
+  match: ['성냥', '봉인된 문·상자와 꺼진 등에 불을 붙인다'],
+  matchbox: ['성냥갑', '성냥 3개'],
+  coin: ['동전', '동전 1개'],
+  coin_string: ['동전 꾸러미', '동전 4개'],
 };
 const PICKUP_ICON: Partial<Record<PickupKind, string>> = {
-  heart_half: 'pk_heart_half', heart: 'pk_heart', soul_heart: 'pk_soul', soul_half: 'pk_soul_half',
-  bomb: 'pk_bomb', bomb2: 'pk_bomb2', key: 'pk_key', coin: 'pk_coin', nickel: 'pk_nickel', dime: 'pk_dime',
+  heart_half: 'pk_heart_half', heart: 'pk_heart', blue_flame: 'pk_blue_flame', blue_flame_half: 'pk_blue_flame_half',
+  match: 'pk_match', matchbox: 'pk_matchbox', coin: 'pk_coin', coin_string: 'pk_coin_string',
 };
 const RARITY_ORDER: Rarity[] = ['common', 'rare', 'epic', 'legendary'];
 
@@ -181,7 +179,7 @@ export function buildCard(w: World, e: Entity): ItemCard | null {
     } else if (e.heartPrice > 0) {
       price = { icon: 'hud_heart_full', text: `${e.heartPrice}`, ok };
       extra.push([{ t: heartCostText(p, e.heartPrice), c: C.bad }]);
-      extra.push([{ t: '최대 체력 부족 시 영혼 하트로 지불', c: C.textFaint }]);
+      extra.push([{ t: '최대 체력 부족 시 푸른 불꽃으로 지불', c: C.textFaint }]);
       label = '거래';
     }
     return { icon: info.icon, name: info.name, color: col, sub, desc: [info.desc, info.detail].filter(Boolean).join(' '), extra, action: { key: keyOf(), label, pad, ok }, note: '', price };
@@ -252,7 +250,11 @@ function signature(w: World, e: Entity): string {
   let s = `${e.id}|${p.weaponId}|${p.weapon2Id ?? ''}|${p.activeId ?? ''}|${p.potionId ?? ''}|${input.aimMode === 'pad' ? 1 : 0}|${touchUiActive() ? 1 : 0}`;
   if (e instanceof Pedestal) s += `|${e.item?.kind}:${e.item?.id}|${e.price}|${e.heartPrice}|${e.affordable(w) ? 1 : 0}|${p.coins >= e.price ? 1 : 0}|${e.item ? w.items.powerOf(e.item.id) : 0}`;
   else if (e instanceof Pickup) s += `|${e.kind}|${e.potionId}|${w.run.identified.has(e.potionId) ? 1 : 0}|${e.price}|${p.coins >= e.price ? 1 : 0}|${e.canCollect(w) ? 1 : 0}`;
-  return `${s}|${w.items.revision}|${p.maxRed}|${p.soul}|${p.coins}`;
+  if (e.interactionInfo) {
+    const i = e.interactionInfo(w);
+    s += `|${i.name}|${i.desc}|${i.icon}|${i.actionLabel ?? ''}|${i.available ?? 1}|${i.price ? `${i.price.text}:${i.price.ok}` : ''}`;
+  }
+  return `${s}|${w.items.revision}|${p.maxRed}|${p.soul}|${p.coins}|${p.matches}`;
 }
 
 export class ItemTooltip {

@@ -97,23 +97,24 @@ describe('artifact reworks in the real item system', () => {
     expect(dummies.every((e, i) => e.hp < after[i])).toBe(true);
   });
 
-  it('alchemist scale counts coin value, shows progress, alternates supplies, and retains progress across equipment changes', () => {
+  it('alchemist scale counts coin value, shows progress, gives a match at every threshold, and retains progress across equipment changes', () => {
     const { world: w } = setup('alchemist_scale');
     const spawned = vi.spyOn(w, 'spawn');
     const text = vi.spyOn(w, 'floatText');
-    const supplies = () => spawned.mock.calls.map(c => c[0]).filter((e): e is Pickup => e instanceof Pickup && ['bomb', 'key'].includes(e.kind));
-    w.items.onPickup('dime');
+    const supplies = () => spawned.mock.calls.map(c => c[0]).filter((e): e is Pickup => e instanceof Pickup && e.kind === 'match');
+    w.items.onPickup('coin_string'); w.items.onPickup('coin_string'); w.items.onPickup('coin'); w.items.onPickup('coin');
     expect(supplies()).toHaveLength(0);
     expect(text.mock.calls.some(c => c[2] === '보급 10/20')).toBe(true);
     w.player.equipWeapon(w, 'dragon_breath');
-    w.items.onPickup('dime');
-    expect(supplies().map(e => e.kind)).toEqual(['bomb']);
+    w.items.onPickup('coin_string'); w.items.onPickup('coin_string'); w.items.onPickup('coin'); w.items.onPickup('coin');
+    expect(supplies()).toHaveLength(1);
     w.items.onRoomEnter();
-    w.items.onPickup('nickel'); w.items.onPickup('dime');
+    for (let i = 0; i < 3; i++) w.items.onPickup('coin_string');
+    w.items.onPickup('coin'); w.items.onPickup('coin'); w.items.onPickup('coin');
     expect(w.vars.__scaleGold).toBe(15);
-    w.items.onPickup('nickel');
-    expect(supplies().map(e => e.kind)).toEqual(['bomb', 'key']);
-    w.items.onPickup('key');
+    w.items.onPickup('coin_string'); w.items.onPickup('coin');
+    expect(supplies()).toHaveLength(2);
+    w.items.onPickup('match');
     expect(w.vars.__scaleGold).toBe(0);
   });
 

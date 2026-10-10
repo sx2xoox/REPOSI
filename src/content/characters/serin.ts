@@ -151,7 +151,6 @@ defineCharacter({
   color: '#a8e070',
   hearts: 2,
   weapon: 'hunter_bow',
-  bombs: 1,
   coins: 5,
   baseStats: {
     moveSpeed: 106,

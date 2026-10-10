@@ -40,7 +40,7 @@ export interface Stats {
   bossDamage: number;
   /** multiplier for coins found */
   greed: number;
-  /** chance to not consume a bomb/key etc. */
+  /** chance to keep a match when striking it */
   thrift: number;
   /** life steal: chance per kill to heal half heart */
   lifesteal: number;

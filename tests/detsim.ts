@@ -17,7 +17,8 @@ import { World, type WorldHost } from '../src/game/world';
 import { RunState } from '../src/game/run';
 import { FIXED_DT, TILE } from '../src/game/constants';
 import { EMBER_MAX, type Player } from '../src/game/player';
-import { Pedestal, Pickup, Trapdoor } from '../src/game/pickups';
+import { Chest, Pedestal, Pickup, Trapdoor } from '../src/game/pickups';
+import { SealLamp } from '../src/game/seal-lamp';
 import { HELD, PRESS, fixedRules, type PlayerInput } from '../src/game/seam';
 import { stateHash, stateHashParts } from '../src/game/statehash';
 import { applyBlessing, blessingChoices, blessingDue, markBlessed } from '../src/game/blessings';
@@ -166,11 +167,17 @@ export interface BotState {
   cursorMode: boolean;
   modeT: number;
   dashT: number;
+  /** strikes a match at the focused match target (sealed door / chest ...) every few seconds, even mid-fight */
   bombT: number;
   swapT: number;
   door: Door | null;
   roomSteps: number;
   clearSteps: number;
+}
+
+/** A world fixture lit with a match through interact (A2 adds stone lanterns and cold sconces). */
+function isMatchTarget(e: Entity | null): boolean {
+  return !!e && ((e instanceof SealLamp && !e.lit) || (e instanceof Chest && e.locked && !e.opened));
 }
 
 function unit(x: number, y: number): [number, number] {
@@ -238,7 +245,7 @@ export function botInput(w: World, b: BotState, out: PlayerInput): void {
     if (p.ember >= EMBER_MAX) out.pressed |= PRESS.release;
     b.bombT -= FIXED_DT;
     if (b.bombT <= 0) {
-      if (p.bombs > 0 && bd < 70) out.pressed |= PRESS.bomb;
+      if (p.matches > 0 && isMatchTarget(w.focus)) out.pressed |= PRESS.interact;
       b.bombT = r.range(4, 12);
     }
     if (p.activeId && r.chance(0.01)) out.pressed |= PRESS.active;
@@ -251,7 +258,7 @@ export function botInput(w: World, b: BotState, out: PlayerInput): void {
     out.pressed |= PRESS.swap;
     b.swapT = r.range(3, 9);
   }
-  if (r.chance(0.005)) out.pressed |= PRESS.bomb; // rocks / secret walls
+  if (r.chance(0.05) && p.matches > 0 && isMatchTarget(w.focus)) out.pressed |= PRESS.interact; // seals, lanterns, sconces
   if (w.focus && r.chance(0.2)) out.pressed |= PRESS.interact;
   let goal: { x: number; y: number } | null = null;
   if (w.node.cleared) {
@@ -273,7 +280,7 @@ export function botInput(w: World, b: BotState, out: PlayerInput): void {
     }
   }
   if (!goal && w.node.cleared) {
-    const doors = w.room.doors.filter((d) => d.state === 'open' || (d.state === 'locked' && p.keys > 0));
+    const doors = w.room.doors.filter((d) => d.state === 'open' || (d.state === 'locked' && p.matches > 0));
     if (!b.door || !doors.includes(b.door)) {
       const fresh = doors.filter((d) => !w.map.nodes[d.to].visited);
       const pool = fresh.length ? fresh : doors;
@@ -356,8 +363,7 @@ export function runScenario(sc: Scenario, v: Variant, partsAt = -1): RunResult {
     if (cyc || cmd.chance(0.7)) p.setActive(nextActive(), w);
     if (cyc || cmd.chance(0.6)) p.equipWeapon(w, nextWeapon());
     if (cyc || cmd.chance(0.5)) p.potionId = nextPotion();
-    p.bombs = Math.max(p.bombs, 3);
-    p.keys = Math.max(p.keys, 2);
+    p.matches = Math.max(p.matches, 3);
     p.coins = Math.max(p.coins, 15);
     phase = 'explore';
     phaseSteps = 0;

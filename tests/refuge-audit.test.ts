@@ -81,7 +81,7 @@ describe('refuge release audit',()=>{
   expect(w.vars.rfSwiftRooms).toBe(MIRA_SWIFT_ROOMS);expect(save.hasFlag('unlock:mira')).toBe(false);
   w.run.floor=3;w.node.kind='boss';w.node.id=300;h.onRoomClear!(w,1);expect(save.hasFlag('unlock:mira')).toBe(true);
  }));
- it('in a real run: a bomb kill, a kill after a dash and a fast hit-free combat room are all recorded',()=>clean(()=>{
+ it('in a real run: a blast kill, a kill after a dash and a fast hit-free combat room are all recorded',()=>clean(()=>{
   const run=new RunState('UNLOCK-REAL','ria');run.staged=true;
   const w=new World(new Renderer(fakeDisplay(1280,720)),run,{openInventory(){},onGameOver(){}});
   w.start();w.player.god=true;
@@ -91,10 +91,10 @@ describe('refuge release audit',()=>{
   for(let i=0;i<40;i++)w.update(FIXED_DT);
   expect(w.vars.rfFight).toBe(1);
   const p=w.player;
-  // a real bomb: placed, fuse, explosion through World.explode
+  // a real keeper blast through World.explode
   const foe=w.enemies.find(e=>e.alive&&!e.isBoss)!;
   foe.x=p.x+6;foe.y=p.y+2;foe.vx=foe.vy=0;foe.hp=1;
-  p.bombs=1;p.placeBomb(w);p.x+=60;
+  w.explode(p.x,p.y+2,38,60+p.stats.damage*2,{byPlayer:true});p.x+=60;
   for(let i=0;i<150&&foe.alive;i++)w.update(FIXED_DT);
   expect(foe.alive).toBe(false);expect(w.vars.rfExplosionKills).toBeGreaterThanOrEqual(1);
   // a real dash, then a kill right after it

@@ -82,13 +82,13 @@ describe('co-op ownership and rules', () => {
     advance(w, 1); expect(b.downed).toBe(false); expect(b.red).toBe(2);
     down(w, 0); down(w, 1); step(w, 110); expect(w.gameOver?.won).toBe(false);
   });
-  it('coins are shared, hearts go to an injured keeper, and bombs spare teammates', () => {
+  it('coins are shared, hearts go to an injured keeper, and keeper blasts spare teammates', () => {
     const w = party(['ria', 'ria']); const [a, b] = w.players;
     b.coins += 5; expect(a.coins).toBe(5); b.red -= 2;
     a.x = b.x; a.y = b.y;
     w.spawn(new Pickup('heart', b.x, b.y)); step(w, 100);
     expect(b.red).toBe(b.maxRed); expect(a.red).toBe(a.maxRed);
-    w.asPlayer(a, () => w.explode(a.x, a.y, 40, 1, { noTiles: true }));
+    w.asPlayer(a, () => w.explode(a.x, a.y, 40, 1, { noTiles: true, byPlayer: true }));
     expect(a.red).toBe(a.maxRed - 2); expect(b.red).toBe(b.maxRed);
   });
   it('blessing commands apply only to the sender and reject duplicate/stale/invalid choices', () => {

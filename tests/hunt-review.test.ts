@@ -1,6 +1,6 @@
 // 등불 도둑 사냥 — regressions from the adversarial gameplay review: the minion wave budget
 // (no endless farm in a stalled hunt), party-scaled ember coins, no walking out of the hunt
-// through a key door, leaving mid-hunt never spills a free win, the thief's top speed stays
+// through a sealed door, leaving mid-hunt never spills a free win, the thief's top speed stays
 // under the hunters' (slow keepers), a time stop holds its escape channel, a full mission run
 // hashes alike with different cosmetic RNG / drawing / quality, and co-op with a downed
 // keeper or after the keeper who started it leaves.
@@ -14,6 +14,7 @@ import { World } from '../src/game/world';
 import { RunState } from '../src/game/run';
 import { Enemy } from '../src/game/enemy';
 import { Pedestal, Pickup } from '../src/game/pickups';
+import { SealLamp } from '../src/game/seal-lamp';
 import { stateHash } from '../src/game/statehash';
 import { WeaponChest } from '../src/content/weapons/drops';
 import { HuntDevice, HuntEmber, MAX_WAVES, claimCoins } from '../src/content/rooms/hunt';
@@ -118,7 +119,7 @@ describe('hunt review: ember coins scale with the party', () => {
 });
 
 describe('hunt review: no way out mid-hunt', () => {
-  /** A hunt room next to a key door (treasure / shop rooms are locked from floor 2). */
+  /** A hunt room next to a sealed door (treasure / shop rooms are sealed from floor 2). */
   function lockedSetup() {
     const w = world(1, 'HUNT-LOCKED');
     const n = huntNode(w, (x) => x.doors.filter((q) => !q.secret).length >= 2);
@@ -139,23 +140,33 @@ describe('hunt review: no way out mid-hunt', () => {
     }
   }
 
-  it('a key door stays locked (key kept) while the hunt holds the doors, and opens with the key afterwards', () => {
+  it('a sealed door refuses a match (match kept) while the hunt holds the doors, and burns open with one afterwards', () => {
     const { w, n, d, door } = lockedSetup();
+    const lamp = w.entities.find((e): e is SealLamp => e instanceof SealLamp && e.door === door)!;
+    expect(lamp).toBeTruthy();
     begin(w, d);
     for (let i = 0; i < 60; i++) w.update(DT);
-    w.player.purse.keys = 1;
+    w.player.purse.matches = 1;
     pushInto(w, door, 240, n.id);
     expect(w.node.id).toBe(n.id);
     expect(door.state).toBe('locked');
-    expect(w.player.keys).toBe(1);
+    w.player.x = lamp.x;
+    w.player.y = lamp.y;
+    expect(lamp.interact(w)).toBe(false);
+    expect(w.player.matches).toBe(1);
+    expect(door.state).toBe('locked');
     expect(d.mem.phase).toBe(1);
-    // the hunt ends: now the key works as usual
+    // the hunt ends: now the match burns the seal as usual
     d.mem.sealed = 0;
     d.mem.nextEscape = d.mem.clock;
     for (let i = 0; i < 60 * 40 && !d.mem.used; i++) { park(w); for (const e of w.enemies) if (e.def.id !== WEASEL_ID) e.dead = true; w.update(DT); }
     expect(d.mem.phase).toBe(5);
+    w.player.x = lamp.x;
+    w.player.y = lamp.y;
+    expect(lamp.interact(w)).toBe(true);
+    expect(w.player.matches).toBe(0);
+    expect(door.state).toBe('open');
     pushInto(w, door, 240, n.id);
-    expect(w.player.keys).toBe(0);
     expect(w.node.id).not.toBe(n.id);
   }, 60000);
 

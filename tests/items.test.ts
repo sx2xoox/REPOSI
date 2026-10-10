@@ -28,7 +28,7 @@ function fakeWorld(): World {
   return {
     time: 10,
     vars: {},
-    player: { coins: 37, keys: 5, bombs: 2, lastHurtAt: -999, red: 6, maxRed: 6, soul: 0, stats: { ...BASE_STATS }, flags: new Set<string>() },
+    player: { coins: 37, matches: 5, lastHurtAt: -999, red: 6, maxRed: 6, soul: 0, stats: { ...BASE_STATS }, flags: new Set<string>() },
     items: { recomputeStats() {} },
   } as unknown as World;
 }

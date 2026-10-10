@@ -5,7 +5,7 @@ import { BASE_STATS, computeStats, StatMods } from '../src/game/stats';
 import { DEFAULT_BINDINGS } from '../src/engine/input';
 import { packColor } from '../src/engine/painter';
 import {
-  applyTyped, characterOrder, characterStatRows, characterStats, formatDelta, fullStatRows, gridMove, heartSlots,
+  applyTyped, characterOrder, characterStatRows, characterStats, formatDelta, fullStatRows, gridMove,
   hudStats, isUnlocked, sanitizeSeed, scrollToRow, ROOM_ICONS, ROOM_LABELS,
 } from '../src/ui/logic';
 import { ChangeTracker, Repeater, Spring, envelope, heartbeat, popScale } from '../src/ui/anim';
@@ -59,12 +59,6 @@ describe('character select logic', () => {
 });
 
 describe('hud logic', () => {
-  it('builds heart slots like Isaac (red containers, then soul)', () => {
-    expect(heartSlots(6, 6, 0)).toEqual(['full', 'full', 'full']);
-    expect(heartSlots(3, 6, 0)).toEqual(['full', 'half', 'empty']);
-    expect(heartSlots(0, 4, 3)).toEqual(['empty', 'empty', 'soul', 'soulHalf']);
-    expect(heartSlots(0, 0, 4)).toEqual(['soul', 'soul']);
-  });
   it('normalizes HUD stats and formats deltas', () => {
     const s = hudStats(BASE_STATS);
     expect(s.find((x) => x.key === 'moveSpeed')!.text).toBe('1.00');
@@ -165,7 +159,7 @@ describe('key labels', () => {
   });
   it('controls reference covers every gameplay action', () => {
     const covered = new Set(CONTROL_ROWS.flatMap((r) => r.actions));
-    for (const a of ['up', 'dash', 'bomb', 'active', 'consumable', 'special', 'inventory', 'map', 'pause'] as const) expect(covered.has(a), a).toBe(true);
+    for (const a of ['up', 'dash', 'interact', 'active', 'consumable', 'special', 'inventory', 'map', 'pause'] as const) expect(covered.has(a), a).toBe(true);
   });
 });
 

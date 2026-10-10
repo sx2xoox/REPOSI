@@ -30,7 +30,7 @@ export function killerSprite(source: string): string {
   const e = Enemies.all().find((d) => d.name === source);
   if (e) return e.portrait ?? e.sprite;
   if (/화상|불|용암/.test(source)) return 'ui_flame';
-  if (/폭발|폭탄/.test(source)) return 'hud_bomb';
+  if (/폭발|폭탄/.test(source)) return 'ui_blast';
   if (/가시|함정/.test(source)) return 'ui_swords';
   if (/독/.test(source) && hasSprite('res_venom')) return 'res_venom';
   return 'ui_skull';

@@ -34,8 +34,10 @@ export const SFX_NAMES = [
   'explosion', 'bomb_place', 'fuse', 'rock_break', 'pot_break', 'door_open', 'door_close',
   'door_unlock', 'secret_found', 'trapdoor', 'floor_start', 'room_clear', 'teleport',
   // pickups / economy
-  'coin', 'heart', 'soul_heart', 'key', 'bomb_pickup', 'chest_open', 'item_get', 'item_get_rare',
+  'coin', 'heart', 'blue_flame', 'match_pickup', 'chest_open', 'item_get', 'item_get_rare',
   'buy', 'no_money', 'active_use', 'active_ready', 'potion',
+  // matches: striking, burning a seal (door / chest), lighting a lantern or sconce
+  'match_strike', 'seal_burn', 'lantern_lit',
   // ui
   'ui_move', 'ui_select', 'ui_back', 'ui_open', 'ui_close', 'ui_error', 'ui_place',
   // character kits (passives / dashes; see content/characters/kit-*.ts)

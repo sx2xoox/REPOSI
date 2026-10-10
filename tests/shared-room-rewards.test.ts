@@ -118,7 +118,7 @@ it('any keeper can open multiple crates, then another keeper can claim the conte
 
 it('loot survives a former creator leaving, including legacy ownership metadata', () => {
   const w=setup('refinery',2),creator=w.players[1];
-  const loot=[new Chest(100,100),new WeaponChest(140,100,'iron_spear'),new Pedestal(180,100,{kind:'artifact',id:'fallen_star'}),new Pickup('key',220,100)];
+  const loot=[new Chest(100,100),new WeaponChest(140,100,'iron_spear'),new Pedestal(180,100,{kind:'artifact',id:'fallen_star'}),new Pickup('match',220,100)];
   w.spawnOwner=creator;for(const e of loot){w.spawn(e);expect(e.ctxP).toBeNull();e.ctxP=creator;e.mem.ownerSlot=1;}w.spawnOwner=null;
   w.removePlayer(1);w.update(1/60);
   expect(loot.every(e=>!e.dead)).toBe(true);

@@ -400,7 +400,7 @@ export class CharacterSelectScene implements Scene {
     });
     // consumables
     const cy = hy + 24 + rows.length * rowH + 2;
-    const cons: [string, number][] = [['hud_coin', open ? c.coins ?? 0 : 0], ['hud_bomb', open ? c.bombs ?? 1 : 0], ['hud_key', open ? c.keys ?? 0 : 0]];
+    const cons: [string, number][] = [['hud_coin', open ? c.coins ?? 0 : 0], ['hud_match', open ? c.matches ?? 1 : 0]];
     cons.forEach(([icon, n], i) => {
       const cx = tx + 10 + i * 56;
       r.uiSprite(icon, cx, cy + 6, 2, { alpha: A });

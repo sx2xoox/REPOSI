@@ -1,7 +1,7 @@
 // Lantern-keeper HUD chrome, painted at art resolution (1 art px = PX UI units)
 // like the other UI frames and cached per size / variant:
 //   - the brass lantern whose glass is the ember (등불 해방) gauge,
-//   - the keeper plate behind the hearts and the purse (coins / bombs / keys),
+//   - the keeper plate behind the hearts and the purse (coins / matches),
 //   - the gear rack behind the weapons, active item and potion,
 //   - small rarity gems for equipment slots.
 // Only the static chrome is cached here; the HUD draws the live parts (glass

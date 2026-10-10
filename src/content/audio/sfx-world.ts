@@ -1,5 +1,6 @@
-// Sound effects: world (explosions, rocks, doors, secrets, floors) and
-// pickups / economy (coins, hearts, keys, items, shop).
+// Sound effects: world (explosions, rocks, doors, secrets, floors), match fire
+// (striking, sealed doors / chests, lanterns) and pickups / economy (coins,
+// health, blue flames, matches, items, shop).
 
 import { registerSfx } from '../../audio/audio';
 import { mtof, rnd } from '../../audio/synth';
@@ -134,27 +135,52 @@ registerSfx('heart', (ctx, out, t, o) => {
   p.tone({ wave: 'sine', f: mtof(88), at: 0.15, dur: 0.3, gain: 0.06, vib: [6, 15] });
 });
 
-registerSfx('soul_heart', (ctx, out, t, o) => {
+registerSfx('blue_flame', (ctx, out, t, o) => {
+  // a cool flame catching: airy breath, then a glassy rising pair
   const p = sp(ctx, out, t, o, { reverb: 0.5, delay: 0.2 });
+  p.noise({ dur: 0.22, a: 0.06, gain: 0.1, filter: { type: 'bandpass', f: [900, 2600], q: 2 } });
   p.tone({ wave: 'sine', f: mtof(81), dur: 0.5, a: 0.05, gain: 0.18, vib: [5, 15] });
   p.tone({ wave: 'sine', f: mtof(88), at: 0.06, dur: 0.5, a: 0.05, gain: 0.15, vib: [5.5, 15] });
   p.tone({ wave: 'triangle', f: mtof(93), at: 0.12, dur: 0.45, a: 0.05, gain: 0.09 });
-  p.noise({ dur: 0.35, a: 0.12, gain: 0.1, filter: { type: 'bandpass', f: [2000, 5000], q: 4 } });
+  p.noise({ dur: 0.35, a: 0.12, gain: 0.08, filter: { type: 'bandpass', f: [2000, 5000], q: 4 } });
 });
 
-registerSfx('key', (ctx, out, t, o) => {
-  const p = sp(ctx, out, t, o, { reverb: 0.2 });
-  [2100, 2900, 2500].forEach((f, i) => p.fm({ f: f * rnd(0.98, 1.02), ratio: 2.37, index: [2.5, 0.1], at: i * 0.05, dur: 0.18, gain: 0.15 }));
-  debris(p, 0, 0.15, 0.3, 4500, 1);
-  p.tone({ wave: 'pulse25', f: mtof(88), at: 0.12, dur: 0.18, gain: 0.1, filter: { type: 'lowpass', f: 5000 } });
-});
-
-registerSfx('bomb_pickup', (ctx, out, t, o) => {
+registerSfx('match_pickup', (ctx, out, t, o) => {
+  // dry wooden sticks rattling in a little box
   const p = sp(ctx, out, t, o, { reverb: 0.12 });
-  thump(p, 0, 200, 110, 0.1, 0.38);
-  p.noise({ dur: 0.03, gain: 0.18, filter: { type: 'lowpass', f: 1500 } });
-  p.tone({ wave: 'pulse25', f: mtof(64), at: 0.05, dur: 0.08, gain: 0.08, filter: { type: 'lowpass', f: 4000 } });
-  p.tone({ wave: 'pulse25', f: mtof(71), at: 0.11, dur: 0.12, gain: 0.08, filter: { type: 'lowpass', f: 4000 } });
+  [0, 0.045, 0.08].forEach((at, i) => click(p, at, 0.2 - i * 0.04, rnd(2600, 3600), 0.012));
+  p.fm({ f: 1250 * rnd(0.97, 1.03), ratio: 1.9, index: [1.5, 0.1], at: 0.02, dur: 0.06, gain: 0.07 });
+  debris(p, 0.03, 0.12, 0.18, 4200, 0.8);
+  p.tone({ wave: 'triangle', f: mtof(84), at: 0.1, dur: 0.12, gain: 0.07 });
+});
+
+// --- match fire ---------------------------------------------------------------
+
+registerSfx('match_strike', (ctx, out, t, o) => {
+  // the scratch along the striker, then the head flaring into a small flame
+  const p = sp(ctx, out, t, o, { reverb: 0.15 });
+  p.noise({ dur: 0.09, a: 0.005, gain: 0.32, filter: { type: 'bandpass', f: [2400, 6200], q: 2.5 } });
+  p.noise({ color: 'crackle', at: 0.04, dur: 0.12, gain: 0.22, filter: { type: 'highpass', f: 3000 } });
+  p.noise({ at: 0.08, dur: 0.35, a: 0.03, gain: 0.2, filter: { type: 'lowpass', f: [700, 2400, 900] } });
+  thump(p, 0.08, 160, 90, 0.08, 0.12);
+});
+
+registerSfx('seal_burn', (ctx, out, t, o) => {
+  // wax hissing and cords crackling apart
+  const p = sp(ctx, out, t, o, { reverb: 0.2 });
+  p.noise({ dur: 0.5, a: 0.02, sus: 0.6, gain: 0.16, filter: { type: 'highpass', f: [5200, 3200] } });
+  p.noise({ color: 'crackle', dur: 0.45, gain: 0.3, filter: { type: 'bandpass', f: 2600, q: 1.5 } });
+  p.noise({ color: 'brown', at: 0.05, dur: 0.3, gain: 0.18, filter: { type: 'lowpass', f: [1400, 400] } });
+  [0.12, 0.2, 0.31].forEach((at) => click(p, at, 0.12, rnd(1800, 3000), 0.01));
+});
+
+registerSfx('lantern_lit', (ctx, out, t, o) => {
+  // a whoomp of flame catching in stone, then a warm chord and a few sparks
+  const p = sp(ctx, out, t, o, { reverb: 0.4, stretch: 1 });
+  p.noise({ dur: 0.3, a: 0.04, gain: 0.3, filter: { type: 'lowpass', f: [300, 2200, 600] }, drive: 1.5 });
+  thump(p, 0.02, 120, 60, 0.18, 0.3);
+  [64, 68, 71, 76].forEach((m, i) => p.tone({ wave: 'triangle', f: mtof(m), at: 0.08 + i * 0.04, dur: 0.5, sus: 0.6, rel: 0.3, gain: 0.07 }));
+  sparkle(p, 0.2, 4, 3200, 0.04);
 });
 
 registerSfx('chest_open', (ctx, out, t, o) => {

@@ -139,7 +139,8 @@ export interface ItemHooks {
   onRoomEnter?(w: World, power: number): void;
   onRoomClear?(w: World, power: number): void;
   onFloorStart?(w: World, power: number): void;
-  onBomb?(w: World, x: number, y: number, power: number): void;
+  /** the keeper struck a match at (x, y) (sealed door / chest, lantern, sconce; game/matches.ts) */
+  onMatch?(w: World, x: number, y: number, power: number): void;
   onPickup?(w: World, kind: string, power: number): void;
   /** the player used "등불 해방" (ember gauge release) */
   onRelease?(w: World, power: number): void;
@@ -382,8 +383,8 @@ export interface CharacterDef {
   artifacts?: string[];
   active?: string;
   coins?: number;
-  bombs?: number;
-  keys?: number;
+  /** starting matches (default 1; co-op purses add the party's up to MATCH_CAP) */
+  matches?: number;
   /** unlocked from the start (otherwise needs save flag `unlock:<id>`) */
   unlocked: boolean;
   suspended?: boolean;
@@ -508,7 +509,7 @@ export interface RoomTemplate {
   weight?: number;
   /**
    * Interior rows (CELL_W*cw x CELL_H*ch characters). Legend: see TEMPLATE_LEGEND plus
-   *   'e' random enemy, 'E' tougher enemy, 'f' fireplace, 'c' coin, 'h' heart, 'k' key, 'b' bomb pickup,
+   *   'e' random enemy, 'E' tougher enemy, 'f' fireplace, 'c' coin, 'h' heart,
    *   'I' item pedestal (treasure), 'S' shop slot, 'B' boss position, '@' room center marker.
    */
   rows: string[];
@@ -627,5 +628,5 @@ export function enemyHitDamage(floor: FloorDef | undefined, halfHearts: number):
 }
 
 export function defaultPrice(r: Rarity): number {
-  return r === 'common' ? 15 : r === 'rare' ? 20 : r === 'epic' ? 30 : 45;
+  return r === 'common' ? 16 : r === 'rare' ? 22 : r === 'epic' ? 32 : 48;
 }

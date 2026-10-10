@@ -1,6 +1,6 @@
-// World objects the player interacts with: pickups (coins, hearts, bombs, keys,
-// potions), item pedestals (free or for sale), chests, placed bombs, fireplaces
-// and the trapdoor to the next floor.
+// World objects the player interacts with: pickups (coins, health, blue flames,
+// matches, potions), item pedestals (free or for sale), chests (a sealed one
+// opens with a match), fireplaces and the trapdoor to the next floor.
 
 import { Actor, Entity, type HitInfo } from './entity';
 import type { World } from './world';
@@ -15,16 +15,23 @@ import { ramp } from '../engine/painter';
 import { sceneSprite } from '../ui/pixellab-scenery';
 import { PREVIEW_RANGE } from './interact';
 import { STAGES_PER_FLOOR } from './stage-plan';
+import { MATCH_CAP, matchCard, tryLightWithMatch } from './matches';
 
 export type PickupKind =
-  | 'coin' | 'nickel' | 'dime'
-  | 'heart_half' | 'heart' | 'soul_heart' | 'soul_half'
-  | 'bomb' | 'bomb2' | 'key' | 'potion';
+  | 'coin' | 'coin_string'
+  | 'heart_half' | 'heart' | 'blue_flame' | 'blue_flame_half'
+  | 'match' | 'matchbox' | 'potion';
 
+/** Still sprite per pickup kind (preview cards, touch buttons; blue flames also animate in the world). */
 export const PICKUP_SPRITE: Record<PickupKind, string> = {
-  coin: 'pk_coin', nickel: 'pk_nickel', dime: 'pk_dime',
-  heart_half: 'pk_heart_half', heart: 'pk_heart', soul_heart: 'pk_soul', soul_half: 'pk_soul_half',
-  bomb: 'pk_bomb', bomb2: 'pk_bomb2', key: 'pk_key', potion: 'pk_potion',
+  coin: 'pk_coin', coin_string: 'pk_coin_string',
+  heart_half: 'pk_heart_half', heart: 'pk_heart', blue_flame: 'pk_blue_flame', blue_flame_half: 'pk_blue_flame_half',
+  match: 'pk_match', matchbox: 'pk_matchbox', potion: 'pk_potion',
+};
+
+/** World animation per pickup kind (drawn instead of the still sprite). */
+const PICKUP_ANIM: Partial<Record<PickupKind, string>> = {
+  blue_flame: 'pk_blue_flame_anim', blue_flame_half: 'pk_blue_flame_half_anim',
 };
 
 const GOLDEN_ANGLE = 2.399963229728653;
@@ -111,9 +118,13 @@ export class Pickup extends Entity {
       case 'heart':
         // 'overheal' keepers (보리's rescue barrel) store hearts they cannot use
         return p.red < p.maxRed || p.flags.has('overheal');
-      case 'soul_heart':
-      case 'soul_half':
+      case 'blue_flame':
+      case 'blue_flame_half':
         return p.red + p.soul < 24;
+      case 'match':
+      case 'matchbox':
+        // a full purse leaves them lying (not magnet-pulled, not for sale)
+        return p.matches < MATCH_CAP;
       default:
         return true;
     }
@@ -152,7 +163,9 @@ export class Pickup extends Entity {
     let name = PICKUP_SPRITE[this.kind];
     if (this.kind === 'potion') name = potionSpriteFor(w, this.potionId);
     const shine = Math.floor(this.bobT * 2) % 5 === 0 ? 0.25 : 0;
-    r.sprite(name, this.x, this.y - this.z - 2 + bob, { flash: shine });
+    const anim = PICKUP_ANIM[this.kind];
+    if (anim) r.anim(anim, this.bobT, this.x, this.y - this.z - 2 + bob);
+    else r.sprite(name, this.x, this.y - this.z - 2 + bob, { flash: shine });
     if (this.price > 0) {
       const col = w.player.coins >= this.price ? '#ffffff' : '#ff7070';
       r.pixelText(`${this.price}`, this.x, this.y + 6, col, { align: 'center', outline: '#140c1c' });
@@ -160,8 +173,9 @@ export class Pickup extends Entity {
   }
 
   override light(w: World): void {
-    if (this.kind === 'soul_heart' || this.kind === 'soul_half') w.lights.add(this.x, this.y, 22, '#8ab0ff', { intensity: 0.6 });
-    else if (this.kind === 'coin' || this.kind === 'nickel' || this.kind === 'dime') w.lights.add(this.x, this.y, 14, '#ffd060', { intensity: 0.4 });
+    if (this.kind === 'blue_flame' || this.kind === 'blue_flame_half') w.lights.add(this.x, this.y, 22, '#8ab0ff', { intensity: 0.6 });
+    else if (this.kind === 'coin' || this.kind === 'coin_string') w.lights.add(this.x, this.y, 14, '#ffd060', { intensity: 0.4 });
+    else if (this.kind === 'match' || this.kind === 'matchbox') w.lights.add(this.x, this.y - 3, 10, '#ffb060', { intensity: 0.35 });
   }
 }
 
@@ -196,6 +210,8 @@ export interface PedestalItem {
   temper?: number;
   kind: PedestalItemKind;
   id: string;
+  /** an active item put down by a keeper keeps its charge (unset: full) */
+  charge?: number;
 }
 
 export function itemInfo(it: PedestalItem): { name: string; desc: string; detail?: string; icon: string; rarity: Rarity; quote?: string } {
@@ -224,7 +240,7 @@ export class Pedestal extends Entity {
   group = 0;
   /** blocks pickup until the player steps away once (after swapping) */
   waitForLeave = false;
-  /** optional: costs hearts instead of coins (devil deal style) */
+  /** optional: costs hearts instead of coins (대가의 방, 성소) */
   heartPrice = 0;
   bobT = fx.range(0, 6);
   spawnFx = 0.5;
@@ -298,6 +314,11 @@ export class Pedestal extends Entity {
 }
 
 // ------------------------------------------------------------------ chests
+/**
+ * A chest. A plain one opens when a keeper touches it; a sealed one (red wax
+ * seal and cords over the lid) opens only when a keeper lights it with a match
+ * through 'interact' (never by brushing past).
+ */
 export class Chest extends Entity {
   override readonly worldLoot = true;
   mem: Record<string, number> = {};
@@ -314,74 +335,40 @@ export class Chest extends Entity {
 
   override update(w: World, dt: number): void {
     this.age += dt;
-    if (this.opened) return;
+    if (this.opened || this.locked) return;
     const p = w.player;
     if (!p.alive || p.downed) return;
     if (dist(this.x, this.y, p.x, p.y) < this.r + p.r + 1) {
-      if (this.locked) {
-        if (p.keys <= 0) return;
-        p.keys--;
-      }
       this.opened = true;
       w.openChest(this);
     }
+  }
+
+  override previewable(): boolean {
+    return this.locked && !this.opened && !this.dead;
+  }
+
+  override interactionInfo(w?: World) {
+    if (!w) return { name: '봉랍 상자', desc: '성냥으로 봉랍을 녹이면 열린다.', icon: 'icon_seal', actionLabel: '불 붙이기', available: false, price: { icon: 'hud_match', text: '1', ok: false } };
+    return matchCard(w, { name: '봉랍 상자', desc: '성냥으로 봉랍을 녹이면 열린다.' });
+  }
+
+  override interact(w: World): boolean {
+    if (!this.previewable() || !w.entities.includes(this)) return false;
+    if (!tryLightWithMatch(w, this, false)) return false;
+    this.opened = true;
+    w.sfx('seal_burn', { x: this.x });
+    w.particles.burst(this.x, this.y - 5, { count: 10, speed: [10, 40], life: [0.4, 0.8], colors: ['#ff6050', '#c02a2a', '#8a1a1a'], size: [1, 2], gravity: 260, vz: [10, 40] });
+    w.particles.burst(this.x, this.y - 6, { count: 8, speed: [10, 30], life: [0.3, 0.6], colors: ['#ffffff', '#ffd060', '#ff8a30'], size: [1, 1], additive: true });
+    w.openChest(this);
+    return true;
   }
 
   override draw(r: Renderer): void {
     r.shadow(this.x, this.y + 4, 14, 4, 0.3);
     const base = this.locked ? 'chest_gold' : 'chest';
     r.sprite(sceneSprite(this.opened ? `${base}_open` : base), this.x, this.y);
-  }
-}
-
-// ------------------------------------------------------------------ bombs
-export class Bomb extends Entity {
-  fuse: number;
-  damage: number;
-  radius: number;
-  owner: 'player' | 'enemy';
-  constructor(x: number, y: number, owner: 'player' | 'enemy' = 'player', fuse = 1.5, damage = 60, radius = 38) {
-    super();
-    this.x = x;
-    this.y = y;
-    this.fuse = fuse;
-    this.damage = damage;
-    this.radius = radius;
-    this.owner = owner;
-    this.r = 5;
-    this.solid = false;
-  }
-
-  override update(w: World, dt: number): void {
-    this.age += dt;
-    this.fuse -= dt;
-    const k = Math.exp(-dt * 6);
-    this.vx *= k;
-    this.vy *= k;
-    if (this.z > 0 || this.vz) {
-      this.vz -= 500 * dt;
-      this.z += this.vz * dt;
-      if (this.z <= 0) { this.z = 0; this.vz = 0; }
-    }
-    this.move(w, dt);
-    if (fx.chance(dt * 30)) {
-      w.particles.spawn({ x: this.x + 3, y: this.y - 9 - this.z, vy: -20, vx: fx.range(-10, 10), life: 0.3, colors: ['#ffffff', '#ffd040', '#ff6020'], size: 1, additive: true });
-    }
-    if (this.fuse <= 0) {
-      this.dead = true;
-      w.explode(this.x, this.y, this.radius, this.damage, { source: this, byPlayer: this.owner === 'player' });
-    }
-  }
-
-  override draw(r: Renderer): void {
-    const blink = this.fuse < 0.6 ? Math.floor(this.fuse * 20) % 2 === 0 : Math.floor(this.fuse * 6) % 2 === 0;
-    const s = 1 + (this.fuse < 0.5 ? (0.5 - this.fuse) * 0.6 : 0);
-    r.shadow(this.x, this.y + 4, 10, 4, 0.35);
-    r.sprite('bomb_placed', this.x, this.y - this.z, { flash: blink ? 0.7 : 0, sx: s, sy: s });
-  }
-
-  override light(w: World): void {
-    w.lights.add(this.x + 3, this.y - 9, 16, '#ffb040', { intensity: 0.7 });
+    if (this.locked && !this.opened) r.sprite('chest_seal', this.x, this.y);
   }
 }
 

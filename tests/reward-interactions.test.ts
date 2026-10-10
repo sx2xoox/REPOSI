@@ -66,7 +66,7 @@ for (const kind of ['relay', 'workshop', 'vault', 'hunt', 'elite'] as const) {
   });
 }
 
-for (const kind of ['heart', 'soul_heart', 'bomb', 'bomb2', 'key', 'potion'] as PickupKind[]) {
+for (const kind of ['heart', 'blue_flame', 'match', 'matchbox', 'potion'] as PickupKind[]) {
   it(`priced ${kind} can be previewed while standing on it and only buys on an interaction press`, () => {
     const w = setup(), p = w.player, pk = new Pickup(kind, p.x, p.y);
     p.red = p.maxRed - 2; pk.price = 5; pk.grace = 0;
@@ -97,7 +97,7 @@ it('free hearts still collect on touch while shared shop stock is paid for only 
   const w = setup('ria', 2), p = w.players[0], other = w.players[1];
   p.red -= 2; const free = new Pickup('heart', p.x, p.y); free.grace = 0;
   free.update(w, 1 / 60); expect(free.dead).toBe(true); expect(p.red).toBe(p.maxRed); expect(p.coins).toBe(100);
-  const shop = new Pickup('soul_heart', p.x, p.y); shop.grace = 0; shop.price = 5;
+  const shop = new Pickup('blue_flame', p.x, p.y); shop.grace = 0; shop.price = 5;
   const soul = other.soul;
   expect(shop.interact(w)).toBe(true); expect(w.asPlayer(other, () => shop.interact(w))).toBe(false);
   expect(p.coins).toBe(95); expect(other.soul).toBe(soul);
@@ -110,7 +110,7 @@ it('shrine previews the exact heart price and only offers after pressing interac
     w.spawn(bowl); const red = p.maxRed, soul = p.soul;
     for (let i = 0; i < 90; i++) w.update(1 / 60);
     expect(bowl.used).toBe(false); expect(p.maxRed).toBe(red); expect(p.soul).toBe(soul);
-    expect(buildCard(w, bowl)?.desc).toContain(soulPayment ? '영혼 하트 1칸 소모' : '최대 빨간 체력 1칸 감소');
+    expect(buildCard(w, bowl)?.desc).toContain(soulPayment ? '푸른 불꽃 1칸 소모' : '최대 체력 1칸 감소');
     expect(buildCard(w, bowl)?.action?.label).toBe('봉헌'); press(w, PRESS.interact);
     expect(bowl.used).toBe(true); expect(p.maxRed).toBe(red - (soulPayment ? 0 : 2)); expect(p.soul).toBe(soul - (soulPayment ? 2 : 0));
     expect(bowl.interact(w)).toBe(false); expect(shrine.spent).toBe(1);

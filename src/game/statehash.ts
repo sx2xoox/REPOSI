@@ -19,7 +19,7 @@ import { Enemy } from './enemy';
 import { Player } from './player';
 import { Projectile } from './projectile';
 import { MeleeSwing } from './melee';
-import { Bomb, Chest, Pedestal, Pickup, Trapdoor } from './pickups';
+import { Chest, Pedestal, Pickup, Trapdoor } from './pickups';
 import type { RNG } from '../engine/rng';
 import type { WeaponState } from './defs';
 
@@ -147,7 +147,7 @@ function hashRun(h: StateHasher, w: World): void {
   h.str(r.seed).str(w.coop ? w.players.map((p) => `${p.slot}:${p.character.id}`).join(',') : r.characterId).int(r.floor).int(r.stage).bool(r.staged).rng(r.rng).rng(r.lootRng);
   const s = r.stats;
   h.int(s.kills).num(s.timeSec).num(s.damageTaken).num(s.damageDealt).int(s.roomsCleared).int(s.itemsTaken);
-  h.int(s.coinsCollected).int(s.coinsSpent).int(s.activesUsed).int(s.bossesKilled).int(s.secretsFound).int(s.releases);
+  h.int(s.coinsCollected).int(s.coinsSpent).int(s.activesUsed).int(s.bossesKilled).int(s.secretsFound).int(s.releases).int(s.matchesUsed);
   for (const id of r.identified) h.str(id);
   h.word(-2);
   for (const id of r.seenOnPedestal) h.str(id);
@@ -220,7 +220,7 @@ function hashPlayer(h: StateHasher, p: Player, coop = false): void {
   hashActor(h, p);
   if (coop) h.int(p.slot).bool(p.downed).num(p.reviveT);
   h.num(p.red).num(p.soul).num(p.shields).num(p.baseHearts).num(p.ember).num(p.releaseT).num(p.releaseCooldown);
-  h.int(p.coins).int(p.bombs).int(p.keys);
+  h.int(p.coins).int(p.matches);
   h.num(p.aim).bool(p.firing).str(p.facing).bool(p.moving).num(p.dashT).num(p.dashCD).num(p.dashDX).num(p.dashDY).num(p.dashX0).num(p.dashY0);
   h.num((p as unknown as { dashBuffer: number }).dashBuffer).num(p.holdT).bool(p.frozen).num(p.fall).bool(p.god);
   h.num(p.spikeCD).num(p.lastAttackAt).num(p.swapAt);
@@ -288,14 +288,15 @@ function hashEntity(h: StateHasher, e: Entity, coop = false): void {
   } else if (e instanceof Pickup) {
     h.str(e.kind).int(e.price).str(e.potionId).num(e.grace).bool(e.waitForLeave);
   } else if (e instanceof Pedestal) {
-    h.str(e.item?.kind).str(e.item?.id).num(e.item?.temper ?? 0).int(e.price).int(e.heartPrice).int(e.group).bool(e.waitForLeave);
+    h.str(e.item?.kind).str(e.item?.id).num(e.item?.temper ?? 0).num(e.item?.charge ?? -1).int(e.price).int(e.heartPrice).int(e.group).bool(e.waitForLeave);
   } else if (e instanceof Chest) {
     h.bool(e.locked).bool(e.opened);
-  } else if (e instanceof Bomb) {
-    h.num(e.fuse).num(e.damage).num(e.radius).str(e.owner);
   } else if (e instanceof Trapdoor) {
     h.num(e.openT);
   }
+  // world fixtures lit with a match (sealed doors, stone lanterns, cold sconces)
+  const lit = (e as { lit?: unknown }).lit;
+  if (typeof lit === 'boolean') h.bool(lit);
   const m = (e as unknown as { mem?: Record<string, unknown> }).mem;
   if (m && !(e instanceof Projectile)) h.mem(m);
 }

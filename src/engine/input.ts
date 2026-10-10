@@ -8,7 +8,7 @@
 export type Action =
   | 'up' | 'down' | 'left' | 'right'
   | 'shootUp' | 'shootDown' | 'shootLeft' | 'shootRight'
-  | 'fire' | 'dash' | 'bomb' | 'active' | 'consumable' | 'special' | 'swap' | 'interact'
+  | 'fire' | 'dash' | 'active' | 'consumable' | 'special' | 'swap' | 'interact'
   | 'inventory' | 'map' | 'pause' | 'confirm' | 'cancel'
   | 'uiUp' | 'uiDown' | 'uiLeft' | 'uiRight' | 'restart'
   | 'tabPrev' | 'tabNext' | 'discard';
@@ -19,7 +19,7 @@ export type Action =
  */
 export const GAMEPLAY_ACTIONS: readonly Action[] = [
   'up', 'down', 'left', 'right', 'shootUp', 'shootDown', 'shootLeft', 'shootRight',
-  'fire', 'dash', 'bomb', 'active', 'consumable', 'special', 'swap', 'interact', 'inventory', 'map', 'pause',
+  'fire', 'dash', 'active', 'consumable', 'special', 'swap', 'interact', 'inventory', 'map', 'pause',
 ];
 
 export type AimMode = 'mouse' | 'keys' | 'pad' | 'touch';
@@ -39,14 +39,13 @@ export const DEFAULT_BINDINGS: Record<Action, string[]> = {
   shootRight: ['ArrowRight'],
   fire: ['Mouse0'],
   dash: ['Space', 'ShiftLeft', 'ShiftRight', 'Mouse2'],
-  bomb: ['KeyE'],
   active: ['KeyQ'],
   consumable: ['KeyR'],
   special: ['KeyF', 'Mouse1'],
   /** switch between the two weapon slots ("Wheel" = any mouse-wheel step over the game) */
   swap: ['KeyC', 'Wheel'],
-  /** take the item on the pedestal the keeper stands at (read its card first) */
-  interact: ['KeyG'],
+  /** take the item the keeper stands at (read its card first), buy, light a match */
+  interact: ['KeyE', 'KeyG'],
   inventory: ['Tab', 'KeyI'],
   map: ['KeyM'],
   pause: ['Escape', 'KeyP'],
@@ -66,7 +65,6 @@ export const DEFAULT_BINDINGS: Record<Action, string[]> = {
 // Standard gamepad mapping button indices
 export const PAD_BUTTONS: Partial<Record<Action, number[]>> = {
   dash: [0, 5],          // A, RB
-  bomb: [2],             // X
   active: [3],           // Y
   consumable: [1],       // B
   inventory: [8],        // Back/Select
@@ -81,7 +79,7 @@ export const PAD_BUTTONS: Partial<Record<Action, number[]>> = {
   fire: [7],             // RT (fires in last aim direction)
   special: [6],          // LT (lantern release)
   swap: [11],            // R3 (right stick click: weapon swap)
-  interact: [13],        // D-pad down (take a pedestal item)
+  interact: [2, 13],     // X, D-pad down (take an item / buy / light a match)
   // menu-only
   tabPrev: [4],          // LB
   tabNext: [5],          // RB
@@ -371,7 +369,7 @@ export class Input {
     return { x, y };
   }
 
-  /** Direction from arrow keys (Isaac-style 4/8-way shooting), or null. */
+  /** Direction from arrow keys (4/8-way shooting), or null. */
   keyAim(): { x: number; y: number } | null {
     let x = 0;
     let y = 0;

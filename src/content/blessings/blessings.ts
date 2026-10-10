@@ -11,6 +11,7 @@ import { Chest, Pickup } from '../../game/pickups';
 import { RingFx } from '../../game/effects';
 import type { ArtifactLook } from '../../game/look';
 import { grantPerCopy, isAttack, isPrimary, proc } from '../items/lib';
+import { addMatches } from '../../game/matches';
 
 const O = '#140c1c';
 const GOLD = '#ffd060';
@@ -107,10 +108,10 @@ bless({
   id: 'bless_blastproof', name: '화약 내성', desc: '폭발 피해를 받지 않는다. 폭탄 +2', quote: '불꽃이 길을 비켜 간다.',
   disk: '#4a2a1a', glyph: (p) => { p.circle(7.5, 9, 3.8, '#1a1420'); p.ring(7.5, 9, 3.8, 1, '#ffb040'); p.px(6, 8, '#a8a0b8'); p.line(10, 6, 12, 3, '#c8a060'); p.px(12, 2, '#ffd040'); }, look: { aura: '#ff9a30' },
   stats(m) {
-    m.flag('bombImmune');
+    m.flag('blastImmune');
   },
   onAcquire(w, power) {
-    grantPerCopy(w, 'bless_blastproof', power, () => { w.player.bombs = Math.min(99, w.player.bombs + 2); });
+    grantPerCopy(w, 'bless_blastproof', power, () => { addMatches(w, 2); });
   },
 });
 
@@ -169,7 +170,7 @@ bless({
       }
       if (was || !e.opened) continue;
       chestSeen.set(e, true);
-      w.spawn(new Pickup(w.rng.chance(0.55) ? 'key' : 'bomb', e.x, e.y).pop());
+      w.spawn(new Pickup(w.rng.chance(0.55) ? 'match' : 'coin', e.x, e.y).pop());
       proc(w, 'bless_locksmith');
     }
   },
@@ -233,9 +234,9 @@ bless({
   id: 'bless_powder', name: '화약 주머니', desc: '폭탄 +3. 폭탄을 놓으면 주변 적 탄환이 사라진다', quote: '쾅, 하고 조용해진다.',
   disk: '#5a3a1a', glyph: (p) => { p.ellipse(8, 9.5, 4.5, 3.8, '#f0c890'); p.ellipse(8, 10, 3.5, 2.8, '#d09858'); p.rect(6, 4, 4, 2, '#fff0c0'); p.px(8, 9, '#ff7a20'); p.px(12, 3, '#ffd040'); p.px(13, 2, '#ffffff'); }, look: { step: '#ffb040' },
   onAcquire(w, power) {
-    grantPerCopy(w, 'bless_powder', power, () => { w.player.bombs = Math.min(99, w.player.bombs + 3); });
+    grantPerCopy(w, 'bless_powder', power, () => { addMatches(w, 3); });
   },
-  onBomb(w, x, y) {
+  onMatch(w, x, y) {
     if (w.clearEnemyBullets(x, y, 70) > 0) proc(w, 'bless_powder');
   },
 });

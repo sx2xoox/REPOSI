@@ -1,7 +1,7 @@
 // Lockstep determinism: the simulation must produce bit-identical state on every
 // peer. Each scenario drives the real World headless for thousands of fixed
 // steps with a scripted, seeded bot (moving, shooting with stick and cursor aim,
-// dashing, 등불 해방, bombs, interact, weapon swaps; walking through doors,
+// dashing, 등불 해방, matches (sealed doors / chests), interact, weapon swaps; walking through doors,
 // clearing rooms, shops / treasure / special rooms, boss fights, trapdoors, floors
 // 1–5, four keepers; see detsim.ts) and records `stateHash(w)` after every step.
 // The hash sequence must not change when things that legitimately differ

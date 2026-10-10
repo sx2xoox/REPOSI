@@ -8,8 +8,8 @@
 // enemies the aim follows the movement. Scheme 'twin': floating right stick =
 // aim + auto-fire. Either way the aim is fed through input.touchAim (the same
 // path as the gamepad right stick), so gameplay code has no touch special cases;
-// targeting only reads the world. Round buttons for dash / bomb / active /
-// potion / lantern release sit in an arc around the attack button, plus pause /
+// targeting only reads the world. Round buttons for dash / interact (take, buy,
+// light a match) / active / potion / lantern release sit in an arc around the attack button, plus pause /
 // map / status buttons. Everything is drawn on the display canvas in CSS-pixel
 // layout inside the device safe area, with chunky pixel-art discs.
 //
@@ -43,7 +43,6 @@ import {
 
 const BUTTON_ACTION: Record<TouchButtonId, Action> = {
   dash: 'dash',
-  bomb: 'bomb',
   active: 'active',
   consumable: 'consumable',
   special: 'special',
@@ -918,8 +917,6 @@ export class TouchControls {
     const dashMax = p.stats?.dashCooldown || 1;
     const dashFrac = p.dashCD > 0 ? 1 - p.dashCD / dashMax : 1;
     this.drawBtn(r, 'dash', A, held.has('dash'), 'tc_dash', dashFrac >= 1, false, dashFrac, '#7ac8ff', '대시');
-    // bomb: count
-    this.drawBtn(r, 'bomb', A, held.has('bomb'), 'hud_bomb', p.bombs > 0, false, 1, '', '', String(p.bombs));
     // lantern release: ember gauge on the rim
     const ember = clamp(p.ember / EMBER_MAX, 0, 1);
     const full = ember >= 1 && p.releaseCooldown <= 0;
@@ -950,7 +947,9 @@ export class TouchControls {
     if (f?.interact && f.interactionInfo) {
       const info = f.interactionInfo(w);
       const ok = info.available ?? true;
-      this.drawBtn(r, 'interact', A, held.has('interact'), info.icon, ok, ok, 1, '', info.actionLabel ?? '사용');
+      // short verbs fit the button ('불 붙이기', '내려가기'); anything longer reads as '줍기'
+      const label = info.actionLabel && info.actionLabel.length <= 6 ? info.actionLabel : '줍기';
+      this.drawBtn(r, 'interact', A, held.has('interact'), info.icon, ok, ok, 1, '', label);
     }
     // system
     this.drawBtn(r, 'pause', A, held.has('pause'), 'tc_pause');

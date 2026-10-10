@@ -19,6 +19,16 @@ export interface RunStats {
   bossesKilled: number;
   secretsFound: number;
   releases: number;
+  /** matches struck (sealed doors / chests, lanterns, sconces) */
+  matchesUsed: number;
+}
+
+/** Zeroed run statistics (also the base a checkpoint from an older version is restored over). */
+export function freshRunStats(): RunStats {
+  return {
+    kills: 0, timeSec: 0, damageTaken: 0, damageDealt: 0, roomsCleared: 0, itemsTaken: 0,
+    coinsCollected: 0, coinsSpent: 0, activesUsed: 0, bossesKilled: 0, secretsFound: 0, releases: 0, matchesUsed: 0,
+  };
 }
 
 const POTION_COLORS = ['#e04a5a', '#4ac0e0', '#7ae04a', '#e0c04a', '#c04ae0', '#e0804a', '#4a6ae0', '#e04ab0', '#f0f0f0', '#5a5a5a', '#40e0a0', '#a0602a'];
@@ -42,12 +52,9 @@ export class RunState {
   seenOnPedestal = new Set<string>();
   /** potion ids identified this run */
   identified = new Set<string>();
-  /** potion id -> flask color (shuffled per run, like Isaac pills) */
+  /** potion id -> flask color (shuffled per run) */
   potionColors: Record<string, string> = {};
-  stats: RunStats = {
-    kills: 0, timeSec: 0, damageTaken: 0, damageDealt: 0, roomsCleared: 0, itemsTaken: 0,
-    coinsCollected: 0, coinsSpent: 0, activesUsed: 0, bossesKilled: 0, secretsFound: 0, releases: 0,
-  };
+  stats: RunStats = freshRunStats();
   lastDamageSource = '';
   won = false;
   /** seeded runs don't count for unlocks */

@@ -2,8 +2,8 @@
 // a flat list of active hook providers with their power, recomputes player
 // stats, and dispatches gameplay events to every provider.
 //
-// Loot: weighted rolls for item pools (rarity + luck), with Isaac's rule that an
-// item that appeared on a pedestal is removed from the pool for this run.
+// Loot: weighted rolls for item pools (rarity + luck); an item that has appeared
+// leaves its pool (on a pedestal, for the rest of the run).
 
 import type { World } from './world';
 import {
@@ -53,7 +53,7 @@ export interface ProcEvent {
 
 /** hooks whose helper effects count as visible procs (continuous hooks never auto-proc) */
 const EVENT_HOOKS = new Set<keyof ItemHooks>([
-  'modifyHit', 'onHit', 'onKill', 'onHurt', 'onDash', 'onRoomEnter', 'onRoomClear', 'onFloorStart', 'onBomb', 'onPickup', 'onRelease', 'onDeflect',
+  'modifyHit', 'onHit', 'onKill', 'onHurt', 'onDash', 'onRoomEnter', 'onRoomClear', 'onFloorStart', 'onMatch', 'onPickup', 'onRelease', 'onDeflect',
 ]);
 /**
  * Co-op: hooks that are world events (dispatched to every keeper's item system).
@@ -369,7 +369,7 @@ export class ItemSystem {
   onRoomEnter(): void { this.each('onRoomEnter', (e) => e.hooks.onRoomEnter?.(this.w, e.power)); }
   onRoomClear(): void { this.each('onRoomClear', (e) => e.hooks.onRoomClear?.(this.w, e.power)); }
   onFloorStart(): void { this.each('onFloorStart', (e) => e.hooks.onFloorStart?.(this.w, e.power)); }
-  onBomb(x: number, y: number): void { this.each('onBomb', (e) => e.hooks.onBomb?.(this.w, x, y, e.power)); }
+  onMatch(x: number, y: number): void { this.each('onMatch', (e) => e.hooks.onMatch?.(this.w, x, y, e.power)); }
   onPickup(kind: string): void { this.each('onPickup', (e) => e.hooks.onPickup?.(this.w, kind, e.power)); }
   onRelease(): void { this.each('onRelease', (e) => e.hooks.onRelease?.(this.w, e.power)); }
   onDeflect(p: Projectile): void { this.each('onDeflect', (e) => e.hooks.onDeflect?.(this.w, p, e.power)); }

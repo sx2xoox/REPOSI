@@ -28,7 +28,7 @@ export const HELD = {
 /** Edge buttons: pressed since the previous step. */
 export const PRESS = {
   dash: 1,
-  bomb: 2,
+  // 2: retired (bombs removed), never reuse
   active: 4,
   potion: 8,
   /** 등불 해방 (F) */
@@ -99,7 +99,6 @@ export function readLocalInput(w: World, _p: Player, out: PlayerInput): void {
   out.held = (input.held('fire') ? HELD.fire : 0) | (input.aimMode === 'mouse' ? HELD.cursorAim : 0);
   out.pressed =
     (input.pressed('dash') ? PRESS.dash : 0) |
-    (input.pressed('bomb') ? PRESS.bomb : 0) |
     (input.pressed('active') ? PRESS.active : 0) |
     (input.pressed('consumable') ? PRESS.potion : 0) |
     (input.pressed('special') ? PRESS.release : 0) |

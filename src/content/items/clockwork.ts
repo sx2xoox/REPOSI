@@ -13,6 +13,7 @@ import {
 } from './lib';
 import { GearTurret } from './familiars';
 import { amplifyShot, proc } from './lib';
+import { addMatches } from '../../game/matches';
 
 const dmg = (w: { player: { stats: { damage: number } } }) => w.player.stats.damage;
 const BRASS = ['#5a3a18', '#8a6028', '#c89848', '#f0d080', '#fff4c0'];
@@ -99,16 +100,16 @@ defineArtifact({
   look: { mote: '#c8a060', orbit: '#e8c880' },
   pools: ['treasure', 'shop'],
   stats(m, power, w) {
-    const keys = w?.player?.keys ?? 0;
+    const keys = w?.player?.matches ?? 0;
     m.addStat('damage', Math.min(3, keys * 0.25) * power);
   },
   onAcquire(w, power) {
-    grantPerCopy(w, 'wind_up_key', power, () => { w.player.keys = Math.min(99, w.player.keys + 2); });
+    grantPerCopy(w, 'wind_up_key', power, () => { addMatches(w, 2); });
     w.items.recomputeStats();
   },
   onUpdate(w, _dt, power) {
-    grantPerCopy(w, 'wind_up_key', power, () => { w.player.keys = Math.min(99, w.player.keys + 2); });
-    watch(w, 'wind_up_key', Math.min(12, w.player.keys));
+    grantPerCopy(w, 'wind_up_key', power, () => { addMatches(w, 2); });
+    watch(w, 'wind_up_key', Math.min(12, w.player.matches));
   },
 });
 
@@ -142,12 +143,12 @@ defineArtifact({
   look: { aura: '#f0d080', hit: '#f0d080' },
   pools: ['treasure', 'shop'],
   onAcquire(w, power) {
-    grantPerCopy(w, 'tick_bomb', power, () => { w.player.bombs = Math.min(99, w.player.bombs + 3); });
+    grantPerCopy(w, 'tick_bomb', power, () => { addMatches(w, 3); });
   },
   onUpdate(w, _dt, power) {
-    grantPerCopy(w, 'tick_bomb', power, () => { w.player.bombs = Math.min(99, w.player.bombs + 3); });
+    grantPerCopy(w, 'tick_bomb', power, () => { addMatches(w, 3); });
   },
-  onBomb(w, x, y, power) {
+  onMatch(w, x, y, power) {
     const R = 70 + 10 * (power - 1);
     w.spawn(new RingFx(x, y, R, 0.45, '#f0d080', 2));
     w.sfx('ui_select', { vol: 0.5, pitch: 0.8 });

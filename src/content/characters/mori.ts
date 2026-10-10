@@ -153,7 +153,6 @@ defineCharacter({
   color: '#7ae0d0',
   hearts: 3,
   weapon: 'shepherd_crook',
-  bombs: 1,
   baseStats: {
     moveSpeed: 96,
     damage: 9,

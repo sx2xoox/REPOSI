@@ -5,7 +5,7 @@ import { defineArtifact } from '../../game/defs';
 import type { World } from '../../game/world';
 import { defineDrawnSprite } from '../../engine/sprites';
 import { ramp } from '../../engine/painter';
-import { Bomb, Pickup } from '../../game/pickups';
+import { Pickup } from '../../game/pickups';
 import { TAU } from '../../engine/math';
 import { O, addHitStatus, grantPerCopy, isAttack, roll, rollHit, spawnShards, stackMul, syncFamiliars, watch } from './lib';
 import { MirrorShard } from './familiars';
@@ -83,16 +83,14 @@ defineArtifact({
   look: { mote: '#a080ff', hit: '#ffd040' },
   pools: ['shop', 'treasure'],
   onPickup(w, kind, power) {
-    if (kind !== 'coin' && kind !== 'nickel' && kind !== 'dime') return;
+    if (kind !== 'coin' && kind !== 'coin_string') return;
     const p = w.player;
     const threshold = Math.max(10, 20 - 3 * (power - 1));
-    const value = (kind === 'coin' ? 1 : kind === 'nickel' ? 5 : 10) * Math.max(1, Math.round(p.stats.greed));
+    const value = (kind === 'coin' ? 1 : 4) * Math.max(1, Math.round(p.stats.greed));
     w.vars.__scaleGold = (w.vars.__scaleGold ?? 0) + value;
     while (w.vars.__scaleGold >= threshold) {
       w.vars.__scaleGold -= threshold;
-      const supply = w.vars.__scaleSupply ?? 0;
-      w.spawn(new Pickup(supply % 2 === 0 ? 'bomb' : 'key', p.x, p.y).pop());
-      w.vars.__scaleSupply = supply + 1;
+      w.spawn(new Pickup('match', p.x, p.y).pop());
     }
     w.floatText(p.x, p.y - 24, `보급 ${w.vars.__scaleGold}/${threshold}`, '#ffd040');
     proc(w, 'alchemist_scale');
@@ -439,8 +437,6 @@ defineDrawnSprite('icon_cluster_powder', 16, 16, (p) => {
   p.rect(1, 14, 2, 2, '#3a3a48');
 }, { outline: O });
 
-const bombWatch = new WeakMap<World, Map<Bomb, unknown>>();
-
 defineArtifact({
   id: 'cluster_powder',
   name: '산탄 화약통',
@@ -451,27 +447,15 @@ defineArtifact({
   icon: 'icon_cluster_powder',
   look: { mote: '#ffb040', aura: '#ff7a20' },
   pools: ['treasure', 'shop', 'secret'],
-  onAcquire(w, power) {
-    grantPerCopy(w, 'cluster_powder', power, () => { w.player.bombs = Math.min(99, w.player.bombs + 2); });
-  },
-  onUpdate(w, _dt, power) {
-    grantPerCopy(w, 'cluster_powder', power, () => { w.player.bombs = Math.min(99, w.player.bombs + 2); });
-    let m = bombWatch.get(w);
-    if (!m) bombWatch.set(w, (m = new Map()));
-    for (const e of w.entities) if (e instanceof Bomb && e.owner === 'player' && !e.dead && !m.has(e)) m.set(e, w.room);
-    for (const [b, room] of m) {
-      if (room !== w.room) {
-        m.delete(b);
-        continue;
-      }
-      if (!b.dead) continue;
-      m.delete(b);
-      if (b.fuse > 0) continue;
-      proc(w, 'cluster_powder');
-      spawnShards(w, b.x, b.y - 4, {
-        count: 8 + 2 * (power - 1), damage: dmg(w) * 1.2 + 6, sprite: 'proj_shrapnel', color: '#ffb040', speed: 240, range: 120, radius: 2.5,
-        statuses: [{ kind: 'burn', duration: 2, power: dmg(w) * 0.3 }], spectral: true,
-      });
-    }
+  // interim (bombs removed): a keeper blast that kills throws burning shards; A3 retunes and rewrites the text
+  onHit(w, target, hit, power) {
+    if (hit.kind !== 'explosion' || hit.noProc || hit.attacker !== w.player || target.alive) return;
+    if (w.time - (w.vars.__clusterT ?? -99) < 1) return;
+    w.vars.__clusterT = w.time;
+    proc(w, 'cluster_powder');
+    spawnShards(w, target.x, target.y - 4, {
+      count: 6 + 2 * (power - 1), damage: dmg(w) * 0.9 + 4, sprite: 'proj_shrapnel', color: '#ffb040', speed: 240, range: 120, radius: 2.5,
+      statuses: [{ kind: 'burn', duration: 2, power: dmg(w) * 0.3 }], spectral: true,
+    });
   },
 });

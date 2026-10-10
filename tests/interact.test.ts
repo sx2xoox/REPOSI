@@ -30,14 +30,14 @@ describe('item focus (preview card target)', () => {
     const near = new Pedestal(12, 0, { kind: 'artifact', id });
     const nearer = new Pedestal(0, 8, null); // empty pedestal: nothing to read
     const coin = new Pickup('coin', 0, 3); // free coins are not previewed
-    const shopKey = new Pickup('key', -14, 0);
-    shopKey.price = 5;
+    const shopMatch = new Pickup('match', -14, 0);
+    shopMatch.price = 5;
     const p = { x: 0, y: 0, dead: false, alive: true, previewable: () => false };
-    const w = { player: p, entities: [p, near, nearer, coin, shopKey], transitioning: false, descending: null } as unknown as World;
+    const w = { player: p, entities: [p, near, nearer, coin, shopMatch], transitioning: false, descending: null } as unknown as World;
     expect(findFocus(w)).toBe(near);
     near.x = 20;
-    expect(findFocus(w)).toBe(shopKey);
-    shopKey.dead = true;
+    expect(findFocus(w)).toBe(shopMatch);
+    shopMatch.dead = true;
     near.x = PREVIEW_RANGE + 1;
     expect(findFocus(w)).toBe(null);
     const potion = new Pickup('potion', 0, -10);

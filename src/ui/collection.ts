@@ -177,7 +177,7 @@ export class CollectionScene implements Scene {
       return;
     }
     if (input.pressed('active')) { this.setTab(this.tab - 1); sfx('ui_move'); }
-    if (input.pressed('bomb')) { this.setTab(this.tab + 1); sfx('ui_move'); }
+    if (input.pressed('tabNext')) { this.setTab(this.tab + 1); sfx('ui_move'); }
     const n = this.entries.length;
     const old = this.sel;
     if (n) {

@@ -139,8 +139,7 @@ defineCharacter({
   color: '#e8a060',
   hearts: 5,
   weapon: 'lantern_flail',
-  bombs: 1,
-  keys: 1,
+  matches: 2,
   baseStats: {
     moveSpeed: 80,
     damage: 12,

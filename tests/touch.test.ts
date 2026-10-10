@@ -412,12 +412,12 @@ describe('Input touch API', () => {
   });
   it('a press and release between two steps is not lost', () => {
     const inp = new Input();
-    inp.touchPress('bomb');
-    inp.touchRelease('bomb');
+    inp.touchPress('interact');
+    inp.touchRelease('interact');
     inp.update();
-    expect(inp.pressed('bomb')).toBe(true);
+    expect(inp.pressed('interact')).toBe(true);
     inp.update();
-    expect(inp.held('bomb')).toBe(false);
+    expect(inp.held('interact')).toBe(false);
     inp.touchTap('cancel');
     inp.update();
     expect(inp.pressed('cancel')).toBe(true);

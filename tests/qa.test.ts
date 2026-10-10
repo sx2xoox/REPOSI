@@ -139,7 +139,7 @@ describe('dungeon generation invariants', () => {
 function fakeWorld(): World {
   const noop = () => {};
   const player = {
-    x: 100, y: 100, red: 4, soul: 2, maxRed: 6, coins: 12, keys: 2, bombs: 3, ember: 40, god: false, alive: true,
+    x: 100, y: 100, red: 4, soul: 2, maxRed: 6, coins: 12, matches: 3, ember: 40, god: false, alive: true,
     weaponId: Characters.all()[0].weapon, activeId: null, potionId: null, activeCharge: 0, invuln: 0, dashT: 0, vx: 0, vy: 0, aim: 0, firing: false,
     stats: { ...BASE_STATS }, flags: new Set<string>(), mem: {}, character: Characters.all()[0], inv: { items: [] },
     hurt: () => false, heal: noop, addSoul: noop,

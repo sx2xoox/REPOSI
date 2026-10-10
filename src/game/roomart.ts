@@ -1,4 +1,4 @@
-// Room background art: Isaac-style perspective "box" walls (tall top face, slanted
+// Room background art: perspective "box" walls (tall top face, slanted
 // side faces, a short bottom lip, mitred corners), themed floors with edge shadows,
 // auto-tiled pits (chasm / lava / water / ice / void), obstacles with cast shadows
 // and kind-specific door frames.
@@ -1542,18 +1542,7 @@ export function drawDoor(r: Renderer, room: Room, d: Door, _time: number): void 
     r.sprite(sp.leaf, d.x - OPEN_R * c - s, d.y - OPEN_R * s + c, lo);
     lo.flipX = true;
     r.sprite(sp.leaf, d.x + OPEN_R * c - s, d.y + OPEN_R * s + c, lo);
-    if (d.state === 'locked') r.sprite('__door_lock', d.x + 10 * s, d.y - 10 * c);
   }
   r.sprite(sp.front, d.x, d.y, DOOR_OPTS);
 }
 
-defineDrawnSprite('__door_lock', 9, 11, (p) => {
-  p.ring(4.5, 3.5, 3.5, 1.4, '#b8b8c8');
-  p.px(2, 2, '#e8e8f8');
-  p.rect(0, 4, 9, 7, '#ffcc33');
-  p.shadeVertical(0, 4, 9, 7, ['#8a5a08', '#d09a1a', '#ffcc33', '#ffe680']);
-  p.rect(0, 4, 9, 1, '#fff2b0');
-  p.rect(4, 6, 1, 3, '#3a2a0a');
-  p.px(3, 6, '#3a2a0a');
-  p.px(5, 6, '#3a2a0a');
-}, { outline: '#1a1008' });

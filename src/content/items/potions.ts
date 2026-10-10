@@ -48,7 +48,7 @@ definePotion({
   nature: 'good',
   use(w) {
     w.player.addSoul(2);
-    w.sfx('soul_heart');
+    w.sfx('blue_flame');
     gulp(w, ['#ffffff', '#c8d8ff', '#8ab0ff'], '#8ab0ff');
   },
 });
@@ -145,7 +145,7 @@ definePotion({
     const n = w.rng.int(5, 8);
     const kinds: PickupKind[] = [];
     for (let i = 0; i < n; i++) kinds.push('coin');
-    if (w.rng.chance(0.25 + w.player.stats.luck * 0.03)) kinds.push('nickel');
+    if (w.rng.chance(0.25 + w.player.stats.luck * 0.03)) kinds.push('coin_string');
     popPickups(w, kinds);
     w.sfx('coin');
     w.sfx('chest_open', { vol: 0.5, pitch: 1.3 });
@@ -156,12 +156,12 @@ definePotion({
 definePotion({
   id: 'potion_supply',
   name: '보급 물약',
-  desc: '폭탄 2개와 열쇠 1개가 튀어나온다',
+  desc: '성냥 2개와 동전 꾸러미가 튀어나온다',
   color: '#c08050',
   nature: 'good',
   use(w) {
-    popPickups(w, ['bomb2', 'key']);
-    w.sfx('bomb_pickup', { vol: 0.6 });
+    popPickups(w, ['match', 'match', 'coin_string']);
+    w.sfx('match_pickup', { vol: 0.6 });
     gulp(w, ['#ffffff', '#e0c0a0', '#c08050'], '#e0b080');
   },
 });

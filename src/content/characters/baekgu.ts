@@ -132,7 +132,6 @@ defineCharacter({
   color: '#f0ece0',
   hearts: 2,
   weapon: 'fang_blade',
-  bombs: 1,
   coins: 3,
   baseStats: {
     moveSpeed: 100,

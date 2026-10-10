@@ -38,7 +38,7 @@ export interface Insets {
   b: number;
 }
 
-export type TouchButtonId = 'dash' | 'bomb' | 'active' | 'consumable' | 'special' | 'swap' | 'interact' | 'pause' | 'map' | 'inventory';
+export type TouchButtonId = 'dash' | 'active' | 'consumable' | 'special' | 'swap' | 'interact' | 'pause' | 'map' | 'inventory';
 
 export type TouchScheme = 'auto' | 'twin';
 export const TOUCH_SCHEMES: TouchScheme[] = ['auto', 'twin'];
@@ -48,7 +48,7 @@ export function touchScheme(v: string | undefined): TouchScheme {
   return v === 'twin' ? 'twin' : 'auto';
 }
 
-export const GAME_BUTTONS: TouchButtonId[] = ['dash', 'bomb', 'special', 'active', 'consumable', 'swap', 'interact'];
+export const GAME_BUTTONS: TouchButtonId[] = ['dash', 'special', 'active', 'consumable', 'swap', 'interact'];
 export const SYSTEM_BUTTONS: TouchButtonId[] = ['pause', 'map', 'inventory'];
 
 // ---------------------------------------------------------------- joystick math
@@ -158,12 +158,11 @@ export function computeTouchLayout(view: { w: number; h: number }, safe: Insets,
     attack = { x: cx, y: cy, r: AR };
     rightRest = { x: cx, y: cy };
     const gap = 10 * u;
-    // inner arc (thumb reach): dash left, bomb upper-left, release above
+    // inner arc (thumb reach): dash left, interact upper-left (take / buy / light a match), release above
     const rDash = rad(27);
-    const rBomb = rad(23);
     const rSpec = rad(25);
     place(cx, cy, 'dash', 182, AR + gap + rDash, rDash);
-    place(cx, cy, 'bomb', 135, AR + gap + rBomb, rBomb);
+    place(cx, cy, 'interact', 135, AR + gap + rad(24), rad(24));
     place(cx, cy, 'special', 88, AR + gap + rSpec, rSpec);
     // outer arc: active item + potion (only shown while held)
     const rItem = rad(23);
@@ -174,9 +173,6 @@ export function computeTouchLayout(view: { w: number; h: number }, safe: Insets,
     place(cx, cy, 'swap', 74, outer, rad(22));
     const sw = buttons.swap;
     sw.x = Math.min(sw.x, view.w - r - 6 * u - sw.r);
-    // "줍기" (take the item at the keeper's feet; only shown next to an item): left of dash
-    const rInt = rad(24);
-    place(cx, cy, 'interact', 186, AR + gap + 2 * rDash + gap * 0.8 + rInt, rInt);
   } else {
     rightRest = { x: view.w - r - 26 * u - stickR, y: restY };
     const cx = rightRest.x;
@@ -184,12 +180,11 @@ export function computeTouchLayout(view: { w: number; h: number }, safe: Insets,
     const D = stickR + 42 * u;
     const D2 = D + 50 * u;
     place(cx, cy, 'dash', 180, D, rad(27));
-    place(cx, cy, 'bomb', 136, D, rad(22));
+    place(cx, cy, 'interact', 136, D, rad(24));
     place(cx, cy, 'special', 96, D, rad(24));
     place(cx, cy, 'active', 120, D2, rad(22));
     place(cx, cy, 'consumable', 80, D2, rad(22));
     place(cx, cy, 'swap', 58, D, rad(22));
-    place(cx, cy, 'interact', 194, D2 + 2 * u, rad(24));
   }
 
   // system buttons: a column in the right pillarbox bar when it is wide enough,

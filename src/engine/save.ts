@@ -1,5 +1,6 @@
 // Persistent settings + meta progression in localStorage (fails gracefully).
 import { normalizeStage } from '../game/stage-plan';
+import { normalizeItemId } from '../game/legacy-ids';
 import { speedrunStore } from './speedrun-store';
 
 export interface Settings {
@@ -148,6 +149,12 @@ function write(key: string, value: unknown): void {
   }
 }
 
+/** Old saves: renamed item ids in the collection's seen list (in place; deduplicated). */
+export function migrateProgress(p: Progress): Progress {
+  if (Array.isArray(p.seenItems)) p.seenItems = [...new Set(p.seenItems.map(normalizeItemId))];
+  return p;
+}
+
 export const save = {
   activeSlot: -1,
   slots: (() => {
@@ -159,7 +166,7 @@ export const save = {
     } catch { return Array<SaveSlot | null>(4).fill(null); }
   })(),
   settings: read<Settings>(KEY_SETTINGS, DEFAULT_SETTINGS),
-  progress: read<Progress>(KEY_PROGRESS, DEFAULT_PROGRESS),
+  progress: migrateProgress(read<Progress>(KEY_PROGRESS, DEFAULT_PROGRESS)),
   history: (() => {
     try {
       if (typeof localStorage === 'undefined') return [] as RunRecord[];
@@ -200,7 +207,7 @@ export const save = {
       this.slots[index] = { name: name?.trim().slice(0, 16) || `등불 ${index + 1}`, created: new Date().toISOString(), progress, history };
     }
     this.activeSlot = index;
-    this.progress = this.slots[index]!.progress;
+    this.progress = migrateProgress(this.slots[index]!.progress);
     this.history = this.slots[index]!.history;
     this.progress.campaign ??= newCampaign();
     const checkpoint = this.progress.campaign.checkpoint;

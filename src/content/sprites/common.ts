@@ -5,7 +5,7 @@ import { ramp } from '../../engine/painter';
 
 const O = '#140c1c'; // outline
 
-// ------------------------------------------------------------------ hearts
+// ------------------------------------------------------------------ health
 const HEART = [
   '.rr.rr.',
   'rwrrrrr',
@@ -25,68 +25,204 @@ const HEART_HALF = [
   '...r...',
 ];
 definePixelSprite('hud_heart_full', { r: '#e8283c', w: '#ffb0b8' }, HEART, { outline: O });
-definePixelSprite('hud_heart_half', { r: '#e8283c', w: '#ffb0b8', e: '#3a1820' }, HEART_HALF, { outline: O });
-definePixelSprite('hud_heart_empty', { r: '#3a1820', w: '#4a2830' }, HEART, { outline: O });
-definePixelSprite('hud_soul_full', { r: '#6a8ae8', w: '#d0e0ff' }, HEART, { outline: O });
-definePixelSprite('hud_soul_half', { r: '#6a8ae8', w: '#d0e0ff', e: '#00000000' }, HEART_HALF.map((row) => row.replace(/e/g, '.')), { outline: O });
 
 definePixelSprite('pk_heart', { r: '#e8283c', w: '#ffb0b8' }, HEART, { outline: O });
 definePixelSprite('pk_heart_half', { r: '#e8283c', w: '#ffb0b8' }, HEART_HALF.map((row) => row.replace(/e/g, '.')), { outline: O });
-definePixelSprite('pk_soul', { r: '#7a9af8', w: '#e0ecff' }, HEART, { outline: '#101838' });
-definePixelSprite('pk_soul_half', { r: '#7a9af8', w: '#e0ecff' }, HEART_HALF.map((row) => row.replace(/e/g, '.')), { outline: '#101838' });
 
-// ------------------------------------------------------------------ coins
-function coin(name: string, base: string, size: number): void {
-  defineDrawnSprite(name, size, size, (p) => {
-    const r = size / 2;
-    p.circle(r, r, r, base);
-    p.shadeSphere(r, r, r, r, ramp(base, 4), { dither: false });
-    p.ring(r, r, r - 1.5, 1, ramp(base, 4)[0]);
-    p.px(Math.floor(r - 1), Math.floor(r - 2), '#ffffff');
-  }, { outline: O });
+// ------------------------------------------------------------------ blue flames (푸른 불꽃: burns before health)
+// a cool flame: white-blue core low in the body, a pointed tip that sways
+// between frames and a small side lick; deep blue rim, dark navy outline
+const BLUE = { c: '#e0ecff', b: '#7a9af8', e: '#3050c8' };
+const BLUE_FLAME: string[][] = [
+  [
+    '.....e..',
+    '....eb..',
+    '...ebe..',
+    '..ebbe.e',
+    '..ebbbeb',
+    '.ebbcbbe',
+    '.ebccbbe',
+    'ebcccbbe',
+    'ebcccbe.',
+    '.ebccbe.',
+    '..eeee..',
+  ],
+  [
+    '..e.....',
+    '..be....',
+    '..ebe...',
+    'e.ebbe..',
+    'beebbbe.',
+    'ebbbcbe.',
+    'ebbccbbe',
+    'ebcccbbe',
+    'ebcccbbe',
+    '.ebccbe.',
+    '..eeee..',
+  ],
+  [
+    '....e...',
+    '...ebe..',
+    '...ebe..',
+    '..ebbbe.',
+    '..ebcbe.',
+    '.ebbcbbe',
+    '.ebccbbe',
+    'ebcccbbe',
+    'ebcccbbe',
+    '.ebccbe.',
+    '..eeee..',
+  ],
+];
+const BLUE_FLAME_HALF: string[][] = [
+  ['...e..', '..ebe.', '..ebbe', '.ebcbe', 'ebccbe', 'ebccbe', '.ebbe.', '..ee..'],
+  ['..e...', '.ebe..', 'ebbe..', 'ebcbe.', 'ebccbe', 'ebccbe', '.ebbe.', '..ee..'],
+  ['..e...', '..be..', '.ebbe.', '.ebcbe', 'ebccbe', 'ebccbe', '.ebbe.', '..ee..'],
+];
+for (const [name, frames] of [['pk_blue_flame', BLUE_FLAME], ['pk_blue_flame_half', BLUE_FLAME_HALF]] as const) {
+  frames.forEach((rows, k) => definePixelSprite(`${name}_${k}`, BLUE, rows, { outline: '#101838' }));
+  definePixelSprite(name, BLUE, frames[2], { outline: '#101838' });
+  defineAnim(`${name}_anim`, [0, 1, 2, 1].map((k) => `${name}_${k}`), 7);
 }
-coin('pk_coin', '#f0c030', 6);
-coin('pk_nickel', '#c8d0d8', 7);
-coin('pk_dime', '#f0d870', 8);
-coin('hud_coin', '#f0c030', 7);
 
-// ------------------------------------------------------------------ bombs / keys
-const BOMB = [
-  '....fy',
-  '...f..',
-  '..kkk.',
-  '.kkwkk',
-  '.kwkkk',
-  '.kkkkk',
-  '..kkk.',
-];
-definePixelSprite('pk_bomb', { k: '#3a3448', w: '#8a84a0', f: '#c8a060', y: '#ffe060' }, BOMB, { outline: O });
-definePixelSprite('hud_bomb', { k: '#3a3448', w: '#8a84a0', f: '#c8a060', y: '#ffe060' }, BOMB, { outline: O });
-defineDrawnSprite('pk_bomb2', 11, 8, (p) => {
-  p.circle(3.5, 4.5, 3.5, '#3a3448');
-  p.circle(7.5, 4.5, 3.5, '#3a3448');
-  p.px(2, 3, '#8a84a0');
-  p.px(6, 3, '#8a84a0');
-  p.px(9, 0, '#ffe060');
+// ------------------------------------------------------------------ coins (동전: brass, square hole)
+const BRASS = { g: '#fff0b0', l: '#f0c868', b: '#d8a040', m: '#b0782a', d: '#7a4418' };
+// the hole is left empty: the outline pass fills it dark
+definePixelSprite('pk_coin', BRASS, [
+  '.llbb.',
+  'lgbbbm',
+  'lb..bm',
+  'bb..mm',
+  'bbbmmd',
+  '.bmdd.',
+], { outline: O });
+definePixelSprite('hud_coin', BRASS, [
+  '..llbb..',
+  '.lglbbb.',
+  'llbbbbbm',
+  'lbb..bbm',
+  'lbb..bmm',
+  'bbbbbmmd',
+  '.bbmmmd.',
+  '..mmdd..',
+], { outline: O });
+// 동전 꾸러미: four coins threaded on a red cord, knotted at the end
+const STRUNG_COIN = ['.lbm.', 'lbbbd', 'bbkbd', 'bbbmd', '.mdd.'];
+defineDrawnSprite('pk_coin_string', 12, 8, (p) => {
+  const pal = { ...BRASS, k: '#3a1808' };
+  // back to front: each coin's shaded right rim parts it from the one behind
+  for (const [x, y] of [[6, 2], [4, 1], [2, 2], [0, 1]]) p.stamp(x, y, STRUNG_COIN, pal);
+  // the cord leaves the last coin's hole: a knot and two tails
+  p.px(9, 4, '#c03030');
+  p.rect(10, 3, 2, 2, '#e04040');
+  p.px(10, 3, '#ff8080');
+  p.px(10, 5, '#c03030');
+  p.px(10, 6, '#8a1c1c');
+  p.px(11, 6, '#c03030');
+  p.px(11, 7, '#8a1c1c');
 }, { outline: O });
-defineDrawnSprite('bomb_placed', 10, 11, (p) => {
-  p.circle(5, 6.5, 4.5, '#3a3448');
-  p.shadeSphere(5, 6.5, 4.5, 4.5, ['#1a1428', '#2a2438', '#3a3448', '#5a5470', '#8a84a0']);
-  p.rect(4, 1, 2, 2, '#5a5470');
-  p.px(6, 0, '#c8a060');
-  p.px(7, 0, '#ffe060');
-}, { outline: O, origin: [5, 8] });
-const KEY = [
-  '.yyy.',
-  'yy.yy',
-  '.yyy.',
-  '..y..',
-  '..yy.',
-  '..y..',
-  '..yy.',
+
+// ------------------------------------------------------------------ matches (성냥)
+const MATCH = { w: '#e8d0a0', s: '#b89060', r: '#c03a2a', h: '#ff8a60', d: '#7a2018' };
+definePixelSprite('pk_match', MATCH, [
+  '.hr.',
+  'hrrd',
+  'rrrd',
+  '.dd.',
+  '.ws.',
+  '.ws.',
+  '.ws.',
+  '.ws.',
+  '.ws.',
+  '.ws.',
+  '.ss.',
+], { outline: O });
+// 성냥갑: a small brown box, red label with a flame mark, dark striker strip, two heads peeking out
+definePixelSprite('pk_matchbox', { ...MATCH, b: '#a06a3a', t: '#c89058', k: '#6a4020', L: '#b02a20', y: '#ffd060', x: '#3a2420', g: '#6a5040' }, [
+  '..hr.hr...',
+  '..ws.ws...',
+  'tttttttttt',
+  'bLLLyLLLLk',
+  'bLLyyyLLLk',
+  'xgxxxgxxgx',
+  'kkkkkkkkkk',
+], { outline: O });
+definePixelSprite('hud_match', MATCH, [
+  '.....hr.',
+  '....hrrd',
+  '....rrd.',
+  '...ws...',
+  '..ws....',
+  '.ws.....',
+  'ws......',
+  's.......',
+], { outline: O });
+
+// ------------------------------------------------------------------ wax seals (봉인: sealed doors and chests)
+const WAX = { r: '#c02a2a', h: '#ff6050', s: '#7a1414', d: '#8a1a1a' };
+const SEAL = [
+  '.rhr.',
+  'rhrrr',
+  'rrsrr',
+  'rrrrd',
+  '.rdd.',
 ];
-definePixelSprite('pk_key', { y: '#e8c050' }, KEY, { outline: O });
-definePixelSprite('hud_key', { y: '#e8c050' }, KEY, { outline: O });
+definePixelSprite('seal_wax', WAX, SEAL, { outline: '#3a0a0a' });
+// the sealed chest's overlay (same canvas and origin as the chest sprite): cords over the lid to a wax seal
+defineDrawnSprite('chest_seal', 32, 32, (p) => {
+  p.line(9, 9, 23, 25, '#8a2020');
+  p.line(23, 9, 9, 25, '#8a2020');
+  p.px(9, 9, '#c04040');
+  p.px(23, 9, '#c04040');
+  p.rect(13, 15, 7, 5, '#3a0a0a');
+  p.rect(14, 14, 5, 7, '#3a0a0a');
+  p.stamp(14, 15, SEAL, WAX);
+}, { origin: [16, 22] });
+// card icon of a sealed door / chest: crossed red cords and the wax seal
+defineDrawnSprite('icon_seal', 16, 16, (p) => {
+  p.line(1, 2, 14, 13, '#8a2020');
+  p.line(14, 2, 1, 13, '#8a2020');
+  p.line(1, 3, 13, 14, '#5a1010');
+  p.line(14, 3, 2, 14, '#5a1010');
+  p.circle(7.5, 7.5, 4.2, WAX.r);
+  p.shadeSphere(7.5, 7.5, 4.2, 4.2, ['#5a0a0a', WAX.d, WAX.r, '#e04040', WAX.h], { dither: false });
+  // the stamp: a tiny lantern
+  p.rect(7, 5, 2, 1, WAX.s);
+  p.rect(6, 6, 4, 3, WAX.s);
+  p.px(7, 7, '#e04040');
+  p.px(8, 7, '#e04040');
+  p.rect(7, 9, 2, 1, WAX.s);
+}, { outline: O });
+// the cold iron lamp hung in a sealed doorway (lit: warm glass, a flame drawn inside)
+const LAMP = [
+  '...k...',
+  '..kmk..',
+  '.kmmmk.',
+  '.khkgk.',
+  '.kgkgk.',
+  '.kgkgk.',
+  '.kmmmk.',
+  '..kmk..',
+  '...k...',
+];
+definePixelSprite('seal_lamp', { k: '#2a2630', m: '#6a6474', g: '#3a3048', h: '#6a6080' }, LAMP, { outline: O, origin: [3, 0] });
+definePixelSprite('seal_lamp_lit', { k: '#3a3440', m: '#8a8494', g: '#ffc870', h: '#fff0b0' }, LAMP, { outline: O, origin: [3, 0] });
+
+// ------------------------------------------------------------------ misc
+// death screen icon for blasts
+defineDrawnSprite('ui_blast', 12, 12, (p) => {
+  const pts: number[] = [];
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2 - Math.PI / 2;
+    const r = i % 2 ? 2.6 : 5.8;
+    pts.push(5.5 + Math.cos(a) * r, 5.5 + Math.sin(a) * r);
+  }
+  p.poly(pts, '#ff9a30');
+  p.circle(5.5, 5.5, 2.8, '#ffd060');
+  p.circle(5, 5, 1.4, '#fff8d0');
+  p.px(9, 2, '#ffe080');
+  p.px(2, 9, '#c04010');
+}, { outline: O });
 
 definePixelSprite('hud_ember', { f: '#ff8a30', y: '#ffe080', r: '#c03810' }, [
   '..f..',

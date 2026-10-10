@@ -95,7 +95,7 @@ function botMain(opts) {
     opts, done: false, outcome: null, events: [], shotReq: null, paused: false, stop: false,
     floors: [], samples: [], cost: [], nan: 0, lastDir: { x: 0, y: 0 }, tickN: 0,
     tried: new Map(), failed: new Set(), roomKey: '', roomEnterT: 0, progressT: 0, progressSig: '',
-    closedT: -1, wallT: -1, bombPlan: null, secretTried: new Set(), unreach: new Set(), deadT: -1, wonT: -1,
+    closedT: -1, wallT: -1, lightPlan: null, unreach: new Set(), deadT: -1, wonT: -1,
     curFloor: 0, floorStartT: 0, floorWall: 0, chargeT: 0, retreat: null, trapOffT: -1, pausedT: -1, lastSample: -99,
     fallbacks: 0,
   };
@@ -114,8 +114,8 @@ function botMain(opts) {
   // room: clear time vs enemy HP; per boss: fight duration. With `immortal` the
   // keeper takes real hits (invuln frames, shields, dodge) but is topped up
   // instead of dying, so later floors still get measured ("wouldDie" counts it).
-  const BAL = (B.bal = { floors: [], rooms: [], bosses: [], wouldDie: 0 });
-  const bal = { room: null, boss: null, lastRel: 0, relT: -99, hooked: null, debt: 0 };
+  const BAL = (B.bal = { floors: [], rooms: [], bosses: [], stages: [], wouldDie: 0 });
+  const bal = { room: null, boss: null, lastRel: 0, relT: -99, hooked: null, debt: 0, stage: null, matches: -1, used: -1, secrets: -1 };
   const estDps = (s) => Math.max(0, s.damage) * Math.max(0, s.fireRate) * (1 + Math.max(0, s.critChance) * Math.max(0, s.critMult - 1))
     * (1 + Math.max(0, s.shots - 1) * 0.7) * (1 + Math.min(3, Math.max(0, s.pierce)) * 0.12);
   function balFloor(w) {
@@ -169,9 +169,53 @@ function botMain(opts) {
       return ok;
     };
   }
+  /**
+   * What a match target is (duck-typed: a dist build mangles class names): a sealed
+   * door's lamp sits by a 'locked' door, a cold sconce by a 'hidden' one; any other
+   * world fixture with a `lit` flag and an interaction is a stone lantern.
+   */
+  const targetKinds = new WeakMap();
+  function matchTargetKind(e) {
+    if (typeof e.lit !== 'boolean' || typeof e.interact !== 'function') return null;
+    let k = targetKinds.get(e);
+    if (!k) targetKinds.set(e, (k = !e.door ? 'lantern' : e.door.state === 'hidden' ? 'sconce' : 'seal'));
+    return k;
+  }
+  /** Per stage: matches held at the start, gained, spent; seals / lanterns / sconces seen and lit; secrets by cause. */
+  function balStage(w) {
+    const p = w.player;
+    const key = `${w.run.floor}-${w.run.stage}`;
+    if (!bal.stage || bal.stage.key !== key) {
+      bal.stage = { key, floor: w.run.floor, stage: w.run.stage, start: p.matches, gained: 0, spent: 0, seals: new Set(), sealsLit: new Set(), lanterns: new Set(), lanternsLit: new Set(), sconces: new Set(), sconcesLit: new Set(), secrets: { match: 0, release: 0, blast: 0 } };
+      BAL.stages.push(bal.stage);
+      bal.matches = p.matches;
+      bal.used = w.run.stats.matchesUsed ?? 0;
+      bal.secrets = w.run.stats.secretsFound;
+    }
+    const st = bal.stage;
+    const used = w.run.stats.matchesUsed ?? 0;
+    const struck = used !== bal.used;
+    if (struck) { st.spent += used - bal.used; bal.used = used; }
+    if (p.matches > bal.matches) st.gained += p.matches - bal.matches;
+    bal.matches = p.matches;
+    for (const e of w.entities) {
+      const k = matchTargetKind(e);
+      if (!k) continue;
+      const id = `${w.node.id}:${e.id}`;
+      const [seen, lit] = k === 'seal' ? [st.seals, st.sealsLit] : k === 'sconce' ? [st.sconces, st.sconcesLit] : [st.lanterns, st.lanternsLit];
+      seen.add(id);
+      if (e.lit) lit.add(id);
+    }
+    if (w.run.stats.secretsFound > bal.secrets) {
+      const n = w.run.stats.secretsFound - bal.secrets;
+      bal.secrets = w.run.stats.secretsFound;
+      st.secrets[struck ? 'match' : w.time - bal.relT < 1 ? 'release' : 'blast'] += n;
+    }
+  }
   function balTick(w) {
     if (!w.player) return;
     balHook(w);
+    balStage(w);
     const f = balFloor(w);
     if (w.run.stats.releases !== bal.lastRel) {
       bal.lastRel = w.run.stats.releases; bal.relT = w.time; f.releases++;
@@ -414,8 +458,8 @@ function botMain(opts) {
         if (e.heartPrice > 0 && (!opts.god || p.maxRed < e.heartPrice * 2 + 2)) continue;
         out.push({ e, x: e.x, y: e.y, kind: 'pedestal', ped: true });
       } else if (isChest(e)) {
-        if (e.opened || (e.locked && p.keys <= 0)) continue;
-        out.push({ e, x: e.x, y: e.y, kind: 'chest' });
+        if (e.opened || (e.locked && p.matches <= 0)) continue;
+        out.push({ e, x: e.x, y: e.y, kind: e.locked ? 'chest:sealed' : 'chest' });
       } else if (isAltar(e)) {
         if (e.state !== 'idle') continue;
         out.push({ e, x: e.x, y: e.y - 4, kind: 'altar' });
@@ -444,7 +488,7 @@ function botMain(opts) {
         if (prev.has(nd.to)) continue;
         const t = nodes[nd.to];
         if (nd.secret && !(nd.revealed || nodes[id].kind === 'secret' || (id === cur.id && revealedDoor(w, nd)))) continue;
-        if (t.locked && p.keys <= 0) continue;
+        if (t.locked && p.matches <= 0) continue;
         if (B.failed.has('node' + t.id)) continue;
         // never path *through* the boss room
         if (nodes[id].kind === 'boss' && id !== cur.id) continue;
@@ -500,7 +544,7 @@ function botMain(opts) {
     for (const e of w.entities) if (e.persistent && !e.dead && !(e.opened || e.used || ('item' in e && !e.item))) loot++;
     // (immortal: lent soul hearts change HP on every hit, which is no progress)
     const hpSig = opts.immortal ? '' : `${p.red}|${p.soul}`;
-    const sig = `${w.run.floor}|${w.node.id}|${w.enemies.length}|${p.coins}|${p.keys}|${p.bombs}|${p.inv?.items?.length}|${loot}|${hpSig}|${p.weaponId}|${p.activeId}`;
+    const sig = `${w.run.floor}|${w.node.id}|${w.enemies.length}|${p.coins}|${p.matches}|${p.inv?.items?.length}|${loot}|${hpSig}|${p.weaponId}|${p.activeId}`;
     if (hp < B.lastHp - 0.5 || w.enemies.length === 0) B.dmgT = w.time;
     if (sig !== B.progressSig || hp < B.lastHp - 0.5) {
       B.progressSig = sig;
@@ -534,7 +578,6 @@ function botMain(opts) {
       B.curFloor = w.run.floor;
       B.floorStartT = w.time;
       B.floorWall = performance.now();
-      B.secretTried.clear();
       B.failed.clear();
       ev('floor', { seed: w.run.seed });
       B.shotReq = `floor${w.run.floor}`;
@@ -575,7 +618,7 @@ function botMain(opts) {
       B.roomKey = roomKey;
       B.roomEnterT = w.time;
       B.closedT = -1;
-      B.bombPlan = null;
+      B.lightPlan = null;
       B.retreat = null;
       B.trapOffT = -1;
     }
@@ -676,7 +719,6 @@ function botMain(opts) {
       if (p.ember >= 100) input.touchTap('special');
       if (p.activeId && B.tickN % 90 === 0) input.touchTap('active');
       if (p.potionId && Math.random() < 0.002) input.touchTap('consumable');
-      if (opts.god && p.bombs > 3 && Math.random() < 0.002) input.touchTap('bomb');
     } else if (B.retreat && w.time < B.retreat.until) {
       move = navTo(w, B.retreat.x, B.retreat.y, true) ?? { x: 0, y: 0 };
       B.obj = 'retreat';
@@ -692,7 +734,13 @@ function botMain(opts) {
         }
       }
       const trap = w.entities.find((e) => isTrapdoor(e) && !e.dead);
-      const hidden = w.room.doors.find((d) => d.state === 'hidden');
+      // match targets worth a match: sealed doors and cold sconces always, stone lanterns with two or more in hand
+      const lockdown = w.room.doors.some((d) => d.state === 'closed');
+      const light = lockdown || p.matches <= 0 ? null : w.entities.find((e) => {
+        if (e.dead || B.failed.has(e.id) || B.unreach.has(e.id)) return false;
+        const k = matchTargetKind(e);
+        return k && !e.lit && (k !== 'lantern' || p.matches >= 2);
+      });
       if (loot.length) {
         const l = loot[0];
         const key = l.ped ? 'ped' + l.e.id : l.e.id;
@@ -720,17 +768,21 @@ function botMain(opts) {
           if (l.e.item) B.retreat = { x: w.room.centerX, y: w.room.centerY + 30, until: w.time + 0.8 };
         }
         if (l.ped && d < 14 && B.tried.get(key) !== 'done' && l.e.item == null) B.tried.set(key, 'done');
-      } else if (hidden && p.bombs > 0 && !B.secretTried.has(B.roomKey + hidden.dir + hidden.x)) {
-        // bomb the hidden secret door
-        const v = DV[hidden.dir];
-        const gx = hidden.x - v.x * 10, gy = hidden.y - v.y * 10;
-        B.obj = 'bomb-secret';
-        if (hyp(gx - p.x, gy - p.y) < 8) {
-          input.touchTap('bomb');
-          B.secretTried.add(B.roomKey + hidden.dir + hidden.x);
-          B.retreat = { x: w.room.centerX, y: w.room.centerY, until: w.time + 2.6 };
-          ev('bomb-secret', { dir: hidden.dir });
-        } else move = navTo(w, gx, gy, !opts.god) ?? (B.secretTried.add(B.roomKey + hidden.dir + hidden.x), { x: 0, y: 0 });
+        // a sealed chest opens with a match, struck through interact while it is the focus
+        if (l.kind === 'chest:sealed' && d < 12 && typeof rec === 'object' && !rec.tapped && w.focus === l.e) {
+          rec.tapped = true;
+          input.touchTap('interact');
+        }
+      } else if (light) {
+        // strike a match at a sealed door's lamp, a cold sconce (secret room) or a stone lantern
+        const kind = matchTargetKind(light);
+        B.obj = 'light:' + kind; B.objId = light.id;
+        const plan = B.lightPlan?.id === light.id ? B.lightPlan : (B.lightPlan = { id: light.id, t0: w.time, tapped: -1 });
+        const d = hyp(light.x - p.x, light.y - p.y);
+        if (w.focus === light && d < 20) {
+          if (plan.tapped < 0 || w.time - plan.tapped > 1.5) { plan.tapped = w.time; input.touchTap('interact'); ev('light', { what: kind }); }
+        } else move = navTo(w, light.x, light.y, !opts.god) ?? (B.unreach.add(light.id), { x: 0, y: 0 });
+        if (w.time - plan.t0 > 10) { B.failed.add(light.id); B.lightPlan = null; }
       } else if (trap) {
         B.obj = 'trapdoor';
         const d = hyp(trap.x - p.x, trap.y - p.y);
@@ -805,7 +857,15 @@ function botMain(opts) {
       room: w?.node.kind, hp: w ? `${w.player.red}+${w.player.soul}/${w.player.maxRed}` : '',
     };
   };
-  B.summary = () => ({ outcome: B.outcome, death: B.death, floors: B.floors, samples: B.samples, cost: B.cost, fallbacks: B.fallbacks, balance: B.bal });
+  B.summary = () => ({
+    outcome: B.outcome, death: B.death, floors: B.floors, samples: B.samples, cost: B.cost, fallbacks: B.fallbacks,
+    // (Sets do not survive the trip out of the page: counts)
+    balance: { ...B.bal, stages: B.bal.stages.map((st) => ({
+      floor: st.floor, stage: st.stage, start: st.start, gained: st.gained, spent: st.spent,
+      seals: st.seals.size, sealsLit: st.sealsLit.size, lanterns: st.lanterns.size, lanternsLit: st.lanternsLit.size,
+      sconces: st.sconces.size, sconcesLit: st.sconcesLit.size, secrets: st.secrets,
+    })) },
+  });
   loop();
 }
 /* eslint-enable */
@@ -866,7 +926,7 @@ async function runOne(browser, spec) {
       curFloor = st.floor ?? curFloor;
       for (const e of st.events) {
         res.events.push(e);
-        if (e.type !== 'floor' && e.type !== 'bomb-secret') console.log(`[${spec.name}] ${e.type} f${e.floor} ${e.room}#${e.roomId} ${e.template ?? ''} ${JSON.stringify(e).slice(0, 300)}`);
+        if (e.type !== 'floor' && e.type !== 'light') console.log(`[${spec.name}] ${e.type} f${e.floor} ${e.room}#${e.roomId} ${e.template ?? ''} ${JSON.stringify(e).slice(0, 300)}`);
       }
       if (st.shotReq) {
         const file = `${String(res.shots.length).padStart(2, '0')}-${st.shotReq}.png`;
@@ -1174,11 +1234,27 @@ function balanceReport(runs) {
   });
   console.log('\n[qa] BALANCE (median room / boss seconds, without fallbacks; taken in half-hearts)');
   console.table(rows);
+  // matches per stage: held at the stage start (median), gained / spent (avg), seals opened / seen, lanterns lit, secrets by cause
+  const stageKeys = [...new Set(runs.flatMap((r) => (r.balance.stages ?? []).map((s) => `${s.floor}-${s.stage}`)))]
+    .sort((a, b) => { const [fa, sa] = a.split('-').map(Number); const [fb, sb] = b.split('-').map(Number); return fa - fb || sa - sb; });
+  const matchRows = stageKeys.map((key) => {
+    const ss = runs.flatMap((r) => (r.balance.stages ?? []).filter((s) => `${s.floor}-${s.stage}` === key));
+    const sum = (f) => ss.reduce((t, s) => t + f(s), 0);
+    return {
+      stage: key, runs: ss.length, heldAtStart: med(ss.map((s) => s.start)), gained: +f1(avg(ss.map((s) => s.gained))), spent: +f1(avg(ss.map((s) => s.spent))),
+      seals: `${sum((s) => s.sealsLit)}/${sum((s) => s.seals)}`, lanterns: `${sum((s) => s.lanternsLit)}/${sum((s) => s.lanterns)}`, sconces: `${sum((s) => s.sconcesLit)}/${sum((s) => s.sconces)}`,
+      secretsMatch: sum((s) => s.secrets.match), secretsRelease: sum((s) => s.secrets.release), secretsBlast: sum((s) => s.secrets.blast),
+    };
+  });
+  if (matchRows.length) {
+    console.log('\n[qa] MATCHES per stage (held at start = median; gained / spent = average; lit / seen summed over runs)');
+    console.table(matchRows);
+  }
   for (const r of runs) {
     const b = r.balance.bosses.map((x) => `f${x.floor} ${x.id} ${x.dur}s hp${x.hp} rel${Math.round((100 * x.relDmg) / Math.max(1, x.allDmg))}% taken${x.taken}${x.fallback ? ' (fallback)' : ''}`).join(' | ');
     console.log(`  ${r.name}: ${b}`);
   }
-  writeFileSync(join(out, 'balance.json'), JSON.stringify({ rows, runs: runs.map((r) => ({ name: r.name, balance: r.balance })) }, null, 1));
+  writeFileSync(join(out, 'balance.json'), JSON.stringify({ rows, matchRows, runs: runs.map((r) => ({ name: r.name, balance: r.balance })) }, null, 1));
 }
 const bad = all.some((r) => r.crash || (r.consoleErrors?.length ?? 0) > 0 || (r.lkErrors?.length ?? 0) > 0 || r.checks?.checks?.some((c) => !c.ok));
 process.exit(bad ? 1 : 0);

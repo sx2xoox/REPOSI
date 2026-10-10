@@ -29,7 +29,9 @@ import { RunState } from './run';
 import type { BossSplit } from './speedrun';
 import { roomHandler } from './roomkinds';
 import { DamageNumber, DoorClearGlow, FloatingText, RingFx } from './effects';
-import { Bomb, Chest, FirePlace, Pedestal, Pickup, Trapdoor, itemInfo, type PedestalItem, type PickupKind } from './pickups';
+import { Chest, FirePlace, Pedestal, Pickup, Trapdoor, itemInfo, type PedestalItem, type PickupKind } from './pickups';
+import { MATCH_CAP, addMatches } from './matches';
+import { SealLamp } from './seal-lamp';
 import { Tile } from './tiles';
 import { findFocus } from './interact';
 import { roomBaseJob } from './roomart';
@@ -173,7 +175,7 @@ export class World {
   private camInit = false;
   /** minimap / UI dirty counter */
   mapVersion = 0;
-  /** free-form per-run flags for content (e.g. "devilDealTaken") */
+  /** free-form per-run flags for content */
   flags = new Set<string>();
   private noVars: Record<string, number> = {};
   /**
@@ -346,8 +348,9 @@ export class World {
 
   /**
    * Create the keepers and enter floor 1. `coop`: an online party (same seed and
-   * roster on every peer, `localSlot` = this peer's keeper): coins / bombs / keys
-   * become one shared purse (the characters' starting amounts added up).
+   * roster on every peer, `localSlot` = this peer's keeper): coins / matches
+   * become one shared purse (the characters' starting amounts added up; matches
+   * up to the purse's cap).
    */
   startParty(members: PartyMember[], localSlot: number, coop = true): void {
     const prevIds = useEntityIds(this.ids);
@@ -361,7 +364,7 @@ export class World {
   private startParty1(members: PartyMember[], localSlot: number, coop: boolean): void {
     const sorted = [...members].sort((a, b) => a.slot - b.slot);
     const purse = new Purse();
-    purse.bombs = 0;
+    purse.matches = 0;
     this.coop = coop;
     this.players = sorted.map((m) => {
       const p = new Player(Characters.must(m.characterId));
@@ -379,12 +382,10 @@ export class World {
       p.soul = (ch.soulHearts ?? 0) * 2;
       if (coop) {
         purse.coins += ch.coins ?? 0;
-        purse.bombs += ch.bombs ?? 1;
-        purse.keys += ch.keys ?? 0;
+        purse.matches = Math.min(MATCH_CAP, purse.matches + (ch.matches ?? 1));
       } else {
         p.coins = ch.coins ?? 0;
-        p.bombs = ch.bombs ?? 1;
-        p.keys = ch.keys ?? 0;
+        p.matches = Math.min(MATCH_CAP, ch.matches ?? 1);
       }
       this.items.recompute();
       for (const a of ch.artifacts ?? []) this.items.give(a);
@@ -539,6 +540,7 @@ export class World {
       room.theme.decorate?.(this, new RNG(node.seed ^ 0x77));
       handler?.populate?.(this, room, rng);
       this.spawnTemplateMarkers(room, rng);
+      this.spawnRoomFixtures(room);
     }
     let hostile = false;
     if (!node.cleared) {
@@ -648,10 +650,17 @@ export class World {
         case 'f': this.spawn(new FirePlace(m.x, m.y, rng.chance(0.08 * this.floor.index))); break;
         case 'c': this.spawn(new Pickup('coin', m.x, m.y)); break;
         case 'h': this.spawn(new Pickup('heart', m.x, m.y)); break;
-        case 'k': this.spawn(new Pickup('key', m.x, m.y)); break;
-        case 'b': this.spawn(new Pickup('bomb', m.x, m.y)); break;
       }
     }
+  }
+
+  /**
+   * Match targets fixed to the room, spawned once on its first visit (after the
+   * template markers, before the enemies) and kept with the room: one SealLamp
+   * per sealed door, in door order.
+   */
+  private spawnRoomFixtures(room: Room): void {
+    for (const d of room.doors) if (d.state === 'locked') this.spawn(new SealLamp(d));
   }
 
   /** Enemy pool for the current floor: id -> weight. */
@@ -667,7 +676,7 @@ export class World {
     const markers = room.markers.filter((m) => m.ch === 'e' || m.ch === 'E');
     const pool = Object.entries(this.enemyPool()).map(([id, w]) => ({ def: Enemies.get(id)!, w })).filter((x) => x.def);
     if (!pool.length || (!markers.length && room.node.kind !== 'normal')) return false;
-    // choose 1-3 enemy types for this room (Isaac rooms are themed)
+    // rooms use 1–3 enemy types
     const types: typeof pool = [];
     const nTypes = rng.int(1, Math.min(3, pool.length));
     for (let i = 0; i < nTypes; i++) {
@@ -1435,9 +1444,9 @@ export class World {
     const friendly = o.byPlayer !== false && !(o.source instanceof Enemy);
     for (const pl of this.coop ? this.players : [p]) {
       if (this.coop && friendly && pl !== p) continue;
-      if ((o.hurtsPlayer ?? true) && !pl.flags.has('bombImmune') && dist(x, y, pl.x, pl.y) < radius + pl.r - 4) {
+      if ((o.hurtsPlayer ?? true) && !pl.flags.has('blastImmune') && dist(x, y, pl.x, pl.y) < radius + pl.r - 4) {
         // enemy blasts (e.g. bursting bloaters) name their owner on the death screen
-        // enemy blasts scale with the floor's enemy damage; the keeper's own bombs do not
+        // enemy blasts scale with the floor's enemy damage; the keeper's own blasts do not
         if (pl.hurt(this, 2, o.source instanceof Enemy ? o.source.def.name : '폭발', !(o.source instanceof Enemy), { x, y })) {
           const d = dist(x, y, pl.x, pl.y) || 1;
           pl.knock((pl.x - x) / d, (pl.y - y) / d, 240);
@@ -1445,7 +1454,7 @@ export class World {
       }
     }
     for (const e of this.entities) {
-      if (e instanceof Pickup || e instanceof Bomb) {
+      if (e instanceof Pickup) {
         const d = dist(x, y, e.x, e.y);
         if (d < radius * 1.5 && d > 0.1) {
           e.vx += ((e.x - x) / d) * 160;
@@ -1460,7 +1469,7 @@ export class World {
           const cx = (tx + 0.5) * TILE;
           const cy = (ty + 0.5) * TILE;
           if (dist(x, y, cx, cy) > r + 6) continue;
-          this.room.destroyTile(this, tx, ty, 'bomb');
+          this.room.destroyTile(this, tx, ty, 'bomb'); // A2: cause 'blast'
         }
       }
       // secret doors
@@ -1497,8 +1506,7 @@ export class World {
       const r = this.rng.next();
       if (r < 0.25) this.spawn(new Pickup('coin', cx, cy).pop());
       else if (r < 0.31) this.spawn(new Pickup('heart_half', cx, cy).pop());
-      else if (r < 0.34) this.spawn(new Pickup('bomb', cx, cy).pop());
-      else if (r < 0.36) this.spawn(new Pickup('key', cx, cy).pop());
+      else if (r < 0.35) this.spawn(new Pickup('match', cx, cy).pop());
     } else {
       this.sfx('rock_break', { vol: 0.8, x: cx });
       this.particles.burst(cx, cy, { count: 18, speed: [40, 140], life: [0.4, 0.9], colors: pal.rock, size: [1, 3], gravity: 300, vz: [60, 150], shape: 'square', vrot: 8, bounce: 0.3 });
@@ -1506,12 +1514,12 @@ export class World {
       if (t === Tile.TINTED) {
         const r = this.rng.next();
         if (r < 0.4) { for (let i = 0; i < 3; i++) this.spawn(new Pickup('coin', cx, cy).pop()); }
-        else if (r < 0.65) this.spawn(new Pickup('soul_heart', cx, cy).pop());
-        else if (r < 0.85) { this.spawn(new Pickup('bomb', cx, cy).pop()); this.spawn(new Pickup('key', cx, cy).pop()); }
+        else if (r < 0.65) this.spawn(new Pickup('blue_flame', cx, cy).pop());
+        else if (r < 0.85) { this.spawn(new Pickup('match', cx, cy).pop()); this.spawn(new Pickup('match', cx, cy).pop()); }
         else this.spawn(new Chest(cx, cy, false));
         this.sfx('secret_found', { vol: 0.6, x: cx });
       } else if (t === Tile.SKULL_ROCK && this.rng.chance(0.3)) {
-        this.spawn(new Pickup('soul_half', cx, cy).pop());
+        this.spawn(new Pickup('blue_flame_half', cx, cy).pop());
       }
     }
   }
@@ -1527,10 +1535,10 @@ export class World {
     const luck = this.player.stats.luck;
     const kinds: [PickupKind | 'chest' | 'potion' | null, number][] =
       table === 'room'
-        ? [[null, Math.max(10, 38 - luck * 3)], ['coin', 22], ['heart_half', 6], ['heart', 6], ['bomb', 9], ['key', 9], ['chest', 4], ['potion', 3], ['soul_heart', 2], ['nickel', 1]]
+        ? [[null, Math.max(10, 38 - luck * 3)], ['coin', 25], ['coin_string', 2], ['heart_half', 6], ['heart', 6], ['match', 12], ['chest', 5], ['potion', 3], ['blue_flame', 3]]
         : table === 'chest'
-          ? [['coin', 30], ['nickel', 6], ['heart', 10], ['bomb', 12], ['key', 12], ['soul_heart', 6], ['potion', 8], ['bomb2', 4]]
-          : [['coin', 40], ['heart_half', 15], ['bomb', 12], ['key', 12], ['soul_half', 6], ['heart', 6]];
+          ? [['coin', 34], ['coin_string', 7], ['heart', 11], ['match', 14], ['matchbox', 3], ['blue_flame', 7], ['potion', 10]]
+          : [['coin', 46], ['heart_half', 16], ['match', 12], ['blue_flame_half', 7], ['heart', 8]];
     const pick = rng.weighted(kinds, (k) => k[1]);
     if (!pick || pick[0] === null) return;
     const k = pick[0];
@@ -1552,8 +1560,8 @@ export class World {
     const p = this.player;
     const s = p.stats;
     switch (pk.kind) {
-      case 'coin': case 'nickel': case 'dime': {
-        const v = (pk.kind === 'coin' ? 1 : pk.kind === 'nickel' ? 5 : 10) * Math.max(1, Math.round(s.greed));
+      case 'coin': case 'coin_string': {
+        const v = (pk.kind === 'coin' ? 1 : 4) * Math.max(1, Math.round(s.greed));
         p.coins = Math.min(999, p.coins + v);
         this.run.stats.coinsCollected += v;
         playSfx('coin', { pitch: pk.kind === 'coin' ? 1 : 0.85 });
@@ -1562,11 +1570,10 @@ export class World {
       }
       case 'heart_half': p.heal(1); playSfx('heart'); break;
       case 'heart': p.heal(2); playSfx('heart'); break;
-      case 'soul_heart': p.addSoul(2); playSfx('soul_heart'); break;
-      case 'soul_half': p.addSoul(1); playSfx('soul_heart'); break;
-      case 'bomb': p.bombs = Math.min(99, p.bombs + 1); playSfx('bomb_pickup'); break;
-      case 'bomb2': p.bombs = Math.min(99, p.bombs + 2); playSfx('bomb_pickup'); break;
-      case 'key': p.keys = Math.min(99, p.keys + 1); playSfx('key'); break;
+      case 'blue_flame': p.addSoul(2); playSfx('blue_flame'); break;
+      case 'blue_flame_half': p.addSoul(1); playSfx('blue_flame'); break;
+      case 'match': addMatches(this, 1); playSfx('match_pickup'); break;
+      case 'matchbox': addMatches(this, 3); playSfx('match_pickup'); break;
       case 'potion': {
         if (p.potionId) {
           const old = new Pickup('potion', p.x, p.y).pop();
@@ -1608,7 +1615,7 @@ export class World {
       playSfx('no_money');
       if (!ped.mem.t || this.time - ped.mem.t > 0.6) {
         ped.mem.t = this.time;
-        this.floatText(ped.x, ped.y - 24, ped.price > 0 && p.coins < ped.price ? '코인 부족' : '체력 부족', '#ff7070');
+        this.floatText(ped.x, ped.y - 24, ped.price > 0 && p.coins < ped.price ? '동전 부족' : '체력 부족', '#ff7070');
       }
       ped.mem.denyT = this.time;
       return false;
@@ -1627,9 +1634,6 @@ export class World {
       this.run.stats.coinsSpent += ped.price;
       playSfx('buy');
     }
-    if (ped.heartPrice > 0) {
-      this.flags.add('devilDeal');
-    }
     ped.item = null;
     const info = itemInfo(it);
     this.run.stats.itemsTaken++;
@@ -1639,9 +1643,11 @@ export class World {
         this.items.give(it.id);
         break;
       case 'active': {
-        const old = p.setActive(it.id, this);
+        // the active put down keeps its charge (swapping two actives never refills either)
+        const oldCharge = p.activeCharge;
+        const old = p.setActive(it.id, this, it.charge);
         if (old) {
-          ped.item = { kind: 'active', id: old };
+          ped.item = { kind: 'active', id: old, charge: oldCharge };
           ped.waitForLeave = true;
           ped.price = 0;
         }
@@ -1719,29 +1725,17 @@ export class World {
       this.checkDoorsFor(this.player);
       return;
     }
-    // co-op: any standing keeper opens locked doors (shared keys) and walking
-    // into an open doorway takes the whole party through
+    // co-op: walking into an open doorway takes the whole party through
     for (const p of [...this.players]) if (this.checkDoorsFor(p)) return;
   }
 
-  /** Door checks for one keeper; true when it went through a door. */
+  /**
+   * Door checks for one keeper; true when it went through a door. A sealed
+   * ('locked') door stays shut until its SealLamp is lit with a match.
+   */
   private checkDoorsFor(p: Player): boolean {
     if (!p.alive || this.transitioning) return false;
-    // doors shut for a fight / mission: a key door stays locked (and the key kept) until they open,
-    // so a lockdown can't be walked out of (as with a secret door blown open mid-fight)
-    const lockdown = this.room.doors.some((x) => x.state === 'closed');
     for (const d of this.room.doors) {
-      // unlock with key
-      if (d.state === 'locked') {
-        if (!lockdown && dist(p.x, p.y, d.x, d.y) < 16 && p.keys > 0) {
-          p.keys--;
-          d.state = 'open';
-          this.map.nodes[d.to].locked = false;
-          this.sfx('door_unlock', { x: d.x });
-          this.room.markDirty();
-        }
-        continue;
-      }
       if (d.state !== 'open' || d.open < 0.9) continue;
       const v = DIR_VEC[d.dir];
       // crossed the inner wall edge into the doorway?

@@ -1,12 +1,12 @@
 // In-game HUD (UI space 768x432), laid out as the keeper's own gear:
 //   top-left   the life gauge (hud-fire.ts): one cell of fire per heart in a slim
-//              brass frame, no numbers; soul hearts as translucent blue fire over
+//              brass frame, no numbers; blue flames as translucent blue fire over
 //              it, one-hit wards as light-grey plates; temporary buffs hang below
 //   bottom-left  the PixelLab release lantern (ember gauge: ember rises in its
 //              glass, glows with the release key beside it when 등불 해방 is
 //              ready, shutters while it recovers); hidden with touch controls,
 //              which have their own release button
-//   top-right  minimap · floor name · objective / seed · purse (coins / bombs / keys)
+//   top-right  minimap · floor name · objective / seed · purse (coins / matches)
 //   bottom-right  equipment slots (no backing): secondary + swap key, primary
 //              (rarity rim + gem), active item + charge wick, potion
 //   bottom     boss bar with name and damage trail (center)
@@ -30,6 +30,7 @@ import { save } from '../engine/save';
 import { storyObjective } from '../game/story';
 import { potionSpriteFor } from '../game/pickups';
 import { EMBER_MAX } from '../game/player';
+import { MATCH_CAP } from '../game/matches';
 import { input } from '../engine/input';
 import { ChangeTracker, envelope, follow, heartbeat, popScale } from './anim';
 import { MinimapView } from './minimap';
@@ -94,7 +95,7 @@ export interface SplitEntry {
   hTarget: number;
 }
 
-/** Purse (coins / bombs / keys) row under the minimap block: its height (UI). */
+/** Purse (coins / matches) row under the minimap block: its height (UI). */
 const PURSE_H = 20;
 
 // ---- gear rack (bottom-right, desktop)
@@ -171,8 +172,7 @@ export class Hud {
 
   t = 0;
   private coins = new ChangeTracker(0, 2.5);
-  private bombs = new ChangeTracker(0, 2.5);
-  private keys = new ChangeTracker(0, 2.5);
+  private matches = new ChangeTracker(0, 2.5);
   private emberShown = 0;
   private emberFull = false;
   private emberFlash = 0;
@@ -252,8 +252,7 @@ export class Hud {
     this.fire.update(p.red, p.soul, p.shields, dt);
     // ---- counters
     this.coins.update(p.coins, dt);
-    this.bombs.update(p.bombs, dt);
-    this.keys.update(p.keys, dt);
+    this.matches.update(p.matches, dt);
     // ---- ember
     const ef = clamp(p.ember / EMBER_MAX, 0, 1);
     if (this.emberFull && ef < 0.5) this.releaseFlash = 1;
@@ -413,8 +412,8 @@ export class Hud {
     const pb = this.plateBottom(w);
     this.drawBuffs(r, w, A, pb + 8);
     // purse under the minimap block
-    if (counterBusy(this.coins) || counterBusy(this.bombs) || counterBusy(this.keys)) this.drawConsumables(r, w, A);
-    else this.lyPurse.draw(r, `${p.coins}|${p.bombs}|${p.keys}|${this.W}`, ox, oy, this.W - 150, this.purseY() - 4, 150, PURSE_H + 18, A, this.paintPurse);
+    if (counterBusy(this.coins) || counterBusy(this.matches)) this.drawConsumables(r, w, A);
+    else this.lyPurse.draw(r, `${p.coins}|${p.matches}|${this.W}`, ox, oy, this.W - 150, this.purseY() - 4, 150, PURSE_H + 18, A, this.paintPurse);
     // minimap (+ floor name, seed): one cached blit at rest; the current room's glow / flame / pips live on top
     if (!this.minimap.settled) this.drawMinimap(r, w, A);
     else {
@@ -512,10 +511,10 @@ export class Hud {
     return MINIMAP_MARGIN + MINIMAP_H + 30;
   }
 
-  /** The purse: a slim plate under the minimap with coins / bombs / keys, right-aligned. */
+  /** The purse: a slim plate under the minimap with coins / matches, right-aligned (a full match box glows warm). */
   private drawConsumables(r: Renderer, w: World, A: number): void {
     const p = w.player;
-    const items: [string, ChangeTracker, number][] = [['hud_coin', this.coins, p.coins], ['hud_bomb', this.bombs, p.bombs], ['hud_key', this.keys, p.keys]];
+    const items: [string, ChangeTracker, number][] = [['hud_coin', this.coins, p.coins], ['hud_match', this.matches, p.matches]];
     const y = this.purseY();
     const cy = y + PURSE_H / 2;
     const cellW = 34;
@@ -526,7 +525,8 @@ export class Hud {
       const ix = px + 10 + i * cellW;
       const sc = popScale(tr.pop, 0.45);
       r.uiSprite(icon, ix, cy, 1.5, { alpha: A });
-      const col = tr.pop > 0.2 ? (tr.dir > 0 ? '#fff0a0' : '#ff9a9a') : C.text;
+      const full = icon === 'hud_match' && n >= MATCH_CAP;
+      const col = tr.pop > 0.2 ? (tr.dir > 0 ? '#fff0a0' : '#ff9a9a') : full ? '#ffd080' : C.text;
       const d = r.dctx;
       d.save();
       d.translate(ix + 8, cy);

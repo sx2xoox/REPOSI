@@ -87,7 +87,7 @@ it('vault alarm: seeded per run, warning is harmless, a live beam hurts keepers 
  d.damageVault(w,100);expect(d.mem.phase).toBe(5);const after=p.red+p.soul;p.invuln=0;d.update(w,1);expect(p.red+p.soul).toBe(after);
  expect(beamDistance(l,(l.x0+l.x1)/2,(l.y0+l.y1)/2)).toBeLessThan(1);
 });
-it('vault enemies damage the objective and never require a bomb to operate',()=>{
+it('vault enemies damage the objective and never require a match to operate',()=>{
  const w=setup('vault'),d=w.entities.find(e=>e instanceof RoomDevice) as RoomDevice;use(w,d);
  for(let i=0;i<2700&&!d.mem.used;i++)w.update(1/60);
  expect(d.mem.vaultHP).toBeLessThan(d.mem.vaultMax);expect(d.mem.phase).toBe(5);

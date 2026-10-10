@@ -13,7 +13,6 @@ import { animFrame, hasAnim, hasSprite } from '../engine/sprites';
 import { Projectile, fanAngles, type ProjectileOpts } from './projectile';
 import { MeleeSwing, type SwingOpts } from './melee';
 import { Afterimage, RingFx } from './effects';
-import { Bomb } from './pickups';
 import { Tile } from './tiles';
 import { spikeState } from './spikes';
 import { RELEASE_COOLDOWN } from './ember';
@@ -32,13 +31,13 @@ export type Facing = 'down' | 'up' | 'side';
 export const EMBER_MAX = 100;
 
 /**
- * Coins, bombs and keys. Every keeper has their own in single-player; a co-op
+ * Coins and matches. Every keeper has their own in single-player; a co-op
  * party shares one purse (`World.startParty` hands the same object to everyone).
  */
 export class Purse {
   coins = 0;
-  bombs = 1;
-  keys = 0;
+  /** at most MATCH_CAP (game/matches.ts) */
+  matches = 1;
 }
 
 /** Default lantern release: a ring of flame that burns enemies and erases bullets. */
@@ -79,7 +78,7 @@ export class Player extends Actor {
   /** one-hit barriers granted by items (each blocks one hit completely) */
   shields = 0;
   private peakMaxRed = 0;
-  /** coins / bombs / keys (shared by the whole party in co-op) */
+  /** coins / matches (shared by the whole party in co-op) */
   purse = new Purse();
   inv = new Inventory();
   weaponId: string;
@@ -177,20 +176,12 @@ export class Player extends Actor {
     this.purse.coins = v;
   }
 
-  get bombs(): number {
-    return this.purse.bombs;
+  get matches(): number {
+    return this.purse.matches;
   }
 
-  set bombs(v: number) {
-    this.purse.bombs = v;
-  }
-
-  get keys(): number {
-    return this.purse.keys;
-  }
-
-  set keys(v: number) {
-    this.purse.keys = v;
+  set matches(v: number) {
+    this.purse.matches = v;
   }
 
   get maxRed(): number {
@@ -277,7 +268,6 @@ export class Player extends Actor {
         if (this.tryDash(w, mv)) this.dashBuffer = 0;
         else this.dashBuffer -= dt;
       }
-      if (pressed & PRESS.bomb) this.placeBomb(w);
       if (pressed & PRESS.active) this.useActive(w);
       if (pressed & PRESS.potion) this.usePotion(w);
       if (pressed & PRESS.release) this.release(w);
@@ -524,15 +514,6 @@ export class Player extends Actor {
     this.y = by;
   }
 
-  placeBomb(w: World): void {
-    if (this.bombs <= 0) return;
-    if (!(this.stats.thrift > 0 && w.rng.chance(this.stats.thrift))) this.bombs--;
-    const b = new Bomb(this.x, this.y + 2, 'player', 1.5, 60 + this.stats.damage * 2);
-    w.spawn(b);
-    w.sfx('bomb_place');
-    w.items.onBomb(this.x, this.y);
-  }
-
   useActive(w: World): void {
     if (!this.activeId) return;
     const def = Actives.get(this.activeId);
@@ -560,13 +541,17 @@ export class Player extends Actor {
     def.use(w);
   }
 
-  /** Give the player an active item; returns the replaced one (to drop). */
-  setActive(id: string, w: World): string | null {
+  /**
+   * Give the keeper an active item with `charge` (unset: full; a pedestal's
+   * active put down earlier keeps its charge); returns the replaced one (to
+   * drop, with its charge read before this call). Plays no sound (callers do).
+   */
+  setActive(id: string, _w: World, charge?: number): string | null {
     const old = this.activeId;
     this.activeId = id;
     const def = Actives.get(id);
-    this.activeCharge = def ? def.charge : 0;
-    w.sfx('item_get');
+    const max = def ? def.charge : 0;
+    this.activeCharge = clamp(charge ?? max, 0, max);
     return old;
   }
 
@@ -613,7 +598,7 @@ export class Player extends Actor {
       p.mem.weaponDamage = s.damage * share;
       // item-made volleys are secondary before any onShoot hook sees them
       if (o.generation) p.generation = o.generation;
-      // inherit a little of the player's movement (Isaac feel)
+      // inherit a little of the keeper's movement
       p.vx += this.vx * 0.25;
       p.vy += this.vy * 0.25;
       p.angle = Math.atan2(p.vy, p.vx);
@@ -650,7 +635,7 @@ export class Player extends Actor {
   /**
    * Player takes `halfHearts` damage. Returns true if damage was applied. The
    * amount is scaled by the floor's enemy damage (FloorDef.enemyDamage) unless
-   * `raw` (the keeper's own bombs, status ticks).
+   * `raw` (the keeper's own blasts, status ticks).
    */
   hurt(w: World, halfHearts: number, source = '???', raw = false, origin?: { x: number; y: number }): boolean {
     if (!this.alive || this.invuln > 0 || this.god || w.transitioning) return false;

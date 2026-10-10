@@ -139,7 +139,6 @@ defineCharacter({
   color: '#ffd078',
   hearts: 3,
   weapon: 'lantern_bolt',
-  bombs: 1,
   baseStats: {
     dashCooldown: 0.72,
   },

@@ -157,14 +157,14 @@ export function characterOrder(flags: string[]): CharacterDef[] {
 export interface HudStat {
   key: StatKey;
   icon: string;
-  /** displayed value (Isaac-like normalized numbers) */
+  /** displayed value (normalized stat values) */
   value: number;
   text: string;
   /** larger is better? (false for cooldowns) */
   higherBetter: boolean;
 }
 
-/** Isaac-style normalized stat values for the HUD column. */
+/** Normalized stat values for the HUD column. */
 export function hudStats(s: Stats): HudStat[] {
   return [
     { key: 'moveSpeed', icon: 'st_speed', value: s.moveSpeed / 92, text: (s.moveSpeed / 92).toFixed(2), higherBetter: true },
@@ -207,7 +207,6 @@ export function fullStatRows(s: Stats, base: Stats = BASE_STATS): [string, strin
     ['회피', `${Math.round(s.dodge * 100)}%`, cmp(s.dodge, base.dodge)],
     ['흡혈', `${Math.round(s.lifesteal * 100)}%`, cmp(s.lifesteal, base.lifesteal)],
     ['보스 피해', `+${Math.round(s.bossDamage * 100)}%`, cmp(s.bossDamage, base.bossDamage)],
-    ['절약', `${Math.round(s.thrift * 100)}%`, cmp(s.thrift, base.thrift)],
     ['자석 범위', s.magnet.toFixed(0), cmp(s.magnet, base.magnet)],
   ];
 }
@@ -270,21 +269,3 @@ export const ROOM_ICONS: Partial<Record<RoomKind, string>> = {
   refinery: 'map_refinery', fusion: 'map_fusion', well: 'map_well', elite: 'map_elite',
 };
 
-// ---------------------------------------------------------------- hearts
-export type HeartKind = 'full' | 'half' | 'empty' | 'soul' | 'soulHalf';
-
-/** Heart slots from red / max red / soul half-hearts (Isaac order: red containers then soul). */
-export function heartSlots(red: number, maxRed: number, soul: number): HeartKind[] {
-  const out: HeartKind[] = [];
-  const containers = Math.ceil(maxRed / 2);
-  for (let i = 0; i < containers; i++) {
-    const v = red - i * 2;
-    out.push(v >= 2 ? 'full' : v === 1 ? 'half' : 'empty');
-  }
-  const soulSlots = Math.ceil(soul / 2);
-  for (let i = 0; i < soulSlots; i++) {
-    const v = soul - i * 2;
-    out.push(v >= 2 ? 'soul' : 'soulHalf');
-  }
-  return out;
-}

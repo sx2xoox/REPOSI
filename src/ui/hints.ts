@@ -11,6 +11,7 @@ import { input } from '../engine/input';
 import { save } from '../engine/save';
 import { Actives } from '../game/defs';
 import { EMBER_MAX } from '../game/player';
+import { SealLamp } from '../game/seal-lamp';
 import { clamp, ease } from '../engine/math';
 import { frame, keycap } from './frame';
 import { C } from './theme';
@@ -59,8 +60,9 @@ export const HINTS: HintDef[] = [
     when: (_w, h) => h.roomsVisited >= 5,
   },
   {
-    id: 'bomb', action: 'bomb', text: '폭탄 — 금 간 벽 너머에 비밀방이 있을지도',
-    when: (w) => w.player.bombs >= 2 && w.run.floor === 1 && w.node.kind !== 'start',
+    // A2 adds the stone lanterns and cold sconces to the targets
+    id: 'match', action: 'interact', text: '성냥 — 꺼진 등에 불을 붙여 보자',
+    when: (w) => w.player.matches >= 1 && w.entities.some((e) => e instanceof SealLamp && !e.lit),
   },
 ];
 
