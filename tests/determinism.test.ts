@@ -22,7 +22,7 @@ import { deterministicMathInstalled } from '../src/engine/dmath';
 
 const RIA: Scenario = {
   name: 'ria: floors 1-5', seed: 'DET-RIA-1', character: 'ria', floors: [1, 2, 3, 4, 5], exploreSteps: 700, bossSteps: 1500, giftsPerFloor: 6,
-  maxSteps: 14000, cycle: true, extraEnemies: 2,
+  maxSteps: 14000, cycle: true, extraEnemies: 2, strikeMatches: true,
 };
 const NIEL: Scenario = {
   // (the seed is re-tuned whenever the gift pool grows: a longer enemy list reshuffles the whole trajectory)
@@ -36,7 +36,9 @@ describe('lockstep determinism (headless world, state hash every step)', () => {
   });
 
   it(`${RIA.name} (a whole run, five bosses): identical across fx seed / view width / quality / settings / drawing / cache warm-up`, () => {
-    checkScenario(RIA, [{ ...NARROW, drawEvery: 3 }, { ...WIDE, drawEvery: 4 }], true);
+    const base = checkScenario(RIA, [{ ...NARROW, drawEvery: 3 }, { ...WIDE, drawEvery: 4 }], true);
+    // the bot really strikes matches (sealed doors / chests, stone lanterns, cold sconces) under lockstep
+    expect(base.world.run.stats.matchesUsed).toBeGreaterThan(0);
   }, 180_000);
 
   it(`${NIEL.name}: identical when drawn every 2nd step on a narrow low-quality view`, () => {

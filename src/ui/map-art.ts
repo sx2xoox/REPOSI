@@ -153,10 +153,11 @@ export const FLAME5: string[][] = [rows('..o../.oyo./oywyo/oywyo/.rrr.'), rows('
 export const FLAME3: string[] = rows('.o./oyo/ywy/rrr');
 export const FLAME_PAL = { o: '#ff9a3a', y: '#ffe070', w: '#fffef0', r: '#c04010' };
 
-/** Padlock on the thread into a locked room: 3x4 (+ ink outline). */
-export const LOCK: string[] = rows('.y./y.y/yyy/yky');
-export const LOCK_PAL = { y: '#ffd34a', k: '#7a4e1c' };
-export const LOCK_GOLD = '#ffd34a';
+/** Red wax seal (round, two ribbon tails below) on the thread into a sealed room, which a match burns open: 3x4 (+ ink outline). */
+export const SEAL: string[] = rows('.r./rhr/rrr/c.c');
+export const SEAL_PAL = { c: '#8a2020', r: '#c02a2a', h: '#ff6050' };
+/** thread colour into a sealed room */
+export const SEALED_THREAD = '#ffd34a';
 
 /** Floor emblems for the header medallion (7x7, light ramp). */
 export const EMBLEM: Record<EmblemKind, string[]> = {
@@ -544,7 +545,7 @@ function paintThreads(p: PixelPainter, view: MapView, look: MapLook, L: BoardLay
     if (!pts.length) continue;
     const locked = d.lockTo >= 0;
     if (lod === 'mini') {
-      const col = locked ? LOCK_GOLD : d.type === 'lit' ? look.thread : d.type === 'secret' ? '#b4a4ff' : dim;
+      const col = locked ? SEALED_THREAD : d.type === 'lit' ? look.thread : d.type === 'secret' ? '#b4a4ff' : dim;
       pts.forEach(([x, y], i) => {
         if (d.type === 'secret' && i % 2 === 1) return;
         p.px(x, y, col);
@@ -673,14 +674,14 @@ export function paintRooms(view: MapView, look: MapLook, L: BoardLayout, lod: 'b
     else if (st === 'uncleared') glows.push({ x: cxU, y: cyU, r: rad, color: '#ff4050', alpha: 0.12 });
     else if (st === 'seen' && special) glows.push({ x: cxU, y: cyU, r: 0.6 * Math.max(r.w, r.h) * PX, color: special, alpha: 0.08 });
   }
-  // padlocks on the threads into locked rooms
+  // wax seals on the threads into sealed rooms
   if (lod === 'board') {
     for (const d of view.doors) {
       if (d.lockTo < 0) continue;
       const { pts } = threadPixels(d, L);
       const m = pts[Math.floor(pts.length / 2)];
       if (!m) continue;
-      stampMask(p, LOCK, m[0] - 1, m[1] - 2, LOCK_PAL, INK);
+      stampMask(p, SEAL, m[0] - 1, m[1] - 2, SEAL_PAL, INK);
     }
   }
   return { painter: p, glows };

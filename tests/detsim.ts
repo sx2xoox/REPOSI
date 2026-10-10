@@ -73,6 +73,8 @@ export interface Scenario {
   giftsPerFloor: number;
   /** hard cap on total steps */
   maxSteps: number;
+  /** the bot walks up to unlit match targets in cleared rooms and strikes (BotState.strikes) */
+  strikeMatches?: boolean;
   /** extra enemies (cycling through every regular enemy) spawned into each new hostile room */
   extraEnemies?: number;
   /** weapons / actives / artifacts / potions come from shuffled full lists (coverage) */
@@ -171,6 +173,12 @@ export interface BotState {
   dashT: number;
   /** strikes a match at the focused match target (sealed door / chest ...) every few seconds, even mid-fight */
   matchT: number;
+  /**
+   * Opt-in (Scenario.strikeMatches): in a cleared room, walk up to every unlit match target
+   * (sealed door / chest, stone lantern, cold sconce) and strike, skipping pickups it cannot
+   * take (a heart at full health). Off by default: other scenarios keep their trajectories.
+   */
+  strikes: boolean;
   swapT: number;
   door: Door | null;
   roomSteps: number;
@@ -182,15 +190,35 @@ function isMatchTarget(e: Entity | null): boolean {
   return !!e && (((e instanceof SealLamp || e instanceof StoneLantern || e instanceof ColdSconce) && !e.lit) || (e instanceof Chest && e.locked && !e.opened));
 }
 
+/**
+ * Where a keeper stands to strike a match at `e`: a door fixture's doorway front
+ * (always walkable), a free tile beside a stone lantern, a chest's own spot.
+ */
+function matchSpot(w: World, e: Entity): { x: number; y: number } {
+  const door = (e as { door?: Door }).door;
+  if (door) {
+    const v = DIR_VEC[door.dir];
+    return { x: door.x - v.x * 10, y: door.y - v.y * 10 };
+  }
+  if (e instanceof StoneLantern) {
+    for (const [dx, dy] of [[0, 1], [-1, 0], [1, 0], [0, -1]]) {
+      const x = (e.tx + dx + 0.5) * TILE;
+      const y = (e.ty + dy + 0.5) * TILE;
+      if (w.room.isFree(x, y, 4)) return { x, y };
+    }
+  }
+  return { x: e.x, y: e.y };
+}
+
 function unit(x: number, y: number): [number, number] {
   const l = Math.hypot(x, y);
   return l > 1e-9 ? [x / l, y / l] : [0, 0];
 }
 
 /** A fresh bot (seeded); drive it with `botInput` once per step. */
-export function newBot(seed: string): BotState {
+export function newBot(seed: string, strikes = false): BotState {
   return {
-    rng: new RNG(`${seed}:bot`), strafe: 1, strafeT: 0, cursorMode: false, modeT: 0, dashT: 1, matchT: 3, swapT: 2,
+    rng: new RNG(`${seed}:bot`), strafe: 1, strafeT: 0, cursorMode: false, modeT: 0, dashT: 1, matchT: 3, swapT: 2, strikes,
     door: null, roomSteps: 0, clearSteps: 0,
   };
 }
@@ -268,7 +296,8 @@ export function botInput(w: World, b: BotState, out: PlayerInput): void {
     let bdist = Infinity;
     for (const e of w.entities) {
       if (e.dead) continue;
-      const want = e instanceof Trapdoor || (e instanceof Pickup && (e.price <= p.coins || e.price === 0)) || (e instanceof Pedestal && !!e.item && e.price <= p.coins && e.heartPrice === 0);
+      // (a striking bot leaves a pickup it cannot take now lying, e.g. a heart at full health)
+      const want = e instanceof Trapdoor || (e instanceof Pickup && (e.price <= p.coins || e.price === 0) && (!b.strikes || e.canCollect(w))) || (e instanceof Pedestal && !!e.item && e.price <= p.coins && e.heartPrice === 0);
       if (!want) continue;
       const d = Math.hypot(e.x - p.x, e.y - p.y);
       if (d < bdist && (b.clearSteps < 600 || e instanceof Trapdoor)) {
@@ -279,6 +308,23 @@ export function botInput(w: World, b: BotState, out: PlayerInput): void {
     if (best) {
       goal = { x: best.x, y: best.y };
       if (best instanceof Pedestal && bdist < 20) out.pressed |= PRESS.interact;
+    }
+  }
+  // a cleared room's unlit match target (sealed door / chest, stone lantern, cold sconce): walk up and strike
+  if (b.strikes && !goal && w.node.cleared && p.matches > 0 && b.clearSteps < 600) {
+    let best: Entity | null = null;
+    let bdist = Infinity;
+    for (const e of w.entities) {
+      if (e.dead || !isMatchTarget(e)) continue;
+      const d = Math.hypot(e.x - p.x, e.y - p.y);
+      if (d < bdist) {
+        bdist = d;
+        best = e;
+      }
+    }
+    if (best) {
+      goal = matchSpot(w, best);
+      if (w.focus === best) out.pressed |= PRESS.interact;
     }
   }
   if (!goal && w.node.cleared) {
@@ -333,7 +379,7 @@ export function runScenario(sc: Scenario, v: Variant, partsAt = -1): RunResult {
   const w = new World(r, run, host);
   w.setQuality({ lighting: v.quality !== 'low', particles: v.particles * (v.quality === 'low' ? 0.5 : 1) });
   w.rules = fixedRules({ hitStop: true });
-  const bot = newBot(sc.seed);
+  const bot = newBot(sc.seed, !!sc.strikeMatches);
   // the bot is the input source: called by the keeper's update, once per step
   w.inputSource = (ww, _p, out) => botInput(ww, bot, out);
   w.start();
@@ -531,7 +577,7 @@ export function describeMismatch(sc: Scenario, base: RunResult, v: Variant, othe
 }
 
 /** Base run + every variant: identical state hash after every step. */
-export function checkScenario(sc: Scenario, variants: Variant[], repeat = false): void {
+export function checkScenario(sc: Scenario, variants: Variant[], repeat = false): RunResult {
   const base = runScenario(sc, BASE_VARIANT);
   // the scenario really plays: rooms, kills, a boss on every planned floor
   expect(base.hashes.length).toBeGreaterThan(2500);
@@ -547,5 +593,6 @@ export function checkScenario(sc: Scenario, variants: Variant[], repeat = false)
     const k = firstMismatch(base.hashes, other.hashes);
     expect(k, describeMismatch(sc, base, v, other, k)).toBe(-1);
   }
+  return base;
 }
 

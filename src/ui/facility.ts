@@ -39,7 +39,7 @@ export class FacilityOverlay implements Scene {
   const button=(label:string,bx:number,by:number,bw:number,fn:()=>void,selected=false,disabled=false)=>{const i=this.buttons.length;this.buttons.push({x:bx,y:by,w:bw,h:30,label,fn,selected,disabled});frame(r,bx,by,bw,30,selected||i===this.cursor?'buttonHi':'button',{alpha:disabled?.45:1});r.uiText(label,bx+bw/2,by+9,{size:10,font:'small',align:'center',color:disabled?C.textMute:selected?C.goldHi:C.text});};
   const def=Weapons.get(p.weaponId);
   if(def){spriteCentered(r,def.icon,x+64,y+116,fitScale(def.icon,42,3));r.uiText(def.name,x+105,y+91,{size:14,bold:true,color:C.text});r.uiText('현재 무기 · '+RARITY_NAME[def.rarity]+' · 제련 '+(p.weapon.mem.temper??0),x+105,y+114,{size:10,font:'small',color:C.textDim});}
-  const cost=facilityCost(f.kind,w.floor.index);r.uiText(`비용 ${cost} G   /   보유 ${p.coins} G`,x+618,y+82,{size:10,font:'small',align:'right',color:C.gold});
+  const cost=facilityCost(f.kind,w.floor.index);r.uiText(`비용 동전 ${cost}개   /   가진 동전 ${p.coins}개`,x+618,y+82,{size:10,font:'small',align:'right',color:C.gold});
   if(f.kind==='fusion'){
    button('무기 2개',x+24,y+151,115,()=>{this.mode='weapon';this.armed=false;},this.mode==='weapon');
    button('유물 2개',x+149,y+151,115,()=>{this.mode='artifact';this.armed=false;},this.mode==='artifact');

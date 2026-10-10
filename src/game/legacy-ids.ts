@@ -30,6 +30,19 @@ export function normalizeItemId(id: string): string {
   return Object.prototype.hasOwnProperty.call(LEGACY_ITEM_IDS, id) ? LEGACY_ITEM_IDS[id] : id;
 }
 
+/**
+ * The current name of a per-keeper var: an explicit LEGACY_VARS entry (null:
+ * dropped), else a var keyed by an item id after a ':' (the floor's pending
+ * blessing offer `__blessOffer:` / `__blessOrder:` / `__blessSeen:`, the Tab
+ * screen's `blessedAt:`) follows the item's rename.
+ */
+export function normalizeVarKey(key: string): string | null {
+  if (Object.prototype.hasOwnProperty.call(LEGACY_VARS, key)) return LEGACY_VARS[key];
+  const i = key.lastIndexOf(':');
+  if (i < 0) return key;
+  return key.slice(0, i + 1) + normalizeItemId(key.slice(i + 1));
+}
+
 /** Old purses held bombs and keys: a key becomes a match, two bombs one (rounded up). */
 export function migratePurse(purse: { coins?: number; matches?: number; bombs?: number; keys?: number } | undefined): { coins: number; matches: number } {
   const p = purse ?? {};
@@ -48,12 +61,9 @@ export function migrateCheckpoint(c: Checkpoint): Checkpoint {
   if (c.active) c.active = normalizeItemId(c.active);
   const vars: Record<string, number> = {};
   for (const [k, v] of Object.entries(c.vars ?? {})) {
-    if (!Object.prototype.hasOwnProperty.call(LEGACY_VARS, k)) {
-      if (!(k in vars)) vars[k] = v;
-      continue;
-    }
-    const to = LEGACY_VARS[k];
-    if (to) vars[to] = v;
+    const to = normalizeVarKey(k);
+    // a renamed var wins over a stale copy already under the new name
+    if (to && (to !== k || !(to in vars))) vars[to] = v;
   }
   c.vars = vars;
   c.purse = migratePurse(c.purse);

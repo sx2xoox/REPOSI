@@ -447,7 +447,8 @@ defineArtifact({
   icon: 'icon_cluster_powder',
   look: { mote: '#ffb040', aura: '#ff7a20' },
   pools: ['treasure', 'shop', 'secret'],
-  // a keeper blast (weapon, artifact, active, release) that kills throws burning shards, at most once a second
+  // a keeper blast that kills (explosive weapons, the sky lantern, the boiling potion) throws burning
+  // shards, at most once a second; proc-free blasts (releases, other artifacts' blasts) never do
   onHit(w, target, hit, power) {
     if (hit.kind !== 'explosion' || hit.noProc || hit.attacker !== w.player || target.alive) return;
     if (w.time - (w.vars.__clusterT ?? -99) < 1) return;

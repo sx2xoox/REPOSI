@@ -152,8 +152,11 @@ Commands:
   `SEASON` in `net/leaderboard.ts` when balance changes make old times incomparable.
 - **Matches & lanterns** (user 2026-10-10): no bombs. `src/game/matches.ts` is the only spend path (`spendMatch`,
   `onMatch` hook). A secret room opens by lighting its 꺼진 벽등 with a match, the keeper's own release within 80 px,
-  or the keeper's own explosion. Enemy blasts never reveal. One stone lantern per stage (rock conversion, own RNG
-  stream). Old ids are migrated through `game/legacy-ids.ts`.
+  or the keeper's own `World.explode` blast (sky lantern, boiling potion; weapon / kit blasts never light a
+  sconce). Enemy blasts never reveal. One stone lantern per stage (rock conversion, own RNG
+  stream). Old ids (items and vars keyed by an item id) are migrated through `game/legacy-ids.ts`. Measure the
+  match economy with `ECON_AUDIT=1 npx vitest run tests/econ-audit` (per floor: matches held / gained / spent,
+  seals, lanterns, secrets).
 - **등불 해방** balance: a release is a burst / crowd-control moment worth ~10–15x `stats.damage` on a
   single target (multi-hit releases use `HitFalloff`), ≤ ~20% of a run's damage.
 - Enemy AI = generator `script(e, w)`: `yield 0.5` waits 0.5s, `yield` waits a frame.

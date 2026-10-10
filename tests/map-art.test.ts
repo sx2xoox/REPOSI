@@ -8,7 +8,7 @@ import { packColor, type PixelPainter } from '../src/engine/painter';
 import { generateFloor, generateStage, type FloorMap } from '../src/game/dungeon';
 import { ROOM_ICONS } from '../src/ui/logic';
 import {
-  BEAD, BOARD_IN_H, BOARD_IN_W, CORNER, EMBLEM, FLAME3, FLAME5, FLAME7, HOT, LOCK, MINI_LAYOUT, MINI_SIZE, SIGIL5, SIGIL7, SMOULDER,
+  BEAD, BOARD_IN_H, BOARD_IN_W, CORNER, EMBLEM, FLAME3, FLAME5, FLAME7, HOT, SEAL, MINI_LAYOUT, MINI_SIZE, SIGIL5, SIGIL7, SMOULDER,
   paintBoardStatic, paintCompass, paintEmblemMedallion, paintFlame, paintMapPlate, paintMiniBackground, paintPip, paintRooms, paintStageBead,
   paintVignette, plateRect, type SigilKey,
 } from '../src/ui/map-art';
@@ -52,12 +52,12 @@ describe('glyph tables', () => {
       for (const r of s5!) expect(r, k).toMatch(/^[hmdk.]{5}$/);
     }
   });
-  it('flames, lock, emblems, corners and the bead have their sizes', () => {
+  it('flames, the wax seal, emblems, corners and the bead have their sizes', () => {
     expect(FLAME7).toHaveLength(3);
     for (const f of FLAME7) expect(dims(f)).toEqual([7, 9]);
     for (const f of FLAME5) expect(dims(f)).toEqual([5, 5]);
     expect(dims(FLAME3)).toEqual([3, 4]);
-    expect(dims(LOCK)).toEqual([3, 4]);
+    expect(dims(SEAL)).toEqual([3, 4]);
     for (const e of Object.values(EMBLEM)) expect(dims(e)).toEqual([7, 7]);
     for (const c of Object.values(CORNER)) expect(dims(c)).toEqual([9, 9]);
     expect(dims(BEAD)).toEqual([8, 9]);
