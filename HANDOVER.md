@@ -6,7 +6,7 @@
 - Artifacts: 불씨 심장 → **불씨 화로** (id ember_heart: a bronze brazier holding the life flame; warm burst on heal), 심장 실 icon redrawn as an anatomical heart bound with thread (blood item, not a health container), 생명의 축복 glyph is the red life flame on a wine disk (the sibling of 푸른 불의 가호; it had been an orange flame that matched 불씨의 축복's glyph). Kept on purpose: 폭풍의 심장 (blue storm heart, no health), 강철 맥박, 메트로놈 심장, 가마의 심장 (no heart-shaped health), the charm status heart. 보리 passive '+♥와 방패' → '체력과 방패'.
 - Test: tests/health-flame.test.ts (names, sprites, price icons, float-text icons, no 하트 / ♥ in item / keeper text). Captures (floor 1 + forge lineups next to a fireplace / fire patch / ember wisps, cards, 대가의 방, shrine, character select, co-op pips, touch, float texts): session scratchpad flame-health/impl/ and flame-health/review/. Still open: Hangul in world float texts draws blank (보리's auto gulp reads '! +' + flame), 폭풍의 심장 / 강철 맥박 keep heart-shaped icons (not health).
 
-## 2026-10-10 — Matches replace bombs and keys, one G key, silent lanterns (deployed 26c6aaf, gh-pages 32b7622)
+## 2026-10-10 — Matches replace bombs and keys, one G key, silent lanterns (deployed 26c6aaf → gh-pages 32b7622; hotfix 95620f5 → gh-pages 1cbbbf8: first-room floor hints read their keys from the bindings, they still said E)
 - User: no bombs, keys → 성냥, the bomb-for-reward rock → 꺼진 석등 lit with a match, secret rooms found without bombs,
   currency kept as 동전, public text tied to the story. Merged as a5f220a (matches.ts, legacy-ids.ts, stone-lantern.ts,
   cold-sconce.ts, seal-lamp.ts; econ audit `ECON_AUDIT=1`; SEASON 5).
